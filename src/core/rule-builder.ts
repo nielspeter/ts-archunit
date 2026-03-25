@@ -1,0 +1,199 @@
+import type { ArchProject } from './project.js'
+import type { Predicate } from './predicate.js'
+import type { Condition, ConditionContext } from './condition.js'
+import type { ArchViolation } from './violation.js'
+import { ArchRuleError } from './errors.js'
+
+/**
+ * Abstract base class for all rule builders.
+ *
+ * Concrete entry points (plans 0007+) extend this and:
+ * 1. Implement `getElements()` to return the elements to check
+ * 2. Add predicate methods that call `addPredicate()`
+ * 3. Add condition methods that call `addCondition()`
+ *
+ * The builder accumulates predicates and conditions. Nothing executes
+ * until a terminal method (`.check()`, `.warn()`, `.severity()`) is called.
+ */
+export abstract class RuleBuilder<T> {
+  protected _predicates: Predicate<T>[] = []
+  protected _conditions: Condition<T>[] = []
+  protected _reason?: string
+
+  constructor(protected readonly project: ArchProject) {}
+
+  // --- Chain methods (grammar transitions) ---
+
+  /**
+   * Begin the predicate phase. Returns `this` for chaining.
+   * Purely a readability marker — `.that().haveNameMatching(...)` reads like English.
+   */
+  that(): this {
+    return this
+  }
+
+  /**
+   * Add another predicate (AND). Returns `this` for chaining.
+   * `.that().extend('Base').and().resideInFolder('src/repos/**')` means both must match.
+   */
+  and(): this {
+    return this
+  }
+
+  /**
+   * Begin the condition phase. Returns a forked builder for named selection safety.
+   * Creates a fresh builder with the same predicates but empty conditions.
+   */
+  should(): this {
+    const fork = this.fork()
+    return fork
+  }
+
+  /**
+   * Add another condition that must ALSO pass (AND).
+   * `.should().notContain(call('x')).andShould().notContain(call('y'))` means both must hold.
+   */
+  andShould(): this {
+    return this
+  }
+
+  /**
+   * Attach a human-readable rationale to the rule.
+   * Included in violation messages when `.check()` throws.
+   */
+  because(reason: string): this {
+    this._reason = reason
+    return this
+  }
+
+  // --- Terminal methods ---
+
+  /**
+   * Execute the rule and throw `ArchRuleError` if any violations are found.
+   * This is the primary terminal method — use in test assertions.
+   */
+  check(): void {
+    const violations = this.evaluate()
+    if (violations.length > 0) {
+      throw new ArchRuleError(violations, this._reason)
+    }
+  }
+
+  /**
+   * Execute the rule and log violations to stderr. Does not throw.
+   * Use for rules that should warn but not fail CI.
+   */
+  warn(): void {
+    const violations = this.evaluate()
+    if (violations.length > 0) {
+      const formatted = violations
+        .map((v) => `  - ${v.element}: ${v.message} (${v.file}:${String(v.line)})`)
+        .join('\n')
+      const reasonLine = this._reason ? `\nReason: ${this._reason}` : ''
+      console.warn(
+        `Architecture warning${violations.length === 1 ? '' : 's'} (${String(violations.length)} found)${reasonLine}\n${formatted}`,
+      )
+    }
+  }
+
+  /**
+   * Execute the rule with the given severity.
+   * `.severity('error')` is equivalent to `.check()`.
+   * `.severity('warn')` is equivalent to `.warn()`.
+   */
+  severity(level: 'error' | 'warn'): void {
+    if (level === 'error') {
+      this.check()
+    } else {
+      this.warn()
+    }
+  }
+
+  // --- Protected: for subclasses ---
+
+  /**
+   * Register a predicate. Called by concrete builder methods like
+   * `.haveNameMatching()`, `.extend()`, etc.
+   */
+  protected addPredicate(predicate: Predicate<T>): this {
+    this._predicates.push(predicate)
+    return this
+  }
+
+  /**
+   * Register a condition. Called by concrete builder methods like
+   * `.notContain()`, `.notExist()`, etc.
+   */
+  protected addCondition(condition: Condition<T>): this {
+    this._conditions.push(condition)
+    return this
+  }
+
+  /**
+   * Subclasses implement this to return the elements to check.
+   * Called lazily during `.check()` / `.warn()`.
+   */
+  protected abstract getElements(): T[]
+
+  /**
+   * Create a fork of this builder with the same predicates but empty conditions.
+   * Used by `.should()` to support named selections without mutation.
+   *
+   * Subclasses with additional constructor args MUST override this method.
+   */
+  protected fork(): this {
+    const fork = Object.create(Object.getPrototypeOf(this) as object) as this
+    Object.assign(fork, this)
+    fork._predicates = [...this._predicates]
+    fork._conditions = []
+    fork._reason = undefined
+    return fork
+  }
+
+  // --- Private: execution engine ---
+
+  /**
+   * Build the rule description from predicates and conditions.
+   */
+  private buildRuleDescription(): string {
+    const predicateDesc = this._predicates.map((p) => p.description).join(' and ')
+    const conditionDesc = this._conditions.map((c) => c.description).join(' and ')
+    const parts: string[] = []
+    if (predicateDesc) parts.push(`that ${predicateDesc}`)
+    if (conditionDesc) parts.push(`should ${conditionDesc}`)
+    return parts.join(' ')
+  }
+
+  /**
+   * Execute the full pipeline: filter elements with predicates,
+   * evaluate conditions, return violations.
+   */
+  private evaluate(): ArchViolation[] {
+    // Step 1: Get all elements from the concrete builder
+    const allElements = this.getElements()
+
+    // Step 2: Filter with predicates (AND — all predicates must match)
+    const filtered = allElements.filter((element) =>
+      this._predicates.every((predicate) => predicate.test(element)),
+    )
+
+    // Step 3: If no elements match predicates or no conditions, no violations
+    if (filtered.length === 0 || this._conditions.length === 0) {
+      return []
+    }
+
+    // Step 4: Build context for conditions
+    const context: ConditionContext = {
+      rule: this.buildRuleDescription(),
+      because: this._reason,
+    }
+
+    // Step 5: Evaluate all conditions (AND — all must pass)
+    const violations: ArchViolation[] = []
+    for (const condition of this._conditions) {
+      violations.push(...condition.evaluate(filtered, context))
+    }
+
+    return violations
+  }
+}

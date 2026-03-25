@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-25
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 2 completed, ~21 remaining
+**Total Plans:** 6 completed, ~17 remaining
 
 ---
 
@@ -13,10 +13,10 @@
 | -------- | ---------------------------------------------------------------------------- | --------- | ----------- |
 | **P0**   | ~~Project Bootstrap & Package Setup (0000)~~                                 | 2-3 hours | COMPLETED 2026-03-25 |
 | **P0**   | ~~Exploratory PoC & Technical Validation (0001)~~                            | 0.5 day   | COMPLETED 2026-03-25 |
-| **P0**   | Project Loader & Query Engine (0002)                                         | 2-3 days  | Not Started |
-| **P0**   | Predicate Engine & Identity Predicates (0003)                                | 1-2 days  | Not Started |
-| **P0**   | Condition Engine & Structural Conditions (0004)                              | 1-2 days  | Not Started |
-| **P0**   | Fluent Rule Builder & `.check()` / `.warn()` (0005)                          | 1-2 days  | Not Started |
+| **P0**   | ~~Project Loader & Query Engine (0002)~~                                     | 0.5 day   | COMPLETED 2026-03-25 |
+| **P0**   | ~~Predicate Engine & Identity Predicates (0003)~~                            | 1 day     | COMPLETED 2026-03-25 |
+| **P0**   | ~~Condition Engine & Structural Conditions (0004)~~                          | 1 day     | COMPLETED 2026-03-25 |
+| **P0**   | ~~Fluent Rule Builder & `.check()` / `.warn()` (0005)~~                      | 1 day     | COMPLETED 2026-03-25 |
 | **P1**   | Violation Reporting & Code Frames (0006)                                     | 1-2 days  | Not Started |
 | **P1**   | Module Entry Point & Dependency Conditions (0007)                            | 1-2 days  | Not Started |
 | **P1**   | Class Entry Point & Class Predicates/Conditions (0008)                       | 1-2 days  | Not Started |
