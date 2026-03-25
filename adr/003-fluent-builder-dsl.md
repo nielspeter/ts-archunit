@@ -23,10 +23,14 @@ The API design directly determines adoption. A good rule reads like documentatio
 ```typescript
 // The shape: entry(project).that().<predicate>.should().<condition>.check()
 classes(p)
-  .that().extend('BaseRepository')
-  .and().resideInFolder('src/repositories/**')
-  .should().notContain(call('parseInt'))
-  .andShould().contain(call('this.extractCount'))
+  .that()
+  .extend('BaseRepository')
+  .and()
+  .resideInFolder('src/repositories/**')
+  .should()
+  .notContain(call('parseInt'))
+  .andShould()
+  .contain(call('this.extractCount'))
   .because('use this.extractCount() from BaseRepository')
   .check()
 ```
@@ -65,18 +69,32 @@ classes(p).that().extend('Base').should().notContain(call('x')).check().somethin
 ### Positive
 
 **Reads like English:**
+
 ```typescript
 // "Classes that extend BaseRepository should not contain calls to parseInt"
 classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
 
 // "Types that have property orderBy should have property type not string"
-types(p).that().haveProperty('orderBy').should().havePropertyType('orderBy', not(isString())).check()
+types(p)
+  .that()
+  .haveProperty('orderBy')
+  .should()
+  .havePropertyType('orderBy', not(isString()))
+  .check()
 
 // "Functions that have name matching parseXxxOrder and reside in routes should not exist"
-functions(p).that().haveNameMatching(/^parse\w+Order$/).and().resideInFolder('src/routes/**').should().notExist().check()
+functions(p)
+  .that()
+  .haveNameMatching(/^parse\w+Order$/)
+  .and()
+  .resideInFolder('src/routes/**')
+  .should()
+  .notExist()
+  .check()
 ```
 
 **Direct mapping from Java ArchUnit:**
+
 ```java
 // Java ArchUnit
 classes().that().resideInAnyPackage("..repository..")
@@ -92,11 +110,13 @@ classes(p).that().resideInFolder('src/repositories/**')
 Developers who've used Java ArchUnit (like the mimer project's 80+ rules) can transfer their mental model directly.
 
 **IDE-guided discovery:**
+
 - After typing `classes(p).that().`, autocomplete shows: `extend`, `implement`, `haveDecorator`, `haveNameMatching`, `resideInFolder`, etc.
 - After typing `.should().`, autocomplete shows: `notContain`, `contain`, `resideInFile`, `haveNameMatching`, `notExist`, etc.
 - Invalid chains are compile-time errors, not runtime surprises
 
 **Named selections for reuse:**
+
 ```typescript
 // Save a predicate chain — no .should() yet, so it's a reusable query
 const repositories = classes(p).that().extend('BaseRepository')
@@ -109,10 +129,10 @@ repositories.should().notContain(newExpr('Error')).check()
 This is natural with the builder pattern — the intermediate builder object IS the named selection.
 
 **Composable with custom predicates:**
+
 ```typescript
-const isRouteHandler = definePredicate<FunctionDeclaration>(
-  'is a route handler',
-  (fn) => fn.getDecorators().some(d => d.getName() === 'Get')
+const isRouteHandler = definePredicate<FunctionDeclaration>('is a route handler', (fn) =>
+  fn.getDecorators().some((d) => d.getName() === 'Get'),
 )
 
 // .satisfy() plugs in seamlessly
@@ -122,27 +142,38 @@ functions(p).that().satisfy(isRouteHandler).should().contain(call('handleError')
 ### Negative
 
 **TypeScript generics complexity:**
+
 - The builder types need careful generic threading to ensure type safety across chains
 - `ClassRuleBuilder` → `ClassPredicateBuilder` → `ClassConditionBuilder` — each with the right method set
 - Mitigation: this complexity is internal. Users see clean method chains.
 
 **Long chains can be hard to read:**
+
 ```typescript
 // This is pushing it
 classes(p)
-  .that().extend('BaseRepository')
-  .and().resideInFolder('src/repositories/**')
-  .and().haveNameEndingWith('Repository')
-  .and().areNotAbstract()
-  .should().notContain(call('parseInt'))
-  .andShould().contain(call('this.extractCount'))
-  .andShould().notContain(newExpr('Error'))
+  .that()
+  .extend('BaseRepository')
+  .and()
+  .resideInFolder('src/repositories/**')
+  .and()
+  .haveNameEndingWith('Repository')
+  .and()
+  .areNotAbstract()
+  .should()
+  .notContain(call('parseInt'))
+  .andShould()
+  .contain(call('this.extractCount'))
+  .andShould()
+  .notContain(newExpr('Error'))
   .because('repositories must use shared helpers')
   .check()
 ```
+
 - Mitigation: named selections break long chains. Also, this is a feature — the chain IS the specification.
 
 **Method explosion:**
+
 - Each entry point (classes, functions, types, modules, calls, slices) needs its own builder with its own predicate/condition methods
 - 6 entry points × ~10 predicates × ~10 conditions = ~200 methods total
 - Mitigation: shared base classes (identity predicates), good code organization (spec Section 13)
@@ -156,22 +187,22 @@ checkRule({
   entry: 'classes',
   predicates: [
     { type: 'extend', value: 'BaseRepository' },
-    { type: 'resideInFolder', value: 'src/repositories/**' }
+    { type: 'resideInFolder', value: 'src/repositories/**' },
   ],
-  conditions: [
-    { type: 'notContain', value: call('parseInt') }
-  ],
+  conditions: [{ type: 'notContain', value: call('parseInt') }],
   because: 'use this.extractCount()',
-  severity: 'error'
+  severity: 'error',
 })
 ```
 
 **Pros:**
+
 - Easy to serialize (JSON-compatible)
 - Easy to generate programmatically
 - No builder type complexity
 
 **Cons:**
+
 - No IDE autocomplete for valid predicate/condition combinations
 - No compile-time safety — typo in `'notContian'` is a runtime error
 - Reads like configuration, not like a specification
@@ -192,10 +223,12 @@ arch`
 ```
 
 **Pros:**
+
 - Most readable — literally English
 - Compact
 
 **Cons:**
+
 - No IDE autocomplete or type safety inside template literals
 - Requires a custom parser for the template DSL
 - Error messages for invalid rules are terrible ("parse error at position 47")
@@ -214,16 +247,18 @@ pipe(
   where(resideInFolder('src/repositories/**')),
   assert(notContain(call('parseInt'))),
   because('use this.extractCount()'),
-  check
+  check,
 )
 ```
 
 **Pros:**
+
 - Functional style — no mutable builder state
 - Each function is independently testable
 - Tree-shakeable
 
 **Cons:**
+
 - Less readable than method chaining for this use case
 - Requires importing many small functions
 - No natural place for `.and()` vs `.or()` semantics

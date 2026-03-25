@@ -1,6 +1,7 @@
 # Plan 0001: Exploratory PoC & Technical Validation
 
 ## Status
+
 - **State:** Not Started
 - **Priority:** P0 — Gate for all subsequent plans
 - **Effort:** 1 day
@@ -17,14 +18,14 @@ Findings feed back into the plan set and may change API design, split/merge plan
 
 Plan 0212 (`cmless/plans/0212-sdk-list-endpoint-standardization.md`) documents six categories of architecture rot. Each maps to a ts-archunit rule. The PoC validates the four that are Phase 1 (no `calls()` / `within()` needed):
 
-| # | 0212 Pain Point | ts-archunit Rule | Phase 1? | PoC Probe |
-|---|---|---|---|---|
-| 1 | Copy-pasted `parseXxxOrder()` functions | `functions().that().haveNameMatching(/^parse\w+Order$/).should().notExist()` | Yes | Probe 1 |
-| 2 | Routes not using `normalizePagination()` | `within(listRoutes).functions().should().contain(call('normalizePagination'))` | No (Phase 2 — needs `calls()` + `within()`) | — |
-| 3 | Inline `parseInt` instead of `this.extractCount()` | `classes().that().extend('BaseRepository').should().useInsteadOf(call('parseInt'), call('this.extractCount'))` | Yes | Probe 2 |
-| 4 | `orderBy?: string` instead of typed union | `types().that().haveProperty('orderBy').should().havePropertyType('orderBy', not(isString()))` | Yes | Probe 3 |
-| 5 | `throw new Error()` instead of typed domain errors | `classes().that().extend('BaseRepository').should().notContain(newExpr('Error'))` | Yes | Probe 2 |
-| 6 | Manual `URLSearchParams` instead of `buildQueryString()` | `functions().that().resideInFolder('packages/sdk/src/wrappers/**').should().notContain(newExpr('URLSearchParams'))` | Yes | Probe 2 |
+| #   | 0212 Pain Point                                          | ts-archunit Rule                                                                                                    | Phase 1?                                    | PoC Probe |
+| --- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------- |
+| 1   | Copy-pasted `parseXxxOrder()` functions                  | `functions().that().haveNameMatching(/^parse\w+Order$/).should().notExist()`                                        | Yes                                         | Probe 1   |
+| 2   | Routes not using `normalizePagination()`                 | `within(listRoutes).functions().should().contain(call('normalizePagination'))`                                      | No (Phase 2 — needs `calls()` + `within()`) | —         |
+| 3   | Inline `parseInt` instead of `this.extractCount()`       | `classes().that().extend('BaseRepository').should().useInsteadOf(call('parseInt'), call('this.extractCount'))`      | Yes                                         | Probe 2   |
+| 4   | `orderBy?: string` instead of typed union                | `types().that().haveProperty('orderBy').should().havePropertyType('orderBy', not(isString()))`                      | Yes                                         | Probe 3   |
+| 5   | `throw new Error()` instead of typed domain errors       | `classes().that().extend('BaseRepository').should().notContain(newExpr('Error'))`                                   | Yes                                         | Probe 2   |
+| 6   | Manual `URLSearchParams` instead of `buildQueryString()` | `functions().that().resideInFolder('packages/sdk/src/wrappers/**').should().notContain(newExpr('URLSearchParams'))` | Yes                                         | Probe 2   |
 
 ## Probe 1: Function Existence — "no per-resource order parsers"
 
@@ -33,13 +34,15 @@ Plan 0212 (`cmless/plans/0212-sdk-list-endpoint-standardization.md`) documents s
 **Risk:** Can ts-morph find top-level functions by name regex and assert none exist?
 
 **Fixtures:**
+
 ```typescript
 // fixtures/src/routes/content-types.ts
 import { normalizePagination } from '../utils/pagination'
 
 // BAD — should be caught by notExist() rule
 function parseContentTypeOrder(order: string | undefined): {
-  orderBy: 'created_at' | 'updated_at' | 'name'; orderDirection: 'asc' | 'desc'
+  orderBy: 'created_at' | 'updated_at' | 'name'
+  orderDirection: 'asc' | 'desc'
 } {
   let orderBy: 'created_at' | 'updated_at' | 'name' = 'name'
   let orderDirection: 'asc' | 'desc' = 'desc'
@@ -47,19 +50,25 @@ function parseContentTypeOrder(order: string | undefined): {
     const isDesc = order.startsWith('-')
     const field = isDesc ? order.slice(1) : order
     const mapped = contentTypeOrderMap[field]
-    if (mapped) { orderBy = mapped; orderDirection = isDesc ? 'desc' : 'asc' }
+    if (mapped) {
+      orderBy = mapped
+      orderDirection = isDesc ? 'desc' : 'asc'
+    }
   }
   return { orderBy, orderDirection }
 }
 
 const contentTypeOrderMap: Record<string, string> = {
-  'sys.createdAt': 'created_at', 'sys.updatedAt': 'updated_at', name: 'name'
+  'sys.createdAt': 'created_at',
+  'sys.updatedAt': 'updated_at',
+  name: 'name',
 }
 
 // fixtures/src/routes/webhooks.ts
 // BAD — same pattern, different name
 function parseWebhookOrder(order: string | undefined): {
-  orderBy: 'created_at' | 'updated_at' | 'name'; orderDirection: 'asc' | 'desc'
+  orderBy: 'created_at' | 'updated_at' | 'name'
+  orderDirection: 'asc' | 'desc'
 } {
   let orderBy: 'created_at' | 'updated_at' | 'name' = 'created_at'
   let orderDirection: 'asc' | 'desc' = 'desc'
@@ -67,13 +76,18 @@ function parseWebhookOrder(order: string | undefined): {
     const isDesc = order.startsWith('-')
     const field = isDesc ? order.slice(1) : order
     const mapped = webhookOrderMap[field]
-    if (mapped) { orderBy = mapped; orderDirection = isDesc ? 'desc' : 'asc' }
+    if (mapped) {
+      orderBy = mapped
+      orderDirection = isDesc ? 'desc' : 'asc'
+    }
   }
   return { orderBy, orderDirection }
 }
 
 const webhookOrderMap: Record<string, string> = {
-  'sys.createdAt': 'created_at', 'sys.updatedAt': 'updated_at', name: 'name'
+  'sys.createdAt': 'created_at',
+  'sys.updatedAt': 'updated_at',
+  name: 'name',
 }
 
 // fixtures/src/routes/users.ts
@@ -84,12 +98,14 @@ const userOrderMap = { 'sys.createdAt': 'created_at' as const }
 
 export function listUsers() {
   const { orderBy, orderDirection } = parseOrder(undefined, userOrderMap, {
-    orderBy: 'created_at', orderDirection: 'desc'
+    orderBy: 'created_at',
+    orderDirection: 'desc',
   })
 }
 ```
 
 **What to build:**
+
 1. Load fixtures with ts-morph `Project`
 2. Find all `FunctionDeclaration` nodes across the project
 3. Filter by name regex `/^parse\w+Order$/`
@@ -97,11 +113,15 @@ export function listUsers() {
 5. Assert: the matched set is non-empty (violations exist in bad fixtures), empty after "fixing"
 
 **ts-archunit rule this validates:**
+
 ```typescript
 functions(p)
-  .that().haveNameMatching(/^parse\w+Order$/)
-  .and().resideInFolder('src/routes/**')
-  .should().notExist()
+  .that()
+  .haveNameMatching(/^parse\w+Order$/)
+  .and()
+  .resideInFolder('src/routes/**')
+  .should()
+  .notExist()
   .because('use the shared parseOrder() from @cmless/server-common')
   .check()
 ```
@@ -115,6 +135,7 @@ functions(p)
 **Risk:** Can ts-morph reliably match `call('parseInt')`, `call('this.extractCount')`, `newExpr('Error')`, `newExpr('URLSearchParams')` inside method bodies?
 
 **Fixtures:**
+
 ```typescript
 // fixtures/src/repositories/base.repository.ts
 export abstract class BaseRepository {
@@ -130,8 +151,8 @@ export class WebhookRepository extends BaseRepository {
   async query() {
     const countResult = await this.db.count('* as count').first()
     // Violation 1: inline parseInt instead of this.extractCount()
-    const total = typeof countResult.count === 'string'
-      ? parseInt(countResult.count, 10) : countResult.count
+    const total =
+      typeof countResult.count === 'string' ? parseInt(countResult.count, 10) : countResult.count
     return { total, items: [] }
   }
 
@@ -152,14 +173,14 @@ import { NotFoundError } from '../exceptions/not-found-error'
 export class RoleRepository extends BaseRepository {
   async query() {
     const result = await this.db.count('* as count').first()
-    const total = this.extractCount(result)  // GOOD — uses shared helper
+    const total = this.extractCount(result) // GOOD — uses shared helper
     return { total, items: [] }
   }
 
   async findById(id: string) {
     const result = await this.db.where({ id }).first()
     if (!result) {
-      throw new NotFoundError('Role', id)  // GOOD — typed domain error
+      throw new NotFoundError('Role', id) // GOOD — typed domain error
     }
     return result
   }
@@ -170,7 +191,9 @@ import { BaseRepository } from './base.repository'
 
 export class EdgeCaseRepository extends BaseRepository {
   // Optional chaining — should call('this.extractCount') match this?
-  optionalChain() { return this?.extractCount(result) }
+  optionalChain() {
+    return this?.extractCount(result)
+  }
 
   // Destructured — should NOT match call('this.extractCount') in Phase 1
   destructured() {
@@ -179,10 +202,14 @@ export class EdgeCaseRepository extends BaseRepository {
   }
 
   // Nested call — parseInt inside Math.max
-  nested() { return Math.max(0, parseInt(val, 10)) }
+  nested() {
+    return Math.max(0, parseInt(val, 10))
+  }
 
   // Chained method — this.db.query().count()
-  chained() { return this.db.query().count() }
+  chained() {
+    return this.db.query().count()
+  }
 }
 
 // fixtures/src/wrappers/space.ts — BAD (URLSearchParams)
@@ -201,13 +228,14 @@ import { buildQueryString } from '../utils/build-query-string'
 
 export class Environment {
   async getEntries(query?: Record<string, unknown>) {
-    const qs = buildQueryString(query ?? {})  // GOOD — uses shared utility
+    const qs = buildQueryString(query ?? {}) // GOOD — uses shared utility
     return this.http.get(`/entries${qs}`)
   }
 }
 ```
 
 **What to build:**
+
 1. Load fixtures with ts-morph
 2. For each class extending `BaseRepository`, walk all method bodies
 3. Find `CallExpression` nodes, match: `parseInt` (identifier), `this.extractCount` (property access chain)
@@ -215,30 +243,38 @@ export class Environment {
 5. Log: which matches succeed, which fail, AST structure for edge cases
 
 **ts-archunit rules this validates:**
+
 ```typescript
 // Rule 3: use extractCount instead of parseInt
 classes(p)
-  .that().extend('BaseRepository')
-  .should().useInsteadOf(call('parseInt'), call('this.extractCount'))
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .useInsteadOf(call('parseInt'), call('this.extractCount'))
   .because('use this.extractCount() from BaseRepository')
   .check()
 
 // Rule 5: use typed domain errors
 classes(p)
-  .that().extend('BaseRepository')
-  .should().notContain(newExpr('Error'))
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(newExpr('Error'))
   .because('use NotFoundError/ValidationError')
   .check()
 
 // Rule 6: no manual URLSearchParams in SDK wrappers
 functions(p)
-  .that().resideInFolder('src/wrappers/**')
-  .should().notContain(newExpr('URLSearchParams'))
+  .that()
+  .resideInFolder('src/wrappers/**')
+  .should()
+  .notContain(newExpr('URLSearchParams'))
   .because('use buildQueryString() utility')
   .check()
 ```
 
 **Success criteria:**
+
 - `call('parseInt')` matches in `WebhookRepository.query()` — both direct and nested inside `Math.max()`
 - `call('this.extractCount')` matches in `RoleRepository.query()` and `EdgeCaseRepository.optionalChain()`
 - `call('this.extractCount')` does NOT match in `EdgeCaseRepository.destructured()` (known Phase 1 limitation — document it)
@@ -253,13 +289,14 @@ functions(p)
 **Risk:** Can the TypeScript type checker (via ts-morph) reliably distinguish `string` from `'a' | 'b'` when the property is optional (`string | undefined` vs `'a' | 'b' | undefined`)?
 
 **Fixtures:**
+
 ```typescript
 // fixtures/src/types/bad-options.ts
 // FAIL — bare string (matches real cmless RoleQueryOptions)
 export interface RoleQueryOptions {
   skip?: number
   limit?: number
-  orderBy?: string          // SQL injection surface
+  orderBy?: string // SQL injection surface
   orderDirection?: 'asc' | 'desc'
 }
 
@@ -286,14 +323,14 @@ export interface ContentTypeQueryOptions {
 // fixtures/src/types/edge-cases.ts
 // Edge cases for type checker
 interface FullOptions {
-  orderBy: 'created_at' | 'updated_at'   // non-optional
+  orderBy: 'created_at' | 'updated_at' // non-optional
 }
-type PartialOptions = Partial<FullOptions>   // becomes orderBy?: 'created_at' | 'updated_at' | undefined
+type PartialOptions = Partial<FullOptions> // becomes orderBy?: 'created_at' | 'updated_at' | undefined
 
-type PickedOptions = Pick<WebhookQueryOptions, 'orderBy'>  // should resolve through Pick
+type PickedOptions = Pick<WebhookQueryOptions, 'orderBy'> // should resolve through Pick
 
 interface SingleLiteralOptions {
-  orderBy?: 'created_at'                   // single string literal, not union — should PASS
+  orderBy?: 'created_at' // single string literal, not union — should PASS
 }
 
 interface NoOrderBy {
@@ -304,6 +341,7 @@ interface NoOrderBy {
 ```
 
 **What to build:**
+
 1. Load fixtures with ts-morph
 2. Find all `InterfaceDeclaration` and `TypeAliasDeclaration` nodes whose name matches `/QueryOptions$/` or are in the test set
 3. For each, get the `orderBy` property via `interface.getProperty('orderBy')`
@@ -312,6 +350,7 @@ interface NoOrderBy {
 6. Handle optionality: `orderBy?:` means the type is `string | undefined` or `'a' | 'b' | undefined` — need to strip `undefined` before checking
 
 **Key question:** When we have `orderBy?: string`, the type checker sees `string | undefined`. Does `type.isString()` return `true` or `false`? We need to:
+
 - Get the non-nullable type (strip `undefined`)
 - Check if the remaining type is `string` (bad) or a union of string literals (good)
 
@@ -319,21 +358,26 @@ interface NoOrderBy {
 // Pseudocode for the check
 const prop = iface.getProperty('orderBy')
 const type = prop.getType()
-const nonNullable = type.getNonNullableType()  // strip undefined
-const isBareString = nonNullable.isString()    // true for string, false for 'a' | 'b'
+const nonNullable = type.getNonNullableType() // strip undefined
+const isBareString = nonNullable.isString() // true for string, false for 'a' | 'b'
 ```
 
 **ts-archunit rule this validates:**
+
 ```typescript
 types(p)
-  .that().haveNameMatching(/QueryOptions$/)
-  .and().haveProperty('orderBy')
-  .should().havePropertyType('orderBy', not(isString()))
+  .that()
+  .haveNameMatching(/QueryOptions$/)
+  .and()
+  .haveProperty('orderBy')
+  .should()
+  .havePropertyType('orderBy', not(isString()))
   .because('bare string orderBy passed to .orderBy() is a SQL injection surface')
   .check()
 ```
 
 **Success criteria:**
+
 - `RoleQueryOptions.orderBy` (bare `string`) → detected as violation
 - `WebhookQueryOptions.orderBy` (union `'created_at' | 'updated_at' | 'name'`) → passes
 - `ContentTypeQueryOptions.orderBy` (via type alias `ContentTypeOrderByColumn`) → passes (type checker resolves alias)
@@ -347,6 +391,7 @@ types(p)
 **Risk:** ts-morph is known to be slow on large projects. The spec claims <3s for 500 files / 50 rules. Need a baseline.
 
 **What to build:**
+
 1. Generate a fixture project with ~500 small TypeScript files:
    - 40 classes extending `BaseRepository` (with methods containing various call patterns)
    - 40 `*QueryOptions` interfaces (mix of typed/untyped orderBy)
@@ -378,14 +423,16 @@ describe('Repository Standards (from 0212 audit)', () => {
 
   it('must use extractCount() instead of parseInt', () => {
     repositories
-      .should().useInsteadOf(call('parseInt'), call('this.extractCount'))
+      .should()
+      .useInsteadOf(call('parseInt'), call('this.extractCount'))
       .because('use this.extractCount() from BaseRepository')
       .check()
   })
 
   it('must use typed domain errors', () => {
     repositories
-      .should().notContain(newExpr('Error'))
+      .should()
+      .notContain(newExpr('Error'))
       .because('use NotFoundError/ValidationError from exceptions package')
       .check()
   })
@@ -394,9 +441,12 @@ describe('Repository Standards (from 0212 audit)', () => {
 describe('Type Safety (from 0212 audit)', () => {
   it('QueryOptions.orderBy must be a typed union, not bare string', () => {
     types(p)
-      .that().haveNameMatching(/QueryOptions$/)
-      .and().haveProperty('orderBy')
-      .should().havePropertyType('orderBy', not(isString()))
+      .that()
+      .haveNameMatching(/QueryOptions$/)
+      .and()
+      .haveProperty('orderBy')
+      .should()
+      .havePropertyType('orderBy', not(isString()))
       .because('bare string orderBy passed to .orderBy() is a SQL injection surface')
       .check()
   })
@@ -405,9 +455,12 @@ describe('Type Safety (from 0212 audit)', () => {
 describe('Route Consistency (from 0212 audit)', () => {
   it('no per-resource order parsers', () => {
     functions(p)
-      .that().haveNameMatching(/^parse\w+Order$/)
-      .and().resideInFolder('src/routes/**')
-      .should().notExist()
+      .that()
+      .haveNameMatching(/^parse\w+Order$/)
+      .and()
+      .resideInFolder('src/routes/**')
+      .should()
+      .notExist()
       .because('use the shared parseOrder() from @cmless/server-common')
       .check()
   })
@@ -416,8 +469,10 @@ describe('Route Consistency (from 0212 audit)', () => {
 describe('SDK Wrapper Standards (from 0212 audit)', () => {
   it('must not use raw URLSearchParams', () => {
     functions(p)
-      .that().resideInFolder('src/wrappers/**')
-      .should().notContain(newExpr('URLSearchParams'))
+      .that()
+      .resideInFolder('src/wrappers/**')
+      .should()
+      .notContain(newExpr('URLSearchParams'))
       .because('use buildQueryString() utility')
       .check()
   })
@@ -439,6 +494,7 @@ describe('SDK Wrapper Standards (from 0212 audit)', () => {
 ```
 
 **Success criteria:**
+
 - The rules read naturally — they describe the 0212 pain points in a way someone familiar with the codebase would immediately understand
 - Named selections (`const repositories = classes(p).that()...`) feel right for reuse
 - `.because()` messages map cleanly to the rationale from 0212

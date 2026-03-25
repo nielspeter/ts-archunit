@@ -25,15 +25,16 @@ import { Project, SyntaxKind, Node } from 'ts-morph'
 const project = new Project({ tsConfigFilePath: 'tsconfig.json' })
 
 // Structural: find classes extending BaseRepository
-const classes = project.getSourceFiles()
-  .flatMap(f => f.getClasses())
-  .filter(c => c.getExtends()?.getExpression().getText() === 'BaseRepository')
+const classes = project
+  .getSourceFiles()
+  .flatMap((f) => f.getClasses())
+  .filter((c) => c.getExtends()?.getExpression().getText() === 'BaseRepository')
 
 // Body analysis: find parseInt calls in method bodies
 for (const cls of classes) {
   for (const method of cls.getMethods()) {
     const calls = method.getDescendantsOfKind(SyntaxKind.CallExpression)
-    const usesParseInt = calls.some(c => c.getExpression().getText() === 'parseInt')
+    const usesParseInt = calls.some((c) => c.getExpression().getText() === 'parseInt')
   }
 }
 
@@ -41,10 +42,11 @@ for (const cls of classes) {
 const iface = sourceFile.getInterface('RoleQueryOptions')
 const prop = iface.getProperty('orderBy')
 const type = prop.getType().getNonNullableType()
-const isBareString = type.isString()  // true for string, false for 'a' | 'b'
+const isBareString = type.isString() // true for string, false for 'a' | 'b'
 ```
 
 ts-morph wraps the TypeScript compiler API (`typescript` package) with a developer-friendly API. It provides:
+
 - The full TypeScript AST via wrapper classes (`ClassDeclaration`, `FunctionDeclaration`, etc.)
 - The TypeScript type checker via `.getType()`, `.isString()`, `.isUnion()`, `.getUnionTypes()`
 - Source file manipulation (we only use read, not write)
@@ -55,27 +57,32 @@ ts-morph wraps the TypeScript compiler API (`typescript` package) with a develop
 ### Positive
 
 **Full TypeScript fidelity:**
+
 - ts-morph uses the real TypeScript compiler — there is no parser divergence
 - Every TypeScript syntax construct is supported (decorators, satisfies, const assertions, template literals, etc.)
 - Type resolution handles generics, conditional types, mapped types, `Partial<>`, `Pick<>`, `Omit<>`, etc.
 - As TypeScript evolves, ts-morph tracks it (same parser)
 
 **Two-tier analysis (AST + type checker):**
+
 - Most rules only need the AST (fast): name matching, decorator checking, call expression walking
 - Type-level rules trigger the type checker on demand (slower but correct): `isString()`, `isUnionOfLiterals()`, structural matching
 - The spec's performance strategy relies on this separation — AST-only rules don't pay for type checking
 
 **Battle-tested:**
+
 - ts-morph has 4M+ weekly npm downloads
 - Used by ts-auto-mock, ts-json-schema-generator, and many code generation tools
 - Active maintenance, tracks TypeScript releases closely
 
 **Developer-friendly API:**
+
 - `cls.getExtends()` vs `ts.getHeritageClauses(node).find(h => h.token === ts.SyntaxKind.ExtendsKeyword)`
 - `method.getDescendantsOfKind(SyntaxKind.CallExpression)` vs manual `ts.forEachChild` recursion
 - `.getText()`, `.getStartLineNumber()`, `.getSourceFile().getFilePath()` — all convenience methods needed for violation reporting
 
 **Source maps and code frames:**
+
 - ts-morph preserves exact source positions
 - `node.getStartLineNumber()` and `node.getStart()` give precise locations for violation reporting
 - This is critical for code frame generation (spec Section 12)
@@ -83,16 +90,19 @@ ts-morph wraps the TypeScript compiler API (`typescript` package) with a develop
 ### Negative
 
 **Performance overhead:**
+
 - ts-morph wraps every AST node in a class instance — memory overhead vs raw TypeScript compiler API
 - For 500-file projects: negligible. For 5000+ files: may need lazy loading (spec Section 13.4)
 - Mitigation: lazy source file parsing, predicate memoization, file-set narrowing via `resideInFolder`
 
 **Large dependency:**
+
 - ts-morph pulls in the `typescript` package (~40MB installed)
 - ts-archunit is a dev dependency — disk size is acceptable
 - Users likely already have `typescript` installed
 
 **Version coupling:**
+
 - ts-morph pins a TypeScript version range — if a user's project uses a newer TypeScript, there could be parser mismatches
 - Mitigation: ts-morph tracks TypeScript releases quickly (usually within weeks)
 - Future: allow users to pass their own TypeScript instance (ts-morph supports this)
@@ -112,9 +122,7 @@ const checker = program.getTypeChecker()
 // Verbose: finding classes that extend BaseRepository
 function visit(node: ts.Node) {
   if (ts.isClassDeclaration(node)) {
-    const heritage = node.heritageClauses?.find(
-      h => h.token === ts.SyntaxKind.ExtendsKeyword
-    )
+    const heritage = node.heritageClauses?.find((h) => h.token === ts.SyntaxKind.ExtendsKeyword)
     if (heritage) {
       const expr = heritage.types[0]?.expression
       if (ts.isIdentifier(expr) && expr.text === 'BaseRepository') {
@@ -127,11 +135,13 @@ function visit(node: ts.Node) {
 ```
 
 **Pros:**
+
 - No wrapper overhead — slightly faster
 - Direct access to all compiler internals
 - No version coupling (uses project's own TypeScript)
 
 **Cons:**
+
 - Extremely verbose API — 3-5x more code for the same operations
 - No convenience methods — manual tree walking, manual position calculation
 - Internal API is not stable between TypeScript versions (some helpers move/rename)
@@ -144,11 +154,13 @@ function visit(node: ts.Node) {
 **Use tree-sitter for fast, incremental parsing.**
 
 **Pros:**
+
 - Very fast parsing (written in C)
 - Incremental reparsing (only changed regions)
 - Language-agnostic query syntax
 
 **Cons:**
+
 - No type checker — cannot resolve `Partial<>`, type aliases, structural typing
 - Separate grammar from TypeScript compiler — parser divergence risk
 - Tree-sitter's TypeScript grammar lags behind TypeScript releases
@@ -161,10 +173,12 @@ function visit(node: ts.Node) {
 **Use a Rust-based parser for speed.**
 
 **Pros:**
+
 - 10-100x faster parsing than TypeScript's own parser
 - Growing ecosystem
 
 **Cons:**
+
 - No type checker — same limitation as tree-sitter
 - AST format differs from TypeScript's — would need translation layer
 - SWC/OXC TypeScript support is "parse and strip types", not "understand types"
@@ -177,11 +191,13 @@ function visit(node: ts.Node) {
 **Use `ts.createLanguageService()` for IDE-like queries.**
 
 **Pros:**
+
 - Designed for interactive queries (find references, go to definition)
 - Incremental updates
 - Same API that VS Code uses
 
 **Cons:**
+
 - Designed for single-file-at-a-time queries, not batch analysis
 - More complex setup than `ts.createProgram`
 - ts-morph already uses the program/checker API which is more appropriate for batch analysis

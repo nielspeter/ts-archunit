@@ -14,12 +14,12 @@ ts-archunit is an architecture testing library for TypeScript, inspired by Java'
 
 **CRITICAL:** All architectural decisions are documented in `/adr/`. These decisions are **binding** and must be followed in all plans and code. Read relevant ADRs before implementing features.
 
-| ADR | Title | Key Takeaway |
-|-----|-------|--------------|
-| [001](./adr/001-toolchain-node-vitest-eslint-prettier.md) | Toolchain | Node 24 + TS ~5.9 (pinned to ts-morph) + Vitest 4 + ESLint 10 + Prettier 3.8. No Bun. |
-| [002](./adr/002-ts-morph-ast-engine.md) | AST Engine | ts-morph 27 for all AST and type checking. No tree-sitter/SWC/raw TS API. |
-| [003](./adr/003-fluent-builder-dsl.md) | DSL Pattern | Fluent builder with method chaining. `entry(p).that().<predicate>.should().<condition>.check()` |
-| [004](./adr/004-esm-only-package.md) | Module Format | ESM only. `"type": "module"`, Node.js >=24. No dual CJS/ESM. |
+| ADR                                                       | Title         | Key Takeaway                                                                                    |
+| --------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| [001](./adr/001-toolchain-node-vitest-eslint-prettier.md) | Toolchain     | Node 24 + TS ~5.9 (pinned to ts-morph) + Vitest 4 + ESLint 10 + Prettier 3.8. No Bun.           |
+| [002](./adr/002-ts-morph-ast-engine.md)                   | AST Engine    | ts-morph 27 for all AST and type checking. No tree-sitter/SWC/raw TS API.                       |
+| [003](./adr/003-fluent-builder-dsl.md)                    | DSL Pattern   | Fluent builder with method chaining. `entry(p).that().<predicate>.should().<condition>.check()` |
+| [004](./adr/004-esm-only-package.md)                      | Module Format | ESM only. `"type": "module"`, Node.js >=24. No dual CJS/ESM.                                    |
 
 ## Plans
 
@@ -40,15 +40,15 @@ From the ADRs:
 
 ## Dependencies
 
-| Package | Purpose | Required in |
-|---------|---------|-------------|
-| `ts-morph` ^27 | TypeScript AST analysis, type checker | Core |
-| `picomatch` ^4 | Glob pattern matching | Core |
-| `vitest` ^4 | Test runner | Dev / peer dep |
-| `typescript` ~5.9 | Type checking, compilation (pinned to ts-morph compat) | Dev |
-| `eslint` ^10 | Linting (flat config, `eslint.config.ts`) | Dev |
-| `typescript-eslint` ^8 | Type-checked ESLint rules (unified package) | Dev |
-| `prettier` ^3.8 | Formatting | Dev |
+| Package                | Purpose                                                | Required in    |
+| ---------------------- | ------------------------------------------------------ | -------------- |
+| `ts-morph` ^27         | TypeScript AST analysis, type checker                  | Core           |
+| `picomatch` ^4         | Glob pattern matching                                  | Core           |
+| `vitest` ^4            | Test runner                                            | Dev / peer dep |
+| `typescript` ~5.9      | Type checking, compilation (pinned to ts-morph compat) | Dev            |
+| `eslint` ^10           | Linting (flat config, `eslint.config.ts`)              | Dev            |
+| `typescript-eslint` ^8 | Type-checked ESLint rules (unified package)            | Dev            |
+| `prettier` ^3.8        | Formatting                                             | Dev            |
 
 No runtime dependencies beyond ts-morph and picomatch. The tool is a dev dependency.
 

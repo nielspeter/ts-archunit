@@ -44,6 +44,7 @@ The library's core dependency — ts-morph — calls `ts.createProgram()` and us
 **Note:** Using `typescript-eslint` unified package (not separate `@typescript-eslint/eslint-plugin` + `@typescript-eslint/parser`). The unified package is the recommended approach since v8.
 
 TypeScript strict mode with type checking in CI:
+
 ```json
 {
   "compilerOptions": {
@@ -63,12 +64,14 @@ TypeScript strict mode with type checking in CI:
 ### Positive
 
 **Node.js runtime:**
+
 - ts-morph is built for Node.js — zero compatibility risk
 - ts-morph uses `ts.createProgram()`, `ts.createLanguageService()`, and Node.js `fs` APIs internally
 - Same runtime as the target audience (TypeScript developers running vitest/jest)
 - npm ecosystem — the library ships as an npm package
 
 **Vitest over Jest:**
+
 - Native ESM support — no `ts-jest` transformer needed
 - Built on Vite — fast startup, native TypeScript
 - Same assertion API as Jest (easy migration)
@@ -76,12 +79,14 @@ TypeScript strict mode with type checking in CI:
 - Watch mode with HMR for fast feedback during development
 
 **ESLint over Biome:**
+
 - `@typescript-eslint` provides type-aware linting rules
 - Mature ecosystem — more rules, more plugins
 - Industry standard for TypeScript projects
 - Biome's TS support is improving but not yet at parity for type-aware rules
 
 **Prettier for formatting:**
+
 - Zero-config opinionated formatting
 - Integrates with ESLint via `eslint-config-prettier`
 - Industry standard — contributors know it
@@ -89,14 +94,17 @@ TypeScript strict mode with type checking in CI:
 ### Negative
 
 **Node.js:**
+
 - Slower startup than Bun — irrelevant for a library (users run it in their own test suite)
 - No built-in TypeScript execution — mitigated by vitest handling TS natively
 
 **Vitest:**
+
 - Less mature than Jest — mitigated by Vite ecosystem stability
 - Some Jest plugins don't work — we don't need any
 
 **ESLint + Prettier (two tools):**
+
 - Biome could replace both — but Biome's TypeScript type-aware rules are not mature enough
 - Slightly more config files — acceptable tradeoff for rule quality
 
@@ -105,11 +113,13 @@ TypeScript strict mode with type checking in CI:
 ### Alternative 1: Bun
 
 **Pros:**
+
 - Faster startup and npm install
 - Built-in TypeScript execution
 - Built-in test runner
 
 **Cons:**
+
 - ts-morph uses Node.js `fs` and `path` APIs extensively — Bun compatibility is "mostly works" not "guaranteed"
 - ts-morph calls `ts.createProgram()` which uses the TypeScript compiler's internal file resolution — untested on Bun's module system
 - Bun's test runner is less mature than vitest
@@ -120,11 +130,13 @@ TypeScript strict mode with type checking in CI:
 ### Alternative 2: Deno
 
 **Pros:**
+
 - Built-in TypeScript
 - Security sandbox
 - Modern runtime
 
 **Cons:**
+
 - ts-morph doesn't support Deno
 - npm compatibility layer adds friction
 - Target audience uses Node.js
@@ -134,10 +146,12 @@ TypeScript strict mode with type checking in CI:
 ### Alternative 3: Jest
 
 **Pros:**
+
 - Most widely used test runner
 - Mature, stable
 
 **Cons:**
+
 - Requires `ts-jest` or SWC transformer for TypeScript
 - ESM support still experimental (--experimental-vm-modules)
 - Slower than Vitest for TypeScript projects
@@ -148,11 +162,13 @@ TypeScript strict mode with type checking in CI:
 ### Alternative 4: Biome (replacing ESLint + Prettier)
 
 **Pros:**
+
 - Single tool for linting + formatting
 - Faster than ESLint
 - Zero config
 
 **Cons:**
+
 - No type-aware linting rules (can't use TypeScript type checker for lint rules)
 - Smaller rule set than `@typescript-eslint`
 - Rapidly evolving — more breaking changes

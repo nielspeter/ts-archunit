@@ -1,0 +1,50 @@
+{
+  "name": "ts-archunit",
+  "version": "0.0.1",
+  "description": "Architecture testing for TypeScript",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ tests/",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "typescript",
+    "architecture",
+    "testing",
+    "archunit",
+    "static-analysis"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "picomatch": "^4.0.4",
+    "ts-morph": "^27.0.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/picomatch": "^4.0.2",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jiti": "^2.6.1",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.1.1"
+  }
+}

@@ -7,11 +7,13 @@
 ## Context
 
 npm packages can ship as:
+
 1. **CommonJS only** (`require()`)
 2. **ESM only** (`import`)
 3. **Dual CJS/ESM** (both formats via conditional exports)
 
 ts-archunit is a dev dependency that runs in test suites (vitest, jest). The choice affects:
+
 - How users import the library
 - Build complexity
 - Compatibility with test runners
@@ -37,6 +39,7 @@ ts-archunit is a dev dependency that runs in test suites (vitest, jest). The cho
 ```
 
 tsconfig:
+
 ```json
 {
   "compilerOptions": {
@@ -70,9 +73,11 @@ tsconfig:
 ### Alternative 1: Dual CJS/ESM
 
 **Pros:**
+
 - Maximum compatibility — works everywhere
 
 **Cons:**
+
 - Dual package hazard — CJS and ESM versions can be loaded simultaneously, causing singleton issues
 - Complex build (two tsconfig files or bundler)
 - More surface area for bugs

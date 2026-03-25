@@ -38,7 +38,8 @@ A shared utility `normalizePagination()` existed in the codebase. Some endpoints
 ```typescript
 // webhooks.ts
 function parseWebhookOrder(order: string | undefined): {
-  orderBy: WebhookOrderByColumn; orderDirection: 'asc' | 'desc'
+  orderBy: WebhookOrderByColumn
+  orderDirection: 'asc' | 'desc'
 } {
   let orderBy: WebhookOrderByColumn = 'created_at'
   let orderDirection: 'asc' | 'desc' = 'desc'
@@ -46,14 +47,18 @@ function parseWebhookOrder(order: string | undefined): {
     const isDesc = order.startsWith('-')
     const field = isDesc ? order.slice(1) : order
     const mapped = webhookOrderMap[field]
-    if (mapped) { orderBy = mapped; orderDirection = isDesc ? 'desc' : 'asc' }
+    if (mapped) {
+      orderBy = mapped
+      orderDirection = isDesc ? 'desc' : 'asc'
+    }
   }
   return { orderBy, orderDirection }
 }
 
 // content-types.ts — identical logic, different variable names
 function parseContentTypeOrder(order: string | undefined): {
-  orderBy: ContentTypeOrderByColumn; orderDirection: 'asc' | 'desc'
+  orderBy: ContentTypeOrderByColumn
+  orderDirection: 'asc' | 'desc'
 } {
   // ... exact same implementation with different map and defaults
 }
@@ -63,17 +68,17 @@ function parseContentTypeOrder(order: string | undefined): {
 
 ```typescript
 // Repository A — inline, no null guard
-const total = typeof countResult.count === 'string'
-  ? parseInt(countResult.count, 10) : countResult.count
+const total =
+  typeof countResult.count === 'string' ? parseInt(countResult.count, 10) : countResult.count
 
 // Repository B — inline, with null guard + throw
 if (!countResult) throw new Error('Count query returned no results')
-const total = typeof countResult.count === 'string'
-  ? parseInt(countResult.count, 10) : countResult.count
+const total =
+  typeof countResult.count === 'string' ? parseInt(countResult.count, 10) : countResult.count
 
 // Repository C — same as A (copy-pasted)
-const total = typeof countResult.count === 'string'
-  ? parseInt(countResult.count, 10) : countResult.count
+const total =
+  typeof countResult.count === 'string' ? parseInt(countResult.count, 10) : countResult.count
 
 // Repository D — uses the shared base class helper (the correct way!)
 return this.extractCount(result) > 0
@@ -86,12 +91,12 @@ The base class provided `extractCount()`. One repository out of 40+ used it.
 ```typescript
 // Repository A — typed column union (safe)
 export interface WebhookQueryOptions {
-  orderBy?: 'created_at' | 'updated_at' | 'name'  // only valid columns
+  orderBy?: 'created_at' | 'updated_at' | 'name' // only valid columns
 }
 
 // Repository B — bare string (SQL injection surface)
 export interface RoleQueryOptions {
-  orderBy?: string  // accepts anything, passed to .orderBy()
+  orderBy?: string // accepts anything, passed to .orderBy()
 }
 ```
 
@@ -121,13 +126,13 @@ The audit plan itself — just documenting what's wrong — took longer than fix
 
 ### 1.3 What Existing Tools Cannot Do
 
-| Tool | What it checks | What it misses |
-|---|---|---|
-| **dependency-cruiser** | Import paths between modules | Everything inside function bodies |
-| **eslint-plugin-boundaries** | Which modules can import which | Type shapes, call patterns, class inheritance |
-| **Nx module boundaries** | Cross-library imports in monorepos | Same as above |
-| **ts-arch** (npm) | Basic dependency rules | Body analysis, type checking, custom predicates |
-| **ESLint rules** | Syntax-level patterns | Architectural relationships, cross-file analysis |
+| Tool                         | What it checks                     | What it misses                                   |
+| ---------------------------- | ---------------------------------- | ------------------------------------------------ |
+| **dependency-cruiser**       | Import paths between modules       | Everything inside function bodies                |
+| **eslint-plugin-boundaries** | Which modules can import which     | Type shapes, call patterns, class inheritance    |
+| **Nx module boundaries**     | Cross-library imports in monorepos | Same as above                                    |
+| **ts-arch** (npm)            | Basic dependency rules             | Body analysis, type checking, custom predicates  |
+| **ESLint rules**             | Syntax-level patterns              | Architectural relationships, cross-file analysis |
 
 None of these can express: "Every class extending `BaseRepository` must call `this.extractCount()` instead of inline `parseInt`." That requires **body analysis** — inspecting what happens _inside_ a function, not just its signature or imports.
 
@@ -138,10 +143,12 @@ ts-archunit expresses architectural rules as executable tests using a fluent DSL
 ```typescript
 // This single rule prevents all four count-parsing variants from ever diverging again
 classes(p)
-  .that().extend('BaseRepository')
-  .should().useInsteadOf(call('parseInt'), call('this.extractCount'))
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .useInsteadOf(call('parseInt'), call('this.extractCount'))
   .because('use this.extractCount() from BaseRepository')
-  .check();
+  .check()
 ```
 
 Rules run in your test suite (vitest/jest). CI catches violations on the PR that introduces them — not 18 months later during an audit.
@@ -196,31 +203,31 @@ Rules run in your test suite (vitest/jest). CI catches violations on the PR that
 
 TypeScript has multiple levels of architectural structure. Unlike Java where the class is king, TypeScript code mixes paradigms — classes, functions, modules, types. The DSL must work across all of them.
 
-| Unit | What it represents | ts-morph type |
-|---|---|---|
-| **Module** | A source file (`.ts`/`.tsx`) | `SourceFile` |
-| **Class** | A class declaration | `ClassDeclaration` |
-| **Function** | A function declaration or const arrow function | `FunctionDeclaration`, `VariableDeclaration` with arrow |
-| **Type** | An interface or type alias | `InterfaceDeclaration`, `TypeAliasDeclaration` |
-| **Enum** | An enum declaration | `EnumDeclaration` |
-| **Call** | A call expression (e.g., `router.get(...)`, `app.use(...)`) | `CallExpression` |
-| **Slice** | A logical grouping of modules by path pattern | Custom (set of `SourceFile`) |
+| Unit         | What it represents                                          | ts-morph type                                           |
+| ------------ | ----------------------------------------------------------- | ------------------------------------------------------- |
+| **Module**   | A source file (`.ts`/`.tsx`)                                | `SourceFile`                                            |
+| **Class**    | A class declaration                                         | `ClassDeclaration`                                      |
+| **Function** | A function declaration or const arrow function              | `FunctionDeclaration`, `VariableDeclaration` with arrow |
+| **Type**     | An interface or type alias                                  | `InterfaceDeclaration`, `TypeAliasDeclaration`          |
+| **Enum**     | An enum declaration                                         | `EnumDeclaration`                                       |
+| **Call**     | A call expression (e.g., `router.get(...)`, `app.use(...)`) | `CallExpression`                                        |
+| **Slice**    | A logical grouping of modules by path pattern               | Custom (set of `SourceFile`)                            |
 
 ### 4.2 Entry Points
 
 Each architectural unit has a top-level entry function that returns a rule builder:
 
 ```typescript
-import { project, modules, classes, functions, types, calls, slices } from 'ts-archunit';
+import { project, modules, classes, functions, types, calls, slices } from 'ts-archunit'
 
-const p = project('tsconfig.json');
+const p = project('tsconfig.json')
 
-modules(p)      // → ModuleRuleBuilder
-classes(p)      // → ClassRuleBuilder
-functions(p)    // → FunctionRuleBuilder
-types(p)        // → TypeRuleBuilder
-calls(p)        // → CallRuleBuilder
-slices(p)       // → SliceRuleBuilder
+modules(p) // → ModuleRuleBuilder
+classes(p) // → ClassRuleBuilder
+functions(p) // → FunctionRuleBuilder
+types(p) // → TypeRuleBuilder
+calls(p) // → CallRuleBuilder
+slices(p) // → SliceRuleBuilder
 ```
 
 ### 4.3 Rule Structure
@@ -243,16 +250,23 @@ Predicate chains can be saved and reused across multiple rules. This prevents re
 
 ```typescript
 // Define once
-const repositories = classes(p).that().extend('BaseRepository');
-const routes = calls(p).that().onObject('app').and().withMethod(/^(get|post|put|delete|patch)$/);
+const repositories = classes(p).that().extend('BaseRepository')
+const routes = calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
 
 // Use in multiple rules
-repositories.should().notContain(call('parseInt')).check();
-repositories.should().notContain(newExpr('Error')).check();
-repositories.should().notHaveMethodMatching(/^query$/).check();
+repositories.should().notContain(call('parseInt')).check()
+repositories.should().notContain(newExpr('Error')).check()
+repositories
+  .should()
+  .notHaveMethodMatching(/^query$/)
+  .check()
 
-routes.should().haveCallbackContaining(call('handleError')).check();
-routes.should().haveCallbackContaining(call('normalizePagination')).check();
+routes.should().haveCallbackContaining(call('handleError')).check()
+routes.should().haveCallbackContaining(call('normalizePagination')).check()
 ```
 
 Named selections are lazy — the predicate chain is evaluated when `.check()` is called, not when the selection is defined. This means they always reflect the current state of the project.
@@ -263,15 +277,15 @@ Named selections can also scope rules to a context — "within route handlers, e
 
 ```typescript
 const routeHandlers = calls(p)
-  .that().onObject('app')
-  .and().withMethod(/^(get|post|put|delete|patch)$/);
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
 
 // Rules scoped to route handler callbacks
-within(routeHandlers)
-  .functions().should().contain(call('handleError')).check();
+within(routeHandlers).functions().should().contain(call('handleError')).check()
 
-within(routeHandlers)
-  .functions().should().contain(call('normalizePagination')).check();
+within(routeHandlers).functions().should().contain(call('normalizePagination')).check()
 ```
 
 `within()` restricts the search space. Instead of scanning all functions in the project, it only looks at functions that are callbacks inside the matched call expressions. This is both a correctness improvement (the rule only applies where it should) and a performance improvement (smaller search space).
@@ -286,36 +300,38 @@ Predicates filter which architectural elements a rule applies to. They follow th
 
 Available on all entry points.
 
-| Predicate | Description | Applies to |
-|---|---|---|
-| `haveNameMatching(pattern)` | Name matches regex or glob | all |
-| `haveNameStartingWith(prefix)` | Name starts with string | all |
-| `haveNameEndingWith(suffix)` | Name ends with string | all |
-| `resideInFile(glob)` | Source file path matches glob | all |
-| `resideInFolder(glob)` | Source file's directory matches glob | all |
-| `areExported()` | Has `export` keyword | all except Call |
-| `areNotExported()` | No `export` keyword | all except Call |
+| Predicate                      | Description                          | Applies to      |
+| ------------------------------ | ------------------------------------ | --------------- |
+| `haveNameMatching(pattern)`    | Name matches regex or glob           | all             |
+| `haveNameStartingWith(prefix)` | Name starts with string              | all             |
+| `haveNameEndingWith(suffix)`   | Name ends with string                | all             |
+| `resideInFile(glob)`           | Source file path matches glob        | all             |
+| `resideInFolder(glob)`         | Source file's directory matches glob | all             |
+| `areExported()`                | Has `export` keyword                 | all except Call |
+| `areNotExported()`             | No `export` keyword                  | all except Call |
 
 ```typescript
 classes(p).that().haveNameEndingWith('Repository')
 functions(p).that().resideInFolder('src/routes/**')
-types(p).that().haveNameMatching(/QueryOptions$/)
+types(p)
+  .that()
+  .haveNameMatching(/QueryOptions$/)
 modules(p).that().resideInFile('**/index.ts')
 ```
 
 ### 5.2 Class Predicates
 
-| Predicate | Description |
-|---|---|
-| `extend(className)` | Extends a specific base class |
-| `implement(interfaceName)` | Has explicit `implements` clause |
+| Predicate                          | Description                                     |
+| ---------------------------------- | ----------------------------------------------- |
+| `extend(className)`                | Extends a specific base class                   |
+| `implement(interfaceName)`         | Has explicit `implements` clause                |
 | `structurallyMatch(interfaceName)` | Satisfies interface structurally (type checker) |
-| `haveDecorator(name)` | Has decorator with given name |
-| `haveDecoratorMatching(regex)` | Has decorator matching pattern |
-| `areAbstract()` | Is abstract class |
-| `haveMethodNamed(name)` | Has a method with the given name |
-| `haveMethodMatching(regex)` | Has a method whose name matches |
-| `havePropertyNamed(name)` | Has a property with the given name |
+| `haveDecorator(name)`              | Has decorator with given name                   |
+| `haveDecoratorMatching(regex)`     | Has decorator matching pattern                  |
+| `areAbstract()`                    | Is abstract class                               |
+| `haveMethodNamed(name)`            | Has a method with the given name                |
+| `haveMethodMatching(regex)`        | Has a method whose name matches                 |
+| `havePropertyNamed(name)`          | Has a property with the given name              |
 
 ```typescript
 classes(p).that().extend('BaseRepository')
@@ -325,32 +341,38 @@ classes(p).that().implement('EventHandler')
 
 ### 5.3 Function Predicates
 
-| Predicate | Description |
-|---|---|
-| `areAsync()` | Is async function |
-| `haveParameterCount(n)` | Has exactly n parameters |
-| `haveParameterCountGreaterThan(n)` | Has more than n parameters |
-| `haveParameterNamed(name)` | Has a parameter with given name |
-| `haveReturnType(typePattern)` | Return type matches (string or structural) |
-| `haveDecorator(name)` | Has decorator (for class methods selected as functions) |
+| Predicate                          | Description                                             |
+| ---------------------------------- | ------------------------------------------------------- |
+| `areAsync()`                       | Is async function                                       |
+| `haveParameterCount(n)`            | Has exactly n parameters                                |
+| `haveParameterCountGreaterThan(n)` | Has more than n parameters                              |
+| `haveParameterNamed(name)`         | Has a parameter with given name                         |
+| `haveReturnType(typePattern)`      | Return type matches (string or structural)              |
+| `haveDecorator(name)`              | Has decorator (for class methods selected as functions) |
 
 ```typescript
 functions(p).that().areAsync().and().haveParameterCount(3)
-functions(p).that().haveReturnType(/Promise/)
+functions(p)
+  .that()
+  .haveReturnType(/Promise/)
 ```
 
 ### 5.4 Type Predicates
 
-| Predicate | Description |
-|---|---|
-| `areInterfaces()` | Is an `interface`, not a `type` alias |
-| `areTypeAliases()` | Is a `type` alias, not an `interface` |
-| `haveProperty(name)` | Has a property with given name |
-| `havePropertyOfType(name, typePattern)` | Has a property whose type matches |
-| `extendType(name)` | Extends another interface/type |
+| Predicate                               | Description                           |
+| --------------------------------------- | ------------------------------------- |
+| `areInterfaces()`                       | Is an `interface`, not a `type` alias |
+| `areTypeAliases()`                      | Is a `type` alias, not an `interface` |
+| `haveProperty(name)`                    | Has a property with given name        |
+| `havePropertyOfType(name, typePattern)` | Has a property whose type matches     |
+| `extendType(name)`                      | Extends another interface/type        |
 
 ```typescript
-types(p).that().haveNameMatching(/QueryOptions$/).and().haveProperty('orderBy')
+types(p)
+  .that()
+  .haveNameMatching(/QueryOptions$/)
+  .and()
+  .haveProperty('orderBy')
 types(p).that().areInterfaces().and().extendType('BaseOptions')
 ```
 
@@ -358,42 +380,41 @@ types(p).that().areInterfaces().and().extendType('BaseOptions')
 
 Call predicates select call expressions. This is critical for any framework that registers behavior via function calls rather than decorators — which includes most of the TypeScript ecosystem (Express `router.get()`, Fastify `app.get()`, Hono `app.route()`, tRPC `router()`, Elysia `.get()`, etc.).
 
-| Predicate | Description |
-|---|---|
-| `onObject(name)` | Call is on object named `name` (e.g., `app`, `router`) |
-| `withMethod(nameOrRegex)` | Method name matches (e.g., `get`, `/^(get\|post\|put\|delete)$/`) |
-| `withArgMatching(index, pattern)` | Argument at position matches pattern |
-| `withStringArg(index, glob)` | String literal argument matches glob |
-| `haveCallbackContaining(predicate)` | The callback argument contains... |
+| Predicate                           | Description                                                       |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `onObject(name)`                    | Call is on object named `name` (e.g., `app`, `router`)            |
+| `withMethod(nameOrRegex)`           | Method name matches (e.g., `get`, `/^(get\|post\|put\|delete)$/`) |
+| `withArgMatching(index, pattern)`   | Argument at position matches pattern                              |
+| `withStringArg(index, glob)`        | String literal argument matches glob                              |
+| `haveCallbackContaining(predicate)` | The callback argument contains...                                 |
 
 ```typescript
 // Select route registrations (works for any framework using this call pattern)
 calls(p)
-  .that().onObject('app')
-  .and().withMethod(/^(get|post|put|delete|patch)$/)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
 
 // Select specific routes by path pattern
-calls(p)
-  .that().onObject('router')
-  .and().withMethod('get')
-  .and().withStringArg(0, '/api/users/**')
+calls(p).that().onObject('router').and().withMethod('get').and().withStringArg(0, '/api/users/**')
 ```
 
 ### 5.6 Module Predicates
 
-| Predicate | Description |
-|---|---|
-| `importFrom(glob)` | Has an import from a path matching glob |
-| `notImportFrom(glob)` | Has no imports from path matching glob |
-| `exportSymbolNamed(name)` | Exports a symbol with given name |
-| `havePathMatching(glob)` | Module file path matches |
+| Predicate                 | Description                             |
+| ------------------------- | --------------------------------------- |
+| `importFrom(glob)`        | Has an import from a path matching glob |
+| `notImportFrom(glob)`     | Has no imports from path matching glob  |
+| `exportSymbolNamed(name)` | Exports a symbol with given name        |
+| `havePathMatching(glob)`  | Module file path matches                |
 
 ### 5.7 Slice Predicates
 
-| Predicate | Description |
-|---|---|
-| `matching(glob)` | Each directory matching the glob is a slice |
-| `assignedFrom(definition)` | Slices are defined by a name-to-glob map |
+| Predicate                  | Description                                 |
+| -------------------------- | ------------------------------------------- |
+| `matching(glob)`           | Each directory matching the glob is a slice |
+| `assignedFrom(definition)` | Slices are defined by a name-to-glob map    |
 
 ```typescript
 const layers = {
@@ -401,7 +422,7 @@ const layers = {
   application: 'src/services/**',
   persistence: 'src/repositories/**',
   domain: 'src/domain/**',
-};
+}
 
 slices(p).assignedFrom(layers)
 slices(p).matching('src/features/*/')
@@ -415,45 +436,52 @@ Conditions assert what must be true about the filtered elements. They follow `.s
 
 ### 6.1 Structural Conditions
 
-| Condition | Description | Applies to |
-|---|---|---|
-| `resideInFile(glob)` | Must be in a file matching glob | all |
-| `resideInFolder(glob)` | Must be in a folder matching glob | all |
-| `haveNameMatching(regex)` | Name must match | all |
-| `beExported()` | Must be exported | all |
-| `notExist()` | No elements should match (the predicate set must be empty) | all |
+| Condition                 | Description                                                | Applies to |
+| ------------------------- | ---------------------------------------------------------- | ---------- |
+| `resideInFile(glob)`      | Must be in a file matching glob                            | all        |
+| `resideInFolder(glob)`    | Must be in a folder matching glob                          | all        |
+| `haveNameMatching(regex)` | Name must match                                            | all        |
+| `beExported()`            | Must be exported                                           | all        |
+| `notExist()`              | No elements should match (the predicate set must be empty) | all        |
 
 ```typescript
 // "Helper functions with this naming pattern should not exist"
 functions(p)
-  .that().haveNameMatching(/^parse\w+Order$/)
-  .and().resideInFolder('src/routes/**')
-  .should().notExist()
+  .that()
+  .haveNameMatching(/^parse\w+Order$/)
+  .and()
+  .resideInFolder('src/routes/**')
+  .should()
+  .notExist()
   .because('use the shared parseOrder() utility')
-  .check();
+  .check()
 ```
 
 ### 6.2 Dependency Conditions
 
-| Condition | Description | Applies to |
-|---|---|---|
-| `onlyImportFrom(...globs)` | May only import from listed paths | Module |
-| `notImportFrom(...globs)` | Must not import from listed paths | Module |
-| `onlyHaveTypeImportsFrom(...globs)` | Imports from these paths must be `import type` | Module |
-| `notReference(name)` | Must not reference this identifier anywhere | Class, Function, Module |
-| `notReferenceType(name)` | Must not reference this type | Class, Function |
+| Condition                           | Description                                    | Applies to              |
+| ----------------------------------- | ---------------------------------------------- | ----------------------- |
+| `onlyImportFrom(...globs)`          | May only import from listed paths              | Module                  |
+| `notImportFrom(...globs)`           | Must not import from listed paths              | Module                  |
+| `onlyHaveTypeImportsFrom(...globs)` | Imports from these paths must be `import type` | Module                  |
+| `notReference(name)`                | Must not reference this identifier anywhere    | Class, Function, Module |
+| `notReferenceType(name)`            | Must not reference this type                   | Class, Function         |
 
 ```typescript
 modules(p)
-  .that().resideInFolder('src/domain/**')
-  .should().notImportFrom('src/repositories/**', 'src/controllers/**')
-  .check();
+  .that()
+  .resideInFolder('src/domain/**')
+  .should()
+  .notImportFrom('src/repositories/**', 'src/controllers/**')
+  .check()
 
 classes(p)
-  .that().resideInFolder('src/wrappers/**')
-  .should().notReference('URLSearchParams')
+  .that()
+  .resideInFolder('src/wrappers/**')
+  .should()
+  .notReference('URLSearchParams')
   .because('use the shared buildQueryString() utility')
-  .check();
+  .check()
 ```
 
 ### 6.3 Body Analysis Conditions
@@ -462,34 +490,34 @@ These inspect the contents of function/method bodies. This is where ts-archunit 
 
 **Important design note:** Body analysis operates at the **AST level**, not string matching. `call('parseInt')` matches the call expression node for `parseInt(...)` regardless of whitespace, formatting, or surrounding code. The `expression()` helper (Section 6.3.3) is the only string-based matcher and is explicitly labeled as an escape hatch.
 
-| Condition | Description | Applies to |
-|---|---|---|
-| `contain(call(name))` | Body must contain a call to `name` | Function, Class (any method) |
-| `contain(call(regex))` | Body must contain a call matching regex | Function, Class |
-| `notContain(call(name))` | Body must NOT contain a call to `name` | Function, Class |
-| `contain(access(chain))` | Body accesses a property chain | Function, Class |
-| `contain(newExpr(name))` | Body contains `new Name(...)` | Function, Class |
-| `notContain(newExpr(name))` | Body must NOT contain `new Name(...)` | Function, Class |
-| `useInsteadOf(bad, good)` | Must NOT contain `bad` AND must contain `good` | Function, Class |
+| Condition                   | Description                                    | Applies to                   |
+| --------------------------- | ---------------------------------------------- | ---------------------------- |
+| `contain(call(name))`       | Body must contain a call to `name`             | Function, Class (any method) |
+| `contain(call(regex))`      | Body must contain a call matching regex        | Function, Class              |
+| `notContain(call(name))`    | Body must NOT contain a call to `name`         | Function, Class              |
+| `contain(access(chain))`    | Body accesses a property chain                 | Function, Class              |
+| `contain(newExpr(name))`    | Body contains `new Name(...)`                  | Function, Class              |
+| `notContain(newExpr(name))` | Body must NOT contain `new Name(...)`          | Function, Class              |
+| `useInsteadOf(bad, good)`   | Must NOT contain `bad` AND must contain `good` | Function, Class              |
 
 #### 6.3.1 `call()` helper
 
 The primary matching mechanism. Operates on AST `CallExpression` nodes.
 
 ```typescript
-call('normalizePagination')       // exact function name
-call('parseOrder')                // exact function name
-call(/^parse\w+Order$/)           // regex match on function name
-call('Math.min')                  // method call on object
-call('JSON.stringify')            // method call on global
-call('this.extractCount')         // method call on this
+call('normalizePagination') // exact function name
+call('parseOrder') // exact function name
+call(/^parse\w+Order$/) // regex match on function name
+call('Math.min') // method call on object
+call('JSON.stringify') // method call on global
+call('this.extractCount') // method call on this
 ```
 
 **Advanced:** `call()` also accepts a predicate function for full AST-level matching:
 
 ```typescript
-call(c => c.getArguments().length === 2)   // calls with exactly 2 args
-call('parseInt').withArgument(access('countResult.count'))  // parseInt(countResult.count)
+call((c) => c.getArguments().length === 2) // calls with exactly 2 args
+call('parseInt').withArgument(access('countResult.count')) // parseInt(countResult.count)
 ```
 
 **Symbol-aware matching (optional):** For cases where functions are aliased, destructured, or re-exported, string-based name matching can miss calls. Symbol-aware matching uses the TypeScript type checker to resolve the actual symbol:
@@ -499,7 +527,7 @@ call('parseInt').withArgument(access('countResult.count'))  // parseInt(countRes
 call(symbolOf('BaseRepository.extractCount'))
 
 // Matches even if imported under a different name
-call(resolvesTo('parseOrder'))   // traces through imports/re-exports
+call(resolvesTo('parseOrder')) // traces through imports/re-exports
 ```
 
 `symbolOf()` and `resolvesTo()` are Phase 2 additions. Phase 1 uses name-based matching only, which covers the majority of real-world cases (most codebases call `this.extractCount()`, not a destructured alias).
@@ -509,8 +537,8 @@ call(resolvesTo('parseOrder'))   // traces through imports/re-exports
 #### 6.3.2 `access()` helper
 
 ```typescript
-access('request.query.order')     // property access chain
-access('this.db')                 // access on this
+access('request.query.order') // property access chain
+access('this.db') // access on this
 ```
 
 **Implementation:** Walks `PropertyAccessExpression` chains and matches against the dotted path.
@@ -522,7 +550,7 @@ access('this.db')                 // access on this
 ```typescript
 // AVOID when possible — fragile, breaks on formatting changes
 expression('Number(')
-expression("typeof countResult")
+expression('typeof countResult')
 
 // PREFER — AST-level, formatting-independent
 call('Number')
@@ -581,24 +609,24 @@ For cases where the value is destructured or aliased before being passed, the si
 
 ### 6.4 Type-Level Conditions
 
-| Condition | Description | Applies to |
-|---|---|---|
-| `havePropertyType(name, matcher)` | Property's type must match | Type |
-| `returnTypeMatches(shape)` | Return type must match structural shape | Function |
-| `implementShape(shape)` | Must structurally match a shape | Class |
+| Condition                         | Description                             | Applies to |
+| --------------------------------- | --------------------------------------- | ---------- |
+| `havePropertyType(name, matcher)` | Property's type must match              | Type       |
+| `returnTypeMatches(shape)`        | Return type must match structural shape | Function   |
+| `implementShape(shape)`           | Must structurally match a shape         | Class      |
 
 #### Semantic Type Matchers
 
 Type matchers operate on the TypeScript type checker, not on string representations. They handle unions, aliases, generics, and `undefined` correctly.
 
 ```typescript
-not(isString())                   // any type except string (handles string | undefined)
-exactly(isNumber())               // exactly number
-isUnionOfLiterals()               // must be a union of string/number literals
-isStringLiteral()                 // a specific string literal type
+not(isString()) // any type except string (handles string | undefined)
+exactly(isNumber()) // exactly number
+isUnionOfLiterals() // must be a union of string/number literals
+isStringLiteral() // a specific string literal type
 shapeOf({ skip: 'number', limit: 'number', total: 'number' })
-arrayOf(isString())               // string[]
-matching(/Promise</)              // regex on type text (escape hatch)
+arrayOf(isString()) // string[]
+matching(/Promise</) // regex on type text (escape hatch)
 ```
 
 **Implementation:** Uses `type.isString()`, `type.isUnion()`, `type.getUnionTypes()`, `type.isStringLiteral()` etc. from the TypeScript type checker via ts-morph. These are semantic checks, not string comparisons — they correctly handle type aliases, `Partial<>`, `Pick<>`, and other type-level operations.
@@ -606,59 +634,61 @@ matching(/Promise</)              // regex on type text (escape hatch)
 ```typescript
 // "QueryOptions.orderBy must be a typed union, never bare string"
 types(p)
-  .that().haveNameMatching(/QueryOptions$/)
-  .and().haveProperty('orderBy')
-  .should().havePropertyType('orderBy', not(isString()))
+  .that()
+  .haveNameMatching(/QueryOptions$/)
+  .and()
+  .haveProperty('orderBy')
+  .should()
+  .havePropertyType('orderBy', not(isString()))
   .because('bare string orderBy passed to .orderBy() is a SQL injection surface')
-  .check();
+  .check()
 
 // "Pagination options must use number literals for defaults"
-types(p)
-  .that().haveProperty('limit')
-  .should().havePropertyType('limit', isNumber())
-  .check();
+types(p).that().haveProperty('limit').should().havePropertyType('limit', isNumber()).check()
 ```
 
 ### 6.5 Class-Specific Conditions
 
-| Condition | Description |
-|---|---|
-| `extend(className)` | Must extend this class |
-| `implement(interfaceName)` | Must explicitly implement |
-| `haveMethodNamed(name)` | Must have this method |
+| Condition                      | Description                    |
+| ------------------------------ | ------------------------------ |
+| `extend(className)`            | Must extend this class         |
+| `implement(interfaceName)`     | Must explicitly implement      |
+| `haveMethodNamed(name)`        | Must have this method          |
 | `notHaveMethodMatching(regex)` | Must not have methods matching |
 
 ### 6.6 Slice Conditions
 
-| Condition | Description |
-|---|---|
-| `beFreeOfCycles()` | No circular dependencies between slices |
-| `respectLayerOrder(...layers)` | Layer A may depend on B, but B not on A |
-| `notDependOn(...sliceNames)` | Named slices must not depend on listed slices |
+| Condition                      | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `beFreeOfCycles()`             | No circular dependencies between slices       |
+| `respectLayerOrder(...layers)` | Layer A may depend on B, but B not on A       |
+| `notDependOn(...sliceNames)`   | Named slices must not depend on listed slices |
 
 ```typescript
-slices(p).assignedFrom(layers)
-  .should().respectLayerOrder('presentation', 'application', 'persistence', 'domain')
+slices(p)
+  .assignedFrom(layers)
+  .should()
+  .respectLayerOrder('presentation', 'application', 'persistence', 'domain')
   .because('dependencies point inward')
-  .check();
+  .check()
 ```
 
 ### 6.7 Quantifier Conditions
 
-| Condition | Description |
-|---|---|
-| `allMatch(condition)` | Every element must satisfy |
-| `noneMatch(condition)` | No element may satisfy |
+| Condition               | Description                       |
+| ----------------------- | --------------------------------- |
+| `allMatch(condition)`   | Every element must satisfy        |
+| `noneMatch(condition)`  | No element may satisfy            |
 | `atLeastOne(condition)` | At least one element must satisfy |
 
 ### 6.8 Logical Combinators
 
-| Combinator | Description |
-|---|---|
-| `.andShould()` | Both conditions must hold (AND) |
-| `.orShould()` | At least one condition must hold (OR) |
+| Combinator                 | Description                           |
+| -------------------------- | ------------------------------------- |
+| `.andShould()`             | Both conditions must hold (AND)       |
+| `.orShould()`              | At least one condition must hold (OR) |
 | `haveAtLeastOneOf(c1, c2)` | At least one of the listed conditions |
-| `haveAllOf(c1, c2)` | All listed conditions |
+| `haveAllOf(c1, c2)`        | All listed conditions                 |
 
 ### 6.9 Rule Severity
 
@@ -666,22 +696,23 @@ Not every rule should fail CI. Rules can specify severity levels:
 
 ```typescript
 // Fails CI (default)
-classes(p).that().extend('BaseRepository')
-  .should().notContain(call('parseInt'))
-  .check();
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
 
 // Warns but does not fail
-classes(p).that().extend('BaseRepository')
-  .should().notHaveMethodMatching(/^query$/)
-  .warn();    // instead of .check()
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notHaveMethodMatching(/^query$/)
+  .warn() // instead of .check()
 ```
 
-| Method | Behavior |
-|---|---|
-| `.check()` | Throws on violations (fails CI) |
-| `.warn()` | Prints violations but does not throw |
-| `.severity('error')` | Same as `.check()` |
-| `.severity('warn')` | Same as `.warn()` |
+| Method               | Behavior                             |
+| -------------------- | ------------------------------------ |
+| `.check()`           | Throws on violations (fails CI)      |
+| `.warn()`            | Prints violations but does not throw |
+| `.severity('error')` | Same as `.check()`                   |
+| `.severity('warn')`  | Same as `.warn()`                    |
 
 ---
 
@@ -692,53 +723,51 @@ Users define their own predicates and conditions using the same interface as bui
 ### 7.1 Custom Predicate
 
 ```typescript
-import { definePredicate } from 'ts-archunit';
+import { definePredicate } from 'ts-archunit'
 
 // Example: define what a "route handler" means in YOUR framework
-const isRouteRegistration = definePredicate<CallExpression>(
-  'is a route registration',
-  (call) => {
-    const expr = call.getExpression();
-    if (!Node.isPropertyAccessExpression(expr)) return false;
-    const method = expr.getName();
-    return ['get', 'post', 'put', 'delete', 'patch'].includes(method);
-  }
-);
+const isRouteRegistration = definePredicate<CallExpression>('is a route registration', (call) => {
+  const expr = call.getExpression()
+  if (!Node.isPropertyAccessExpression(expr)) return false
+  const method = expr.getName()
+  return ['get', 'post', 'put', 'delete', 'patch'].includes(method)
+})
 
 // Now use it like any built-in predicate
-calls(p).that().satisfy(isRouteRegistration)
-  .should().haveCallbackContaining(call('handleError'))
-  .check();
+calls(p)
+  .that()
+  .satisfy(isRouteRegistration)
+  .should()
+  .haveCallbackContaining(call('handleError'))
+  .check()
 ```
 
 ### 7.2 Custom Condition
 
 ```typescript
-import { defineCondition } from 'ts-archunit';
+import { defineCondition } from 'ts-archunit'
 
 const useSharedCountHelper = defineCondition<ClassDeclaration>(
   'use shared count helper instead of inline parsing',
   (cls) => {
-    const violations = [];
+    const violations = []
     for (const method of cls.getMethods()) {
-      const body = method.getBody();
-      if (!body) continue;
-      const calls = body.getDescendantsOfKind(SyntaxKind.CallExpression);
-      const usesParseInt = calls.some(c => c.getExpression().getText() === 'parseInt');
+      const body = method.getBody()
+      if (!body) continue
+      const calls = body.getDescendantsOfKind(SyntaxKind.CallExpression)
+      const usesParseInt = calls.some((c) => c.getExpression().getText() === 'parseInt')
       if (usesParseInt) {
         violations.push({
           element: method,
-          message: `${method.getName()} calls parseInt() — use this.extractCount() instead`
-        });
+          message: `${method.getName()} calls parseInt() — use this.extractCount() instead`,
+        })
       }
     }
-    return violations;
-  }
-);
+    return violations
+  },
+)
 
-classes(p).that().extend('BaseRepository')
-  .should().satisfy(useSharedCountHelper)
-  .check();
+classes(p).that().extend('BaseRepository').should().satisfy(useSharedCountHelper).check()
 ```
 
 ### 7.3 Pattern Templates
@@ -746,7 +775,7 @@ classes(p).that().extend('BaseRepository')
 Reusable architectural patterns that encode team conventions:
 
 ```typescript
-import { definePattern } from 'ts-archunit';
+import { definePattern } from 'ts-archunit'
 
 const paginatedCollection = definePattern('paginated-collection', {
   returnShape: {
@@ -755,13 +784,16 @@ const paginatedCollection = definePattern('paginated-collection', {
     limit: 'number',
     items: 'T[]',
   },
-});
+})
 
 functions(p)
-  .that().resideInFolder('src/routes/**')
-  .and().haveReturnType(/Promise/)
-  .should().followPattern(paginatedCollection)
-  .check();
+  .that()
+  .resideInFolder('src/routes/**')
+  .and()
+  .haveReturnType(/Promise/)
+  .should()
+  .followPattern(paginatedCollection)
+  .check()
 ```
 
 ---
@@ -775,12 +807,13 @@ Beyond user-defined rules, ts-archunit ships detectors for common architectural 
 Detects functions with near-identical AST structure across the codebase (like the `parseWebhookOrder` / `parseContentTypeOrder` copy-paste from Section 1.1):
 
 ```typescript
-import { smells } from 'ts-archunit';
+import { smells } from 'ts-archunit'
 
-smells.duplicateBodies(p)
+smells
+  .duplicateBodies(p)
   .inFolder('src/routes/**')
-  .withMinSimilarity(0.9)        // AST similarity threshold
-  .check();
+  .withMinSimilarity(0.9) // AST similarity threshold
+  .check()
 ```
 
 ### 8.2 Inconsistent Sibling Patterns
@@ -788,10 +821,11 @@ smells.duplicateBodies(p)
 Detects when files in the same folder follow different patterns. "All repositories do X except this one" — the odd one out is flagged:
 
 ```typescript
-smells.inconsistentSiblings(p)
+smells
+  .inconsistentSiblings(p)
   .inFolder('src/repositories/**')
-  .forPattern(call('this.extractCount'))   // most siblings use this
-  .check();
+  .forPattern(call('this.extractCount')) // most siblings use this
+  .check()
 ```
 
 ### 8.3 Guardrails
@@ -799,14 +833,15 @@ smells.inconsistentSiblings(p)
 Smell detectors are powerful but noisy without tuning. They ship with configurable filters to prevent false positives and distrust:
 
 ```typescript
-smells.duplicateBodies(p)
+smells
+  .duplicateBodies(p)
   .inFolder('src/**')
-  .minLines(10)               // ignore trivially small functions
-  .ignoreTests()              // exclude test files
-  .ignorePaths('**/*.d.ts')   // exclude type declarations
-  .groupByFolder()            // group results by directory for readability
-  .withMinSimilarity(0.85)    // AST similarity threshold
-  .warn();                    // warn, don't fail CI — smells are advisory
+  .minLines(10) // ignore trivially small functions
+  .ignoreTests() // exclude test files
+  .ignorePaths('**/*.d.ts') // exclude type declarations
+  .groupByFolder() // group results by directory for readability
+  .withMinSimilarity(0.85) // AST similarity threshold
+  .warn() // warn, don't fail CI — smells are advisory
 ```
 
 **Default behavior:** Smell detectors default to `.warn()`, not `.check()`. They are advisory by design. Teams that want to enforce zero duplication can opt in with `.check()`.
@@ -824,22 +859,22 @@ GraphQL schemas (`.graphql` files or programmatic SDL) are not TypeScript and ne
 ### 9.1 Entry Points
 
 ```typescript
-import { schema, resolvers } from 'ts-archunit/graphql';
+import { schema, resolvers } from 'ts-archunit/graphql'
 
-const s = schema(p, 'src/**/*.graphql');
-const r = resolvers(p, 'src/resolvers/**');
+const s = schema(p, 'src/**/*.graphql')
+const r = resolvers(p, 'src/resolvers/**')
 ```
 
 ### 9.2 Schema Predicates and Conditions
 
-| Predicate / Condition | Description |
-|---|---|
-| `queries()` | Select Query type fields |
-| `mutations()` | Select Mutation type fields |
-| `typesNamed(regex)` | Select types by name |
-| `returnListOf(any())` | Fields returning a list |
-| `acceptArgs(...names)` | Must accept these arguments |
-| `haveFields(...names)` | Type must have these fields |
+| Predicate / Condition    | Description                          |
+| ------------------------ | ------------------------------------ |
+| `queries()`              | Select Query type fields             |
+| `mutations()`            | Select Mutation type fields          |
+| `typesNamed(regex)`      | Select types by name                 |
+| `returnListOf(any())`    | Fields returning a list              |
+| `acceptArgs(...names)`   | Must accept these arguments          |
+| `haveFields(...names)`   | Type must have these fields          |
 | `haveMatchingResolver()` | A resolver implementation must exist |
 
 ### 9.3 Resolver Conditions
@@ -848,16 +883,20 @@ Resolver conditions reuse the same body analysis engine as function conditions:
 
 ```typescript
 // "Collection types must have standard pagination fields"
-schema.typesNamed(/Collection$/)
-  .should().haveFields('total', 'skip', 'limit', 'items')
-  .check();
+schema
+  .typesNamed(/Collection$/)
+  .should()
+  .haveFields('total', 'skip', 'limit', 'items')
+  .check()
 
 // "Resolvers for relation fields must use DataLoader"
 resolvers
-  .that().resolveFieldReturning(/^[A-Z]/)
-  .should().contain(call('loader.load'))
+  .that()
+  .resolveFieldReturning(/^[A-Z]/)
+  .should()
+  .contain(call('loader.load'))
   .because('prevent N+1 queries')
-  .check();
+  .check()
 ```
 
 ---
@@ -892,69 +931,76 @@ Rules are organized using the test runner's native grouping mechanisms. No new c
 
 ```typescript
 // arch.test.ts
-import { describe, it } from 'vitest';
-import { project, classes, functions, types, modules, slices, calls } from 'ts-archunit';
+import { describe, it } from 'vitest'
+import { project, classes, functions, types, modules, slices, calls } from 'ts-archunit'
 
-const p = project('tsconfig.json');
+const p = project('tsconfig.json')
 
 // ─── Named selections (define once, reuse across rules) ───
-const repositories = classes(p).that().extend('BaseRepository');
-const routes = calls(p).that().onObject('app').and().withMethod(/^(get|post|put|delete|patch)$/);
+const repositories = classes(p).that().extend('BaseRepository')
+const routes = calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
 
 // ─── Rules grouped by architectural concern ───
 describe('Repository Standards', () => {
   it('must use extractCount()', () => {
-    repositories
-      .should().useInsteadOf(call('parseInt'), call('this.extractCount'))
-      .check();
-  });
+    repositories.should().useInsteadOf(call('parseInt'), call('this.extractCount')).check()
+  })
 
   it('must use typed errors', () => {
     repositories
-      .should().notContain(newExpr('Error'))
+      .should()
+      .notContain(newExpr('Error'))
       .because('use NotFoundError/ValidationError')
-      .check();
-  });
+      .check()
+  })
 
   it('QueryOptions.orderBy must be typed', () => {
     types(p)
-      .that().haveNameMatching(/QueryOptions$/)
-      .and().haveProperty('orderBy')
-      .should().havePropertyType('orderBy', not(isString()))
-      .check();
-  });
-});
+      .that()
+      .haveNameMatching(/QueryOptions$/)
+      .and()
+      .haveProperty('orderBy')
+      .should()
+      .havePropertyType('orderBy', not(isString()))
+      .check()
+  })
+})
 
 describe('Route Consistency', () => {
   it('must use normalizePagination()', () => {
-    within(routes)
-      .functions().should().contain(call('normalizePagination'))
-      .check();
-  });
+    within(routes).functions().should().contain(call('normalizePagination')).check()
+  })
 
   it('no per-resource order parsers', () => {
     functions(p)
-      .that().haveNameMatching(/^parse\w+Order$/)
-      .and().resideInFolder('src/routes/**')
-      .should().notExist()
-      .check();
-  });
-});
+      .that()
+      .haveNameMatching(/^parse\w+Order$/)
+      .and()
+      .resideInFolder('src/routes/**')
+      .should()
+      .notExist()
+      .check()
+  })
+})
 
 describe('Layer Dependencies', () => {
   it('domain must not depend on infrastructure', () => {
     modules(p)
-      .that().resideInFolder('src/domain/**')
-      .should().notImportFrom('src/repositories/**')
-      .check();
-  });
+      .that()
+      .resideInFolder('src/domain/**')
+      .should()
+      .notImportFrom('src/repositories/**')
+      .check()
+  })
 
   it('no cycles between feature modules', () => {
-    slices(p).matching('src/features/*/')
-      .should().beFreeOfCycles()
-      .check();
-  });
-});
+    slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
+  })
+})
 ```
 
 **Rule organization philosophy:** ts-archunit does NOT introduce its own grouping mechanism (`group()`, `ruleset()`, etc.). Test runners already solve this problem with `describe()`, `it()`, and file-level organization. Adding another layer would create confusion. Use your test runner's features — nested describes, `.skip`, `.only`, tags, file patterns — they all work.
@@ -973,7 +1019,7 @@ npx ts-archunit check --watch
 
 ```typescript
 // ts-archunit.config.ts
-import { defineConfig, layers } from 'ts-archunit';
+import { defineConfig, layers } from 'ts-archunit'
 
 export default defineConfig({
   project: 'tsconfig.json',
@@ -984,7 +1030,7 @@ export default defineConfig({
       repositories: 'src/repositories/**',
     }).respectOrder('controllers', 'services', 'repositories'),
   ],
-});
+})
 ```
 
 ### 11.4 Diff-Aware Mode
@@ -1000,6 +1046,7 @@ npx ts-archunit check --changed --base main
 ```
 
 **Important distinction — evaluation scope vs reporting scope:**
+
 - **Evaluation scope: full project.** Rules always analyze the complete codebase. This is necessary because rules like "inconsistent siblings" or "no cycles" need full context to produce correct results.
 - **Reporting scope: changed files only.** Violations are only surfaced for files that appear in `git diff --name-only <base>...HEAD`. Existing violations in untouched files are silently ignored.
 
@@ -1021,17 +1068,19 @@ The baseline file records all known violations (file, line, rule). On subsequent
 
 ```typescript
 // Programmatic API
-import { project, classes, withBaseline } from 'ts-archunit';
+import { project, classes, withBaseline } from 'ts-archunit'
 
-const p = project('tsconfig.json');
+const p = project('tsconfig.json')
 
 // Load baseline — only new violations fail
-const baseline = withBaseline('arch-baseline.json');
+const baseline = withBaseline('arch-baseline.json')
 
 classes(p)
-  .that().extend('BaseRepository')
-  .should().useInsteadOf(call('parseInt'), call('this.extractCount'))
-  .check({ baseline });
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .useInsteadOf(call('parseInt'), call('this.extractCount'))
+  .check({ baseline })
 ```
 
 **Baseline file format:** JSON array of `{ rule, file, line }` objects. Line numbers are fuzzy-matched (within a small window) to handle code movement from unrelated changes.
@@ -1046,14 +1095,14 @@ When a rule fails, the error message must be actionable: what failed, where, why
 
 ```typescript
 interface ArchViolation {
-  rule: string;           // the rule description
-  element: string;        // e.g., "WebhookRepository.query()"
-  file: string;           // absolute file path
-  line: number;           // line number
-  message: string;        // human-readable violation description
-  because?: string;       // the .because() rationale
-  codeFrame?: string;     // source code snippet around the violation
-  suggestion?: string;    // what to use instead (from useInsteadOf, etc.)
+  rule: string // the rule description
+  element: string // e.g., "WebhookRepository.query()"
+  file: string // absolute file path
+  line: number // line number
+  message: string // human-readable violation description
+  because?: string // the .because() rationale
+  codeFrame?: string // source code snippet around the violation
+  suggestion?: string // what to use instead (from useInsteadOf, etc.)
 }
 ```
 
@@ -1088,11 +1137,11 @@ Rule: "QueryOptions.orderBy must be typed"
 
 ### 12.3 Output Formats
 
-| Format | Use case |
-|---|---|
-| **terminal** (default) | Human-readable with code frames and colors |
-| **json** | Machine-readable for CI integration |
-| **github** | GitHub Actions annotations (inline PR comments) |
+| Format                 | Use case                                        |
+| ---------------------- | ----------------------------------------------- |
+| **terminal** (default) | Human-readable with code frames and colors      |
+| **json**               | Machine-readable for CI integration             |
+| **github**             | GitHub Actions annotations (inline PR comments) |
 
 ```bash
 npx ts-archunit check --format github
@@ -1175,17 +1224,17 @@ This is what makes the tool a query engine, not a naive walker. The first rule i
 
 Every predicate/condition ultimately calls ts-morph APIs:
 
-| DSL operation | ts-morph call |
-|---|---|
-| `haveDecorator('X')` | `node.getDecorators().some(d => d.getName() === 'X')` |
-| `extend('Base')` | `cls.getExtends()?.getExpression().getText()` |
-| `resideInFolder(glob)` | `sourceFile.getFilePath()` matched against glob |
-| `contain(call('foo'))` | `node.getDescendantsOfKind(SyntaxKind.CallExpression)` filtered by identifier |
-| `havePropertyType('x', ...)` | `iface.getProperty('x')?.getType()` → type checker methods |
-| `returnTypeMatches(shape)` | `checker.isTypeAssignableTo(returnType, shapeType)` |
-| `onlyImportFrom(globs)` | `sourceFile.getImportDeclarations()` filtered and checked |
-| `beFreeOfCycles()` | Build directed graph from imports, run Tarjan's SCC algorithm |
-| `onObject('app')` | `callExpr.getExpression()` → check `PropertyAccessExpression` object name |
+| DSL operation                | ts-morph call                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `haveDecorator('X')`         | `node.getDecorators().some(d => d.getName() === 'X')`                         |
+| `extend('Base')`             | `cls.getExtends()?.getExpression().getText()`                                 |
+| `resideInFolder(glob)`       | `sourceFile.getFilePath()` matched against glob                               |
+| `contain(call('foo'))`       | `node.getDescendantsOfKind(SyntaxKind.CallExpression)` filtered by identifier |
+| `havePropertyType('x', ...)` | `iface.getProperty('x')?.getType()` → type checker methods                    |
+| `returnTypeMatches(shape)`   | `checker.isTypeAssignableTo(returnType, shapeType)`                           |
+| `onlyImportFrom(globs)`      | `sourceFile.getImportDeclarations()` filtered and checked                     |
+| `beFreeOfCycles()`           | Build directed graph from imports, run Tarjan's SCC algorithm                 |
+| `onObject('app')`            | `callExpr.getExpression()` → check `PropertyAccessExpression` object name     |
 
 ### 13.3 Two-Tier Analysis: AST-Only vs Type-Checked
 
@@ -1208,10 +1257,10 @@ Type checking is **lazy** — it is not triggered during project loading or inde
 
 ### 13.5 Performance Budget
 
-| Codebase size | Target | Strategy |
-|---|---|---|
-| Small (< 500 files) | < 3 seconds for 50 rules | Full project in memory, no special handling |
-| Medium (500–2000 files) | < 10 seconds for 50 rules | Lazy AST loading, memoized predicates |
+| Codebase size                     | Target                    | Strategy                                                               |
+| --------------------------------- | ------------------------- | ---------------------------------------------------------------------- |
+| Small (< 500 files)               | < 3 seconds for 50 rules  | Full project in memory, no special handling                            |
+| Medium (500–2000 files)           | < 10 seconds for 50 rules | Lazy AST loading, memoized predicates                                  |
 | Large monorepo (2000–10000 files) | < 30 seconds for 50 rules | Lazy loading + on-disk cache + file-set narrowing via `resideInFolder` |
 
 The query engine indexing is a one-time cost per test run; rule evaluation is fast index lookups. With TS7's compiler speed, these targets should be achievable. If a specific codebase exceeds these budgets, the first optimization is narrowing the file set — most rules don't need to scan the entire project.
@@ -1317,12 +1366,12 @@ tests/
 
 ## 16. Dependencies
 
-| Package | Purpose | Required in |
-|---|---|---|
-| `ts-morph` | TypeScript AST analysis, type checker | Core |
-| `picomatch` | Glob pattern matching | Core |
-| `graphql` | GraphQL schema parsing | Phase 3 (optional peer dep) |
-| `vitest` / `jest` | Test runner integration | Core (peer dep) |
+| Package           | Purpose                               | Required in                 |
+| ----------------- | ------------------------------------- | --------------------------- |
+| `ts-morph`        | TypeScript AST analysis, type checker | Core                        |
+| `picomatch`       | Glob pattern matching                 | Core                        |
+| `graphql`         | GraphQL schema parsing                | Phase 3 (optional peer dep) |
+| `vitest` / `jest` | Test runner integration               | Core (peer dep)             |
 
 No runtime dependencies beyond ts-morph and a glob matcher. The tool is a dev dependency.
 

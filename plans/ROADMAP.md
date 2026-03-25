@@ -3,37 +3,37 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-25
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 0 completed, ~23 planned
+**Total Plans:** 1 completed, ~22 remaining
 
 ---
 
 ## Priority Matrix
 
-| Priority | Plan | Effort | Status |
-|----------|------|--------|--------|
-| **P0** | Project Bootstrap & Package Setup (0000) | 2-3 hours | Not Started |
-| **P0** | Exploratory PoC & Technical Validation (0001) | 1 day | Not Started |
-| **P0** | Project Loader & Query Engine (0002) | 2-3 days | Not Started |
-| **P0** | Predicate Engine & Identity Predicates (0003) | 1-2 days | Not Started |
-| **P0** | Condition Engine & Structural Conditions (0004) | 1-2 days | Not Started |
-| **P0** | Fluent Rule Builder & `.check()` / `.warn()` (0005) | 1-2 days | Not Started |
-| **P1** | Violation Reporting & Code Frames (0006) | 1-2 days | Not Started |
-| **P1** | Module Entry Point & Dependency Conditions (0007) | 1-2 days | Not Started |
-| **P1** | Class Entry Point & Class Predicates/Conditions (0008) | 1-2 days | Not Started |
-| **P1** | Function Entry Point & Function Predicates (0009) | 1 day | Not Started |
-| **P1** | Type Entry Point & Type-Level Conditions (0010) | 1-2 days | Not Started |
-| **P1** | Body Analysis: `call()`, `access()`, `newExpr()`, `expression()` (0011) | 2-3 days | Not Started |
-| **P1** | Slice Entry Point & Cycle/Layer Conditions (0012) | 2-3 days | Not Started |
-| **P1** | Custom Predicates, Conditions & `definePredicate` / `defineCondition` (0013) | 1 day | Not Started |
-| **P2** | Call Entry Point & Call Predicates (0014) | 2-3 days | Not Started |
-| **P2** | Named Selections, `within()` & Scoped Rules (0015) | 1-2 days | Not Started |
-| **P2** | Baseline Mode & Diff-Aware Mode (0016) | 1-2 days | Not Started |
-| **P2** | Pattern Templates & `definePattern` / `followPattern` (0017) | 1-2 days | Not Started |
-| **P2** | Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018) | 2-3 days | Not Started |
-| **P2** | Output Formats: JSON, GitHub Annotations (0019) | 1 day | Not Started |
-| **P3** | CLI Standalone Runner & Watch Mode (0020) | 1-2 days | Not Started |
-| **P3** | GraphQL Extension: Schema & Resolver Rules (0021) | 3-5 days | Not Started |
-| **P4** | Cross-Layer Validation (0022) | 3-5 days | Not Started |
+| Priority | Plan                                                                         | Effort    | Status      |
+| -------- | ---------------------------------------------------------------------------- | --------- | ----------- |
+| **P0**   | ~~Project Bootstrap & Package Setup (0000)~~                                 | 2-3 hours | COMPLETED 2026-03-25 |
+| **P0**   | Exploratory PoC & Technical Validation (0001)                                | 1 day     | Not Started |
+| **P0**   | Project Loader & Query Engine (0002)                                         | 2-3 days  | Not Started |
+| **P0**   | Predicate Engine & Identity Predicates (0003)                                | 1-2 days  | Not Started |
+| **P0**   | Condition Engine & Structural Conditions (0004)                              | 1-2 days  | Not Started |
+| **P0**   | Fluent Rule Builder & `.check()` / `.warn()` (0005)                          | 1-2 days  | Not Started |
+| **P1**   | Violation Reporting & Code Frames (0006)                                     | 1-2 days  | Not Started |
+| **P1**   | Module Entry Point & Dependency Conditions (0007)                            | 1-2 days  | Not Started |
+| **P1**   | Class Entry Point & Class Predicates/Conditions (0008)                       | 1-2 days  | Not Started |
+| **P1**   | Function Entry Point & Function Predicates (0009)                            | 1 day     | Not Started |
+| **P1**   | Type Entry Point & Type-Level Conditions (0010)                              | 1-2 days  | Not Started |
+| **P1**   | Body Analysis: `call()`, `access()`, `newExpr()`, `expression()` (0011)      | 2-3 days  | Not Started |
+| **P1**   | Slice Entry Point & Cycle/Layer Conditions (0012)                            | 2-3 days  | Not Started |
+| **P1**   | Custom Predicates, Conditions & `definePredicate` / `defineCondition` (0013) | 1 day     | Not Started |
+| **P2**   | Call Entry Point & Call Predicates (0014)                                    | 2-3 days  | Not Started |
+| **P2**   | Named Selections, `within()` & Scoped Rules (0015)                           | 1-2 days  | Not Started |
+| **P2**   | Baseline Mode & Diff-Aware Mode (0016)                                       | 1-2 days  | Not Started |
+| **P2**   | Pattern Templates & `definePattern` / `followPattern` (0017)                 | 1-2 days  | Not Started |
+| **P2**   | Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)             | 2-3 days  | Not Started |
+| **P2**   | Output Formats: JSON, GitHub Annotations (0019)                              | 1 day     | Not Started |
+| **P3**   | CLI Standalone Runner & Watch Mode (0020)                                    | 1-2 days  | Not Started |
+| **P3**   | GraphQL Extension: Schema & Resolver Rules (0021)                            | 3-5 days  | Not Started |
+| **P4**   | Cross-Layer Validation (0022)                                                | 3-5 days  | Not Started |
 
 ---
 
