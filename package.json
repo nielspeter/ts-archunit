@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^22.19.15",
     "@types/picomatch": "^4.0.2",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",

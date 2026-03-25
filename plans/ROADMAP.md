@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-25
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 1 completed, ~22 remaining
+**Total Plans:** 2 completed, ~21 remaining
 
 ---
 
@@ -12,7 +12,7 @@
 | Priority | Plan                                                                         | Effort    | Status      |
 | -------- | ---------------------------------------------------------------------------- | --------- | ----------- |
 | **P0**   | ~~Project Bootstrap & Package Setup (0000)~~                                 | 2-3 hours | COMPLETED 2026-03-25 |
-| **P0**   | Exploratory PoC & Technical Validation (0001)                                | 1 day     | Not Started |
+| **P0**   | ~~Exploratory PoC & Technical Validation (0001)~~                            | 0.5 day   | COMPLETED 2026-03-25 |
 | **P0**   | Project Loader & Query Engine (0002)                                         | 2-3 days  | Not Started |
 | **P0**   | Predicate Engine & Identity Predicates (0003)                                | 1-2 days  | Not Started |
 | **P0**   | Condition Engine & Structural Conditions (0004)                              | 1-2 days  | Not Started |
