@@ -213,6 +213,6 @@ modules(p)
   .that()
   .resideInFolder('**/domain/**')
   .should()
-  .notImportFrom('**/node_modules/express/**')
+  .notImportFromCondition('**/node_modules/express/**')
   .check()
 ```

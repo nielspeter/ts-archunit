@@ -233,12 +233,18 @@ try {
 
 Each violation contains:
 
-| Property    | Type     | Description                          |
-| ----------- | -------- | ------------------------------------ |
-| `message`   | `string` | Human-readable violation description |
-| `filePath`  | `string` | Absolute path to the source file     |
-| `line`      | `number` | Line number of the violation         |
-| `codeFrame` | `string` | Surrounding source code              |
+| Property     | Type                  | Description                                                  |
+| ------------ | --------------------- | ------------------------------------------------------------ |
+| `rule`       | `string`              | Human-readable rule description from the fluent chain        |
+| `ruleId`     | `string \| undefined` | Unique rule identifier from `.rule({ id })`                  |
+| `element`    | `string`              | Element identifier, e.g. `"OrderService"` or `"parseConfig"` |
+| `file`       | `string`              | Absolute path to the source file                             |
+| `line`       | `number`              | Line number where the violating element starts               |
+| `message`    | `string`              | Human-readable description of what went wrong                |
+| `because`    | `string \| undefined` | Rationale provided via `.because()`                          |
+| `suggestion` | `string \| undefined` | Actionable suggestion for fixing the violation               |
+| `docs`       | `string \| undefined` | Link to documentation (ADR, wiki, style guide)               |
+| `codeFrame`  | `string \| undefined` | Source code snippet around the violation line                |
 
 ## Programmatic Access
 

@@ -1,62 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import type { ArchProject } from '../../src/core/project.js'
-import type { Predicate } from '../../src/core/predicate.js'
-import type { Condition, ConditionContext } from '../../src/core/condition.js'
-import type { ArchViolation } from '../../src/core/violation.js'
+import { TestRuleBuilder, stubProject, alwaysFail } from '../support/test-rule-builder.js'
 
-// --- Test element type ---
-interface TestElement {
-  name: string
-  file: string
-  line: number
-}
-
-// --- Test-only concrete builder ---
-class TestRuleBuilder extends RuleBuilder<TestElement> {
-  constructor(
-    project: ArchProject,
-    private elements: TestElement[],
-  ) {
-    super(project)
-  }
-
-  protected getElements(): TestElement[] {
-    return this.elements
-  }
-
-  withPredicate(predicate: Predicate<TestElement>): this {
-    return this.addPredicate(predicate)
-  }
-
-  withCondition(condition: Condition<TestElement>): this {
-    return this.addCondition(condition)
-  }
-}
-
-// --- Helpers ---
-
-function alwaysFail(): Condition<TestElement> {
-  return {
-    description: 'always fails',
-    evaluate: (elements: TestElement[], context: ConditionContext): ArchViolation[] =>
-      elements.map((el) => ({
-        rule: context.rule,
-        element: el.name,
-        file: el.file,
-        line: el.line,
-        message: `violation in ${el.name}`,
-        because: context.because,
-      })),
-  }
-}
-
-const stubProject = {} as ArchProject
-
-const elements: TestElement[] = [
-  { name: 'ServiceA', file: `${process.cwd()}/src/a.ts`, line: 5 },
-  { name: 'ServiceB', file: `${process.cwd()}/src/b.ts`, line: 10 },
+const elements = [
+  { name: 'ServiceA', file: `${process.cwd()}/src/a.ts`, line: 5, exported: true },
+  { name: 'ServiceB', file: `${process.cwd()}/src/b.ts`, line: 10, exported: true },
 ]
 
 describe('RuleBuilder with format option', () => {

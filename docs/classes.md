@@ -39,11 +39,11 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ### Structural Conditions
 
-| Condition              | Description                            |
-| ---------------------- | -------------------------------------- |
-| `beExported()`         | Class must be exported                 |
-| `notExist()`           | No classes should match the predicates |
-| `haveNameMatching(re)` | Class name must match the regex        |
+| Condition                       | Description                            |
+| ------------------------------- | -------------------------------------- |
+| `beExported()`                  | Class must be exported                 |
+| `notExist()`                    | No classes should match the predicates |
+| `conditionHaveNameMatching(re)` | Class name must match the regex        |
 
 ### Class-Specific Conditions
 
@@ -91,7 +91,7 @@ classes(p)
   .that()
   .resideInFolder('**/controllers/**')
   .should()
-  .haveNameMatching(/Controller$/)
+  .conditionHaveNameMatching(/Controller$/)
   .rule({
     id: 'naming/controller-suffix',
     because: 'Consistent naming makes the codebase navigable',

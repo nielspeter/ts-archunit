@@ -1,5 +1,11 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { run } from '../../src/cli/index.js'
+
+const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../package.json')
+const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -17,6 +23,18 @@ describe('run', () => {
     const output = chunks.join('')
     expect(output).toContain('ts-archunit')
     expect(output).toContain('Usage')
+    writeSpy.mockRestore()
+  })
+
+  it('prints version with --version flag', async () => {
+    const chunks: string[] = []
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      chunks.push(String(chunk))
+      return true
+    })
+    await run(['--version'])
+    const output = chunks.join('')
+    expect(output).toContain(pkg.version)
     writeSpy.mockRestore()
   })
 

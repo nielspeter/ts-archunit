@@ -16,7 +16,7 @@ function resolveImportPath(decl: ImportDeclaration): string {
  */
 function importViolation(
   sourceFile: SourceFile,
-  _importPath: string,
+  importDecl: ImportDeclaration,
   message: string,
   context: ConditionContext,
 ): ArchViolation {
@@ -24,7 +24,7 @@ function importViolation(
     rule: context.rule,
     element: sourceFile.getBaseName(),
     file: sourceFile.getFilePath(),
-    line: 1, // File-level violation
+    line: importDecl.getStartLineNumber(),
     message,
     because: context.because,
   }
@@ -53,7 +53,7 @@ export function onlyImportFrom(...globs: string[]): Condition<SourceFile> {
             violations.push(
               importViolation(
                 sf,
-                importPath,
+                decl,
                 `${sf.getBaseName()} imports "${importPath}" which does not match any of [${globs.join(', ')}]`,
                 context,
               ),
@@ -89,7 +89,7 @@ export function notImportFrom(...globs: string[]): Condition<SourceFile> {
             violations.push(
               importViolation(
                 sf,
-                importPath,
+                decl,
                 `${sf.getBaseName()} imports "${importPath}" which matches forbidden [${globs.join(', ')}]`,
                 context,
               ),
@@ -125,7 +125,7 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
             violations.push(
               importViolation(
                 sf,
-                importPath,
+                decl,
                 `${sf.getBaseName()} has a value import from "${importPath}" which should be a type-only import`,
                 context,
               ),

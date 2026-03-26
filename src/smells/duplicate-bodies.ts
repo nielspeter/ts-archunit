@@ -107,6 +107,12 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
       for (let j = i + 1; j < items.length; j++) {
         const a = items[i]!
         const b = items[j]!
+        // Fast rejection: if node counts differ too much, similarity cannot reach threshold
+        const maxCount = Math.max(a.fingerprint.nodeCount, b.fingerprint.nodeCount)
+        const minCount = Math.min(a.fingerprint.nodeCount, b.fingerprint.nodeCount)
+        if (maxCount > 0 && minCount / maxCount < this._minSimilarity) {
+          continue
+        }
         const similarity = computeSimilarity(a.fingerprint, b.fingerprint)
         if (similarity >= this._minSimilarity) {
           pairs.push({ a: a.fn, b: b.fn, similarity })

@@ -1,11 +1,6 @@
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
-import type { CheckOptions } from '../core/check-options.js'
-import type { RuleMetadata } from '../core/rule-metadata.js'
-import { ArchRuleError } from '../core/errors.js'
-import { formatViolations } from '../core/format.js'
-import { formatViolationsJson } from '../core/format-json.js'
-import { formatViolationsGitHub } from '../core/format-github.js'
+import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { Predicate } from '../core/predicate.js'
 import type { LoadedSchema } from './schema-loader.js'
 import type { GraphQLObjectTypeLike, GraphQLTypeLike } from './schema-loader.js'
@@ -50,13 +45,13 @@ function isObjectType(type: GraphQLTypeLike): type is GraphQLObjectTypeLike {
  *   .check()
  * ```
  */
-export class SchemaRuleBuilder {
+export class SchemaRuleBuilder extends TerminalBuilder {
   private _predicates: Predicate<SchemaElement>[] = []
   private _conditions: Condition<SchemaElement>[] = []
-  private _reason?: string
-  private _metadata?: RuleMetadata
 
-  constructor(private readonly loaded: LoadedSchema) {}
+  constructor(private readonly loaded: LoadedSchema) {
+    super()
+  }
 
   // --- Predicate methods ---
 
@@ -150,95 +145,25 @@ export class SchemaRuleBuilder {
     return this
   }
 
-  // --- Metadata methods ---
+  // --- Evaluation ---
 
-  /**
-   * Attach a human-readable rationale to the rule.
-   */
-  because(reason: string): this {
-    this._reason = reason
-    return this
-  }
-
-  /**
-   * Attach rich metadata to the rule.
-   */
-  rule(metadata: RuleMetadata): this {
-    this._metadata = metadata
-    if (metadata.because) {
-      this._reason = metadata.because
-    }
-    return this
-  }
-
-  // --- Terminal methods ---
-
-  /**
-   * Execute the rule and throw ArchRuleError if any violations are found.
-   */
-  check(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
-      }
-      throw new ArchRuleError(violations, this._reason)
-    }
-  }
-
-  /**
-   * Execute the rule and log violations to stderr. Does not throw.
-   */
-  warn(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'json') {
-        console.warn(formatViolationsJson(violations, this._reason))
-      } else if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
-      } else {
-        console.warn(formatViolations(violations, this._reason))
-      }
-    }
-  }
-
-  /**
-   * Execute the rule with the given severity.
-   */
-  severity(level: 'error' | 'warn'): void {
-    if (level === 'error') {
-      this.check()
-    } else {
-      this.warn()
-    }
-  }
-
-  // --- Private ---
-
-  private evaluate(): ArchViolation[] {
+  protected collectViolations(): ArchViolation[] {
     const allElements = this.getElements()
 
     const filtered = allElements.filter((element) =>
       this._predicates.every((predicate) => predicate.test(element)),
     )
 
-    if (filtered.length === 0 || this._conditions.length === 0) {
+    if (filtered.length === 0) {
+      return []
+    }
+
+    if (this._conditions.length === 0) {
+      const ruleId = this._metadata?.id ?? 'unnamed'
+      console.warn(
+        `[ts-archunit] Schema rule '${ruleId}' has predicates but no conditions. ` +
+          `Did you forget to add a condition after .should()?`,
+      )
       return []
     }
 

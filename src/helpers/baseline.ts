@@ -78,7 +78,17 @@ export function withBaseline(baselinePath: string): Baseline {
   }
 
   const raw = fs.readFileSync(resolved, 'utf-8')
-  const data = JSON.parse(raw) as BaselineFile
+  const parsed: unknown = JSON.parse(raw)
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !('violations' in parsed) ||
+    !Array.isArray(parsed.violations)
+  ) {
+    console.warn(`[ts-archunit] Invalid baseline file format at ${resolved} — treating as empty`)
+    return new Baseline(new Set(), baselineDir)
+  }
+  const data = parsed as BaselineFile
   const hashes = new Set(data.violations.map((v) => v.hash))
 
   return new Baseline(hashes, baselineDir)

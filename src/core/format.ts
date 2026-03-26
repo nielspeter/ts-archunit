@@ -1,5 +1,5 @@
 import type { ArchViolation } from './violation.js'
-import { bold, red, yellow, cyan, dim } from './ansi.js'
+import { bold, red, cyan, dim } from './ansi.js'
 import path from 'node:path'
 
 /**
@@ -37,13 +37,6 @@ export function formatViolations(
     // Rule line
     const ruleLine = `  ${dim('Rule:')} ${v.rule}`
 
-    // Reason line (from .because())
-    const reasonLine = v.because
-      ? `  ${dim('Reason:')} ${v.because}`
-      : reason
-        ? `  ${dim('Reason:')} ${reason}`
-        : ''
-
     // Location: relative path + element
     const relativePath = path.relative(cwd, v.file)
     const location = `  ${cyan(`${relativePath}:${String(v.line)}`)} ${dim('—')} ${v.element}`
@@ -51,19 +44,18 @@ export function formatViolations(
     // Code frame
     const codeLine = showCodeFrames && v.codeFrame ? `\n${v.codeFrame}` : ''
 
-    // Suggestion
-    const suggestionLine = v.suggestion ? `\n  ${yellow(`Suggestion: ${v.suggestion}`)}` : ''
-
     // Why / Fix / Docs metadata lines
-    const whyLine = v.because ? `  ${dim('Why:')} ${v.because}` : ''
+    const whyLine = v.because
+      ? `  ${dim('Why:')} ${v.because}`
+      : reason
+        ? `  ${dim('Why:')} ${reason}`
+        : ''
     const fixLine = v.suggestion ? `  ${dim('Fix:')} ${v.suggestion}` : ''
     const docsLine = v.docs ? `  ${dim('Docs:')} ${v.docs}` : ''
 
     const parts = [counter, '', ruleLine]
-    if (reasonLine) parts.push(reasonLine)
     parts.push('', location)
     if (codeLine) parts.push(codeLine)
-    if (suggestionLine) parts.push(suggestionLine)
     if (whyLine) parts.push(whyLine)
     if (fixLine) parts.push(fixLine)
     if (docsLine) parts.push(docsLine)
@@ -92,7 +84,7 @@ export function formatViolationsPlain(violations: ArchViolation[], reason?: stri
         `  [${String(i + 1)}/${String(violations.length)}] ${v.element}: ${v.message} (${v.file}:${String(v.line)})`,
       ]
       if (v.codeFrame) parts.push(v.codeFrame)
-      if (v.suggestion) parts.push(`  Suggestion: ${v.suggestion}`)
+      if (v.suggestion) parts.push(`  Fix: ${v.suggestion}`)
       return parts.join('\n')
     })
     .join('\n\n')

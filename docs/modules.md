@@ -37,11 +37,11 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Available Conditions
 
-| Condition                       | Description                                        | Example                                             |
-| ------------------------------- | -------------------------------------------------- | --------------------------------------------------- |
-| `onlyImportFrom(...globs)`      | Module may only import from the listed paths       | `.should().onlyImportFrom('**/domain/**')`          |
-| `notImportFrom(...globs)`       | Module must not import from the listed paths       | `.should().notImportFrom('**/controllers/**')`      |
-| `onlyHaveTypeImportsFrom(glob)` | Imports from matching paths must use `import type` | `.should().onlyHaveTypeImportsFrom('**/models/**')` |
+| Condition                          | Description                                        | Example                                                 |
+| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| `onlyImportFrom(...globs)`         | Module may only import from the listed paths       | `.should().onlyImportFrom('**/domain/**')`              |
+| `notImportFromCondition(...globs)` | Module must not import from the listed paths       | `.should().notImportFromCondition('**/controllers/**')` |
+| `onlyHaveTypeImportsFrom(glob)`    | Imports from matching paths must use `import type` | `.should().onlyHaveTypeImportsFrom('**/models/**')`     |
 
 ## Real-World Examples
 
@@ -68,7 +68,7 @@ modules(p)
   .that()
   .resideInFolder('**/domain/**')
   .should()
-  .notImportFrom('**/node_modules/express/**')
+  .notImportFromCondition('**/node_modules/express/**')
   .because('domain entities must be framework-independent')
   .check()
 ```
@@ -92,7 +92,7 @@ modules(p)
   .that()
   .resideInFolder('**/repositories/**')
   .should()
-  .notImportFrom('**/controllers/**')
+  .notImportFromCondition('**/controllers/**')
   .rule({
     id: 'layer/repo-no-controllers',
     because: 'Repositories are inner layer -- they must not depend on the HTTP layer',

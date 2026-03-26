@@ -1,21 +1,21 @@
 import { describe, it, expect } from 'vitest'
 import { formatViolationsGitHub, escapeGitHub } from '../../src/core/format-github.js'
-import type { ArchViolation } from '../../src/core/violation.js'
+import { makeViolation } from '../support/test-rule-builder.js'
 
-function makeViolation(overrides: Partial<ArchViolation> = {}): ArchViolation {
-  return {
-    rule: 'test rule',
+/** Shorthand with format-github-test defaults. */
+function mv(overrides: Partial<Parameters<typeof makeViolation>[0]> = {}) {
+  return makeViolation({
     element: 'MyService.getTotal',
     file: `${process.cwd()}/src/service.ts`,
     line: 42,
     message: 'bad call to parseInt',
     ...overrides,
-  }
+  })
 }
 
 describe('formatViolationsGitHub', () => {
   it('formats single violation as ::error', () => {
-    const violations = [makeViolation()]
+    const violations = [mv()]
     const output = formatViolationsGitHub(violations)
     expect(output).toContain('::error file=')
     expect(output).toContain(',line=42,')
@@ -24,7 +24,7 @@ describe('formatViolationsGitHub', () => {
   })
 
   it('uses relative file paths', () => {
-    const violations = [makeViolation()]
+    const violations = [mv()]
     const output = formatViolationsGitHub(violations)
     expect(output).toContain('file=src/service.ts,')
     expect(output).not.toContain(process.cwd())
@@ -37,13 +37,13 @@ describe('formatViolationsGitHub', () => {
   })
 
   it('includes because in message when present', () => {
-    const violations = [makeViolation({ because: 'security risk' })]
+    const violations = [mv({ because: 'security risk' })]
     const output = formatViolationsGitHub(violations)
     expect(output).toContain('::bad call to parseInt (security risk)')
   })
 
   it('uses ::warning for warn severity', () => {
-    const violations = [makeViolation()]
+    const violations = [mv()]
     const output = formatViolationsGitHub(violations, 'warning')
     expect(output).toMatch(/^::warning file=/)
     expect(output).not.toContain('::error')
@@ -51,9 +51,9 @@ describe('formatViolationsGitHub', () => {
 
   it('produces one line per violation for multiple violations', () => {
     const violations = [
-      makeViolation({ element: 'A', line: 1 }),
-      makeViolation({ element: 'B', line: 2 }),
-      makeViolation({ element: 'C', line: 3 }),
+      mv({ element: 'A', line: 1 }),
+      mv({ element: 'B', line: 2 }),
+      mv({ element: 'C', line: 3 }),
     ]
     const output = formatViolationsGitHub(violations)
     const lines = output.split('\n')

@@ -82,11 +82,15 @@ export function extendType(name: string): Predicate<TypeDeclaration> {
     description: `extend type "${name}"`,
     test: (element) => {
       if (Node.isInterfaceDeclaration(element)) {
-        return element.getExtends().some((ext) => ext.getText().startsWith(name))
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const nameRegex = new RegExp(`^${escaped}(\\b|$|<)`)
+        return element.getExtends().some((ext) => nameRegex.test(ext.getText()))
       }
-      // For type aliases, check if the type text references the name
+      // For type aliases, check if the type directly references the named type
+      // Use word boundary matching to avoid false positives (e.g., "BaseConfig" inside "{ bar: BaseConfig }")
       const typeText = element.getType().getText()
-      return typeText.includes(name)
+      const nameRegex = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+      return nameRegex.test(typeText)
     },
   }
 }

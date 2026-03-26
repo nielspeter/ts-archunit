@@ -128,12 +128,13 @@ Conditions assert what must be true about the filtered elements. They go between
 
 ### Structural Conditions
 
-| Condition              | Description                                  |
-| ---------------------- | -------------------------------------------- |
-| `notExist()`           | No elements should match the predicates      |
-| `beExported()`         | All matched elements should be exported      |
-| `haveNameMatching(re)` | All matched elements should match the regex  |
-| `resideInFolder(glob)` | All matched elements should be in the folder |
+| Condition                       | Description                                  |
+| ------------------------------- | -------------------------------------------- |
+| `notExist()`                    | No elements should match the predicates      |
+| `beExported()`                  | All matched elements should be exported      |
+| `conditionHaveNameMatching(re)` | All matched elements should match the regex  |
+| `shouldResideInFolder(glob)`    | All matched elements should be in the folder |
+| `shouldResideInFile(glob)`      | All matched elements should be in the file   |
 
 ### Chaining Conditions
 

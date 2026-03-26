@@ -20,7 +20,7 @@ modules(p)
   .that()
   .resideInFolder('**/controllers/**')
   .should()
-  .notImportFrom('**/repositories/**')
+  .notImportFromCondition('**/repositories/**')
   .check()
 
 // Shared package must not depend on app code
@@ -28,7 +28,7 @@ modules(p)
   .that()
   .resideInFolder('**/shared/**')
   .should()
-  .notImportFrom('**/controllers/**', '**/services/**')
+  .notImportFromCondition('**/controllers/**', '**/services/**')
   .check()
 
 // Imports from repositories must be type-only
@@ -74,7 +74,7 @@ classes(p)
   .that()
   .resideInFolder('**/controllers/**')
   .should()
-  .haveNameMatching(/Controller$/)
+  .conditionHaveNameMatching(/Controller$/)
   .check()
 
 // Services must be exported
@@ -116,7 +116,7 @@ classes(p)
   .that()
   .haveNameEndingWith('Controller')
   .should()
-  .resideInFile('**/controllers/**')
+  .shouldResideInFile('**/controllers/**')
   .check()
 
 // DTOs must reside in dto folder
@@ -124,7 +124,7 @@ classes(p)
   .that()
   .haveNameMatching(/Request$|Response$|DTO$/)
   .should()
-  .resideInFile('**/dto/**')
+  .shouldResideInFile('**/dto/**')
   .check()
 ```
 
@@ -136,7 +136,7 @@ classes(p)
   .that()
   .extend('BaseRepository')
   .should()
-  .haveNameMatching(/Repository$/)
+  .conditionHaveNameMatching(/Repository$/)
   .check()
 
 // Classes implementing EventHandler must end with Handler
@@ -144,7 +144,7 @@ classes(p)
   .that()
   .implement('EventHandler')
   .should()
-  .haveNameMatching(/Handler$/)
+  .conditionHaveNameMatching(/Handler$/)
   .check()
 ```
 
@@ -152,7 +152,12 @@ classes(p)
 
 ```typescript
 // @Controller classes must be in controllers folder
-classes(p).that().haveDecorator('Controller').should().resideInFile('**/controllers/**').check()
+classes(p)
+  .that()
+  .haveDecorator('Controller')
+  .should()
+  .shouldResideInFile('**/controllers/**')
+  .check()
 
 // Abstract classes must not have @Controller
 classes(p).that().areAbstract().and().haveDecorator('Controller').should().notExist().check()

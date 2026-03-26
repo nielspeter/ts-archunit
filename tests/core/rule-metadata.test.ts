@@ -1,54 +1,24 @@
 import { describe, it, expect } from 'vitest'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
 import type { ArchRuleError } from '../../src/core/errors.js'
 import { formatViolations } from '../../src/core/format.js'
 import { formatViolationsGitHub } from '../../src/core/format-github.js'
 import { formatViolationsJson } from '../../src/core/format-json.js'
-import type { ArchProject } from '../../src/core/project.js'
-import type { Predicate } from '../../src/core/predicate.js'
 import type { Condition, ConditionContext } from '../../src/core/condition.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import { SliceRuleBuilder } from '../../src/builders/slice-rule-builder.js'
+import {
+  type TestElement,
+  TestRuleBuilder,
+  stubProject,
+  nameMatches,
+  alwaysPass,
+  makeViolation,
+} from '../support/test-rule-builder.js'
 
-// --- Test element type ---
-interface TestElement {
-  name: string
-  file: string
-  line: number
-}
+// --- Helpers unique to this file ---
 
-// --- Test-only concrete builder ---
-class TestRuleBuilder extends RuleBuilder<TestElement> {
-  constructor(
-    project: ArchProject,
-    private elements: TestElement[],
-  ) {
-    super(project)
-  }
-
-  protected getElements(): TestElement[] {
-    return this.elements
-  }
-
-  withPredicate(predicate: Predicate<TestElement>): this {
-    return this.addPredicate(predicate)
-  }
-
-  withCondition(condition: Condition<TestElement>): this {
-    return this.addCondition(condition)
-  }
-}
-
-// --- Helpers ---
-
-function nameMatches(pattern: RegExp): Predicate<TestElement> {
-  return {
-    description: `name matches ${String(pattern)}`,
-    test: (el) => pattern.test(el.name),
-  }
-}
-
-function alwaysFail(): Condition<TestElement> {
+/** Condition that always fails, forwarding all metadata fields from context. */
+function alwaysFailWithMetadata(): Condition<TestElement> {
   return {
     description: 'always fails',
     evaluate: (elements: TestElement[], context: ConditionContext): ArchViolation[] =>
@@ -66,29 +36,9 @@ function alwaysFail(): Condition<TestElement> {
   }
 }
 
-function alwaysPass(): Condition<TestElement> {
-  return {
-    description: 'always passes',
-    evaluate: () => [],
-  }
-}
-
-function makeViolation(overrides: Partial<ArchViolation> = {}): ArchViolation {
-  return {
-    rule: 'test rule',
-    element: 'MyService.getTotal',
-    file: `${process.cwd()}/src/service.ts`,
-    line: 42,
-    message: 'bad call to parseInt',
-    ...overrides,
-  }
-}
-
-const stubProject = {} as ArchProject
-
 const elements: TestElement[] = [
-  { name: 'ServiceA', file: `${process.cwd()}/src/a.ts`, line: 5 },
-  { name: 'ServiceB', file: `${process.cwd()}/src/b.ts`, line: 10 },
+  { name: 'ServiceA', file: `${process.cwd()}/src/a.ts`, line: 5, exported: true },
+  { name: 'ServiceB', file: `${process.cwd()}/src/b.ts`, line: 10, exported: true },
 ]
 
 describe('RuleMetadata', () => {
@@ -97,7 +47,7 @@ describe('RuleMetadata', () => {
     try {
       builder
         .should()
-        .withCondition(alwaysFail())
+        .withCondition(alwaysFailWithMetadata())
         .rule({
           id: 'test/rule-id',
           because: 'test reason',
@@ -120,7 +70,7 @@ describe('RuleMetadata', () => {
     try {
       builder
         .should()
-        .withCondition(alwaysFail())
+        .withCondition(alwaysFailWithMetadata())
         .rule({ because: 'typed errors required' })
         .check()
       expect.unreachable('should have thrown')
@@ -134,7 +84,7 @@ describe('RuleMetadata', () => {
   it('.because() still works alone without .rule()', () => {
     const builder = new TestRuleBuilder(stubProject, elements)
     try {
-      builder.should().withCondition(alwaysFail()).because('legacy reason').check()
+      builder.should().withCondition(alwaysFailWithMetadata()).because('legacy reason').check()
       expect.unreachable('should have thrown')
     } catch (error) {
       const archError = error as ArchRuleError
@@ -149,6 +99,7 @@ describe('RuleMetadata', () => {
   it('terminal format shows Why/Fix/Docs when present', () => {
     const violations = [
       makeViolation({
+        element: 'MyService.getTotal',
         because: 'Generic Error loses context',
         suggestion: 'Replace new Error() with new NotFoundError()',
         docs: 'https://example.com/adr-011',
@@ -161,7 +112,7 @@ describe('RuleMetadata', () => {
   })
 
   it('terminal format omits Why/Fix/Docs when not present', () => {
-    const violations = [makeViolation()]
+    const violations = [makeViolation({ element: 'MyService.getTotal' })]
     const output = formatViolations(violations)
     expect(output).not.toContain('Why:')
     expect(output).not.toContain('Fix:')
@@ -171,6 +122,7 @@ describe('RuleMetadata', () => {
   it('GitHub format includes suggestion and docs in message', () => {
     const violations = [
       makeViolation({
+        element: 'MyService.getTotal',
         because: 'security risk',
         suggestion: 'Use typed errors',
         docs: 'https://example.com/docs',
@@ -184,6 +136,7 @@ describe('RuleMetadata', () => {
   it('GitHub format uses ruleId as title when present', () => {
     const violations = [
       makeViolation({
+        element: 'MyService.getTotal',
         ruleId: 'repo/typed-errors',
       }),
     ]
@@ -194,6 +147,7 @@ describe('RuleMetadata', () => {
   it('JSON format includes all metadata fields', () => {
     const violations = [
       makeViolation({
+        element: 'MyService.getTotal',
         ruleId: 'test/json-rule',
         suggestion: 'do better',
         docs: 'https://example.com/docs',
@@ -217,7 +171,7 @@ describe('RuleMetadata', () => {
     try {
       builder
         .should()
-        .withCondition(alwaysFail())
+        .withCondition(alwaysFailWithMetadata())
         .rule({
           id: 'ctx/rule',
           docs: 'https://example.com/rule',
@@ -246,7 +200,7 @@ describe('RuleMetadata', () => {
 
     // First rule from the selection
     try {
-      selection.should().withCondition(alwaysFail()).check()
+      selection.should().withCondition(alwaysFailWithMetadata()).check()
       expect.unreachable('should have thrown')
     } catch (error) {
       const archError = error as ArchRuleError

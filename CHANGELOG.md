@@ -20,3 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Custom rules: `definePredicate()`, `defineCondition()`, `.satisfy()`
 - Violation reporting with code frames, ANSI colors, `.check()` / `.warn()` / `.severity()`
 - Named selections for reusable predicate chains
+
+### Fixed
+
+- Runtime warning when `.check()` is called with predicates but no conditions (prevents silent no-op rules)
+- `.check()` now honors `format: 'json'` option (previously only `.warn()` did)
+- `.check()` now prints rich format (Why/Fix/Docs) to stderr before throwing
+- Duplicate Reason/Suggestion lines removed from terminal violation output
+- `diffAware()` error fallback no longer silently suppresses all violations
+- Inline exclusion comments (`// ts-archunit-exclude`) now work across all builder types
+- `.excluding()` API available on all builders (GraphQL, cross-layer, smell detectors)
+- Shell injection vulnerability fixed in `diffAware()` — uses `execFileSync` instead of shell interpolation
+- `FORCE_COLOR=0` correctly disables color output (previously enabled it)
+- `extendType()` predicate uses word-boundary matching to avoid false positives
+- Slice violation line numbers now point to the actual import declaration
+- Baseline file loading validates JSON structure instead of unsafe cast
+- `fork()` preserves `.because()` reason across `.should()` boundary

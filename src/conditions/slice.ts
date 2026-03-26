@@ -1,7 +1,11 @@
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Slice } from '../models/slice.js'
-import { buildSliceDependencyGraph, findSliceDependencyDetails } from '../helpers/slice-graph.js'
+import {
+  buildSliceDependencyGraph,
+  buildFileToSliceMap,
+  findSliceDependencyDetails,
+} from '../helpers/slice-graph.js'
 import { tarjanSCC, type AdjacencyList } from '../helpers/tarjan.js'
 
 /**
@@ -21,7 +25,8 @@ export function beFreeOfCycles(): Condition<Slice> {
   return {
     description: 'be free of cycles',
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
-      const edges = buildSliceDependencyGraph(slices)
+      const fileToSlice = buildFileToSliceMap(slices)
+      const edges = buildSliceDependencyGraph(slices, fileToSlice)
 
       // Map slice names to indices for Tarjan's
       const sliceNames = slices.map((s) => s.name)
@@ -51,14 +56,14 @@ export function beFreeOfCycles(): Condition<Slice> {
         // Find one concrete file causing the cycle for the violation location
         const fromSlice = cycleNames[0]!
         const toSlice = cycleNames[1] ?? cycleNames[0]!
-        const details = findSliceDependencyDetails(slices, fromSlice, toSlice)
+        const details = findSliceDependencyDetails(slices, fromSlice, toSlice, fileToSlice)
         const firstDetail = details[0]
 
         violations.push({
           rule: context.rule,
           element: `[${cycleNames.join(', ')}]`,
           file: firstDetail ? firstDetail.sourceFile.getFilePath() : 'unknown',
-          line: firstDetail ? firstDetail.sourceFile.getStartLineNumber() : 0,
+          line: firstDetail ? firstDetail.importLine : 0,
           message: `Cycle detected: ${cyclePath}`,
           because: context.because,
         })
@@ -90,7 +95,8 @@ export function respectLayerOrder(...layers: string[]): Condition<Slice> {
   return {
     description: `respect layer order [${layers.join(' -> ')}]`,
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
-      const edges = buildSliceDependencyGraph(slices)
+      const fileToSlice = buildFileToSliceMap(slices)
+      const edges = buildSliceDependencyGraph(slices, fileToSlice)
 
       // Map layer names to their position (lower index = higher layer)
       const layerIndex = new Map(layers.map((name, i) => [name, i]))
@@ -106,13 +112,13 @@ export function respectLayerOrder(...layers: string[]): Condition<Slice> {
 
         // Violation: depending on a higher layer (lower index)
         if (toIdx < fromIdx) {
-          const details = findSliceDependencyDetails(slices, edge.from, edge.to)
+          const details = findSliceDependencyDetails(slices, edge.from, edge.to, fileToSlice)
           for (const detail of details) {
             violations.push({
               rule: context.rule,
               element: detail.sourceFile.getBaseName(),
               file: detail.sourceFile.getFilePath(),
-              line: detail.sourceFile.getStartLineNumber(),
+              line: detail.importLine,
               message: `Layer "${edge.from}" depends on higher layer "${edge.to}" (allowed: ${layers.slice(fromIdx + 1).join(', ') || 'none'})`,
               because: context.because,
             })
@@ -143,19 +149,20 @@ export function notDependOn(...forbiddenSlices: string[]): Condition<Slice> {
   return {
     description: `not depend on [${forbiddenSlices.join(', ')}]`,
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
-      const edges = buildSliceDependencyGraph(slices)
+      const fileToSlice = buildFileToSliceMap(slices)
+      const edges = buildSliceDependencyGraph(slices, fileToSlice)
 
       const violations: ArchViolation[] = []
 
       for (const edge of edges) {
         if (forbiddenSet.has(edge.to)) {
-          const details = findSliceDependencyDetails(slices, edge.from, edge.to)
+          const details = findSliceDependencyDetails(slices, edge.from, edge.to, fileToSlice)
           for (const detail of details) {
             violations.push({
               rule: context.rule,
               element: detail.sourceFile.getBaseName(),
               file: detail.sourceFile.getFilePath(),
-              line: detail.sourceFile.getStartLineNumber(),
+              line: detail.importLine,
               message: `Slice "${edge.from}" depends on forbidden slice "${edge.to}"`,
               because: context.because,
             })

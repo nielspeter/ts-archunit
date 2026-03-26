@@ -1,50 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import type { ArchProject } from '../../src/core/project.js'
 import type { Predicate } from '../../src/core/predicate.js'
-import type { Condition, ConditionContext } from '../../src/core/condition.js'
-import type { ArchViolation } from '../../src/core/violation.js'
+import {
+  type TestElement,
+  TestRuleBuilder,
+  stubProject,
+  nameMatches,
+  alwaysPass,
+  alwaysFail,
+} from '../support/test-rule-builder.js'
 
-// --- Test element type ---
-interface TestElement {
-  name: string
-  file: string
-  line: number
-  exported: boolean
-}
-
-// --- Test-only concrete builder ---
-class TestRuleBuilder extends RuleBuilder<TestElement> {
-  constructor(
-    project: ArchProject,
-    private elements: TestElement[],
-  ) {
-    super(project)
-  }
-
-  protected getElements(): TestElement[] {
-    return this.elements
-  }
-
-  // Expose predicate/condition registration for testing
-  withPredicate(predicate: Predicate<TestElement>): this {
-    return this.addPredicate(predicate)
-  }
-
-  withCondition(condition: Condition<TestElement>): this {
-    return this.addCondition(condition)
-  }
-}
-
-// --- Helpers ---
-
-function nameMatches(pattern: RegExp): Predicate<TestElement> {
-  return {
-    description: `name matches ${String(pattern)}`,
-    test: (el) => pattern.test(el.name),
-  }
-}
+// --- Helpers unique to this file ---
 
 function isExported(): Predicate<TestElement> {
   return {
@@ -52,30 +18,6 @@ function isExported(): Predicate<TestElement> {
     test: (el) => el.exported,
   }
 }
-
-function alwaysPass(): Condition<TestElement> {
-  return {
-    description: 'always passes',
-    evaluate: () => [],
-  }
-}
-
-function alwaysFail(msg: string): Condition<TestElement> {
-  return {
-    description: `always fails with "${msg}"`,
-    evaluate: (elements: TestElement[], context: ConditionContext): ArchViolation[] =>
-      elements.map((el) => ({
-        rule: context.rule,
-        element: el.name,
-        file: el.file,
-        line: el.line,
-        message: `${msg}: ${el.name}`,
-        because: context.because,
-      })),
-  }
-}
-
-const stubProject = {} as ArchProject
 
 const elements: TestElement[] = [
   { name: 'UserService', file: 'src/services/user.ts', line: 5, exported: true },
@@ -124,8 +66,10 @@ describe('RuleBuilder', () => {
         expect(error).toBeInstanceOf(ArchRuleError)
         const archError = error as ArchRuleError
         expect(archError.violations).toHaveLength(2)
-        expect(archError.message).toContain('bad: UserService')
-        expect(archError.message).toContain('bad: OrderService')
+        expect(archError.message).toContain('2 found')
+        // Detailed violations accessible programmatically
+        expect(archError.violations[0]!.element).toBe('UserService')
+        expect(archError.violations[1]!.element).toBe('OrderService')
       }
     })
   })

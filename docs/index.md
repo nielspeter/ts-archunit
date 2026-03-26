@@ -68,7 +68,7 @@ modules(p)
   .that()
   .resideInFolder('**/domain/**')
   .should()
-  .notImportFrom('**/repositories/**')
+  .notImportFromCondition('**/repositories/**')
   .check()
 ```
 
@@ -140,19 +140,20 @@ slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 When a rule fails, you don't just get "error." You get **why it matters and how to fix it**:
 
 ```
-Architecture Violation [repo/no-parseint]
+Architecture Violation [1 of 1]
 
-  WebhookRepository.query contains call to 'parseInt' at line 7
-  at src/repositories/webhook.repository.ts:7
+  Rule: Classes extending 'BaseRepository' should not contain call to 'parseInt'
+
+  src/repositories/webhook.repository.ts:7 — WebhookRepository
+
+  Why: BaseRepository provides extractCount() — inline parseInt diverges
+  Fix: Replace parseInt(x, 10) with this.extractCount(result)
 
       5 |   async query() {
       6 |     const countResult = await this.db.count('* as count').first()
     > 7 |     const total = typeof countResult.count === 'string'
               ? parseInt(countResult.count, 10) : countResult.count
       8 |
-
-  Why: BaseRepository provides extractCount() — inline parseInt diverges
-  Fix: Replace parseInt(x, 10) with this.extractCount(result)
 ```
 
 In GitHub Actions, this appears **inline on the PR diff** — right where the violation was introduced.
@@ -202,4 +203,4 @@ ts-archunit is the guardrail. Rules run in CI. Violations show up inline on the 
 
 [Get Started →](/getting-started) — install, write your first rule, run it in 5 minutes.
 
-[What Can It Check?](/what-to-check) — browse 8 categories of rules as one-liner examples.
+[What Can It Check?](/what-to-check) — browse 21 categories of rules as one-liner examples.

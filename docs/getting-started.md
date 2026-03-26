@@ -48,17 +48,17 @@ That's it. Architecture rules are regular tests. They run alongside your unit te
 When a module in `domain/` imports from `infrastructure/`, you see:
 
 ```
-Architecture Violation [1 violation]
+Architecture Violation [1 of 1]
 
-  Module 'src/domain/order.service.ts' imports from 'src/infrastructure/database.ts'
-  but should only import from '**/domain/**', '**/shared/**'
-  at src/domain/order.service.ts:3
+  Rule: Modules in '**/domain/**' should only import from '**/domain/**', '**/shared/**'
+
+  src/domain/order.service.ts:3 — order.service.ts
+
+  Why: Domain must be independent of infrastructure
 
     2 | import { OrderEntity } from './order.entity'
   > 3 | import { db } from '../infrastructure/database'
     4 | import { validate } from '../shared/validation'
-
-  Why: Domain must be independent of infrastructure
 ```
 
 The test fails, your CI blocks the PR, the violation is caught before code review.

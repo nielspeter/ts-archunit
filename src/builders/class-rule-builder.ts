@@ -31,6 +31,7 @@ import {
 import {
   resideInFile as conditionResideInFile,
   resideInFolder as conditionResideInFolder,
+  haveNameMatching as conditionHaveNameMatching,
   beExported as conditionBeExported,
   notExist as conditionNotExist,
 } from '../conditions/structural.js'
@@ -143,6 +144,14 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
 
   notExist(): this {
     return this.addCondition(conditionNotExist())
+  }
+
+  /**
+   * Assert that matched classes have names matching the regex.
+   * Note: The predicate variant (used after .that()) is haveNameMatching().
+   */
+  conditionHaveNameMatching(pattern: RegExp): this {
+    return this.addCondition(conditionHaveNameMatching(pattern))
   }
 
   // --- Class-specific condition methods ---

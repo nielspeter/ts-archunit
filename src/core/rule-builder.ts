@@ -1,15 +1,10 @@
-import fs from 'node:fs'
 import type { ArchProject } from './project.js'
 import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
-import { ArchRuleError } from './errors.js'
-import { formatViolations } from './format.js'
-import { formatViolationsJson } from './format-json.js'
-import { formatViolationsGitHub } from './format-github.js'
-import { parseExclusionComments, isExcludedByComment } from '../helpers/exclusion-comments.js'
+import { executeCheck, executeWarn } from './execute-rule.js'
 
 /**
  * Abstract base class for all rule builders.
@@ -130,25 +125,16 @@ export abstract class RuleBuilder<T> {
    * @param options - Optional baseline and diff filtering
    */
   check(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    // Apply baseline filter — remove known violations
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-
-    // Apply diff filter — only violations in changed files
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'github') {
-        // Print GitHub annotations to stdout (GitHub reads stdout for commands)
-        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
-      }
-      throw new ArchRuleError(violations, this._reason)
-    }
+    const violations = this.evaluate()
+    executeCheck(
+      violations,
+      {
+        reason: this._reason,
+        metadata: this._metadata,
+        exclusions: this._exclusions,
+      },
+      options,
+    )
   }
 
   /**
@@ -158,25 +144,16 @@ export abstract class RuleBuilder<T> {
    * @param options - Optional baseline and diff filtering
    */
   warn(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'json') {
-        console.warn(formatViolationsJson(violations, this._reason))
-      } else if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
-      } else {
-        console.warn(formatViolations(violations, this._reason))
-      }
-    }
+    const violations = this.evaluate()
+    executeWarn(
+      violations,
+      {
+        reason: this._reason,
+        metadata: this._metadata,
+        exclusions: this._exclusions,
+      },
+      options,
+    )
   }
 
   /**
@@ -235,7 +212,7 @@ export abstract class RuleBuilder<T> {
     fork._conditions = []
     fork._exclusions = [...this._exclusions]
     fork._metadata = this._metadata ? { ...this._metadata } : undefined
-    fork._reason = fork._metadata?.because
+    fork._reason = fork._metadata?.because ?? this._reason
     return fork
   }
 
@@ -266,8 +243,20 @@ export abstract class RuleBuilder<T> {
       this._predicates.every((predicate) => predicate.test(element)),
     )
 
-    // Step 3: If no elements match predicates or no conditions, no violations
-    if (filtered.length === 0 || this._conditions.length === 0) {
+    // Step 3: If no elements match predicates, no violations
+    if (filtered.length === 0) {
+      return []
+    }
+
+    // Step 3b: Warn if no conditions were added — likely a predicate/condition mixup
+    if (this._conditions.length === 0) {
+      const ruleId = this._metadata?.id ?? (this.buildRuleDescription() || 'unnamed')
+      console.warn(
+        `[ts-archunit] Rule '${ruleId}' has predicates but no conditions. ` +
+          `Did you use a predicate method after .should()? ` +
+          `Predicate methods (e.g. notImportFrom) filter elements; ` +
+          `use the condition variant (e.g. notImportFromCondition) after .should().`,
+      )
       return []
     }
 
@@ -281,55 +270,9 @@ export abstract class RuleBuilder<T> {
     }
 
     // Step 5: Evaluate all conditions (AND — all must pass)
-    let violations: ArchViolation[] = []
+    const violations: ArchViolation[] = []
     for (const condition of this._conditions) {
       violations.push(...condition.evaluate(filtered, context))
-    }
-
-    // Step 6: Apply .excluding() chain exclusions first (rule-level, more efficient)
-    if (this._exclusions.length > 0) {
-      const matchedPatterns = new Set<number>()
-      violations = violations.filter((v) => {
-        const matchIndex = this._exclusions.findIndex((pattern) =>
-          typeof pattern === 'string' ? v.element === pattern : pattern.test(v.element),
-        )
-        if (matchIndex >= 0) {
-          matchedPatterns.add(matchIndex)
-          return false
-        }
-        return true
-      })
-
-      const ruleId = this._metadata?.id ?? 'unnamed'
-      this._exclusions.forEach((pattern, index) => {
-        if (!matchedPatterns.has(index)) {
-          console.warn(
-            `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
-              `It matched zero violations — it may be stale after a rename.`,
-          )
-        }
-      })
-    }
-
-    // Step 7: Scan source files for inline exclusion comments (code-level, when rule has an ID)
-    if (this._metadata?.id && violations.length > 0) {
-      const filePaths = new Set(violations.map((v) => v.file))
-      const allComments = [...filePaths].flatMap((filePath) => {
-        try {
-          const sourceText = fs.readFileSync(filePath, 'utf-8')
-          const result = parseExclusionComments(sourceText, filePath)
-          for (const warning of result.warnings) {
-            console.warn(`[ts-archunit] ${warning.message}`)
-          }
-          return result.exclusions
-        } catch {
-          return []
-        }
-      })
-
-      if (allComments.length > 0) {
-        violations = violations.filter((v) => !isExcludedByComment(v, allComments))
-      }
     }
 
     return violations

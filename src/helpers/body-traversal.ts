@@ -58,8 +58,9 @@ export function searchClassBody(cls: ClassDeclaration, matcher: ExpressionMatche
     matchingNodes.push(...findMatchesInNode(body, matcher))
   }
 
-  // Also check constructor body
-  const ctor = cls.getConstructors()[0]
+  // Also check constructor body (use last constructor — earlier ones are overload signatures without bodies)
+  const ctors = cls.getConstructors()
+  const ctor = ctors[ctors.length - 1]
   if (ctor) {
     const body = ctor.getBody()
     if (body) {

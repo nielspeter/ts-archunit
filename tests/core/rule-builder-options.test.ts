@@ -1,66 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import { Baseline } from '../../src/helpers/baseline.js'
+import { Baseline, hashViolation } from '../../src/helpers/baseline.js'
 import { DiffFilter } from '../../src/helpers/diff-aware.js'
-import { hashViolation } from '../../src/helpers/baseline.js'
-import type { ArchProject } from '../../src/core/project.js'
-import type { Predicate } from '../../src/core/predicate.js'
-import type { Condition, ConditionContext } from '../../src/core/condition.js'
 import type { ArchViolation } from '../../src/core/violation.js'
+import { TestRuleBuilder, stubProject, alwaysFail } from '../support/test-rule-builder.js'
 
-// --- Test element type ---
-interface TestElement {
-  name: string
-  file: string
-  line: number
-}
-
-// --- Test-only concrete builder ---
-class TestRuleBuilder extends RuleBuilder<TestElement> {
-  constructor(
-    project: ArchProject,
-    private elements: TestElement[],
-  ) {
-    super(project)
-  }
-
-  protected getElements(): TestElement[] {
-    return this.elements
-  }
-
-  withPredicate(predicate: Predicate<TestElement>): this {
-    return this.addPredicate(predicate)
-  }
-
-  withCondition(condition: Condition<TestElement>): this {
-    return this.addCondition(condition)
-  }
-}
-
-// --- Helpers ---
-
-function alwaysFail(): Condition<TestElement> {
-  return {
-    description: 'always fails',
-    evaluate: (elements: TestElement[], context: ConditionContext): ArchViolation[] =>
-      elements.map((el) => ({
-        rule: context.rule,
-        element: el.name,
-        file: el.file,
-        line: el.line,
-        message: `violation in ${el.name}`,
-        because: context.because,
-      })),
-  }
-}
-
-const stubProject = {} as ArchProject
-
-const elements: TestElement[] = [
-  { name: 'ServiceA', file: '/project/src/a.ts', line: 5 },
-  { name: 'ServiceB', file: '/project/src/b.ts', line: 10 },
-  { name: 'ServiceC', file: '/project/src/c.ts', line: 15 },
+const elements = [
+  { name: 'ServiceA', file: '/project/src/a.ts', line: 5, exported: true },
+  { name: 'ServiceB', file: '/project/src/b.ts', line: 10, exported: true },
+  { name: 'ServiceC', file: '/project/src/c.ts', line: 15, exported: true },
 ]
 
 describe('RuleBuilder with CheckOptions', () => {
@@ -78,11 +26,11 @@ describe('RuleBuilder with CheckOptions', () => {
     // Build a baseline that knows all 3 violations
     // We need to compute the hashes the same way the evaluate pipeline does
     const fakeViolations: ArchViolation[] = elements.map((el) => ({
-      rule: 'should always fails',
+      rule: 'should always fails with "violated"',
       element: el.name,
       file: el.file,
       line: el.line,
-      message: `violation in ${el.name}`,
+      message: `violated: ${el.name}`,
     }))
     const hashes = new Set(fakeViolations.map((v) => hashViolation(v)))
     const baseline = new Baseline(hashes, '/project')
@@ -97,18 +45,18 @@ describe('RuleBuilder with CheckOptions', () => {
     // Baseline knows ServiceA and ServiceB but not ServiceC
     const knownViolations: ArchViolation[] = [
       {
-        rule: 'should always fails',
+        rule: 'should always fails with "violated"',
         element: 'ServiceA',
         file: '/project/src/a.ts',
         line: 5,
-        message: 'violation in ServiceA',
+        message: 'violated: ServiceA',
       },
       {
-        rule: 'should always fails',
+        rule: 'should always fails with "violated"',
         element: 'ServiceB',
         file: '/project/src/b.ts',
         line: 10,
-        message: 'violation in ServiceB',
+        message: 'violated: ServiceB',
       },
     ]
     const hashes = new Set(knownViolations.map((v) => hashViolation(v)))
@@ -147,11 +95,11 @@ describe('RuleBuilder with CheckOptions', () => {
     // ServiceA is known in baseline, ServiceB is in a changed file, ServiceC is neither
     const knownViolations: ArchViolation[] = [
       {
-        rule: 'should always fails',
+        rule: 'should always fails with "violated"',
         element: 'ServiceA',
         file: '/project/src/a.ts',
         line: 5,
-        message: 'violation in ServiceA',
+        message: 'violated: ServiceA',
       },
     ]
     const hashes = new Set(knownViolations.map((v) => hashViolation(v)))
@@ -178,18 +126,18 @@ describe('RuleBuilder with CheckOptions', () => {
 
     const knownViolations: ArchViolation[] = [
       {
-        rule: 'should always fails',
+        rule: 'should always fails with "violated"',
         element: 'ServiceA',
         file: '/project/src/a.ts',
         line: 5,
-        message: 'violation in ServiceA',
+        message: 'violated: ServiceA',
       },
       {
-        rule: 'should always fails',
+        rule: 'should always fails with "violated"',
         element: 'ServiceB',
         file: '/project/src/b.ts',
         line: 10,
-        message: 'violation in ServiceB',
+        message: 'violated: ServiceB',
       },
     ]
     const hashes = new Set(knownViolations.map((v) => hashViolation(v)))

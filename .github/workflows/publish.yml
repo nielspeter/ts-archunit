@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run format:check
       - run: npm run test
       - run: npm run build
 
@@ -50,6 +51,9 @@ jobs:
           NOTES=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
           # Write to file for the release body (handles multiline)
           echo "$NOTES" > /tmp/release-notes.txt
+          if [ ! -s /tmp/release-notes.txt ]; then
+            echo "No changelog entry for v${VERSION}." > /tmp/release-notes.txt
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

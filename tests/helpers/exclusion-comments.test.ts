@@ -5,9 +5,8 @@ import {
 } from '../../src/helpers/exclusion-comments.js'
 import type { ExclusionComment } from '../../src/helpers/exclusion-comments.js'
 import type { ArchViolation } from '../../src/core/violation.js'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
-import type { ArchProject } from '../../src/core/project.js'
-import type { Condition, ConditionContext } from '../../src/core/condition.js'
+import { TestRuleBuilder, stubProject, alwaysFail } from '../support/test-rule-builder.js'
+import type { TestElement } from '../support/test-rule-builder.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -181,47 +180,6 @@ describe('isExcludedByComment', () => {
 })
 
 describe('inline exclusion end-to-end', () => {
-  // --- Test element type ---
-  interface TestElement {
-    name: string
-    file: string
-    line: number
-  }
-
-  // --- Test-only concrete builder ---
-  class TestRuleBuilder extends RuleBuilder<TestElement> {
-    constructor(
-      project: ArchProject,
-      private elements: TestElement[],
-    ) {
-      super(project)
-    }
-
-    protected getElements(): TestElement[] {
-      return this.elements
-    }
-
-    withCondition(condition: Condition<TestElement>): this {
-      return this.addCondition(condition)
-    }
-  }
-
-  function alwaysFail(): Condition<TestElement> {
-    return {
-      description: 'always fails',
-      evaluate: (elements: TestElement[], context: ConditionContext): ArchViolation[] =>
-        elements.map((el) => ({
-          rule: context.rule,
-          ruleId: context.ruleId,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: `violation in ${el.name}`,
-          because: context.because,
-        })),
-    }
-  }
-
   it('inline exclusion comment suppresses violation in full pipeline', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-archunit-test-'))
     const filePath = path.join(tmpDir, 'test-source.ts')
@@ -232,8 +190,9 @@ describe('inline exclusion end-to-end', () => {
     ].join('\n')
     fs.writeFileSync(filePath, sourceContent)
 
-    const stubProject = {} as ArchProject
-    const elements: TestElement[] = [{ name: 'doSomething', file: filePath, line: 3 }]
+    const elements: TestElement[] = [
+      { name: 'doSomething', file: filePath, line: 3, exported: true },
+    ]
 
     const builder = new TestRuleBuilder(stubProject, elements)
     // With rule ID matching the exclusion comment, the violation should be suppressed

@@ -120,8 +120,14 @@ function extractRootDir(tsConfigPath: string): string {
   return path.dirname(tsConfigPath)
 }
 
+const matcherCache = new Map<string, picomatch.Matcher>()
+
 function picomatchFilter(filePath: string, glob: string, rootDir: string): boolean {
   const relativePath = path.relative(rootDir, filePath)
-  const matcher = picomatch(glob)
+  let matcher = matcherCache.get(glob)
+  if (!matcher) {
+    matcher = picomatch(glob)
+    matcherCache.set(glob, matcher)
+  }
   return matcher(relativePath)
 }

@@ -6,3 +6,5 @@ coverage/
 .idea/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+/.claude/
+/.serena/

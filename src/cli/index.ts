@@ -1,8 +1,17 @@
 import { parseArgs } from 'node:util'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
 import type { OutputFormat } from '../core/check-options.js'
 import { resolveConfig } from './resolve-config.js'
 import { runCheck } from './commands/check.js'
 import { runBaseline } from './commands/baseline.js'
+
+function getVersion(): string {
+  const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../package.json')
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
+  return pkg.version
+}
 
 const HELP_TEXT = `
 ts-archunit — Architecture testing for TypeScript
@@ -18,6 +27,7 @@ Options:
   --base <branch>       Base branch for diff (default: main)
   --format <format>     Output format: terminal, json, github, auto (default: auto)
   --config <path>       Path to config file
+  -v, --version         Show version number
   -h, --help            Show this help message
 `
 
@@ -30,6 +40,7 @@ interface ParsedArgs {
     format?: string
     config?: string
     help?: boolean
+    version?: boolean
   }
   positionals: string[]
 }
@@ -45,6 +56,7 @@ export function parseCliArgs(args: string[]): ParsedArgs {
       format: { type: 'string' },
       config: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
+      version: { type: 'boolean', short: 'v', default: false },
     },
     allowPositionals: true,
     strict: true,
@@ -54,6 +66,11 @@ export function parseCliArgs(args: string[]): ParsedArgs {
 export async function run(args: string[]): Promise<void> {
   const parsed = parseCliArgs(args)
   const { values, positionals } = parsed
+
+  if (values.version === true) {
+    process.stdout.write(getVersion() + '\n')
+    return
+  }
 
   if (values.help === true) {
     process.stdout.write(HELP_TEXT + '\n')

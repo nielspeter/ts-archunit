@@ -1,73 +1,19 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { Baseline, hashViolation } from '../../src/helpers/baseline.js'
-import type { ArchProject } from '../../src/core/project.js'
-import type { Predicate } from '../../src/core/predicate.js'
-import type { Condition, ConditionContext } from '../../src/core/condition.js'
 import type { ArchViolation } from '../../src/core/violation.js'
+import {
+  TestRuleBuilder,
+  stubProject,
+  nameMatches,
+  alwaysFail,
+} from '../support/test-rule-builder.js'
 
-// --- Test element type ---
-interface TestElement {
-  name: string
-  file: string
-  line: number
-}
-
-// --- Test-only concrete builder ---
-class TestRuleBuilder extends RuleBuilder<TestElement> {
-  constructor(
-    project: ArchProject,
-    private elements: TestElement[],
-  ) {
-    super(project)
-  }
-
-  protected getElements(): TestElement[] {
-    return this.elements
-  }
-
-  withPredicate(predicate: Predicate<TestElement>): this {
-    return this.addPredicate(predicate)
-  }
-
-  withCondition(condition: Condition<TestElement>): this {
-    return this.addCondition(condition)
-  }
-}
-
-// --- Helpers ---
-
-function nameMatches(pattern: RegExp): Predicate<TestElement> {
-  return {
-    description: `name matches ${String(pattern)}`,
-    test: (el) => pattern.test(el.name),
-  }
-}
-
-function alwaysFail(msg = 'violated'): Condition<TestElement> {
-  return {
-    description: `always fails with "${msg}"`,
-    evaluate: (elements: TestElement[], context: ConditionContext): ArchViolation[] =>
-      elements.map((el) => ({
-        rule: context.rule,
-        ruleId: context.ruleId,
-        element: el.name,
-        file: el.file,
-        line: el.line,
-        message: `${msg}: ${el.name}`,
-        because: context.because,
-      })),
-  }
-}
-
-const stubProject = {} as ArchProject
-
-const elements: TestElement[] = [
-  { name: 'UserService', file: '/project/src/services/user.ts', line: 5 },
-  { name: 'OrderService', file: '/project/src/services/order.ts', line: 3 },
-  { name: 'FooHelper', file: '/project/src/helpers/foo.ts', line: 1 },
-  { name: 'BarHelper', file: '/project/src/helpers/bar.ts', line: 10 },
+const elements = [
+  { name: 'UserService', file: '/project/src/services/user.ts', line: 5, exported: true },
+  { name: 'OrderService', file: '/project/src/services/order.ts', line: 3, exported: true },
+  { name: 'FooHelper', file: '/project/src/helpers/foo.ts', line: 1, exported: true },
+  { name: 'BarHelper', file: '/project/src/helpers/bar.ts', line: 10, exported: true },
 ]
 
 describe('.excluding()', () => {

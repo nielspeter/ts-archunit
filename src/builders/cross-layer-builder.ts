@@ -2,15 +2,9 @@ import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
 import type { PairCondition } from '../core/pair-condition.js'
-import type { ArchViolation } from '../core/violation.js'
 import type { ConditionContext } from '../core/condition.js'
-import type { CheckOptions } from '../core/check-options.js'
-import type { RuleMetadata } from '../core/rule-metadata.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
-import { ArchRuleError } from '../core/errors.js'
-import { formatViolations } from '../core/format.js'
-import { formatViolationsJson } from '../core/format-json.js'
-import { formatViolationsGitHub } from '../core/format-github.js'
+import { TerminalBuilder } from '../core/terminal-builder.js'
 
 /**
  * Resolve a layer by matching its glob against the project's source files.
@@ -142,95 +136,16 @@ export class PairConditionBuilder {
 /**
  * Terminal builder — call `.check()`, `.warn()`, or `.because()`.
  */
-export class PairFinalBuilder {
-  private _reason?: string
-  private _metadata?: RuleMetadata
-
+export class PairFinalBuilder extends TerminalBuilder {
   constructor(
     private readonly layers: Layer[],
     private readonly pairs: LayerPair[],
     private readonly condition: PairCondition,
-  ) {}
-
-  /**
-   * Attach a human-readable rationale to the rule.
-   * Included in violation messages when `.check()` throws.
-   */
-  because(reason: string): PairFinalBuilder {
-    this._reason = reason
-    return this
+  ) {
+    super()
   }
 
-  /**
-   * Attach rich metadata to the rule.
-   */
-  rule(metadata: RuleMetadata): PairFinalBuilder {
-    this._metadata = metadata
-    if (metadata.because) {
-      this._reason = metadata.because
-    }
-    return this
-  }
-
-  /**
-   * Execute the rule and throw `ArchRuleError` if any violations are found.
-   */
-  check(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
-      }
-      throw new ArchRuleError(violations, this._reason)
-    }
-  }
-
-  /**
-   * Execute the rule and log violations to stderr. Does not throw.
-   */
-  warn(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'json') {
-        console.warn(formatViolationsJson(violations, this._reason))
-      } else if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
-      } else {
-        console.warn(formatViolations(violations, this._reason))
-      }
-    }
-  }
-
-  /**
-   * Execute the rule with the given severity.
-   */
-  severity(level: 'error' | 'warn'): void {
-    if (level === 'error') {
-      this.check()
-    } else {
-      this.warn()
-    }
-  }
-
-  private evaluate(): ArchViolation[] {
+  protected collectViolations() {
     const layerNames = this.layers.map((l) => l.name)
     const context: ConditionContext = {
       rule: `cross-layer [${layerNames.join(', ')}] should ${this.condition.description}`,

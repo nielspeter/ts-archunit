@@ -11,6 +11,11 @@ import {
 } from '../predicates/type.js'
 import { havePropertyType } from '../conditions/type-level.js'
 import {
+  beExported as conditionBeExported,
+  notExist as conditionNotExist,
+  haveNameMatching as conditionHaveNameMatching,
+} from '../conditions/structural.js'
+import {
   haveNameMatching as identityHaveNameMatching,
   resideInFile as identityResideInFile,
   resideInFolder as identityResideInFolder,
@@ -75,6 +80,18 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
 
   havePropertyType(name: string, matcher: TypeMatcher): this {
     return this.addCondition(havePropertyType(name, matcher))
+  }
+
+  beExported(): this {
+    return this.addCondition(conditionBeExported())
+  }
+
+  notExist(): this {
+    return this.addCondition(conditionNotExist())
+  }
+
+  conditionHaveNameMatching(pattern: RegExp): this {
+    return this.addCondition(conditionHaveNameMatching(pattern))
   }
 
   // --- Identity predicates (convenience wrappers) ---

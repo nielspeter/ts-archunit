@@ -88,7 +88,7 @@ describe('ADR-002: ts-morph as AST engine', () => {
       .that()
       .resideInFolder('**/src/**')
       .should()
-      .notImportFrom('**/node_modules/typescript/**')
+      .notImportFromCondition('**/node_modules/typescript/**')
       .rule({
         id: 'adr002/no-raw-ts',
         because:
@@ -169,7 +169,8 @@ describe('Architecture', () => {
       .that()
       .resideInFolder('**/src/helpers/**')
       .should()
-      .notImportFrom('**/src/builders/**')
+      .notImportFromCondition('**/src/builders/**')
+      .excluding('within.ts') // within() intentionally creates scoped builders
       .rule({
         id: 'arch/helpers-no-builders',
         because: 'Helpers are lower-level primitives — builders depend on helpers, not the reverse',
@@ -183,7 +184,7 @@ describe('Architecture', () => {
       .that()
       .resideInFolder('**/src/core/**')
       .should()
-      .notImportFrom('**/src/builders/**')
+      .notImportFromCondition('**/src/builders/**')
       .rule({
         id: 'arch/core-no-builders',
         because: 'Core is the foundation — it must not depend on entry points',
@@ -197,7 +198,7 @@ describe('Architecture', () => {
       .that()
       .resideInFolder('**/src/predicates/**')
       .should()
-      .notImportFrom('**/src/conditions/**')
+      .notImportFromCondition('**/src/conditions/**')
       .rule({
         id: 'arch/predicates-independent',
         because: 'Predicates filter, conditions assert — they are independent concerns',
@@ -210,7 +211,7 @@ describe('Architecture', () => {
       .that()
       .resideInFolder('**/src/models/**')
       .should()
-      .notImportFrom('**/src/builders/**')
+      .notImportFromCondition('**/src/builders/**')
       .rule({
         id: 'arch/models-no-builders',
         because: 'Models are data representations — they must not depend on the rule engine',
@@ -223,7 +224,7 @@ describe('Architecture', () => {
       .that()
       .resideInFolder('**/src/conditions/**')
       .should()
-      .notImportFrom('**/src/builders/**')
+      .notImportFromCondition('**/src/builders/**')
       .rule({
         id: 'arch/conditions-no-builders',
         because: 'Conditions are reusable — they must not depend on specific entry points',

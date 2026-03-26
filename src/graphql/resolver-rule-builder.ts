@@ -1,13 +1,8 @@
 import type { SourceFile } from 'ts-morph'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
-import type { CheckOptions } from '../core/check-options.js'
-import type { RuleMetadata } from '../core/rule-metadata.js'
 import type { Predicate } from '../core/predicate.js'
-import { ArchRuleError } from '../core/errors.js'
-import { formatViolations } from '../core/format.js'
-import { formatViolationsJson } from '../core/format-json.js'
-import { formatViolationsGitHub } from '../core/format-github.js'
+import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import { collectFunctions } from '../models/arch-function.js'
@@ -57,13 +52,13 @@ export function resolveFieldReturning(pattern: RegExp | string): Predicate<ArchF
  *   .check()
  * ```
  */
-export class ResolverRuleBuilder {
+export class ResolverRuleBuilder extends TerminalBuilder {
   private _predicates: Predicate<ArchFunction>[] = []
   private _conditions: Condition<ArchFunction>[] = []
-  private _reason?: string
-  private _metadata?: RuleMetadata
 
-  constructor(private readonly sourceFiles: SourceFile[]) {}
+  constructor(private readonly sourceFiles: SourceFile[]) {
+    super()
+  }
 
   // --- Predicate methods ---
 
@@ -131,95 +126,25 @@ export class ResolverRuleBuilder {
     return this
   }
 
-  // --- Metadata methods ---
+  // --- Evaluation ---
 
-  /**
-   * Attach a human-readable rationale to the rule.
-   */
-  because(reason: string): this {
-    this._reason = reason
-    return this
-  }
-
-  /**
-   * Attach rich metadata to the rule.
-   */
-  rule(metadata: RuleMetadata): this {
-    this._metadata = metadata
-    if (metadata.because) {
-      this._reason = metadata.because
-    }
-    return this
-  }
-
-  // --- Terminal methods ---
-
-  /**
-   * Execute the rule and throw ArchRuleError if any violations are found.
-   */
-  check(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
-      }
-      throw new ArchRuleError(violations, this._reason)
-    }
-  }
-
-  /**
-   * Execute the rule and log violations to stderr. Does not throw.
-   */
-  warn(options?: CheckOptions): void {
-    let violations = this.evaluate()
-
-    if (options?.baseline) {
-      violations = options.baseline.filterNew(violations)
-    }
-    if (options?.diff) {
-      violations = options.diff.filterToChanged(violations)
-    }
-
-    if (violations.length > 0) {
-      if (options?.format === 'json') {
-        console.warn(formatViolationsJson(violations, this._reason))
-      } else if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
-      } else {
-        console.warn(formatViolations(violations, this._reason))
-      }
-    }
-  }
-
-  /**
-   * Execute the rule with the given severity.
-   */
-  severity(level: 'error' | 'warn'): void {
-    if (level === 'error') {
-      this.check()
-    } else {
-      this.warn()
-    }
-  }
-
-  // --- Private ---
-
-  private evaluate(): ArchViolation[] {
+  protected collectViolations(): ArchViolation[] {
     const allElements = this.getElements()
 
     const filtered = allElements.filter((element) =>
       this._predicates.every((predicate) => predicate.test(element)),
     )
 
-    if (filtered.length === 0 || this._conditions.length === 0) {
+    if (filtered.length === 0) {
+      return []
+    }
+
+    if (this._conditions.length === 0) {
+      const ruleId = this._metadata?.id ?? 'unnamed'
+      console.warn(
+        `[ts-archunit] Resolver rule '${ruleId}' has predicates but no conditions. ` +
+          `Did you forget to add a condition after .should()?`,
+      )
       return []
     }
 

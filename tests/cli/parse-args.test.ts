@@ -34,4 +34,14 @@ describe('parseCliArgs', () => {
     expect(result.values.changed).toBe(true)
     expect(result.values.base).toBe('main')
   })
+
+  it('parses --version flag', () => {
+    const result = parseCliArgs(['--version'])
+    expect(result.values.version).toBe(true)
+  })
+
+  it('parses -v short flag', () => {
+    const result = parseCliArgs(['-v'])
+    expect(result.values.version).toBe(true)
+  })
 })

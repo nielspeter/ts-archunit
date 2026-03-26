@@ -1,5 +1,4 @@
 import type { ArchViolation } from './violation.js'
-import { formatViolationsPlain } from './format.js'
 
 /**
  * Thrown by `.check()` when architecture violations are found.
@@ -11,7 +10,9 @@ export class ArchRuleError extends Error {
   public readonly violations: ArchViolation[]
 
   constructor(violations: ArchViolation[], reason?: string) {
-    super(formatViolationsPlain(violations, reason))
+    const summary = `Architecture violation${violations.length === 1 ? '' : 's'} (${String(violations.length)} found)`
+    const reasonLine = reason ? ` — ${reason}` : ''
+    super(`${summary}${reasonLine}`)
     this.name = 'ArchRuleError'
     this.violations = violations
   }

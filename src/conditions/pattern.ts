@@ -122,7 +122,8 @@ function matchesConstraint(propType: Type, constraint: PropertyConstraint): bool
     return stripped.isArray()
   }
 
-  // Match constraint as regex against type text
-  const regex = new RegExp(`^${constraint}$`)
+  // Match constraint as literal string against type text
+  const escaped = constraint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`^${escaped}$`)
   return regex.test(stripped.getText())
 }

@@ -1,17 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import type { ArchViolation } from '../../src/core/violation.js'
 import { DiffFilter } from '../../src/helpers/diff-aware.js'
+import { makeViolation } from '../support/test-rule-builder.js'
 
-// --- Helpers ---
-
-function makeViolation(file: string, element: string = 'TestElement'): ArchViolation {
-  return {
-    rule: 'test rule',
-    element,
-    file,
-    line: 1,
-    message: 'test message',
-  }
+/** Shorthand with diff-aware-test defaults. */
+function mv(file: string, element: string = 'TestElement') {
+  return makeViolation({ element, file, message: 'test message' })
 }
 
 describe('DiffFilter', () => {
@@ -20,11 +13,11 @@ describe('DiffFilter', () => {
     const filter = new DiffFilter(changedFiles)
 
     const violations = [
-      makeViolation('/project/src/a.ts', 'A'),
-      makeViolation('/project/src/b.ts', 'B'),
-      makeViolation('/project/src/c.ts', 'C'),
-      makeViolation('/project/src/a.ts', 'A2'),
-      makeViolation('/project/src/d.ts', 'D'),
+      mv('/project/src/a.ts', 'A'),
+      mv('/project/src/b.ts', 'B'),
+      mv('/project/src/c.ts', 'C'),
+      mv('/project/src/a.ts', 'A2'),
+      mv('/project/src/d.ts', 'D'),
     ]
 
     const result = filter.filterToChanged(violations)
@@ -34,7 +27,7 @@ describe('DiffFilter', () => {
 
   it('filterToChanged returns empty for no changes', () => {
     const filter = new DiffFilter(new Set())
-    const violations = [makeViolation('/project/src/a.ts'), makeViolation('/project/src/b.ts')]
+    const violations = [mv('/project/src/a.ts'), mv('/project/src/b.ts')]
 
     const result = filter.filterToChanged(violations)
     expect(result).toHaveLength(0)

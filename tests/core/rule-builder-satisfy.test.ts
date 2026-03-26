@@ -1,41 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { RuleBuilder } from '../../src/core/rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { definePredicate, defineCondition } from '../../src/core/define.js'
-import type { ArchProject } from '../../src/core/project.js'
 import type { Predicate } from '../../src/core/predicate.js'
 import type { Condition } from '../../src/core/condition.js'
-
-interface TestElement {
-  name: string
-  file: string
-  line: number
-}
-
-class TestRuleBuilder extends RuleBuilder<TestElement> {
-  constructor(
-    project: ArchProject,
-    private elements: TestElement[],
-  ) {
-    super(project)
-  }
-
-  protected getElements(): TestElement[] {
-    return this.elements
-  }
-
-  // Expose addCondition for test setup
-  withCondition(condition: Condition<TestElement>): this {
-    return this.addCondition(condition)
-  }
-}
-
-const stubProject = {} as ArchProject
+import { type TestElement, TestRuleBuilder, stubProject } from '../support/test-rule-builder.js'
 
 const elements: TestElement[] = [
-  { name: 'UserService', file: 'src/user.ts', line: 1 },
-  { name: 'OrderService', file: 'src/order.ts', line: 1 },
-  { name: 'helperUtil', file: 'src/util.ts', line: 1 },
+  { name: 'UserService', file: 'src/user.ts', line: 1, exported: true },
+  { name: 'OrderService', file: 'src/order.ts', line: 1, exported: true },
+  { name: 'helperUtil', file: 'src/util.ts', line: 1, exported: true },
 ]
 
 describe('.satisfy() with custom predicate', () => {

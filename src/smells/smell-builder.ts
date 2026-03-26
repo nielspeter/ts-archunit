@@ -1,28 +1,25 @@
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
-import type { OutputFormat } from '../core/check-options.js'
-import { ArchRuleError } from '../core/errors.js'
-import { formatViolations } from '../core/format.js'
-import { formatViolationsJson } from '../core/format-json.js'
-import { formatViolationsGitHub } from '../core/format-github.js'
+import { TerminalBuilder } from '../core/terminal-builder.js'
 
 /**
  * Base class for smell detector builders.
- * Provides guardrail methods and terminal methods (check/warn).
+ * Extends TerminalBuilder for shared terminal methods (check/warn/excluding/because/rule).
  *
  * SmellBuilder does NOT extend RuleBuilder — smell detectors have a
  * different chain grammar (no .that()/.should()) and execution model
  * (pairwise comparison rather than individual element evaluation).
  */
-export abstract class SmellBuilder {
+export abstract class SmellBuilder extends TerminalBuilder {
   protected _folders: string[] = []
   protected _minLines = 5
   protected _ignoreTests = false
   protected _ignorePaths: string[] = []
   protected _groupByFolder = false
-  protected _reason?: string
 
-  constructor(protected readonly project: ArchProject) {}
+  constructor(protected readonly project: ArchProject) {
+    super()
+  }
 
   /** Scope detection to files matching the glob pattern. */
   inFolder(glob: string): this {
@@ -54,35 +51,9 @@ export abstract class SmellBuilder {
     return this
   }
 
-  /** Explain why this smell check exists. */
-  because(reason: string): this {
-    this._reason = reason
-    return this
-  }
-
-  /** Run detection and throw on violations. */
-  check(options?: { format?: OutputFormat }): void {
-    const violations = this.detect()
-    if (violations.length > 0) {
-      if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
-      }
-      throw new ArchRuleError(violations, this._reason)
-    }
-  }
-
-  /** Run detection and log violations without throwing. */
-  warn(options?: { format?: OutputFormat }): void {
-    const violations = this.detect()
-    if (violations.length > 0) {
-      if (options?.format === 'json') {
-        console.warn(formatViolationsJson(violations, this._reason))
-      } else if (options?.format === 'github') {
-        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
-      } else {
-        console.warn(formatViolations(violations, this._reason))
-      }
-    }
+  /** Delegate to detect() for the terminal builder pipeline. */
+  protected collectViolations(): ArchViolation[] {
+    return this.detect()
   }
 
   /** Subclasses implement: run detection, return violations. */

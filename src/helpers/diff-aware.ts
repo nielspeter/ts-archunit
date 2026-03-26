@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import type { ArchViolation } from '../core/violation.js'
 
@@ -12,22 +12,25 @@ import type { ArchViolation } from '../core/violation.js'
  * a cycle is detected even though the cycle involves unchanged files.
  */
 export class DiffFilter {
-  private readonly changedFiles: Set<string>
+  private readonly changedFiles: Set<string> | null
 
-  constructor(changedFiles: Set<string>) {
+  constructor(changedFiles: Set<string> | null) {
     this.changedFiles = changedFiles
   }
 
   /**
    * Filter violations to only those in changed files.
+   * If changedFiles is null (git error), returns all violations unfiltered.
    */
   filterToChanged(violations: ArchViolation[]): ArchViolation[] {
-    return violations.filter((v) => this.changedFiles.has(v.file))
+    const files = this.changedFiles
+    if (files === null) return violations
+    return violations.filter((v) => files.has(v.file))
   }
 
-  /** Number of changed files detected */
+  /** Number of changed files detected, or -1 if diff unavailable */
   get size(): number {
-    return this.changedFiles.size
+    return this.changedFiles === null ? -1 : this.changedFiles.size
   }
 }
 
@@ -50,18 +53,17 @@ export function diffAware(baseBranch: string = 'main'): DiffFilter {
 
   let output: string
   try {
-    output = execSync(`git diff --name-only ${baseBranch}...HEAD`, {
+    output = execFileSync('git', ['diff', '--name-only', `${baseBranch}...HEAD`], {
       encoding: 'utf-8',
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim()
   } catch {
-    // Not a git repo, or base branch doesn't exist — return all files as "changed"
-    // This means no filtering, which is the safe default
+    // Not a git repo, or base branch doesn't exist — skip filtering (report all violations)
     console.warn(
       `[ts-archunit] Could not run git diff against '${baseBranch}'. All violations will be reported.`,
     )
-    return new DiffFilter(new Set())
+    return new DiffFilter(null)
   }
 
   if (output === '') {

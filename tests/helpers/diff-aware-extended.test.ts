@@ -1,22 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import type { ArchViolation } from '../../src/core/violation.js'
 import { DiffFilter } from '../../src/helpers/diff-aware.js'
+import { makeViolation } from '../support/test-rule-builder.js'
 
-function makeViolation(file: string, element: string = 'TestElement'): ArchViolation {
-  return {
-    rule: 'test rule',
-    element,
-    file,
-    line: 1,
-    message: 'test message',
-  }
+/** Shorthand with diff-aware-test defaults. */
+function mv(file: string, element: string = 'TestElement') {
+  return makeViolation({ element, file, message: 'test message' })
 }
 
 describe('DiffFilter.filterToChanged (extended)', () => {
   it('returns all violations when all files are in changed set', () => {
     const changedFiles = new Set(['/a.ts', '/b.ts'])
     const filter = new DiffFilter(changedFiles)
-    const violations = [makeViolation('/a.ts'), makeViolation('/b.ts')]
+    const violations = [mv('/a.ts'), mv('/b.ts')]
     const result = filter.filterToChanged(violations)
     expect(result).toHaveLength(2)
   })
@@ -24,7 +20,7 @@ describe('DiffFilter.filterToChanged (extended)', () => {
   it('returns empty when no violations match changed files', () => {
     const changedFiles = new Set(['/x.ts'])
     const filter = new DiffFilter(changedFiles)
-    const violations = [makeViolation('/a.ts'), makeViolation('/b.ts')]
+    const violations = [mv('/a.ts'), mv('/b.ts')]
     const result = filter.filterToChanged(violations)
     expect(result).toHaveLength(0)
   })
@@ -32,12 +28,7 @@ describe('DiffFilter.filterToChanged (extended)', () => {
   it('handles mixed matches and non-matches', () => {
     const changedFiles = new Set(['/a.ts', '/c.ts'])
     const filter = new DiffFilter(changedFiles)
-    const violations = [
-      makeViolation('/a.ts', 'A'),
-      makeViolation('/b.ts', 'B'),
-      makeViolation('/c.ts', 'C'),
-      makeViolation('/d.ts', 'D'),
-    ]
+    const violations = [mv('/a.ts', 'A'), mv('/b.ts', 'B'), mv('/c.ts', 'C'), mv('/d.ts', 'D')]
     const result = filter.filterToChanged(violations)
     expect(result).toHaveLength(2)
     expect(result.map((v) => v.element)).toEqual(['A', 'C'])
@@ -53,11 +44,7 @@ describe('DiffFilter.filterToChanged (extended)', () => {
   it('handles duplicate files in violations', () => {
     const changedFiles = new Set(['/a.ts'])
     const filter = new DiffFilter(changedFiles)
-    const violations = [
-      makeViolation('/a.ts', 'A1'),
-      makeViolation('/a.ts', 'A2'),
-      makeViolation('/b.ts', 'B'),
-    ]
+    const violations = [mv('/a.ts', 'A1'), mv('/a.ts', 'A2'), mv('/b.ts', 'B')]
     const result = filter.filterToChanged(violations)
     expect(result).toHaveLength(2)
     expect(result.map((v) => v.element)).toEqual(['A1', 'A2'])
