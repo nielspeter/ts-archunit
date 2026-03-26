@@ -33,7 +33,8 @@ docs/
 │   └── config.ts          # VitePress config (sidebar, nav, metadata)
 ├── index.md               # Landing page
 ├── getting-started.md     # Install + first rule
-├── core-concepts.md       # Project, predicates, conditions, the chain
+├── what-to-check.md       # Recipe gallery — 8 rule categories as one-liners (inspired by ArchUnit Section 4)
+├── core-concepts.md       # Project, predicates, conditions, the chain + before/after motivation
 ├── modules.md             # modules() entry point + dependency rules
 ├── classes.md             # classes() entry point + class predicates/conditions
 ├── functions.md           # functions() entry point + ArchFunction
@@ -68,6 +69,7 @@ export default defineConfig({
         items: [
           { text: 'What is ts-archunit?', link: '/' },
           { text: 'Getting Started', link: '/getting-started' },
+          { text: 'What to Check', link: '/what-to-check' },
         ],
       },
       {
@@ -169,19 +171,67 @@ Content:
 
 Each section has a working code example that can be copy-pasted.
 
+## Phase 3b: What to Check (inspired by ArchUnit Section 4)
+
+### `docs/what-to-check.md`
+
+A recipe gallery placed before any API theory. Shows what ts-archunit can do in one-liner examples. No explanation of predicates or conditions — just "here's what you can enforce." The user should be able to scan this page in 2 minutes and know if the tool solves their problem.
+
+Categories (each with 1-2 code snippets):
+
+1. **Import Dependencies** — "domain must not import from infrastructure"
+2. **Layer Ordering** — "dependencies flow controllers → services → domain"
+3. **Cycle Detection** — "no circular dependencies between feature modules"
+4. **Naming Conventions** — "controllers end with Controller, services end with Service"
+5. **Class Structure** — "repositories must extend BaseRepository"
+6. **Body Analysis** — "no raw parseInt, use shared helper instead"
+7. **Type Safety** — "query options must use typed unions, not bare string"
+8. **Custom Rules** — "define your own team conventions"
+
+Each category is 3-5 lines: a sentence describing the rule, then the code. No chain explanation, no predicate/condition theory. Just results.
+
+::: tip
+This is the "sell" page. If a user reads only one page after the landing page, it should be this one.
+:::
+
 ## Phase 4: Core Concepts
 
 ### `docs/core-concepts.md`
 
 Content:
+
+**Before/After motivation** (inspired by ArchUnit Section 7.1) — open with a comparison showing raw ts-morph code (10-15 lines of AST traversal from the PoC probes) vs the ts-archunit one-liner. This motivates *why* the fluent chain exists before explaining how it works.
+
+```typescript
+// WITHOUT ts-archunit: 12 lines of manual AST traversal
+const project = new Project({ tsConfigFilePath: 'tsconfig.json' })
+const classes = project.getSourceFiles()
+  .flatMap(sf => sf.getClasses())
+  .filter(cls => cls.getExtends()?.getExpression().getText() === 'BaseService')
+for (const cls of classes) {
+  for (const method of cls.getMethods()) {
+    const calls = method.getDescendantsOfKind(SyntaxKind.CallExpression)
+    if (calls.some(c => c.getExpression().getText() === 'parseInt')) {
+      throw new Error(`${cls.getName()} calls parseInt`)
+    }
+  }
+}
+
+// WITH ts-archunit: 1 chain
+classes(p).that().extend('BaseService').should().notContain(call('parseInt')).check()
+```
+
+Then the concepts:
+
 1. **Project** — `project('tsconfig.json')` loads the project, cached per path
 2. **Entry points** — `modules()`, `classes()`, `functions()`, `types()`, `slices()` — each returns a builder
-3. **The chain** — `.that()` → predicates → `.should()` → conditions → `.check()`
+3. **The chain** — `.that()` → predicates → `.should()` → conditions → `.check()` (with diagram)
 4. **Predicates** — filter which elements the rule applies to (identity + type-specific)
 5. **Conditions** — assert what must be true about filtered elements
 6. **Violations** — what you see when a rule fails
 7. **Named selections** — save a `.that()` chain, reuse with multiple `.should()` rules
 8. **`.check()` vs `.warn()`** — fail CI vs advisory
+9. **Composing rules** — `.and()` for predicates, `.andShould()` for conditions, `and()`/`or()`/`not()` combinators
 
 Diagram of the chain flow. Table of all identity predicates. Table of all structural conditions.
 
@@ -351,6 +401,7 @@ In repo settings: Pages → Source → GitHub Actions.
 | `docs/.vitepress/config.ts` | VitePress configuration |
 | `docs/index.md` | Landing page with hero + features |
 | `docs/getting-started.md` | Install, first rule, CI integration |
+| `docs/what-to-check.md` | Recipe gallery — 8 rule categories as one-liners |
 | `docs/core-concepts.md` | Project, chain, predicates, conditions |
 | `docs/modules.md` | Module entry point + dependency rules |
 | `docs/classes.md` | Class entry point + class predicates/conditions |
