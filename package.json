@@ -29,6 +29,9 @@
       "import": "./dist/rules/dependencies.js"
     }
   },
+  "bin": {
+    "ts-archunit": "./dist/cli/bin.js"
+  },
   "files": [
     "dist",
     "README.md",

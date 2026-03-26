@@ -9,6 +9,8 @@ import {
 } from '../conditions/body-analysis-function.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import { collectFunctions } from '../models/arch-function.js'
+import { followPattern as followPatternCondition } from '../conditions/pattern.js'
+import type { ArchPattern } from '../helpers/pattern.js'
 import {
   notExist as fnNotExist,
   beExported as fnBeExported,
@@ -190,6 +192,16 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
    */
   useInsteadOf(bad: ExpressionMatcher, good: ExpressionMatcher): this {
     return this.addCondition(functionUseInsteadOf(bad, good))
+  }
+
+  /**
+   * Assert that matched functions follow an architectural pattern.
+   *
+   * Checks that return types contain all properties defined in
+   * the pattern's returnShape with matching types.
+   */
+  followPattern(pattern: ArchPattern): this {
+    return this.addCondition(followPatternCondition(pattern))
   }
 }
 

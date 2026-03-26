@@ -1,8 +1,11 @@
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { createViolation } from '../core/violation.js'
+import type { InterfaceDeclaration, TypeAliasDeclaration } from 'ts-morph'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
-import type { TypeDeclaration } from '../predicates/type.js'
+
+// Inline the type alias to avoid conditions → predicates import cycle
+type TypeDeclaration = InterfaceDeclaration | TypeAliasDeclaration
 
 /**
  * Assert that a named property's type satisfies the given matcher.

@@ -189,3 +189,36 @@ export { diffAware, DiffFilter } from './helpers/diff-aware.js'
 
 // Baseline generation helper
 export { collectViolations } from './helpers/baseline-generator.js'
+
+// Call entry point (plan 0014)
+export { calls, CallRuleBuilder } from './builders/call-rule-builder.js'
+export type { ArchCall } from './models/arch-call.js'
+export { collectCalls, fromCallExpression } from './models/arch-call.js'
+
+// Call predicates (standalone)
+export { onObject, withMethod, withArgMatching, withStringArg } from './predicates/call.js'
+
+// Call conditions (standalone)
+export {
+  haveCallbackContaining as callHaveCallbackContaining,
+  notHaveCallbackContaining as callNotHaveCallbackContaining,
+  notExist as callNotExist,
+} from './conditions/call.js'
+
+// Scoped rules --- within() (plan 0015)
+export { within } from './helpers/within.js'
+export type { ScopedContext } from './helpers/within.js'
+export { ScopedFunctionRuleBuilder } from './builders/scoped-function-rule-builder.js'
+
+// Callback extraction (plan 0015)
+export { extractCallbacks } from './helpers/callback-extractor.js'
+export type { ExtractedCallback } from './helpers/callback-extractor.js'
+
+// Pattern templates (plan 0017)
+export { definePattern } from './helpers/pattern.js'
+export type { ArchPattern, PropertyConstraint } from './helpers/pattern.js'
+export { followPattern } from './conditions/pattern.js'
+
+// CLI config (plan 0020)
+export { defineConfig } from './cli/config.js'
+export type { CliConfig } from './cli/config.js'
