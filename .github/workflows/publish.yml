@@ -37,10 +37,8 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm
+      - name: Publish to npm (Trusted Publishing via OIDC)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # Create GitHub Release with changelog entry
       - name: Extract changelog for this version
