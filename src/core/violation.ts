@@ -1,4 +1,4 @@
-import type { Node } from 'ts-morph'
+import { Node } from 'ts-morph'
 import { generateCodeFrame } from './code-frame.js'
 
 /**
@@ -32,9 +32,18 @@ export interface ArchViolation {
  * and methods. Falls back to the node's kind name for unknown node types.
  */
 export function getElementName(node: Node): string {
-  // Node types with a getName() method
-  if ('getName' in node && typeof (node as Record<string, unknown>).getName === 'function') {
-    const name = (node as { getName(): string | undefined }).getName()
+  // ts-morph type guards for nodes with getName()
+  if (
+    Node.isClassDeclaration(node) ||
+    Node.isFunctionDeclaration(node) ||
+    Node.isInterfaceDeclaration(node) ||
+    Node.isTypeAliasDeclaration(node) ||
+    Node.isEnumDeclaration(node) ||
+    Node.isMethodDeclaration(node) ||
+    Node.isPropertyDeclaration(node) ||
+    Node.isVariableDeclaration(node)
+  ) {
+    const name = node.getName()
     if (name !== undefined) return name
   }
   // Fallback: use the node's kind name (e.g. "VariableDeclaration")

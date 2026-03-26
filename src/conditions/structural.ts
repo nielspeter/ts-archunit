@@ -1,5 +1,4 @@
-import type { Node } from 'ts-morph'
-import { SyntaxKind } from 'ts-morph'
+import { Node } from 'ts-morph'
 import picomatch from 'picomatch'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
@@ -82,15 +81,21 @@ export function beExported<T extends Node>(): Condition<T> {
   return elementCondition<T>(
     'be exported',
     (element) => {
-      // ClassDeclaration, FunctionDeclaration, InterfaceDeclaration, etc.
-      if ('isExported' in element && typeof (element as Record<string, unknown>).isExported === 'function') {
-        return (element as { isExported(): boolean }).isExported()
+      // ts-morph type guards for nodes with isExported()
+      if (
+        Node.isClassDeclaration(element) ||
+        Node.isFunctionDeclaration(element) ||
+        Node.isInterfaceDeclaration(element) ||
+        Node.isTypeAliasDeclaration(element) ||
+        Node.isEnumDeclaration(element)
+      ) {
+        return element.isExported()
       }
       // VariableDeclaration — check parent VariableStatement
-      if (element.getKind() === SyntaxKind.VariableDeclaration) {
-        const varStatement = element.getParent()?.getParent()
-        if (varStatement && 'isExported' in varStatement) {
-          return (varStatement as { isExported(): boolean }).isExported()
+      if (Node.isVariableDeclaration(element)) {
+        const varStatement = element.getVariableStatement()
+        if (varStatement) {
+          return varStatement.isExported()
         }
       }
       return false

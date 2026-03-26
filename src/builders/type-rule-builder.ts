@@ -10,7 +10,6 @@ import {
   type TypeDeclaration,
 } from '../predicates/type.js'
 import { havePropertyType } from '../conditions/type-level.js'
-import type { Condition } from '../core/condition.js'
 import {
   haveNameMatching as identityHaveNameMatching,
   resideInFile as identityResideInFile,
@@ -75,9 +74,7 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
   // --- Type-specific conditions ---
 
   havePropertyType(name: string, matcher: TypeMatcher): this {
-    return this.addCondition(
-      havePropertyType(name, matcher) as Condition<TypeDeclaration>,
-    )
+    return this.addCondition(havePropertyType(name, matcher))
   }
 
   // --- Identity predicates (convenience wrappers) ---

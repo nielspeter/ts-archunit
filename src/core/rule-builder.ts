@@ -153,7 +153,11 @@ export abstract class RuleBuilder<T> {
    * Subclasses with additional constructor args MUST override this method.
    */
   protected fork(): this {
-    const fork = Object.create(Object.getPrototypeOf(this) as object) as this
+    // Object.create/getPrototypeOf return untyped — casts unavoidable at JS interop boundary
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const proto: object = Object.getPrototypeOf(this)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const fork: this = Object.create(proto)
     Object.assign(fork, this)
     fork._predicates = [...this._predicates]
     fork._conditions = []

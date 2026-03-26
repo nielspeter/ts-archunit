@@ -104,10 +104,10 @@ export function resolveByDefinition(
 ): Slice[] {
   const sourceFiles = project.getSourceFiles()
   const entries = Object.entries(definition)
-  const matchers = entries.map(([name, glob]) => ({
+  const matchers = entries.map(([name, glob]): { name: string; isMatch: picomatch.Matcher; files: SourceFile[] } => ({
     name,
     isMatch: picomatch(glob),
-    files: [] as SourceFile[],
+    files: [],
   }))
 
   for (const sf of sourceFiles) {
