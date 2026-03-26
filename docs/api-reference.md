@@ -32,14 +32,14 @@ All public exports from `ts-archunit`, organized by category.
 
 Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`).
 
-| Method         | Signature                                       | Description                                                                       |
-| -------------- | ----------------------------------------------- | --------------------------------------------------------------------------------- |
-| `.excluding()` | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element names. Warns on unused patterns. |
-| `.because()`   | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                    |
-| `.rule()`      | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                             |
-| `.check()`     | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                |
-| `.warn()`      | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                    |
-| `.severity()`  | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                  |
+| Method         | Signature                                       | Description                                                                                             |
+| -------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `.excluding()` | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name, file path, or message. Warns on unused patterns. |
+| `.because()`   | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                          |
+| `.rule()`      | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                   |
+| `.check()`     | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                      |
+| `.warn()`      | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                                          |
+| `.severity()`  | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                                        |
 
 ## Exclusion Comments
 
@@ -317,11 +317,24 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 | `within`                    | `within(sel): ScopedContext` | Create scoped rules from call selections.  |
 | `ScopedFunctionRuleBuilder` | class                        | Builder for function rules within a scope. |
 
+## Metrics
+
+| Export                      | Signature                                                     | Description                                                 |
+| --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| `cyclomaticComplexity`      | `cyclomaticComplexity(body: Node \| undefined): number`       | Calculate McCabe cyclomatic complexity for a function body. |
+| `linesOfCode`               | `linesOfCode(node: Node): number`                             | Count span lines (start to end, inclusive).                 |
+| `haveCyclomaticComplexity`  | `haveCyclomaticComplexity(opts): Predicate<ClassDeclaration>` | Predicate: class has a method with complexity > threshold.  |
+| `haveComplexity`            | `haveComplexity(opts): Predicate<ArchFunction>`               | Predicate: function has complexity > threshold.             |
+| `haveMoreLinesThan`         | `haveMoreLinesThan(n): Predicate<ClassDeclaration>`           | Predicate: class spans more than n lines.                   |
+| `haveMoreFunctionLinesThan` | `haveMoreFunctionLinesThan(n): Predicate<ArchFunction>`       | Predicate: function spans more than n lines.                |
+| `haveMoreMethodsThan`       | `haveMoreMethodsThan(n): Predicate<ClassDeclaration>`         | Predicate: class has more than n methods.                   |
+
 ## CLI
 
-| Export         | Signature                                    | Description                    |
-| -------------- | -------------------------------------------- | ------------------------------ |
-| `defineConfig` | `defineConfig(config: CliConfig): CliConfig` | Define CLI configuration file. |
+| Export              | Signature                                    | Description                                                      |
+| ------------------- | -------------------------------------------- | ---------------------------------------------------------------- |
+| `defineConfig`      | `defineConfig(config: CliConfig): CliConfig` | Define CLI configuration file.                                   |
+| `resetProjectCache` | `resetProjectCache(): void`                  | Clear the project singleton cache. Used by watch mode and tests. |
 
 ## Types (TypeScript)
 
@@ -461,3 +474,16 @@ Requires the optional `graphql` peer dependency.
 | `onlyDependOn(...globs)`    | Module may only import from listed paths.         |
 | `mustNotDependOn(...globs)` | Module must not import from listed paths.         |
 | `typeOnlyFrom(...globs)`    | Imports from listed paths must use `import type`. |
+
+### `ts-archunit/rules/metrics`
+
+| Export                       | Description                                               |
+| ---------------------------- | --------------------------------------------------------- |
+| `maxCyclomaticComplexity(n)` | No method/constructor/getter/setter exceeds complexity n. |
+| `maxClassLines(n)`           | Class spans no more than n lines.                         |
+| `maxMethodLines(n)`          | No method/constructor/getter/setter exceeds n lines.      |
+| `maxMethods(n)`              | Class has no more than n methods.                         |
+| `maxParameters(n)`           | No method/constructor has more than n parameters.         |
+| `maxFunctionComplexity(n)`   | Function complexity does not exceed n.                    |
+| `maxFunctionLines(n)`        | Function spans no more than n lines.                      |
+| `maxFunctionParameters(n)`   | Function has no more than n parameters.                   |

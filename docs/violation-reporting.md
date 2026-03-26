@@ -106,9 +106,10 @@ Some violations are intentional -- they'll never be "fixed" because the code is 
 
 ### Chain-level exclusion
 
-Exclude specific elements by name in the rule definition:
+Suppress specific violations in the rule definition. Patterns match against the violation's **element name**, **file path**, or **message**:
 
 ```typescript
+// Match by element name
 functions(p)
   .that()
   .resideInFolder('**/wrappers/**')
@@ -118,17 +119,25 @@ functions(p)
   .check() // enforced — excluded elements silently skipped
 ```
 
-Supports exact strings and regex patterns:
-
 ```typescript
-classes(p)
-  .that()
-  .extend('BaseRepository')
+// Match by file path (useful for defineCondition violations)
+functions(p)
   .should()
-  .notContain(call('parseInt'))
-  .excluding('LegacyRepo', /Compat$/)
+  .satisfy(routeMustHavePreHandler())
+  .excluding(/images\.ts/, /platform\/index\.ts/)
   .check()
 ```
+
+```typescript
+// Match by message content
+classes(p)
+  .should()
+  .notContain(call('parseInt'))
+  .excluding(/LegacyRepo/, /extractCount/)
+  .check()
+```
+
+Supports exact strings and regex patterns. Patterns are tested against `violation.element`, `violation.file`, and `violation.message` — the first match wins.
 
 If an exclusion pattern matches zero violations, a warning is emitted to help detect stale exclusions after renames.
 
