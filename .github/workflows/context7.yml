@@ -1,0 +1,24 @@
+name: Update Context7 Docs
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add/Refresh Context7 Documentation
+        id: context7
+        uses: rennf93/upsert-context7@v1
+        with:
+          operation: ${{ github.event_name == 'release' && 'add' || 'refresh' }}
+
+      - name: Show result
+        run: |
+          echo "Success: ${{ steps.context7.outputs.success }}"
+          echo "Status: ${{ steps.context7.outputs.status-code }}"
+          echo "Message: ${{ steps.context7.outputs.message }}"
