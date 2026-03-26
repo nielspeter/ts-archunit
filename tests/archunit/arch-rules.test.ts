@@ -193,6 +193,97 @@ describe('Architecture', () => {
       .check()
   })
 
+  it('core must not import from predicates', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/predicates/**')
+      .rule({
+        id: 'arch/core-no-predicates',
+        because: 'Core must not depend on predicate implementations',
+      })
+      .check()
+  })
+
+  it('core must not import from conditions', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/conditions/**')
+      .rule({
+        id: 'arch/core-no-conditions',
+        because: 'Core must not depend on condition implementations',
+      })
+      .check()
+  })
+
+  it('core must not import from smells', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/smells/**')
+      .rule({
+        id: 'arch/core-no-smells',
+        because: 'Core must not depend on smell detectors',
+      })
+      .check()
+  })
+
+  it('core must not import from rules', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/rules/**')
+      .rule({
+        id: 'arch/core-no-rules',
+        because: 'Core must not depend on standard rule implementations',
+      })
+      .check()
+  })
+
+  it('core must not import from graphql', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/graphql/**')
+      .rule({
+        id: 'arch/core-no-graphql',
+        because: 'Core must not depend on the graphql extension',
+      })
+      .check()
+  })
+
+  it('core must not import from cli', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/cli/**')
+      .rule({
+        id: 'arch/core-no-cli',
+        because: 'Core must not depend on the CLI layer',
+      })
+      .check()
+  })
+
+  it('standard rules must not import from builders', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/rules/**')
+      .should()
+      .notImportFromCondition('**/src/builders/**')
+      .rule({
+        id: 'arch/rules-no-builders',
+        because: 'Standard rules are conditions, not builders',
+      })
+      .check()
+  })
+
   it('predicates must not import from conditions', () => {
     modules(p)
       .that()
