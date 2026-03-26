@@ -1,5 +1,10 @@
 # ts-archunit
 
+[![npm version](https://img.shields.io/npm/v/@nielspeter/ts-archunit)](https://www.npmjs.com/package/@nielspeter/ts-archunit)
+[![CI](https://github.com/nielspeter/ts-archunit/actions/workflows/ci.yml/badge.svg)](https://github.com/nielspeter/ts-archunit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Node.js >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org/)
+
 Architecture testing for TypeScript. Enforce structural rules across your codebase as executable tests.
 
 Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](https://ts-morph.com/).

@@ -82,7 +82,19 @@
     "architecture",
     "testing",
     "archunit",
-    "static-analysis"
+    "static-analysis",
+    "ast",
+    "ts-morph",
+    "code-quality",
+    "dependency-rules",
+    "layer-architecture",
+    "clean-architecture",
+    "cycle-detection",
+    "complexity",
+    "metrics",
+    "lint",
+    "guard-rails",
+    "ci"
   ],
   "license": "MIT",
   "peerDependencies": {
