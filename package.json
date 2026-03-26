@@ -1,6 +1,6 @@
 {
   "name": "ts-archunit",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Architecture testing for TypeScript",
   "type": "module",
   "exports": {
@@ -10,12 +10,24 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=24.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NielsPeter/ts-archunit"
+  },
+  "homepage": "https://github.com/NielsPeter/ts-archunit#readme",
+  "bugs": {
+    "url": "https://github.com/NielsPeter/ts-archunit/issues"
+  },
+  "author": "Niels Peter",
   "scripts": {
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
