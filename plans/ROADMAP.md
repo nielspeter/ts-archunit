@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-26
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 28 completed, 0 remaining
+**Total Plans:** 28 completed, 1 planned
 
 ---
 
@@ -39,6 +39,7 @@
 | **P4**   | ~~Cross-Layer Validation (0022)~~                                                | 1 day     | COMPLETED 2026-03-26 |
 | **P2**   | ~~CLI Watch Mode (0027)~~                                                        | 0.5 day   | COMPLETED 2026-03-26 |
 | **P3**   | ~~Metric-Based Standard Rules (0028)~~                                           | 1 day     | COMPLETED 2026-03-26 |
+| **P3**   | Function Signature Predicates (0029)                                             | 0.5 day   | NOT STARTED          |
 
 ---
 
