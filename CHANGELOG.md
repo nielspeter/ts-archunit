@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.1.0] - 2026-03-26
 
+### Added (post-v1: plans 0027, 0028)
+
+- CLI watch mode: `npx ts-archunit check --watch` / `-w` — debounced file watcher with automatic re-run
+- `watchDirs` config option for `defineConfig()` — configure which directories to watch
+- `resetProjectCache()` — clear the project singleton cache (for watch mode and tests)
+- `ts-archunit/rules/metrics` — metric-based standard rules:
+  - `maxCyclomaticComplexity(n)`, `maxClassLines(n)`, `maxMethodLines(n)`, `maxMethods(n)`, `maxParameters(n)` (class-level)
+  - `maxFunctionComplexity(n)`, `maxFunctionLines(n)`, `maxFunctionParameters(n)` (function-level)
+- Metric predicates: `haveCyclomaticComplexity`, `haveComplexity`, `haveMoreLinesThan`, `haveMoreFunctionLinesThan`, `haveMoreMethodsThan`
+- `cyclomaticComplexity()` and `linesOfCode()` helpers exported for custom metric rules
+- `docs/cli.md` — full CLI documentation page
+- `docs/metrics.md` — full metrics documentation page
+
+### Fixed (post-v1)
+
+- `.excluding()` now matches against `violation.element`, `violation.file`, and `violation.message` (was element-only). Fixes BUG-0001: `defineCondition` violations can now be excluded by file path or message content.
+
 ### Added
 
 - `project('tsconfig.json')` — load a TypeScript project with singleton caching
