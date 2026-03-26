@@ -51,9 +51,9 @@ import { defineConfig } from 'ts-archunit'
 
 export default defineConfig({
   project: 'tsconfig.json',
-  rules: ['arch.rules.ts'],           // rule files to load
-  baseline: 'arch-baseline.json',      // default baseline path
-  format: 'auto',                      // 'auto' | 'terminal' | 'json' | 'github'
+  rules: ['arch.rules.ts'], // rule files to load
+  baseline: 'arch-baseline.json', // default baseline path
+  format: 'auto', // 'auto' | 'terminal' | 'json' | 'github'
 })
 ```
 
@@ -82,6 +82,7 @@ export function defineConfig(config: CliConfig): CliConfig {
 ```
 
 Config resolution order:
+
 1. CLI flags (highest priority)
 2. `ts-archunit.config.ts` in project root
 3. Defaults (`project: 'tsconfig.json'`, `format: 'auto'`)
@@ -115,14 +116,14 @@ import { parseArgs } from 'node:util'
 
 const { values, positionals } = parseArgs({
   options: {
-    watch:    { type: 'boolean', default: false },
+    watch: { type: 'boolean', default: false },
     baseline: { type: 'string' },
-    output:   { type: 'string' },
-    changed:  { type: 'boolean', default: false },
-    base:     { type: 'string', default: 'main' },
-    format:   { type: 'string' },
-    config:   { type: 'string' },
-    help:     { type: 'boolean', short: 'h', default: false },
+    output: { type: 'string' },
+    changed: { type: 'boolean', default: false },
+    base: { type: 'string', default: 'main' },
+    format: { type: 'string' },
+    config: { type: 'string' },
+    help: { type: 'boolean', short: 'h', default: false },
   },
   allowPositionals: true,
   strict: true,
@@ -205,7 +206,9 @@ Rule files are loaded via `import()`. They must export a default array of rule b
 ```typescript
 import path from 'node:path'
 
-async function loadRuleFiles(files: string[]): Promise<Array<{ check: (opts?: CheckOptions) => void }>> {
+async function loadRuleFiles(
+  files: string[],
+): Promise<Array<{ check: (opts?: CheckOptions) => void }>> {
   const builders: Array<{ check: (opts?: CheckOptions) => void }> = []
 
   for (const file of files) {
@@ -261,10 +264,7 @@ Use `node:fs/promises` watch API (Node 24 — ADR-001, no chokidar dependency):
 import { watch } from 'node:fs/promises'
 import path from 'node:path'
 
-export async function watchAndRun(
-  projectDir: string,
-  runFn: () => Promise<void>,
-): Promise<void> {
+export async function watchAndRun(projectDir: string, runFn: () => Promise<void>): Promise<void> {
   console.log('Watching for changes...')
 
   // Initial run
@@ -379,19 +379,19 @@ When no rule files are specified on the command line:
 | File                             | Change                                        |
 | -------------------------------- | --------------------------------------------- |
 | `src/cli/bin.ts`                 | New — `#!/usr/bin/env node` shim              |
-| `src/cli/index.ts`              | New — CLI entry point, arg parsing            |
-| `src/cli/config.ts`             | New — `CliConfig` interface, `defineConfig()` |
-| `src/cli/resolve-config.ts`     | New — config file discovery and loading       |
-| `src/cli/commands/check.ts`     | New — `check` command implementation          |
-| `src/cli/commands/baseline.ts`  | New — `baseline` command implementation       |
-| `src/cli/watch.ts`              | New — watch mode with `node:fs/promises`      |
-| `src/index.ts`                  | Modified — export `defineConfig`              |
-| `package.json`                  | Modified — add `bin` field                    |
-| `tests/cli/parse-args.test.ts`  | New — 6 tests                                 |
-| `tests/cli/config.test.ts`      | New — 4 tests                                 |
-| `tests/cli/check.test.ts`       | New — 5 tests                                 |
-| `tests/cli/baseline-cmd.test.ts`| New — 2 tests                                 |
-| `tests/cli/watch.test.ts`       | New — 2 tests                                 |
+| `src/cli/index.ts`               | New — CLI entry point, arg parsing            |
+| `src/cli/config.ts`              | New — `CliConfig` interface, `defineConfig()` |
+| `src/cli/resolve-config.ts`      | New — config file discovery and loading       |
+| `src/cli/commands/check.ts`      | New — `check` command implementation          |
+| `src/cli/commands/baseline.ts`   | New — `baseline` command implementation       |
+| `src/cli/watch.ts`               | New — watch mode with `node:fs/promises`      |
+| `src/index.ts`                   | Modified — export `defineConfig`              |
+| `package.json`                   | Modified — add `bin` field                    |
+| `tests/cli/parse-args.test.ts`   | New — 6 tests                                 |
+| `tests/cli/config.test.ts`       | New — 4 tests                                 |
+| `tests/cli/check.test.ts`        | New — 5 tests                                 |
+| `tests/cli/baseline-cmd.test.ts` | New — 2 tests                                 |
+| `tests/cli/watch.test.ts`        | New — 2 tests                                 |
 
 ## Out of Scope
 

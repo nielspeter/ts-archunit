@@ -137,11 +137,11 @@ export function resolvers(project: ArchProject, glob: string): ResolverRuleBuild
 
 Predicates filter which schema elements a rule applies to.
 
-| Predicate            | Selects                                   |
-| -------------------- | ----------------------------------------- |
-| `queries()`          | Fields on the `Query` root type           |
-| `mutations()`        | Fields on the `Mutation` root type        |
-| `typesNamed(regex)`  | Object types matching the name pattern    |
+| Predicate            | Selects                                      |
+| -------------------- | -------------------------------------------- |
+| `queries()`          | Fields on the `Query` root type              |
+| `mutations()`        | Fields on the `Mutation` root type           |
+| `typesNamed(regex)`  | Object types matching the name pattern       |
 | `returnListOf(type)` | Fields whose return type is a list of `type` |
 
 The builder chain: `schema(p, glob).queries().should()...` or `schema(p, glob).typesNamed(/Collection$/).should()...`.
@@ -150,11 +150,11 @@ The builder chain: `schema(p, glob).queries().should()...` or `schema(p, glob).t
 
 Conditions assert structural properties of the filtered schema elements.
 
-| Condition                  | Asserts                                                   |
-| -------------------------- | --------------------------------------------------------- |
-| `haveFields(...names)`     | Type has all listed fields                                |
-| `acceptArgs(...names)`     | Field accepts all listed arguments                        |
-| `haveMatchingResolver()`   | Cross-references resolver files — a resolver must exist   |
+| Condition                | Asserts                                                 |
+| ------------------------ | ------------------------------------------------------- |
+| `haveFields(...names)`   | Type has all listed fields                              |
+| `acceptArgs(...names)`   | Field accepts all listed arguments                      |
+| `haveMatchingResolver()` | Cross-references resolver files — a resolver must exist |
 
 ### `haveMatchingResolver()` — cross-reference
 
@@ -164,9 +164,9 @@ This condition takes the `resolvers()` glob as a parameter (or is passed the res
 
 Resolver predicates filter TypeScript resolver functions. Resolver conditions reuse body analysis.
 
-| Predicate                        | Selects                                               |
-| -------------------------------- | ----------------------------------------------------- |
-| `resolveFieldReturning(regex)`   | Resolver functions for fields returning matching types |
+| Predicate                      | Selects                                                |
+| ------------------------------ | ------------------------------------------------------ |
+| `resolveFieldReturning(regex)` | Resolver functions for fields returning matching types |
 
 Conditions reuse the existing body analysis engine from plan 0011:
 
@@ -178,7 +178,7 @@ resolvers(p, 'src/resolvers/**')
   .that()
   .resolveFieldReturning(/^[A-Z]/)
   .should()
-  .contain(call('loader.load'))    // reuses body analysis
+  .contain(call('loader.load')) // reuses body analysis
   .check()
 ```
 
@@ -203,13 +203,13 @@ tests/fixtures/graphql/
 
 ### Test inventory
 
-| Area                | Tests                                                            |
-| ------------------- | ---------------------------------------------------------------- |
-| Schema loader       | 4 — parse single file, merge multiple, invalid SDL error, empty  |
-| Schema predicates   | 6 — queries(), mutations(), typesNamed() match/miss, returnListOf() |
+| Area                | Tests                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Schema loader       | 4 — parse single file, merge multiple, invalid SDL error, empty            |
+| Schema predicates   | 6 — queries(), mutations(), typesNamed() match/miss, returnListOf()        |
 | Schema conditions   | 6 — haveFields() pass/fail, acceptArgs() pass/fail, haveMatchingResolver() |
-| Resolver predicates | 4 — resolveFieldReturning() match/miss                          |
-| Resolver conditions | 4 — contain(call()) pass/fail, reuse body analysis engine       |
+| Resolver predicates | 4 — resolveFieldReturning() match/miss                                     |
+| Resolver conditions | 4 — contain(call()) pass/fail, reuse body analysis engine                  |
 
 ## Phase 8: Package.json & Build
 
@@ -236,20 +236,20 @@ Add `graphql` as a devDependency for tests. The `graphql` package is NOT added t
 
 ## Files Changed
 
-| File                                  | Change                                         |
-| ------------------------------------- | ---------------------------------------------- |
-| `src/graphql/index.ts`                | New — public API: schema(), resolvers()        |
-| `src/graphql/schema-loader.ts`        | New — parse .graphql files                     |
-| `src/graphql/schema-builder.ts`       | New — SchemaRuleBuilder fluent chain           |
-| `src/graphql/resolver-builder.ts`     | New — ResolverRuleBuilder fluent chain         |
-| `src/graphql/schema-predicates.ts`    | New — queries(), mutations(), typesNamed(), returnListOf() |
-| `src/graphql/schema-conditions.ts`    | New — haveFields(), acceptArgs(), haveMatchingResolver() |
-| `src/graphql/resolver-predicates.ts`  | New — resolveFieldReturning()                  |
-| `package.json`                        | Modified — add ./graphql export, peer dep      |
-| `tests/fixtures/graphql/`             | New — schema + resolver fixtures               |
-| `tests/graphql/schema-loader.test.ts` | New                                            |
-| `tests/graphql/schema-rules.test.ts`  | New                                            |
-| `tests/graphql/resolver-rules.test.ts`| New                                            |
+| File                                   | Change                                                     |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `src/graphql/index.ts`                 | New — public API: schema(), resolvers()                    |
+| `src/graphql/schema-loader.ts`         | New — parse .graphql files                                 |
+| `src/graphql/schema-builder.ts`        | New — SchemaRuleBuilder fluent chain                       |
+| `src/graphql/resolver-builder.ts`      | New — ResolverRuleBuilder fluent chain                     |
+| `src/graphql/schema-predicates.ts`     | New — queries(), mutations(), typesNamed(), returnListOf() |
+| `src/graphql/schema-conditions.ts`     | New — haveFields(), acceptArgs(), haveMatchingResolver()   |
+| `src/graphql/resolver-predicates.ts`   | New — resolveFieldReturning()                              |
+| `package.json`                         | Modified — add ./graphql export, peer dep                  |
+| `tests/fixtures/graphql/`              | New — schema + resolver fixtures                           |
+| `tests/graphql/schema-loader.test.ts`  | New                                                        |
+| `tests/graphql/schema-rules.test.ts`   | New                                                        |
+| `tests/graphql/resolver-rules.test.ts` | New                                                        |
 
 ## Out of Scope
 

@@ -10,7 +10,7 @@
 
 ## Purpose
 
-Implement `crossLayer(p)` for consistency checks across architectural boundaries. Where `slices(p)` enforces dependency direction between layers, `crossLayer(p)` enforces that elements *within* different layers are consistent with each other — e.g., API routes must match SDK types must match OpenAPI schemas.
+Implement `crossLayer(p)` for consistency checks across architectural boundaries. Where `slices(p)` enforces dependency direction between layers, `crossLayer(p)` enforces that elements _within_ different layers are consistent with each other — e.g., API routes must match SDK types must match OpenAPI schemas.
 
 This is spec section 10.
 
@@ -29,7 +29,7 @@ crossLayer(p)
     // user-defined consistency check
     const routeParams = extractParams(route)
     const schemaFields = extractFields(schema)
-    return routeParams.every(p => schemaFields.includes(p))
+    return routeParams.every((p) => schemaFields.includes(p))
   })
   .check()
 ```
@@ -40,7 +40,7 @@ First version uses **explicit user-provided mappings** only. Automatic matching 
 
 ### CrossLayerBuilder is a new builder, not an extension of RuleBuilder
 
-Same reasoning as `SliceRuleBuilder` (plan 0012, ADR-003): the operation model is fundamentally different. `RuleBuilder<T>` assumes a single element type filtered by predicates. Cross-layer validation operates on *pairs* of elements from two different layers, matched by a user-provided function. The `.that()` / `.should()` grammar doesn't map cleanly — instead we have `.layer()` / `.mapping()` / `.forEachPair()` / `.should()`.
+Same reasoning as `SliceRuleBuilder` (plan 0012, ADR-003): the operation model is fundamentally different. `RuleBuilder<T>` assumes a single element type filtered by predicates. Cross-layer validation operates on _pairs_ of elements from two different layers, matched by a user-provided function. The `.that()` / `.should()` grammar doesn't map cleanly — instead we have `.layer()` / `.mapping()` / `.forEachPair()` / `.should()`.
 
 ### Layers resolve to typed element collections
 
@@ -52,7 +52,7 @@ The spec explicitly states: "first version uses explicit user-provided mappings.
 
 ### PairCondition is a new condition type
 
-Standard `Condition<T>` evaluates a list of elements. Cross-layer conditions evaluate *pairs* `[A, B]` where A and B come from different layers. We introduce `PairCondition<A, B>` with `evaluate(pairs: [A, B][], context): ArchViolation[]`. This keeps the condition model clean rather than shoe-horning pairs into `Condition<[A, B]>`.
+Standard `Condition<T>` evaluates a list of elements. Cross-layer conditions evaluate _pairs_ `[A, B]` where A and B come from different layers. We introduce `PairCondition<A, B>` with `evaluate(pairs: [A, B][], context): ArchViolation[]`. This keeps the condition model clean rather than shoe-horning pairs into `Condition<[A, B]>`.
 
 ## Phase 1: Core Types
 
@@ -188,18 +188,18 @@ tests/fixtures/cross-layer/
 
 ### Test inventory
 
-| Test | Description |
-| --- | --- |
-| layer resolution | `.layer()` resolves globs to correct source files |
-| mapping produces pairs | mapping function filters Cartesian product correctly |
+| Test                     | Description                                                   |
+| ------------------------ | ------------------------------------------------------------- |
+| layer resolution         | `.layer()` resolves globs to correct source files             |
+| mapping produces pairs   | mapping function filters Cartesian product correctly          |
 | happy path — all matched | no violations when every left element has a right counterpart |
-| missing counterpart | violation when a route has no matching schema |
-| extra counterpart | configurable — warn or ignore unmatched right elements |
-| 3-layer chain | routes -> schemas -> sdk consecutive pairing works |
-| custom pair condition | `satisfyPairCondition` receives correct pairs |
-| `.because()` | reason appears in violation message |
-| `.warn()` vs `.check()` | warn logs, check throws `ArchRuleError` |
-| empty layer | no violations, no crash |
+| missing counterpart      | violation when a route has no matching schema                 |
+| extra counterpart        | configurable — warn or ignore unmatched right elements        |
+| 3-layer chain            | routes -> schemas -> sdk consecutive pairing works            |
+| custom pair condition    | `satisfyPairCondition` receives correct pairs                 |
+| `.because()`             | reason appears in violation message                           |
+| `.warn()` vs `.check()`  | warn logs, check throws `ArchRuleError`                       |
+| empty layer              | no violations, no crash                                       |
 
 ## Phase 5: Export & Integration
 
@@ -210,20 +210,24 @@ Add to `src/index.ts`:
 export type { Layer, LayerPair } from './models/cross-layer.js'
 export type { PairCondition } from './core/pair-condition.js'
 export { crossLayer, CrossLayerBuilder } from './builders/cross-layer-builder.js'
-export { haveMatchingCounterpart, haveConsistentExports, satisfyPairCondition } from './conditions/cross-layer.js'
+export {
+  haveMatchingCounterpart,
+  haveConsistentExports,
+  satisfyPairCondition,
+} from './conditions/cross-layer.js'
 ```
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `src/models/cross-layer.ts` | New — Layer, LayerPair types |
-| `src/core/pair-condition.ts` | New — PairCondition interface |
-| `src/builders/cross-layer-builder.ts` | New — CrossLayerBuilder chain |
-| `src/conditions/cross-layer.ts` | New — built-in pair conditions |
-| `src/index.ts` | Modified — export crossLayer and related types |
-| `tests/fixtures/cross-layer/` | New — multi-layer fixture project |
-| `tests/cross-layer/cross-layer.test.ts` | New — builder and condition tests |
+| File                                    | Change                                         |
+| --------------------------------------- | ---------------------------------------------- |
+| `src/models/cross-layer.ts`             | New — Layer, LayerPair types                   |
+| `src/core/pair-condition.ts`            | New — PairCondition interface                  |
+| `src/builders/cross-layer-builder.ts`   | New — CrossLayerBuilder chain                  |
+| `src/conditions/cross-layer.ts`         | New — built-in pair conditions                 |
+| `src/index.ts`                          | Modified — export crossLayer and related types |
+| `tests/fixtures/cross-layer/`           | New — multi-layer fixture project              |
+| `tests/cross-layer/cross-layer.test.ts` | New — builder and condition tests              |
 
 ## Out of Scope
 

@@ -110,10 +110,11 @@ describe('FunctionRuleBuilder', () => {
 
   describe('function-specific predicates', () => {
     it('areAsync filters async functions', () => {
-      // No top-level async functions in the fixtures
+      // Fixtures include async class methods (e.g., ProductService.getTotal),
+      // so areAsync() should find them now that functions() includes class methods
       expect(() => {
         functions(p).that().areAsync().should().notExist().check()
-      }).not.toThrow()
+      }).toThrow(ArchRuleError)
     })
 
     it('haveParameterCount filters by parameter count', () => {

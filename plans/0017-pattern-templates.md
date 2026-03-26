@@ -23,6 +23,7 @@ Spec reference: Section 7.3.
 **Type resolution strategy:** Property types in `returnShape` are matched as strings against `Type.getText()` after `getNonNullableType()`, consistent with how `havePropertyType` + `matching()` work in `src/conditions/type-level.ts` and `src/helpers/type-matchers.ts`. The special token `T[]` matches any array type (delegates to `Type.isArray()`).
 
 **ADR compliance:**
+
 - ADR-002 — all type inspection through ts-morph
 - ADR-003 — `.followPattern()` integrates as a fluent condition
 - ADR-005 — no `any`, no `as` assertions; structural narrowing only
@@ -31,7 +32,7 @@ Spec reference: Section 7.3.
 
 ### `src/core/pattern.ts`
 
-```typescript
+````typescript
 import type { TypeMatcher } from '../helpers/type-matchers.js'
 
 /**
@@ -77,7 +78,7 @@ export function definePattern(
     returnShape: options.returnShape,
   }
 }
-```
+````
 
 Deliberately minimal: a named bag of property constraints. No class, no inheritance — just data (consistent with how `definePredicate` and `defineCondition` return plain interface objects in `src/core/define.ts`).
 
@@ -85,7 +86,7 @@ Deliberately minimal: a named bag of property constraints. No class, no inherita
 
 ### `src/conditions/pattern.ts`
 
-```typescript
+````typescript
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ArchPattern, PropertyConstraint } from '../core/pattern.js'
@@ -168,7 +169,9 @@ function getMissingProperties(type: Type, pattern: ArchPattern): string[] {
       continue
     }
 
-    const propType = prop.getTypeAtLocation(type.getSymbol()?.getDeclarations()[0] ?? prop.getDeclarations()[0]!)
+    const propType = prop.getTypeAtLocation(
+      type.getSymbol()?.getDeclarations()[0] ?? prop.getDeclarations()[0]!,
+    )
     if (!matchesConstraint(propType, constraint)) {
       const actual = propType.getNonNullableType().getText()
       const expected = typeof constraint === 'string' ? constraint : '<custom matcher>'
@@ -200,9 +203,10 @@ function matchesConstraint(propType: Type, constraint: PropertyConstraint): bool
   const regex = new RegExp(`^${constraint}$`)
   return regex.test(stripped.getText())
 }
-```
+````
 
 Key decisions:
+
 - **Promise unwrapping** — async route handlers return `Promise<{ total, ... }>`. The condition unwraps one level of `Promise<T>` so users don't need separate patterns for sync and async.
 - **`T[]` token** — matches any array type. Users who need to constrain the element type can pass a `TypeMatcher` instead (e.g. `arrayOf(isNumber())`).
 - **String constraints** are treated as anchored regex (`^number$`) so `'number'` matches `number` but not `bigNumber`.
@@ -246,8 +250,11 @@ export { followPattern } from './conditions/pattern.js'
 Users who prefer `defineCondition` style can use `followPattern(pattern)` directly as a condition with `.satisfy()`:
 
 ```typescript
-functions(p).that().resideInFolder('src/routes/**')
-  .should().satisfy(followPattern(paginatedCollection))
+functions(p)
+  .that()
+  .resideInFolder('src/routes/**')
+  .should()
+  .satisfy(followPattern(paginatedCollection))
   .check()
 ```
 
@@ -255,18 +262,18 @@ functions(p).that().resideInFolder('src/routes/**')
 
 ### `tests/core/pattern.test.ts`
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `definePattern` creates pattern with name and returnShape | Factory produces correct `ArchPattern` |
-| 2 | `followPattern` passes when return type matches all properties | Happy path — all constraints satisfied |
-| 3 | `followPattern` fails when return type is missing a property | Missing property detection |
-| 4 | `followPattern` fails when property type mismatches | Type constraint checking |
-| 5 | `followPattern` unwraps `Promise<T>` for async functions | Async support |
-| 6 | `followPattern` handles `T[]` constraint (matches any array) | Array wildcard |
-| 7 | `followPattern` accepts `TypeMatcher` as constraint | Programmatic constraint |
-| 8 | `followPattern` reports all missing properties in one violation | Multi-property failure message |
-| 9 | `followPattern` works via `.satisfy()` on `RuleBuilder` | Integration with existing extension API |
-| 10 | `followPattern` works via `.followPattern()` on `FunctionRuleBuilder` | Fluent chain integration |
+| #   | Test                                                                  | What it validates                       |
+| --- | --------------------------------------------------------------------- | --------------------------------------- |
+| 1   | `definePattern` creates pattern with name and returnShape             | Factory produces correct `ArchPattern`  |
+| 2   | `followPattern` passes when return type matches all properties        | Happy path — all constraints satisfied  |
+| 3   | `followPattern` fails when return type is missing a property          | Missing property detection              |
+| 4   | `followPattern` fails when property type mismatches                   | Type constraint checking                |
+| 5   | `followPattern` unwraps `Promise<T>` for async functions              | Async support                           |
+| 6   | `followPattern` handles `T[]` constraint (matches any array)          | Array wildcard                          |
+| 7   | `followPattern` accepts `TypeMatcher` as constraint                   | Programmatic constraint                 |
+| 8   | `followPattern` reports all missing properties in one violation       | Multi-property failure message          |
+| 9   | `followPattern` works via `.satisfy()` on `RuleBuilder`               | Integration with existing extension API |
+| 10  | `followPattern` works via `.followPattern()` on `FunctionRuleBuilder` | Fluent chain integration                |
 
 ### Test fixture: `tests/fixtures/patterns/`
 
@@ -281,14 +288,14 @@ tests/fixtures/patterns/
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/pattern.ts` | New — `ArchPattern` interface, `PropertyConstraint` type, `definePattern()` |
-| `src/conditions/pattern.ts` | New — `followPattern()` condition with Promise unwrap + constraint matching |
-| `src/builders/function-rule-builder.ts` | Modified — add `.followPattern()` method |
-| `src/index.ts` | Modified — export `definePattern`, `ArchPattern`, `PropertyConstraint`, `followPattern` |
-| `tests/core/pattern.test.ts` | New — 10 tests |
-| `tests/fixtures/patterns/*.ts` | New — 4 fixture files |
+| File                                    | Change                                                                                  |
+| --------------------------------------- | --------------------------------------------------------------------------------------- |
+| `src/core/pattern.ts`                   | New — `ArchPattern` interface, `PropertyConstraint` type, `definePattern()`             |
+| `src/conditions/pattern.ts`             | New — `followPattern()` condition with Promise unwrap + constraint matching             |
+| `src/builders/function-rule-builder.ts` | Modified — add `.followPattern()` method                                                |
+| `src/index.ts`                          | Modified — export `definePattern`, `ArchPattern`, `PropertyConstraint`, `followPattern` |
+| `tests/core/pattern.test.ts`            | New — 10 tests                                                                          |
+| `tests/fixtures/patterns/*.ts`          | New — 4 fixture files                                                                   |
 
 ## Out of Scope
 

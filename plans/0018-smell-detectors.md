@@ -10,7 +10,7 @@
 
 ## Purpose
 
-Ship two opt-in smell detectors that catch the exact copy-paste and inconsistency problems described in spec section 1.1 (the 433-line audit). These are syntactic sugar over the predicate/condition engine — users *could* build these with custom conditions, but the common case should be one chain.
+Ship two opt-in smell detectors that catch the exact copy-paste and inconsistency problems described in spec section 1.1 (the 433-line audit). These are syntactic sugar over the predicate/condition engine — users _could_ build these with custom conditions, but the common case should be one chain.
 
 ```typescript
 import { smells, project } from 'ts-archunit'
@@ -47,7 +47,7 @@ A fixed "identical" check is too strict (misses near-clones) or too loose (flags
 Smell detectors get their own `SmellBuilder` class rather than extending `RuleBuilder<T>`. Reasons:
 
 - The chain grammar differs — smells don't have `.that()` predicates or `.should()` conditions
-- The execution model differs — `duplicateBodies` compares *pairs* of functions, not individual elements against a condition
+- The execution model differs — `duplicateBodies` compares _pairs_ of functions, not individual elements against a condition
 - Violation messages are smell-specific ("Function A is 92% similar to Function B")
 
 `SmellBuilder` reuses `ArchRuleError`, `ArchViolation`, `formatViolations`, and the check/warn terminal methods from core.
@@ -130,11 +130,12 @@ function lcsLength(a: readonly number[], b: readonly number[]): number {
 }
 ```
 
-**Performance note:** LCS is O(m*n) where m, n are AST node counts per function. For typical functions (< 500 nodes), this is fast. For pathological cases, `minLines` filters out trivially small functions and `inFolder` scopes the search.
+**Performance note:** LCS is O(m\*n) where m, n are AST node counts per function. For typical functions (< 500 nodes), this is fast. For pathological cases, `minLines` filters out trivially small functions and `inFolder` scopes the search.
 
 ### `src/smells/fingerprint.test.ts`
 
 Tests:
+
 - Identical bodies produce similarity 1.0
 - Bodies with same structure but different identifiers produce similarity > 0.9
 - Completely different bodies produce similarity < 0.3
@@ -373,6 +374,7 @@ export { smells } from './smells/index.js'
 ### `src/smells/__tests__/duplicate-bodies.test.ts`
 
 Test cases:
+
 - Two identical functions in different files are flagged
 - Two similar functions (same structure, different identifiers) above threshold are flagged
 - Two completely different functions are not flagged
@@ -388,6 +390,7 @@ Test cases:
 ### `src/smells/__tests__/inconsistent-siblings.test.ts`
 
 Test cases:
+
 - Folder with 5/6 files matching pattern flags the 1 outlier
 - Folder with 3/6 files matching pattern flags nothing (no majority)
 - Empty folder produces no violations
@@ -420,18 +423,18 @@ tests/fixtures/smells/
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `src/smells/fingerprint.ts` | AST fingerprinting + LCS similarity |
-| `src/smells/smell-builder.ts` | Base class with guardrails + check/warn |
-| `src/smells/duplicate-bodies.ts` | `DuplicateBodiesBuilder` |
-| `src/smells/inconsistent-siblings.ts` | `InconsistentSiblingsBuilder` |
-| `src/smells/index.ts` | `smells` namespace export |
-| `src/index.ts` | Re-export `smells` |
-| `src/smells/__tests__/fingerprint.test.ts` | Fingerprint + similarity tests |
-| `src/smells/__tests__/duplicate-bodies.test.ts` | Integration tests |
-| `src/smells/__tests__/inconsistent-siblings.test.ts` | Integration tests |
-| `tests/fixtures/smells/**` | Fixture projects |
+| File                                                 | Change                                  |
+| ---------------------------------------------------- | --------------------------------------- |
+| `src/smells/fingerprint.ts`                          | AST fingerprinting + LCS similarity     |
+| `src/smells/smell-builder.ts`                        | Base class with guardrails + check/warn |
+| `src/smells/duplicate-bodies.ts`                     | `DuplicateBodiesBuilder`                |
+| `src/smells/inconsistent-siblings.ts`                | `InconsistentSiblingsBuilder`           |
+| `src/smells/index.ts`                                | `smells` namespace export               |
+| `src/index.ts`                                       | Re-export `smells`                      |
+| `src/smells/__tests__/fingerprint.test.ts`           | Fingerprint + similarity tests          |
+| `src/smells/__tests__/duplicate-bodies.test.ts`      | Integration tests                       |
+| `src/smells/__tests__/inconsistent-siblings.test.ts` | Integration tests                       |
+| `tests/fixtures/smells/**`                           | Fixture projects                        |
 
 ## Out of Scope
 

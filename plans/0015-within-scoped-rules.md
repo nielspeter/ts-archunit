@@ -16,8 +16,8 @@ Named selections already work today. The `RuleBuilder.should()` method forks the
 
 ```typescript
 const repositories = classes(p).that().extend('BaseRepository')
-repositories.should().notContain(call('parseInt')).check()   // rule 1
-repositories.should().notContain(newExpr('Error')).check()    // rule 2 (independent)
+repositories.should().notContain(call('parseInt')).check() // rule 1
+repositories.should().notContain(newExpr('Error')).check() // rule 2 (independent)
 ```
 
 What does NOT work is scoping — "within these matched call sites, apply rules to the callback functions." That is what this plan adds.
@@ -33,7 +33,7 @@ app.get('/users', authenticate, async (req, res) => {
 })
 
 app.post('/orders', authenticate, async (req, res) => {
-  const skip = Number(req.query.skip) || 0   // BAD: should use normalizePagination
+  const skip = Number(req.query.skip) || 0 // BAD: should use normalizePagination
   // ...
 })
 ```
@@ -58,7 +58,7 @@ within(routes).functions().should().contain(call('normalizePagination')).check()
 
 `within()` does not return a new `RuleBuilder`. It returns a **scoped context** that provides entry point functions (`functions()`, `classes()`, etc.) which operate on a restricted set of AST nodes — specifically, the callback arguments of the matched call expressions.
 
-Why not a builder method? Because `within()` changes the *element source*, not the predicate or condition. It logically precedes the entry point, not the `.that()` chain. The grammar is:
+Why not a builder method? Because `within()` changes the _element source_, not the predicate or condition. It logically precedes the entry point, not the `.that()` chain. The grammar is:
 
 ```
 within(selection)     -> ScopedContext    (restrict search space)
@@ -173,7 +173,7 @@ function fromArrowExpression(node: Node): ArchFunction {
   return {
     getName: () => undefined, // anonymous — name derived from context
     getSourceFile: () => arrow.getSourceFile(),
-    isExported: () => false,  // callbacks are never exported
+    isExported: () => false, // callbacks are never exported
     isAsync: () => arrow.isAsync(),
     getParameters: () => arrow.getParameters(),
     getReturnType: () => arrow.getReturnType(),
@@ -208,7 +208,7 @@ function fromFunctionExpression(node: Node): ArchFunction {
 
 The `within()` function accepts a `CallRuleBuilder` (from plan 0014), evaluates its predicates to get matching call expressions, extracts callbacks, and returns a `ScopedContext` that provides scoped entry points.
 
-```typescript
+````typescript
 import type { CallRuleBuilder } from '../builders/call-rule-builder.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import { ScopedFunctionRuleBuilder } from '../builders/scoped-function-rule-builder.js'
@@ -260,7 +260,7 @@ export function within(selection: CallRuleBuilder): ScopedContext {
     },
   }
 }
-```
+````
 
 ## Phase 3: Scoped Rule Builders
 
@@ -296,9 +296,7 @@ export class ScopedFunctionRuleBuilder extends FunctionRuleBuilder {
    */
   protected override getElements(): ArchFunction[] {
     const matchedCalls = this.callSelection.getMatchedCalls()
-    return matchedCalls.flatMap((callExpr) =>
-      extractCallbacks(callExpr).map((ec) => ec.fn),
-    )
+    return matchedCalls.flatMap((callExpr) => extractCallbacks(callExpr).map((ec) => ec.fn))
   }
 
   /**
@@ -339,9 +337,7 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
   getMatchedCalls(): CallExpression[] {
     const allCalls = this.getElements()
     return allCalls
-      .filter((archCall) =>
-        this._predicates.every((predicate) => predicate.test(archCall)),
-      )
+      .filter((archCall) => this._predicates.every((predicate) => predicate.test(archCall)))
       .map((archCall) => archCall.getNode() as CallExpression)
   }
 }
@@ -492,11 +488,7 @@ describe('within()', () => {
       .withMethod(/^(get|post|put|delete|patch)$/)
 
     // This should only examine the inline callbacks, not all functions in the project
-    within(routes)
-      .functions()
-      .should()
-      .contain(call('normalizePagination'))
-      .check()
+    within(routes).functions().should().contain(call('normalizePagination')).check()
   })
 
   it('reports violations for callbacks missing required calls', () => {
@@ -510,11 +502,7 @@ describe('within()', () => {
       .withMethod(/^(get|post)$/)
 
     expect(() => {
-      within(routes)
-        .functions()
-        .should()
-        .contain(call('normalizePagination'))
-        .check()
+      within(routes).functions().should().contain(call('normalizePagination')).check()
     }).toThrow(ArchRuleError)
   })
 
@@ -540,11 +528,7 @@ describe('within()', () => {
   it('supports predicates on scoped functions', () => {
     const p = createRouteProject()
 
-    const routes = calls(p)
-      .that()
-      .onObject('app')
-      .and()
-      .withMethod('get')
+    const routes = calls(p).that().onObject('app').and().withMethod('get')
 
     // Filter to only async callbacks, then check
     within(routes)
@@ -559,28 +543,18 @@ describe('within()', () => {
   it('returns no elements when no calls match the selection', () => {
     const p = createRouteProject()
 
-    const noRoutes = calls(p)
-      .that()
-      .onObject('nonexistent')
+    const noRoutes = calls(p).that().onObject('nonexistent')
 
     // No matched calls → no callbacks → no violations (empty set passes)
     expect(() => {
-      within(noRoutes)
-        .functions()
-        .should()
-        .contain(call('anything'))
-        .check()
+      within(noRoutes).functions().should().contain(call('anything')).check()
     }).not.toThrow()
   })
 
   it('preserves .because() reason in scoped rule violations', () => {
     const p = createRouteProject()
 
-    const routes = calls(p)
-      .that()
-      .onObject('app')
-      .and()
-      .withMethod('post')
+    const routes = calls(p).that().onObject('app').and().withMethod('post')
 
     try {
       within(routes)
@@ -600,11 +574,7 @@ describe('within()', () => {
     // Both middleware and handler are inline arrow functions
     const p = createRouteProject()
 
-    const routes = calls(p)
-      .that()
-      .onObject('app')
-      .and()
-      .withMethod('get')
+    const routes = calls(p).that().onObject('app').and().withMethod('get')
 
     // within() extracts ALL inline function arguments, not just the last one
     const scopedFns = within(routes).functions()
@@ -630,7 +600,6 @@ describe('ScopedFunctionRuleBuilder', () => {
     // After .should() the builder forks. The forked builder must
     // still use the scoped getElements(), not the global one.
     // This test ensures the override of fork() works correctly.
-
     // Setup: create a ScopedFunctionRuleBuilder with a mock CallRuleBuilder
     // that returns known call expressions.
     // After .should(), verify the forked builder still scopes correctly.
@@ -673,38 +642,38 @@ Nested scoping is not supported in v1. Each `within()` operates on a `CallRuleBu
 
 ## Files Changed
 
-| File | Change |
-| ---- | ------ |
-| `src/helpers/callback-extractor.ts` | New — extract inline function arguments from call expressions |
-| `src/helpers/within.ts` | New — `within()` function and `ScopedContext` interface |
-| `src/builders/scoped-function-rule-builder.ts` | New — `FunctionRuleBuilder` subclass with scoped `getElements()` |
-| `src/builders/call-rule-builder.ts` | Modified (plan 0014) — add `getProject()` and `getMatchedCalls()` |
-| `src/index.ts` | Modified — export `within`, `ScopedContext`, `ScopedFunctionRuleBuilder` |
-| `tests/helpers/callback-extractor.test.ts` | New — 7 tests for callback extraction |
-| `tests/helpers/within.test.ts` | New — 7 integration tests for scoped rules |
-| `tests/builders/scoped-function-rule-builder.test.ts` | New — 3 tests for fork behavior and element sourcing |
+| File                                                  | Change                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| `src/helpers/callback-extractor.ts`                   | New — extract inline function arguments from call expressions            |
+| `src/helpers/within.ts`                               | New — `within()` function and `ScopedContext` interface                  |
+| `src/builders/scoped-function-rule-builder.ts`        | New — `FunctionRuleBuilder` subclass with scoped `getElements()`         |
+| `src/builders/call-rule-builder.ts`                   | Modified (plan 0014) — add `getProject()` and `getMatchedCalls()`        |
+| `src/index.ts`                                        | Modified — export `within`, `ScopedContext`, `ScopedFunctionRuleBuilder` |
+| `tests/helpers/callback-extractor.test.ts`            | New — 7 tests for callback extraction                                    |
+| `tests/helpers/within.test.ts`                        | New — 7 integration tests for scoped rules                               |
+| `tests/builders/scoped-function-rule-builder.test.ts` | New — 3 tests for fork behavior and element sourcing                     |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-| --- | --- | --- |
-| 1 | Extract arrow function callbacks | Arrow functions detected as arguments |
-| 2 | Extract async arrow function callbacks | `isAsync()` correct on extracted callback |
-| 3 | Extract function expression callbacks | Named function expressions detected |
-| 4 | Extract multiple callbacks from single call | Multi-middleware pattern (Express) |
-| 5 | Ignore non-function arguments | Identifier references skipped |
-| 6 | Empty for calls with no function arguments | `console.log(42)` returns nothing |
-| 7 | Body available for body analysis | Extracted callback body works with `contain()` |
-| 8 | Scopes `functions()` to matched call callbacks | End-to-end: `within(routes).functions()` |
-| 9 | Reports violations for missing calls in callbacks | Violation path works in scoped context |
-| 10 | Named selections work with `within()` | `.should()` fork-on-should produces independent scoped rules |
-| 11 | Predicates work on scoped functions | `.that().areAsync()` filters within scope |
-| 12 | Empty selection produces no violations | No matched calls = no elements = pass |
-| 13 | `.because()` reason preserved in scoped rules | Reason flows through to violations |
-| 14 | Multiple inline callbacks all extracted | Middleware + handler both in scope |
-| 15 | Fork preserves call selection context | `.should()` on scoped builder stays scoped |
-| 16 | Inherits all `FunctionRuleBuilder` methods | No methods lost in subclass |
-| 17 | Empty call selection yields empty elements | Scoped `getElements()` returns `[]` |
+| #   | Test                                              | What it validates                                            |
+| --- | ------------------------------------------------- | ------------------------------------------------------------ |
+| 1   | Extract arrow function callbacks                  | Arrow functions detected as arguments                        |
+| 2   | Extract async arrow function callbacks            | `isAsync()` correct on extracted callback                    |
+| 3   | Extract function expression callbacks             | Named function expressions detected                          |
+| 4   | Extract multiple callbacks from single call       | Multi-middleware pattern (Express)                           |
+| 5   | Ignore non-function arguments                     | Identifier references skipped                                |
+| 6   | Empty for calls with no function arguments        | `console.log(42)` returns nothing                            |
+| 7   | Body available for body analysis                  | Extracted callback body works with `contain()`               |
+| 8   | Scopes `functions()` to matched call callbacks    | End-to-end: `within(routes).functions()`                     |
+| 9   | Reports violations for missing calls in callbacks | Violation path works in scoped context                       |
+| 10  | Named selections work with `within()`             | `.should()` fork-on-should produces independent scoped rules |
+| 11  | Predicates work on scoped functions               | `.that().areAsync()` filters within scope                    |
+| 12  | Empty selection produces no violations            | No matched calls = no elements = pass                        |
+| 13  | `.because()` reason preserved in scoped rules     | Reason flows through to violations                           |
+| 14  | Multiple inline callbacks all extracted           | Middleware + handler both in scope                           |
+| 15  | Fork preserves call selection context             | `.should()` on scoped builder stays scoped                   |
+| 16  | Inherits all `FunctionRuleBuilder` methods        | No methods lost in subclass                                  |
+| 17  | Empty call selection yields empty elements        | Scoped `getElements()` returns `[]`                          |
 
 ## v1 Limitation: Inline Functions Only
 

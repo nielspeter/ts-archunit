@@ -1,10 +1,12 @@
 import {
   type FunctionDeclaration,
   type VariableDeclaration,
+  type MethodDeclaration,
   type SourceFile,
   type ParameterDeclaration,
   type Type,
   type Node,
+  Node as NodeClass,
   SyntaxKind,
 } from 'ts-morph'
 
@@ -95,13 +97,55 @@ export function fromArrowVariableDeclaration(decl: VariableDeclaration): ArchFun
 }
 
 /**
- * Scan a source file for all functions (both patterns).
+ * Create an ArchFunction from a class MethodDeclaration.
+ *
+ * Method name is prefixed with the class name for clarity in violation messages:
+ * "Space.getWebhooks" instead of just "getWebhooks".
+ */
+export function fromMethodDeclaration(method: MethodDeclaration): ArchFunction {
+  const parent = method.getParent()
+  const className = NodeClass.isClassDeclaration(parent)
+    ? (parent.getName() ?? '<anonymous>')
+    : '<anonymous>'
+  return {
+    getName: () => {
+      const methodName = method.getName()
+      return `${className}.${methodName}`
+    },
+    getSourceFile: () => method.getSourceFile(),
+    isExported: () => {
+      // A method is "exported" if its class is exported (ADR-005: use type guard)
+      const cls = method.getParent()
+      if (NodeClass.isClassDeclaration(cls)) {
+        return cls.isExported()
+      }
+      return false
+    },
+    isAsync: () => method.isAsync(),
+    getParameters: () => method.getParameters(),
+    getReturnType: () => method.getReturnType(),
+    getBody: () => method.getBody(),
+    getNode: () => method,
+    getStartLineNumber: () => method.getStartLineNumber(),
+  }
+}
+
+/**
+ * Scan a source file for all functions.
  *
  * Returns ArchFunction wrappers for:
  * 1. FunctionDeclarations — `function foo() {}`
  * 2. VariableDeclarations with ArrowFunction initializer — `const foo = () => {}`
+ * 3. Class MethodDeclarations — `class Foo { bar() {} }` (when includeMethods is true)
+ *
+ * @param sourceFile - The source file to scan
+ * @param options - Set `includeMethods: true` to include class methods (default: true)
  */
-export function collectFunctions(sourceFile: SourceFile): ArchFunction[] {
+export function collectFunctions(
+  sourceFile: SourceFile,
+  options?: { includeMethods?: boolean },
+): ArchFunction[] {
+  const includeMethods = options?.includeMethods ?? true
   const functions: ArchFunction[] = []
 
   // Pattern 1: FunctionDeclarations
@@ -113,6 +157,15 @@ export function collectFunctions(sourceFile: SourceFile): ArchFunction[] {
   for (const varDecl of sourceFile.getVariableDeclarations()) {
     if (varDecl.getInitializerIfKind(SyntaxKind.ArrowFunction)) {
       functions.push(fromArrowVariableDeclaration(varDecl))
+    }
+  }
+
+  // Pattern 3: class methods
+  if (includeMethods) {
+    for (const cls of sourceFile.getClasses()) {
+      for (const method of cls.getMethods()) {
+        functions.push(fromMethodDeclaration(method))
+      }
     }
   }
 

@@ -19,7 +19,7 @@ const project = new Project({
 })
 
 // Collect all functions from all fixture files
-const allFunctions = project.getSourceFiles().flatMap(collectFunctions)
+const allFunctions = project.getSourceFiles().flatMap((sf) => collectFunctions(sf))
 
 function findFn(name: string): ArchFunction {
   const fn = allFunctions.find((f) => f.getName() === name)

@@ -110,8 +110,7 @@ export function fromCallExpression(expr: CallExpression): ArchCall {
     methodName = callExpr.getText()
   }
 
-  const fullName =
-    objectName !== undefined ? `${objectName}.${methodName}` : methodName
+  const fullName = objectName !== undefined ? `${objectName}.${methodName}` : methodName
 
   return {
     getName: () => fullName,
@@ -133,9 +132,7 @@ export function fromCallExpression(expr: CallExpression): ArchCall {
  */
 export function collectCalls(sourceFile: SourceFile): ArchCall[] {
   const calls: ArchCall[] = []
-  for (const callExpr of sourceFile.getDescendantsOfKind(
-    SyntaxKind.CallExpression,
-  )) {
+  for (const callExpr of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
     calls.push(fromCallExpression(callExpr))
   }
   return calls
@@ -223,10 +220,7 @@ export function withMethod(nameOrRegex: string | RegExp): Predicate<ArchCall> {
  * @param index - Zero-based argument position
  * @param pattern - Regex or exact string to match against argument text
  */
-export function withArgMatching(
-  index: number,
-  pattern: string | RegExp,
-): Predicate<ArchCall> {
+export function withArgMatching(index: number, pattern: string | RegExp): Predicate<ArchCall> {
   const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern
   return {
     description: `with argument ${String(index)} matching ${String(regex)}`,
@@ -255,10 +249,7 @@ export function withArgMatching(
  * // No match: router.get(pathVariable, handler)
  * withStringArg(0, '/api/users/**')
  */
-export function withStringArg(
-  index: number,
-  glob: string,
-): Predicate<ArchCall> {
+export function withStringArg(index: number, glob: string): Predicate<ArchCall> {
   const isMatch = picomatch(glob)
   return {
     description: `with string argument ${String(index)} matching '${glob}'`,
@@ -370,10 +361,7 @@ export function getFunctionBody(node: Node): Node | undefined {
  * Reuses the same kind-based traversal logic as the existing
  * findMatchesInBody (but accepts any Node, not just a body).
  */
-export function findMatchesInNode(
-  node: Node,
-  matcher: ExpressionMatcher,
-): Node[] {
+export function findMatchesInNode(node: Node, matcher: ExpressionMatcher): Node[] {
   const matches: Node[] = []
   if (matcher.syntaxKinds && matcher.syntaxKinds.length > 0) {
     for (const kind of matcher.syntaxKinds) {
@@ -405,7 +393,7 @@ Key implementation notes:
 
 ### `src/builders/call-rule-builder.ts`
 
-```typescript
+````typescript
 import type { ArchProject } from '../core/project.js'
 import { RuleBuilder } from '../core/rule-builder.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
@@ -549,9 +537,7 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
    * Used by within() to extract callbacks from matched calls.
    */
   getMatchedCalls(): ArchCall[] {
-    return this.getElements().filter((archCall) =>
-      this._predicates.every((p) => p.test(archCall)),
-    )
+    return this.getElements().filter((archCall) => this._predicates.every((p) => p.test(archCall)))
   }
 }
 
@@ -576,7 +562,7 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
 export function calls(p: ArchProject): CallRuleBuilder {
   return new CallRuleBuilder(p)
 }
-```
+````
 
 Key implementation notes:
 
@@ -638,9 +624,7 @@ export function notExist(): Condition<ArchCall> {
  * Searches all function-like arguments (ArrowFunction, FunctionExpression)
  * for a node matching the given ExpressionMatcher.
  */
-export function haveCallbackContaining(
-  matcher: ExpressionMatcher,
-): Condition<ArchCall> {
+export function haveCallbackContaining(matcher: ExpressionMatcher): Condition<ArchCall> {
   return {
     description: `have callback containing ${matcher.description}`,
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
@@ -667,9 +651,7 @@ export function haveCallbackContaining(
  *
  * Produces one violation per matching node found in any callback.
  */
-export function notHaveCallbackContaining(
-  matcher: ExpressionMatcher,
-): Condition<ArchCall> {
+export function notHaveCallbackContaining(matcher: ExpressionMatcher): Condition<ArchCall> {
   return {
     description: `not have callback containing ${matcher.description}`,
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
@@ -699,10 +681,7 @@ export function notHaveCallbackContaining(
 /**
  * Search all callback arguments of a call for a matcher hit.
  */
-function searchCallbacksFor(
-  archCall: ArchCall,
-  matcher: ExpressionMatcher,
-): boolean {
+function searchCallbacksFor(archCall: ArchCall, matcher: ExpressionMatcher): boolean {
   const args = archCall.getArguments()
   for (const arg of args) {
     const body = getFunctionBody(arg)
@@ -725,12 +704,7 @@ export type { ArchCall } from './models/arch-call.js'
 export { collectCalls, fromCallExpression } from './models/arch-call.js'
 
 // Call predicates (standalone)
-export {
-  onObject,
-  withMethod,
-  withArgMatching,
-  withStringArg,
-} from './predicates/call.js'
+export { onObject, withMethod, withArgMatching, withStringArg } from './predicates/call.js'
 
 // Call conditions (standalone)
 export {
@@ -770,20 +744,20 @@ export function searchFunctionBody(fn: ArchFunction, matcher: ExpressionMatcher)
 
 ## Files Changed
 
-| File                                | Change     | Description                                     |
-| ----------------------------------- | ---------- | ----------------------------------------------- |
-| `src/models/arch-call.ts`           | **New**    | ArchCall interface + fromCallExpression + collectCalls |
-| `src/predicates/call.ts`            | **New**    | onObject, withMethod, withArgMatching, withStringArg |
-| `src/conditions/call.ts`            | **New**    | haveCallbackContaining, notHaveCallbackContaining, notExist |
-| `src/builders/call-rule-builder.ts` | **New**    | CallRuleBuilder class + calls() entry point     |
-| `src/helpers/body-traversal.ts`     | **Modify** | Extract findMatchesInNode, export getFunctionBody |
-| `src/index.ts`                      | **Modify** | Add call entry point + predicate/condition exports |
-| `tests/models/arch-call.test.ts`    | **New**    | ArchCall model unit tests                       |
-| `tests/predicates/call.test.ts`     | **New**    | Call predicate unit tests                       |
-| `tests/conditions/call.test.ts`     | **New**    | Call condition unit tests (haveCallbackContaining) |
-| `tests/builders/call-rule-builder.test.ts` | **New** | CallRuleBuilder integration tests          |
-| `tests/integration/call-entry-point.test.ts` | **New** | End-to-end tests with real framework patterns |
-| `tests/fixtures/calls/`             | **New**    | Test fixture TypeScript files                   |
+| File                                         | Change     | Description                                                 |
+| -------------------------------------------- | ---------- | ----------------------------------------------------------- |
+| `src/models/arch-call.ts`                    | **New**    | ArchCall interface + fromCallExpression + collectCalls      |
+| `src/predicates/call.ts`                     | **New**    | onObject, withMethod, withArgMatching, withStringArg        |
+| `src/conditions/call.ts`                     | **New**    | haveCallbackContaining, notHaveCallbackContaining, notExist |
+| `src/builders/call-rule-builder.ts`          | **New**    | CallRuleBuilder class + calls() entry point                 |
+| `src/helpers/body-traversal.ts`              | **Modify** | Extract findMatchesInNode, export getFunctionBody           |
+| `src/index.ts`                               | **Modify** | Add call entry point + predicate/condition exports          |
+| `tests/models/arch-call.test.ts`             | **New**    | ArchCall model unit tests                                   |
+| `tests/predicates/call.test.ts`              | **New**    | Call predicate unit tests                                   |
+| `tests/conditions/call.test.ts`              | **New**    | Call condition unit tests (haveCallbackContaining)          |
+| `tests/builders/call-rule-builder.test.ts`   | **New**    | CallRuleBuilder integration tests                           |
+| `tests/integration/call-entry-point.test.ts` | **New**    | End-to-end tests with real framework patterns               |
+| `tests/fixtures/calls/`                      | **New**    | Test fixture TypeScript files                               |
 
 ## Test Inventory
 

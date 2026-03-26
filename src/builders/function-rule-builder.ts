@@ -66,7 +66,7 @@ import {
  */
 export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
   protected getElements(): ArchFunction[] {
-    return this.project.getSourceFiles().flatMap(collectFunctions)
+    return this.project.getSourceFiles().flatMap((sf) => collectFunctions(sf))
   }
 
   // --- Identity predicates (delegated to plan 0003 generics) ---

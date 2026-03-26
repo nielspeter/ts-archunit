@@ -98,6 +98,7 @@ export {
   collectFunctions,
   fromFunctionDeclaration,
   fromArrowVariableDeclaration,
+  fromMethodDeclaration,
 } from './models/arch-function.js'
 
 // Function predicates
