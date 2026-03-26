@@ -8,49 +8,45 @@ Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](
 
 ---
 
-## The Problem
+## Does This Sound Familiar?
 
-Architecture decisions are documented in ADRs, discussed in reviews, agreed on in meetings — and then violated one PR at a time.
+**"The domain layer imports from the database layer."**
 
-A real-world API project with 40 repositories grew organically over 18 months. A routine audit found:
-
-```typescript
-// File A — manual Number(), no limit cap
-const skip = Number(request.query.skip) || 0
-const limit = Number(request.query.limit) || 100
-
-// File B — manual Number() with Math.min cap
-const skip = Number(request.query.skip) || 0
-const limit = Math.min(Number(request.query.limit) || 100, 1000)
-
-// File C — conditional Number(), no cap
-skip: skip !== undefined ? Number(skip) : undefined,
-limit: limit !== undefined ? Number(limit) : undefined,
-```
-
-A shared utility `normalizePagination()` existed. Some endpoints used it. Most didn't.
-
-**Six different pagination patterns across 30 routes.** Each was introduced by a single PR that looked correct in isolation. Code review didn't catch them because no reviewer holds the full pattern inventory in their head.
-
-The audit plan — just documenting what's wrong — was 433 lines. Before writing a single line of fix code.
-
-**ts-archunit prevents this.** Write the rule once, CI enforces it forever:
+Someone added a quick import to get a type. Then another. Now your clean architecture has 15 backdoors.
 
 ```typescript
-functions(p)
+// ts-archunit catches this on the PR that introduces it:
+modules(p)
   .that()
-  .haveNameMatching(/^parse\w+Order$/)
-  .and()
-  .resideInFolder('**/routes/**')
+  .resideInFolder('**/domain/**')
   .should()
-  .notExist()
-  .rule({
-    id: 'route/no-copy-paste',
-    because: 'Copy-pasted parsers diverge over time',
-    suggestion: 'Use the shared parseOrder() utility with a column map',
-  })
+  .notImportFrom('**/repositories/**')
   .check()
 ```
+
+**"Half the repositories throw `new Error()` instead of typed errors."**
+
+A shared `NotFoundError` exists. But 12 out of 40 repositories still throw generic `Error`. Code review didn't catch it because each PR only touched one file.
+
+```typescript
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(newExpr('Error'))
+  .because('use NotFoundError, ValidationError, etc.')
+  .check()
+```
+
+**"Feature modules depend on each other in circles."**
+
+The auth module imports from billing, billing imports from notifications, notifications imports from auth. Nobody planned this. It just happened.
+
+```typescript
+slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
+```
+
+**ts-archunit turns these rules into tests.** They run in CI. Violations are caught on the PR that introduces them — not 18 months later during a manual audit.
 
 ---
 
