@@ -1,7 +1,8 @@
 /**
- * Dogfood: Architecture rules for ts-archunit itself.
+ * Architecture rules for ts-archunit itself.
  *
  * These rules enforce our own ADRs on our own codebase.
+ * Uses .rule() metadata for educational violation messages.
  */
 import { describe, it } from 'vitest'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
@@ -20,7 +21,12 @@ describe('ADR-005: Type Safety', () => {
       .resideInFolder('**/ts-archunit/src/**')
       .should()
       .satisfy(noAnyProperties())
-      .because('ADR-005: use specific types or unknown instead of any')
+      .rule({
+        id: 'adr005/no-any',
+        because: 'any bypasses the type checker, hiding bugs that strict mode catches',
+        suggestion: 'Use a specific type, unknown with narrowing, or a generic',
+        docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/005-no-any-no-type-assertions.md',
+      })
       .check()
   })
 
@@ -30,7 +36,13 @@ describe('ADR-005: Type Safety', () => {
       .resideInFolder('**/ts-archunit/src/**')
       .should()
       .satisfy(noTypeAssertions())
-      .because('ADR-005: use type guards instead of as casts')
+      .rule({
+        id: 'adr005/no-as-cast',
+        because: 'as casts bypass the type checker — refactoring silently breaks',
+        suggestion:
+          'Use ts-morph Node type guards (Node.isClassDeclaration etc.) or explicit type annotations',
+        docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/005-no-any-no-type-assertions.md',
+      })
       .check()
   })
 })
@@ -44,17 +56,26 @@ describe('ADR-004: ESM', () => {
       .resideInFolder('**/src/**')
       .should()
       .notContain(call('require'))
-      .because('ADR-004: ESM only, no CommonJS require()')
+      .rule({
+        id: 'adr004/no-require',
+        because: 'ts-archunit is ESM-only — CommonJS require() breaks module resolution',
+        suggestion: "Use import ... from '...' (static) or import('...') (dynamic)",
+        docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/004-esm-only-package.md',
+      })
       .check()
   })
 
-  it('no module.exports in source', () => {
+  it('no require() in source functions', () => {
     functions(p)
       .that()
       .resideInFolder('**/src/**')
       .should()
       .notContain(call('require'))
-      .because('ADR-004: ESM only')
+      .rule({
+        id: 'adr004/no-require-fn',
+        because: 'ESM only',
+        docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/004-esm-only-package.md',
+      })
       .check()
   })
 })
@@ -68,7 +89,13 @@ describe('ADR-002: ts-morph as AST engine', () => {
       .resideInFolder('**/src/**')
       .should()
       .notImportFrom('**/node_modules/typescript/**')
-      .because('ADR-002: use ts-morph, not raw TypeScript compiler API')
+      .rule({
+        id: 'adr002/no-raw-ts',
+        because:
+          'ts-morph wraps the TypeScript compiler API — using it directly creates version coupling and verbose code',
+        suggestion: 'Use ts-morph APIs: Project, Node, SyntaxKind, type checker methods',
+        docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/002-ts-morph-ast-engine.md',
+      })
       .check()
   })
 })
@@ -82,7 +109,10 @@ describe('Code Quality', () => {
       .resideInFolder('**/ts-archunit/src/**')
       .should()
       .satisfy(noEval())
-      .because('eval is a security risk')
+      .rule({
+        id: 'security/no-eval',
+        because: 'eval executes arbitrary code — security risk and prevents static analysis',
+      })
       .check()
   })
 
@@ -92,7 +122,11 @@ describe('Code Quality', () => {
       .resideInFolder('**/ts-archunit/src/**')
       .should()
       .satisfy(noGenericErrors())
-      .because('use typed domain errors')
+      .rule({
+        id: 'quality/typed-errors',
+        because: 'Generic Error loses context. Typed errors enable consistent handling.',
+        suggestion: 'Use ArchRuleError or a specific Error subclass',
+      })
       .check()
   })
 
@@ -104,6 +138,10 @@ describe('Code Quality', () => {
       .resideInFolder('**/src/builders/**')
       .should()
       .beExported()
+      .rule({
+        id: 'quality/builders-exported',
+        because: 'Builders are the public API — unexported builders are unreachable',
+      })
       .check()
   })
 
@@ -115,6 +153,10 @@ describe('Code Quality', () => {
       .resideInFolder('**/src/**')
       .should()
       .beExported()
+      .rule({
+        id: 'quality/entry-points-exported',
+        because: 'Entry point functions are the primary user API',
+      })
       .check()
   })
 })
@@ -128,7 +170,11 @@ describe('Architecture', () => {
       .resideInFolder('**/src/helpers/**')
       .should()
       .notImportFrom('**/src/builders/**')
-      .because('helpers are lower-level than builders')
+      .rule({
+        id: 'arch/helpers-no-builders',
+        because: 'Helpers are lower-level primitives — builders depend on helpers, not the reverse',
+        suggestion: 'Move the shared logic to src/helpers/ or src/core/',
+      })
       .check()
   })
 
@@ -138,7 +184,11 @@ describe('Architecture', () => {
       .resideInFolder('**/src/core/**')
       .should()
       .notImportFrom('**/src/builders/**')
-      .because('core must not depend on entry points')
+      .rule({
+        id: 'arch/core-no-builders',
+        because: 'Core is the foundation — it must not depend on entry points',
+        suggestion: 'If core needs builder functionality, extract it to core first',
+      })
       .check()
   })
 
@@ -148,7 +198,10 @@ describe('Architecture', () => {
       .resideInFolder('**/src/predicates/**')
       .should()
       .notImportFrom('**/src/conditions/**')
-      .because('predicates and conditions are independent')
+      .rule({
+        id: 'arch/predicates-independent',
+        because: 'Predicates filter, conditions assert — they are independent concerns',
+      })
       .check()
   })
 
@@ -158,7 +211,10 @@ describe('Architecture', () => {
       .resideInFolder('**/src/models/**')
       .should()
       .notImportFrom('**/src/builders/**')
-      .because('models are lower-level than builders')
+      .rule({
+        id: 'arch/models-no-builders',
+        because: 'Models are data representations — they must not depend on the rule engine',
+      })
       .check()
   })
 
@@ -168,7 +224,10 @@ describe('Architecture', () => {
       .resideInFolder('**/src/conditions/**')
       .should()
       .notImportFrom('**/src/builders/**')
-      .because('conditions are lower-level than builders')
+      .rule({
+        id: 'arch/conditions-no-builders',
+        because: 'Conditions are reusable — they must not depend on specific entry points',
+      })
       .check()
   })
 
@@ -184,7 +243,11 @@ describe('Architecture', () => {
       })
       .should()
       .beFreeOfCycles()
-      .because('source modules must have a clean dependency graph')
+      .rule({
+        id: 'arch/no-cycles',
+        because: 'Circular dependencies between modules prevent independent testing and reasoning',
+        suggestion: 'Extract shared code to a lower-level module (core or helpers)',
+      })
       .check()
   })
 })
@@ -198,7 +261,11 @@ describe('No console.log in Source', () => {
       .resideInFolder('**/ts-archunit/src/**')
       .should()
       .satisfy(noConsoleLog())
-      .because('use console.warn for warnings or throw for errors')
+      .rule({
+        id: 'quality/no-console-log',
+        because: 'Use console.warn for user-facing warnings or throw for errors',
+        suggestion: 'Replace console.log() with console.warn() or remove it',
+      })
       .check()
   })
 
@@ -208,7 +275,10 @@ describe('No console.log in Source', () => {
       .resideInFolder('**/ts-archunit/src/**')
       .should()
       .notContain(call('console.log'))
-      .because('use console.warn for warnings or throw for errors')
+      .rule({
+        id: 'quality/no-console-log-fn',
+        because: 'Use console.warn for user-facing warnings or throw for errors',
+      })
       .check()
   })
 })

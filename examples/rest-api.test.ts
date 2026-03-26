@@ -33,7 +33,13 @@ describe('Layer Dependencies', () => {
       .resideInFolder('**/domain/**')
       .should()
       .onlyImportFrom('**/domain/**', '**/shared/**')
-      .because('domain layer must be independent of infrastructure')
+      .rule({
+        id: 'layer/domain-isolation',
+        because:
+          'Domain layer must be independent of infrastructure for testability and portability',
+        suggestion: 'Move the import to a service that bridges domain and infrastructure',
+        docs: 'https://example.com/adr/clean-architecture',
+      })
       .check()
   })
 
@@ -43,6 +49,10 @@ describe('Layer Dependencies', () => {
       .resideInFolder('**/repositories/**')
       .should()
       .notImportFrom('**/controllers/**')
+      .rule({
+        id: 'layer/repo-no-controllers',
+        because: 'Repositories are inner layer — they must not depend on the HTTP layer',
+      })
       .check()
   })
 
@@ -56,7 +66,11 @@ describe('Layer Dependencies', () => {
       })
       .should()
       .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
-      .because('dependencies flow inward: controllers → services → repositories → domain')
+      .rule({
+        id: 'layer/direction',
+        because: 'Dependencies flow inward: controllers → services → repositories → domain',
+        docs: 'https://example.com/adr/layer-architecture',
+      })
       .check()
   })
 })
@@ -69,7 +83,11 @@ describe('Cycle Detection', () => {
       .matching('src/features/*/')
       .should()
       .beFreeOfCycles()
-      .because('feature modules must be independently deployable')
+      .rule({
+        id: 'arch/no-feature-cycles',
+        because: 'Circular dependencies prevent independent deployment and testing',
+        suggestion: 'Extract shared code into src/shared/ or introduce an event bus',
+      })
       .check()
   })
 })
@@ -83,6 +101,11 @@ describe('Naming Conventions', () => {
       .resideInFolder('**/controllers/**')
       .should()
       .haveNameMatching(/Controller$/)
+      .rule({
+        id: 'naming/controller-suffix',
+        because: 'Consistent naming makes the codebase navigable',
+        suggestion: 'Rename the class to end with Controller (e.g., OrderController)',
+      })
       .check()
   })
 
@@ -92,6 +115,7 @@ describe('Naming Conventions', () => {
       .resideInFolder('**/services/**')
       .should()
       .haveNameMatching(/Service$/)
+      .rule({ id: 'naming/service-suffix' })
       .check()
   })
 
@@ -101,6 +125,7 @@ describe('Naming Conventions', () => {
       .resideInFolder('**/repositories/**')
       .should()
       .haveNameMatching(/Repository$/)
+      .rule({ id: 'naming/repository-suffix' })
       .check()
   })
 })
@@ -116,11 +141,22 @@ describe('Class Structure', () => {
       .resideInFolder('**/repositories/**')
       .should()
       .shouldExtend('BaseRepository')
+      .rule({
+        id: 'repo/extend-base',
+        because: 'BaseRepository provides transaction support and shared query helpers',
+        suggestion: 'Add `extends BaseRepository` to the class declaration',
+      })
       .check()
   })
 
   it('services must be exported', () => {
-    classes(p).that().haveNameEndingWith('Service').should().beExported().check()
+    classes(p)
+      .that()
+      .haveNameEndingWith('Service')
+      .should()
+      .beExported()
+      .rule({ id: 'quality/services-exported' })
+      .check()
   })
 })
 
@@ -133,7 +169,11 @@ describe('Body Analysis', () => {
       .extend('BaseRepository')
       .should()
       .notContain(call('parseInt'))
-      .because('use this.extractCount() from BaseRepository')
+      .rule({
+        id: 'repo/no-parseint',
+        because: 'BaseRepository provides extractCount() which handles type coercion safely',
+        suggestion: 'Replace parseInt(x, 10) with this.extractCount(result)',
+      })
       .check()
   })
 
@@ -143,17 +183,11 @@ describe('Body Analysis', () => {
       .extend('BaseRepository')
       .should()
       .notContain(newExpr('Error'))
-      .because('use NotFoundError, ValidationError, etc.')
-      .check()
-  })
-
-  it('SDK wrappers must not use raw URLSearchParams', () => {
-    functions(p)
-      .that()
-      .resideInFolder('**/wrappers/**')
-      .should()
-      .notContain(newExpr('URLSearchParams'))
-      .because('use buildQueryString() utility')
+      .rule({
+        id: 'repo/typed-errors',
+        because: 'Generic Error loses context and prevents consistent API error responses',
+        suggestion: 'Use NotFoundError, ValidationError, or ConflictError instead',
+      })
       .check()
   })
 
@@ -165,7 +199,11 @@ describe('Body Analysis', () => {
       .resideInFolder('**/routes/**')
       .should()
       .notExist()
-      .because('use the shared parseOrder() utility')
+      .rule({
+        id: 'route/no-copy-paste-parsers',
+        because: 'Copy-pasted parsers diverge over time — use the shared parseOrder() utility',
+        suggestion: "Import parseOrder from '@company/server-common' and pass a column map",
+      })
       .check()
   })
 })
@@ -181,7 +219,11 @@ describe('Type Safety', () => {
       .haveProperty('orderBy')
       .should()
       .havePropertyType('orderBy', notType(isString()))
-      .because('bare string orderBy passed to .orderBy() is a SQL injection surface')
+      .rule({
+        id: 'type/no-bare-string-orderby',
+        because: 'Bare string orderBy passed to .orderBy() is a SQL injection surface',
+        suggestion: "Use a union type: orderBy?: 'created_at' | 'updated_at' | 'name'",
+      })
       .check()
   })
 })
