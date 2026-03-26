@@ -286,28 +286,7 @@ export abstract class RuleBuilder<T> {
       violations.push(...condition.evaluate(filtered, context))
     }
 
-    // Step 6: Scan source files for inline exclusion comments (when rule has an ID)
-    if (this._metadata?.id && violations.length > 0) {
-      const filePaths = new Set(violations.map((v) => v.file))
-      const allComments = [...filePaths].flatMap((filePath) => {
-        try {
-          const sourceText = fs.readFileSync(filePath, 'utf-8')
-          const result = parseExclusionComments(sourceText, filePath)
-          for (const warning of result.warnings) {
-            console.warn(`[ts-archunit] ${warning.message}`)
-          }
-          return result.exclusions
-        } catch {
-          return []
-        }
-      })
-
-      if (allComments.length > 0) {
-        violations = violations.filter((v) => !isExcludedByComment(v, allComments))
-      }
-    }
-
-    // Step 7: Filter exclusions — track which patterns matched for stale detection
+    // Step 6: Apply .excluding() chain exclusions first (rule-level, more efficient)
     if (this._exclusions.length > 0) {
       const matchedPatterns = new Set<number>()
       violations = violations.filter((v) => {
@@ -330,6 +309,27 @@ export abstract class RuleBuilder<T> {
           )
         }
       })
+    }
+
+    // Step 7: Scan source files for inline exclusion comments (code-level, when rule has an ID)
+    if (this._metadata?.id && violations.length > 0) {
+      const filePaths = new Set(violations.map((v) => v.file))
+      const allComments = [...filePaths].flatMap((filePath) => {
+        try {
+          const sourceText = fs.readFileSync(filePath, 'utf-8')
+          const result = parseExclusionComments(sourceText, filePath)
+          for (const warning of result.warnings) {
+            console.warn(`[ts-archunit] ${warning.message}`)
+          }
+          return result.exclusions
+        } catch {
+          return []
+        }
+      })
+
+      if (allComments.length > 0) {
+        violations = violations.filter((v) => !isExcludedByComment(v, allComments))
+      }
     }
 
     return violations

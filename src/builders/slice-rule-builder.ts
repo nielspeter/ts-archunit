@@ -229,28 +229,7 @@ export class SliceRuleBuilder {
       violations.push(...condition.evaluate(this._slices, context))
     }
 
-    // Scan source files for inline exclusion comments (when rule has an ID)
-    if (this._metadata?.id && violations.length > 0) {
-      const filePaths = new Set(violations.map((v) => v.file))
-      const allComments = [...filePaths].flatMap((filePath) => {
-        try {
-          const sourceText = fs.readFileSync(filePath, 'utf-8')
-          const result = parseExclusionComments(sourceText, filePath)
-          for (const warning of result.warnings) {
-            console.warn(`[ts-archunit] ${warning.message}`)
-          }
-          return result.exclusions
-        } catch {
-          return []
-        }
-      })
-
-      if (allComments.length > 0) {
-        violations = violations.filter((v) => !isExcludedByComment(v, allComments))
-      }
-    }
-
-    // Filter exclusions — track which patterns matched for stale detection
+    // Apply .excluding() chain exclusions first (rule-level)
     if (this._exclusions.length > 0) {
       const matchedPatterns = new Set<number>()
       violations = violations.filter((v) => {
@@ -273,6 +252,27 @@ export class SliceRuleBuilder {
           )
         }
       })
+    }
+
+    // Scan source files for inline exclusion comments (code-level, when rule has an ID)
+    if (this._metadata?.id && violations.length > 0) {
+      const filePaths = new Set(violations.map((v) => v.file))
+      const allComments = [...filePaths].flatMap((filePath) => {
+        try {
+          const sourceText = fs.readFileSync(filePath, 'utf-8')
+          const result = parseExclusionComments(sourceText, filePath)
+          for (const warning of result.warnings) {
+            console.warn(`[ts-archunit] ${warning.message}`)
+          }
+          return result.exclusions
+        } catch {
+          return []
+        }
+      })
+
+      if (allComments.length > 0) {
+        violations = violations.filter((v) => !isExcludedByComment(v, allComments))
+      }
     }
 
     return violations
