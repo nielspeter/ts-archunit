@@ -3,6 +3,9 @@ import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { CheckOptions } from '../core/check-options.js'
 import { ArchRuleError } from '../core/errors.js'
+import { formatViolations } from '../core/format.js'
+import { formatViolationsJson } from '../core/format-json.js'
+import { formatViolationsGitHub } from '../core/format-github.js'
 import type { Slice, SliceDefinition } from '../models/slice.js'
 import { resolveByMatching, resolveByDefinition } from '../models/slice.js'
 import {
@@ -128,6 +131,9 @@ export class SliceRuleBuilder {
     }
 
     if (violations.length > 0) {
+      if (options?.format === 'github') {
+        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
+      }
       throw new ArchRuleError(violations, this._reason)
     }
   }
@@ -149,13 +155,13 @@ export class SliceRuleBuilder {
     }
 
     if (violations.length > 0) {
-      const formatted = violations
-        .map((v) => `  - ${v.element}: ${v.message} (${v.file}:${String(v.line)})`)
-        .join('\n')
-      const reasonLine = this._reason ? `\nReason: ${this._reason}` : ''
-      console.warn(
-        `Architecture warning${violations.length === 1 ? '' : 's'} (${String(violations.length)} found)${reasonLine}\n${formatted}`,
-      )
+      if (options?.format === 'json') {
+        console.warn(formatViolationsJson(violations, this._reason))
+      } else if (options?.format === 'github') {
+        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
+      } else {
+        console.warn(formatViolations(violations, this._reason))
+      }
     }
   }
 

@@ -1,6 +1,15 @@
 import type { ArchViolation } from './violation.js'
 
 /**
+ * Output format for violations.
+ *
+ * - 'terminal' (default): ANSI-colored output with code frames
+ * - 'json': Machine-readable JSON
+ * - 'github': GitHub Actions annotation commands
+ */
+export type OutputFormat = 'terminal' | 'json' | 'github'
+
+/**
  * A filter that removes known violations (e.g. from a baseline file).
  * Implemented by `Baseline` in `../helpers/baseline.js`.
  */
@@ -36,4 +45,6 @@ export interface CheckOptions {
   baseline?: BaselineFilter
   /** Filter to only violations in changed files */
   diff?: DiffFilterLike
+  /** Output format for violations. Default: 'terminal' */
+  format?: OutputFormat
 }

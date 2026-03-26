@@ -5,6 +5,8 @@ import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
 import { ArchRuleError } from './errors.js'
 import { formatViolations } from './format.js'
+import { formatViolationsJson } from './format-json.js'
+import { formatViolationsGitHub } from './format-github.js'
 
 /**
  * Abstract base class for all rule builders.
@@ -106,6 +108,10 @@ export abstract class RuleBuilder<T> {
     }
 
     if (violations.length > 0) {
+      if (options?.format === 'github') {
+        // Print GitHub annotations to stdout (GitHub reads stdout for commands)
+        process.stdout.write(formatViolationsGitHub(violations, 'error') + '\n')
+      }
       throw new ArchRuleError(violations, this._reason)
     }
   }
@@ -128,7 +134,13 @@ export abstract class RuleBuilder<T> {
     }
 
     if (violations.length > 0) {
-      console.warn(formatViolations(violations, this._reason))
+      if (options?.format === 'json') {
+        console.warn(formatViolationsJson(violations, this._reason))
+      } else if (options?.format === 'github') {
+        process.stdout.write(formatViolationsGitHub(violations, 'warning') + '\n')
+      } else {
+        console.warn(formatViolations(violations, this._reason))
+      }
     }
   }
 

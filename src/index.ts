@@ -171,7 +171,12 @@ export { beFreeOfCycles, respectLayerOrder, notDependOn } from './conditions/sli
 export { slices, SliceRuleBuilder } from './builders/slice-rule-builder.js'
 
 // Check options
-export type { CheckOptions } from './core/check-options.js'
+export type { CheckOptions, OutputFormat } from './core/check-options.js'
+
+// Output formats
+export { formatViolationsJson } from './core/format-json.js'
+export { formatViolationsGitHub } from './core/format-github.js'
+export { detectFormat, isCI } from './core/environment.js'
 
 // Baseline mode
 export { withBaseline, generateBaseline, Baseline } from './helpers/baseline.js'
