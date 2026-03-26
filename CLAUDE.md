@@ -20,6 +20,14 @@ ts-archunit is an architecture testing library for TypeScript, inspired by Java'
 | [002](./adr/002-ts-morph-ast-engine.md)                   | AST Engine    | ts-morph 27 for all AST and type checking. No tree-sitter/SWC/raw TS API.                       |
 | [003](./adr/003-fluent-builder-dsl.md)                    | DSL Pattern   | Fluent builder with method chaining. `entry(p).that().<predicate>.should().<condition>.check()` |
 | [004](./adr/004-esm-only-package.md)                      | Module Format | ESM only. `"type": "module"`, Node.js >=24. No dual CJS/ESM.                                    |
+| [005](./adr/005-no-any-no-type-assertions.md)             | Type Safety   | No `any`, no `as` casts. Use ts-morph type guards. Only `eslint-disable` at JS interop boundaries. |
+
+## IMPORTANT: ADR Compliance
+
+**Before writing ANY code or plan, check the ADRs.** Every ADR is binding. Specifically:
+
+- **ADR-005 (Type Safety):** Never use `any`. Never use `as` type assertions. Use ts-morph `Node.isClassDeclaration()` etc. for type narrowing. Use explicit type annotations instead of `as` on literals. Only `eslint-disable` at unavoidable JS interop boundaries (with explanation).
+- Reference ADRs by number when making design decisions in plans or code comments.
 
 ## Plans
 
@@ -36,7 +44,7 @@ From the ADRs:
 - **ts-morph for all AST operations** — never use raw `typescript` compiler API directly (ADR-002)
 - **Fluent builder pattern** — rules read like English: `.that().extend('X').should().notContain(call('Y')).check()` (ADR-003)
 - **Vitest for tests** — fixture-based, no mocking of ts-morph (spec Section 14.2)
-- **No `any`** — strict TypeScript throughout
+- **No `any`, no `as` type assertions** — use ts-morph type guards (`Node.isClassDeclaration()` etc.) for narrowing, explicit type annotations instead of `as` on literals. Only `eslint-disable` at unavoidable JS interop boundaries with explanation. (ADR-005)
 
 ## Dependencies
 
