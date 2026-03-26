@@ -330,6 +330,70 @@ export default defineConfig({
 })
 ```
 
+### Smell Detection
+
+Find code that's drifted — duplicate function bodies and inconsistent patterns:
+
+```typescript
+import { smells } from 'ts-archunit'
+
+// Detect near-identical functions across the codebase
+smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).minLines(10).warn()
+
+// Flag the odd one out — most repositories use extractCount(), one doesn't
+smells
+  .inconsistentSiblings(p)
+  .inFolder('src/repositories/**')
+  .forPattern(call('this.extractCount'))
+  .warn()
+```
+
+### GraphQL Rules
+
+Enforce schema and resolver conventions via `ts-archunit/graphql` (optional `graphql` peer dep):
+
+```typescript
+import { schema, resolvers } from 'ts-archunit/graphql'
+import { call } from 'ts-archunit'
+
+// Collection types must have standard pagination fields
+schema(p, 'src/graphql/**/*.graphql')
+  .that()
+  .typesNamed(/Collection$/)
+  .should()
+  .haveFields('items', 'total', 'skip', 'limit')
+  .check()
+
+// Relation resolvers must use DataLoader
+resolvers(p, 'src/resolvers/**')
+  .that()
+  .resolveFieldReturning(/^[A-Z]/)
+  .should()
+  .contain(call('loader.load'))
+  .because('prevent N+1 queries')
+  .check()
+```
+
+### Cross-Layer Validation
+
+Verify consistency across architectural boundaries — routes match schemas match SDK types:
+
+```typescript
+import { crossLayer } from 'ts-archunit'
+
+crossLayer(p)
+  .layer('routes', 'src/routes/**')
+  .layer('schemas', 'src/schemas/**')
+  .mapping(
+    (route, schema) =>
+      route.getBaseName().replace('-route', '') === schema.getBaseName().replace('-schema', ''),
+  )
+  .forEachPair()
+  .should()
+  .haveMatchingCounterpart()
+  .check()
+```
+
 ### Warnings (Non-Blocking Rules)
 
 ```typescript
@@ -431,13 +495,13 @@ Rules run in your test suite. `.check()` throws on violations (test fails). `.wa
 
 ## Comparison
 
-| Tool                     | Import paths | Body analysis | Type checking | Cycles | Baseline | GitHub annotations |
-| ------------------------ | ------------ | ------------- | ------------- | ------ | -------- | ------------------ |
-| **ts-archunit**          | Yes          | Yes           | Yes           | Yes    | Yes      | Yes                |
-| dependency-cruiser       | Yes          | No            | No            | Yes    | No       | No                 |
-| eslint-plugin-boundaries | Yes          | No            | No            | No     | No       | No                 |
-| ts-arch (npm)            | Yes          | No            | No            | No     | No       | No                 |
-| ESLint rules             | Per-file     | No            | No            | No     | No       | Yes                |
+| Tool                     | Import paths | Body analysis | Type checking | Cycles | Baseline | GraphQL | Smells |
+| ------------------------ | ------------ | ------------- | ------------- | ------ | -------- | ------- | ------ |
+| **ts-archunit**          | Yes          | Yes           | Yes           | Yes    | Yes      | Yes     | Yes    |
+| dependency-cruiser       | Yes          | No            | No            | Yes    | No       | No      | No     |
+| eslint-plugin-boundaries | Yes          | No            | No            | No     | No       | No      | No     |
+| ts-arch (npm)            | Yes          | No            | No            | No     | No       | No      | No     |
+| ESLint rules             | Per-file     | No            | No            | No     | No       | No      | No     |
 
 ## Requirements
 
