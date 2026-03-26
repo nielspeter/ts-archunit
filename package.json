@@ -32,6 +32,10 @@
       "types": "./dist/rules/code-quality.d.ts",
       "import": "./dist/rules/code-quality.js"
     },
+    "./rules/metrics": {
+      "types": "./dist/rules/metrics.d.ts",
+      "import": "./dist/rules/metrics.js"
+    },
     "./graphql": {
       "types": "./dist/graphql/index.d.ts",
       "import": "./dist/graphql/index.js"

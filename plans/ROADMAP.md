@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-26
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 26 completed, 2 planned
+**Total Plans:** 28 completed, 0 remaining
 
 ---
 
@@ -37,14 +37,14 @@
 | **P3**   | ~~Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)~~             | 1 day     | COMPLETED 2026-03-26 |
 | **P3**   | ~~GraphQL Extension: Schema & Resolver Rules (0021)~~                            | 1 day     | COMPLETED 2026-03-26 |
 | **P4**   | ~~Cross-Layer Validation (0022)~~                                                | 1 day     | COMPLETED 2026-03-26 |
-| **P2**   | CLI Watch Mode (0027)                                                            | 0.5 day   | NOT STARTED          |
-| **P3**   | Metric-Based Standard Rules (0028)                                               | 1 day     | NOT STARTED          |
+| **P2**   | ~~CLI Watch Mode (0027)~~                                                        | 0.5 day   | COMPLETED 2026-03-26 |
+| **P3**   | ~~Metric-Based Standard Rules (0028)~~                                           | 1 day     | COMPLETED 2026-03-26 |
 
 ---
 
 ## What's Shipped
 
-**658 tests across 66 files. All checks pass.**
+**1234 tests across 100 files. All checks pass.**
 
 ### Core (P0)
 
@@ -90,18 +90,25 @@
 - VitePress user guide with 13 pages (plan 0023)
 - GitHub Pages deployment workflow
 
-### Not Yet Shipped
+### CLI & Metrics (P2/P3 — plan 0027, 0028)
 
-- **Watch mode for CLI** — Plan 0027. `--watch` / `-w` flag on the `check` command. Uses Node.js `fs.watch` (no chokidar), debounced re-run with full project reload. 0.5 day effort.
-- **Metric-based standard rules** — Plan 0028. `ts-archunit/rules/metrics` sub-path with `maxCyclomaticComplexity(n)`, `maxClassLines(n)`, `maxMethodLines(n)`, `maxMethods(n)`, `maxParameters(n)` + function-level equivalents. Closes the "I still need SonarQube for metrics" gap. 1 day effort.
+- `npx ts-archunit check --watch` — debounced file watcher with `resetProjectCache()` + `importFresh()`
+- `ts-archunit/rules/metrics` — `maxCyclomaticComplexity`, `maxClassLines`, `maxMethodLines`, `maxMethods`, `maxParameters` + function-level equivalents
+- Metric predicates for composition: `haveCyclomaticComplexity`, `haveMoreLinesThan`, `haveMoreMethodsThan`, `haveComplexity`, `haveMoreFunctionLinesThan`
+- `docs/cli.md` — full CLI documentation page
+- `docs/metrics.md` — full metrics documentation page
+
+### Bug Fixes
+
+- BUG-0001: `.excluding()` now matches against `element`, `file`, and `message` (was element-only)
+
+### Documentation
+
+- VitePress user guide with 16 pages (plans 0023, 0027, 0028)
+- GitHub Pages deployment workflow
 
 ---
 
-## Next Up
+## All Plans Complete
 
-26 of 26 original plans complete. 2 new plans queued from post-v1 architect feedback.
-
-| Plan | What | Why | Effort |
-| --- | --- | --- | --- |
-| 0027 | CLI Watch Mode | Only unshipped spec feature, core DX | 0.5 day |
-| 0028 | Metric Standard Rules | Reduces SonarQube overlap objection | 1 day |
+28 of 28 plans implemented. 1234 tests across 100 files. 90% integration test coverage.

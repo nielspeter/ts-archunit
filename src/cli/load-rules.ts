@@ -1,9 +1,15 @@
 import path from 'node:path'
 import type { CheckOptions } from '../core/check-options.js'
+import { importFresh } from './watch.js'
 
 /** Minimal interface for rule builders — only needs .check() */
 export interface RuleBuilderLike {
   check: (opts?: CheckOptions) => void
+}
+
+export interface LoadOptions {
+  /** Use cache-busting imports for watch mode. Default: false */
+  fresh?: boolean
 }
 
 /**
@@ -11,13 +17,19 @@ export interface RuleBuilderLike {
  *
  * Rule files must export a default array of rule builders
  * or a function returning one.
+ *
+ * When `fresh` is true, uses cache-busting imports so that
+ * re-runs in watch mode pick up file changes.
  */
-export async function loadRuleFiles(files: string[]): Promise<RuleBuilderLike[]> {
+export async function loadRuleFiles(
+  files: string[],
+  options?: LoadOptions,
+): Promise<RuleBuilderLike[]> {
   const builders: RuleBuilderLike[] = []
 
   for (const file of files) {
     const resolved = path.resolve(file)
-    const mod: unknown = await import(resolved)
+    const mod: unknown = options?.fresh ? await importFresh(resolved) : await import(resolved)
 
     const exported = extractDefault(mod)
     const items = resolveExported(exported)

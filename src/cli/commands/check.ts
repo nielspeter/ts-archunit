@@ -11,6 +11,8 @@ export interface CheckArgs {
   changed: boolean
   base: string
   format: OutputFormat | 'auto'
+  /** Use cache-busting imports for watch mode re-runs. */
+  fresh?: boolean
 }
 
 /**
@@ -30,7 +32,7 @@ export async function runCheck(args: CheckArgs): Promise<number> {
     options.diff = diffAware(args.base)
   }
 
-  const builders = await loadRuleFiles(args.ruleFiles)
+  const builders = await loadRuleFiles(args.ruleFiles, { fresh: args.fresh })
 
   let failures = 0
   for (const builder of builders) {

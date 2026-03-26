@@ -398,6 +398,39 @@ classes(p)
   .check()
 ```
 
+## Complexity & Size
+
+```typescript
+import {
+  maxCyclomaticComplexity,
+  maxClassLines,
+  maxMethodLines,
+  maxMethods,
+  maxParameters,
+  maxFunctionComplexity,
+  maxFunctionParameters,
+} from 'ts-archunit/rules/metrics'
+
+// No method may exceed complexity 15
+classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
+
+// Classes must not exceed 300 lines
+classes(p).should().satisfy(maxClassLines(300)).warn()
+
+// Methods must be short
+classes(p).should().satisfy(maxMethodLines(50)).warn()
+
+// No god classes
+classes(p).should().satisfy(maxMethods(15)).warn()
+
+// Enforce small parameter lists
+classes(p).should().satisfy(maxParameters(4)).check()
+
+// Function-level: complexity and parameter limits
+functions(p).should().satisfy(maxFunctionComplexity(15)).check()
+functions(p).that().areExported().should().satisfy(maxFunctionParameters(4)).check()
+```
+
 ## Custom Rules
 
 ```typescript
@@ -418,4 +451,4 @@ classes(p).that().areExported().should().satisfy(haveJsDoc).check()
 
 Every example is copy-pasteable. Add `const p = project('tsconfig.json')` at the top, wrap each in `it()`, and run with `npx vitest run`.
 
-For full details: [Modules](/modules) · [Classes](/classes) · [Functions](/functions) · [Types](/types) · [Body Analysis](/body-analysis) · [Calls](/calls) · [Slices](/slices) · [Patterns](/patterns) · [Smells](/smell-detection) · [GraphQL](/graphql) · [Cross-Layer](/cross-layer) · [Standard Rules](/standard-rules) · [Custom Rules](/custom-rules) · [Violations](/violation-reporting)
+For full details: [Modules](/modules) · [Classes](/classes) · [Functions](/functions) · [Types](/types) · [Body Analysis](/body-analysis) · [Calls](/calls) · [Slices](/slices) · [Patterns](/patterns) · [Smells](/smell-detection) · [GraphQL](/graphql) · [Cross-Layer](/cross-layer) · [Standard Rules](/standard-rules) · [Metrics](/metrics) · [Custom Rules](/custom-rules) · [Violations](/violation-reporting)

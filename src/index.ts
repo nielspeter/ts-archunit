@@ -1,5 +1,5 @@
 // Core — project loader
-export { project } from './core/project.js'
+export { project, resetProjectCache } from './core/project.js'
 export type { ArchProject } from './core/project.js'
 
 // Core — predicate interface & combinators
@@ -244,6 +244,18 @@ export {
   haveConsistentExports,
   satisfyPairCondition,
 } from './conditions/cross-layer.js'
+
+// Metric predicates (plan 0028)
+export {
+  haveCyclomaticComplexity,
+  haveMoreLinesThan,
+  haveMoreMethodsThan,
+  haveComplexity,
+  haveMoreFunctionLinesThan,
+} from './predicates/metrics.js'
+
+// Complexity calculator (for custom rules)
+export { cyclomaticComplexity, linesOfCode } from './helpers/complexity.js'
 
 // CLI config (plan 0020)
 export { defineConfig } from './cli/config.js'

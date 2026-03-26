@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import path from 'node:path'
-import { project, _resetProjectCache } from '../../src/core/project.js'
+import { project, resetProjectCache } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 const tsconfigPath = path.join(fixturesDir, 'tsconfig.json')
 
 describe('project()', () => {
   beforeEach(() => {
-    _resetProjectCache()
+    resetProjectCache()
   })
 
   it('loads a project from a tsconfig path', () => {
@@ -54,7 +54,7 @@ describe('project()', () => {
 
     it('returns a fresh instance after cache reset', () => {
       const p1 = project(tsconfigPath)
-      _resetProjectCache()
+      resetProjectCache()
       const p2 = project(tsconfigPath)
       expect(p1).not.toBe(p2)
     })

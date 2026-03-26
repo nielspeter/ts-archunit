@@ -9,6 +9,8 @@ export interface CliConfig {
   baseline?: string
   /** Output format. 'auto' uses detectFormat() */
   format?: OutputFormat | 'auto'
+  /** Directories to watch in --watch mode. Default: ['src'] */
+  watchDirs?: string[]
 }
 
 /**
