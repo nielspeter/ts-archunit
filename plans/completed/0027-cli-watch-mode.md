@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Done
 - **Priority:** P2 — Core DX improvement, the only unshipped spec feature
 - **Effort:** 0.5 day
 - **Created:** 2026-03-26

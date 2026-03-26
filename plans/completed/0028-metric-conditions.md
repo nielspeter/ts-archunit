@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Done
 - **Priority:** P3 — Reduces "I still need SonarQube" objection; not blocking adoption
 - **Effort:** 1 day
 - **Created:** 2026-03-26
