@@ -38,13 +38,26 @@ function extractDefault(mod: unknown): CliConfig {
   if (mod === null || mod === undefined || typeof mod !== 'object') {
     return {}
   }
-  const record = mod as Record<string, unknown>
-  if (
-    'default' in record &&
-    record['default'] !== undefined &&
-    typeof record['default'] === 'object'
-  ) {
-    return record['default'] as CliConfig
+  // Dynamic import returns a module namespace — 'in' narrows safely
+  if (!('default' in mod)) {
+    return {}
   }
-  return {}
+  const defaultExport: unknown = (mod as Record<string, unknown>)['default']
+  if (defaultExport === null || defaultExport === undefined || typeof defaultExport !== 'object') {
+    return {}
+  }
+  // Runtime validate: only pick known CliConfig fields
+  const obj = defaultExport as Record<string, unknown>
+  const config: CliConfig = {}
+  if (typeof obj['project'] === 'string') config.project = obj['project']
+  if (typeof obj['baseline'] === 'string') config.baseline = obj['baseline']
+  if (typeof obj['format'] === 'string') {
+    const validFormats = ['terminal', 'json', 'github', 'auto']
+    if (validFormats.includes(obj['format'])) {
+      config.format = obj['format'] as CliConfig['format']
+    }
+  }
+  if (Array.isArray(obj['rules']))
+    config.rules = obj['rules'].filter((r): r is string => typeof r === 'string')
+  return config
 }

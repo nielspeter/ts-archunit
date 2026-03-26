@@ -37,13 +37,13 @@ export async function loadRuleFiles(files: string[]): Promise<RuleBuilderLike[]>
  */
 function resolveExported(exported: unknown): unknown[] {
   if (Array.isArray(exported)) {
-    return exported as unknown[]
+    return exported
   }
   if (typeof exported === 'function') {
-    const factory = exported as (...args: unknown[]) => unknown
-    const result: unknown = factory()
+    // Runtime validated: exported is a function, call it and check result
+    const result: unknown = (exported as () => unknown)()
     if (Array.isArray(result)) {
-      return result as unknown[]
+      return result
     }
   }
   return []
@@ -53,19 +53,17 @@ function extractDefault(mod: unknown): unknown {
   if (mod === null || mod === undefined || typeof mod !== 'object') {
     return undefined
   }
-  const record = mod as Record<string, unknown>
-  if ('default' in record) {
-    return record['default']
+  // Dynamic import returns a module namespace object — 'in' narrows safely
+  if ('default' in mod) {
+    return (mod as Record<string, unknown>)['default']
   }
   return undefined
 }
 
 function isRuleBuilderLike(value: unknown): value is RuleBuilderLike {
-  return (
-    value !== null &&
-    value !== undefined &&
-    typeof value === 'object' &&
-    'check' in value &&
-    typeof (value as Record<string, unknown>)['check'] === 'function'
-  )
+  if (value === null || value === undefined || typeof value !== 'object') {
+    return false
+  }
+  // Structural type check: must have a 'check' method
+  return 'check' in value && typeof (value as Record<string, unknown>)['check'] === 'function'
 }
