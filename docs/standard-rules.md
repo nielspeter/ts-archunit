@@ -198,6 +198,44 @@ exported.should().satisfy(requireJsDocOnPublicMethods()).warn()
 exported.should().satisfy(noMagicNumbers()).warn()
 ```
 
+## Metrics (`ts-archunit/rules/metrics`)
+
+```typescript
+import {
+  maxCyclomaticComplexity,
+  maxClassLines,
+  maxMethodLines,
+  maxMethods,
+  maxParameters,
+  maxFunctionComplexity,
+  maxFunctionLines,
+  maxFunctionParameters,
+} from 'ts-archunit/rules/metrics'
+```
+
+| Rule                         | What it checks                                           |
+| ---------------------------- | -------------------------------------------------------- |
+| `maxCyclomaticComplexity(n)` | No method/constructor/getter/setter exceeds complexity N |
+| `maxClassLines(n)`           | Class spans no more than N lines                         |
+| `maxMethodLines(n)`          | No method/constructor/getter/setter exceeds N lines      |
+| `maxMethods(n)`              | Class has no more than N methods                         |
+| `maxParameters(n)`           | No method/constructor has more than N parameters         |
+| `maxFunctionComplexity(n)`   | Function complexity does not exceed N                    |
+| `maxFunctionLines(n)`        | Function spans no more than N lines                      |
+| `maxFunctionParameters(n)`   | Function has no more than N parameters                   |
+
+```typescript
+classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
+classes(p).should().satisfy(maxClassLines(300)).warn()
+classes(p).should().satisfy(maxMethods(15)).warn()
+classes(p).should().satisfy(maxParameters(4)).check()
+
+functions(p).should().satisfy(maxFunctionComplexity(15)).check()
+functions(p).should().satisfy(maxFunctionLines(40)).warn()
+```
+
+See [Metrics](/metrics) for full documentation including predicates, thresholds, and custom metric rules.
+
 ## Writing Your Own
 
 Standard rules are just `Condition<ClassDeclaration>` factory functions. See [Custom Rules](/custom-rules) to learn how to write your own using `defineCondition()`.

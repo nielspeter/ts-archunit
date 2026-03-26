@@ -101,7 +101,7 @@
 
 26 of 26 original plans complete. 2 new plans queued from post-v1 architect feedback.
 
-| Plan | What | Why | Effort |
-| --- | --- | --- | --- |
-| 0027 | CLI Watch Mode | Only unshipped spec feature, core DX | 0.5 day |
-| 0028 | Metric Standard Rules | Reduces SonarQube overlap objection | 1 day |
+| Plan | What                  | Why                                  | Effort  |
+| ---- | --------------------- | ------------------------------------ | ------- |
+| 0027 | CLI Watch Mode        | Only unshipped spec feature, core DX | 0.5 day |
+| 0028 | Metric Standard Rules | Reduces SonarQube overlap objection  | 1 day   |

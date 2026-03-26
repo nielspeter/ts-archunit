@@ -195,7 +195,7 @@ interface ParsedArgs {
     config?: string
     help?: boolean
     version?: boolean
-    watch?: boolean  // NEW
+    watch?: boolean // NEW
   }
   positionals: string[]
 }
@@ -294,7 +294,7 @@ The CLI is currently undocumented — there's a brief section in getting-started
 
 ### `docs/cli.md`
 
-```markdown
+````markdown
 # CLI
 
 Run architecture rules without a test runner. The CLI wraps the same API you use in vitest/jest behind `npx ts-archunit` commands.
@@ -322,6 +322,7 @@ npx ts-archunit check arch.rules.ts --watch
 # Output format
 npx ts-archunit check arch.rules.ts --format github
 ```
+````
 
 ### `baseline` — Generate Baseline
 
@@ -334,17 +335,17 @@ Records all existing violations so that `check --baseline` only fails on new one
 
 ## Options
 
-| Flag | Short | Description |
-| --- | --- | --- |
-| `--baseline <path>` | | Baseline file for filtering known violations |
-| `--output <path>` | | Output path for baseline file (default: `arch-baseline.json`) |
-| `--changed` | | Only report violations in files changed since base branch |
-| `--base <branch>` | | Base branch for `--changed` (default: `main`) |
-| `--format <format>` | | Output format: `terminal`, `json`, `github`, `auto` (default: `auto`) |
-| `--watch` | `-w` | Watch for file changes and re-run (check command only) |
-| `--config <path>` | | Path to config file |
-| `--version` | `-v` | Show version number |
-| `--help` | `-h` | Show help message |
+| Flag                | Short | Description                                                           |
+| ------------------- | ----- | --------------------------------------------------------------------- |
+| `--baseline <path>` |       | Baseline file for filtering known violations                          |
+| `--output <path>`   |       | Output path for baseline file (default: `arch-baseline.json`)         |
+| `--changed`         |       | Only report violations in files changed since base branch             |
+| `--base <branch>`   |       | Base branch for `--changed` (default: `main`)                         |
+| `--format <format>` |       | Output format: `terminal`, `json`, `github`, `auto` (default: `auto`) |
+| `--watch`           | `-w`  | Watch for file changes and re-run (check command only)                |
+| `--config <path>`   |       | Path to config file                                                   |
+| `--version`         | `-v`  | Show version number                                                   |
+| `--help`            | `-h`  | Show help message                                                     |
 
 ## Config File
 
@@ -358,7 +359,7 @@ export default defineConfig({
   rules: ['arch.rules.ts'],
   baseline: 'arch-baseline.json',
   format: 'auto',
-  watchDirs: ['src'],  // directories to watch in --watch mode
+  watchDirs: ['src'], // directories to watch in --watch mode
 })
 ```
 
@@ -376,7 +377,11 @@ const p = project('tsconfig.json')
 
 export default [
   classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')),
-  modules(p).that().resideInFolder('src/domain/**').should().notImportFromCondition('src/repositories/**'),
+  modules(p)
+    .that()
+    .resideInFolder('src/domain/**')
+    .should()
+    .notImportFromCondition('src/repositories/**'),
 ]
 ```
 
@@ -399,7 +404,8 @@ npx ts-archunit check arch.rules.ts --watch
 **Note:** Watch mode does a full project reload on each change. For projects under 500 files, this is under 3 seconds. For larger projects, consider using `vitest --watch` with rules in test files instead.
 
 **Linux users:** `fs.watch` with recursive watching may require increasing the inotify limit: `sudo sysctl fs.inotify.max_user_watches=524288`.
-```
+
+````
 
 ### Update `docs/.vitepress/config.ts`
 
@@ -413,7 +419,7 @@ Add CLI page to the sidebar under Reference:
     { text: 'API Reference', link: '/api-reference' },
   ],
 },
-```
+````
 
 ### Update `docs/getting-started.md`
 
@@ -448,20 +454,20 @@ One integration test with a real filesystem (skip on CI if flaky):
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `src/cli/watch.ts` | New — `watchAndRerun`, `importFresh`, SIGINT handler |
-| `src/cli/index.ts` | Modified — add `--watch` / `-w` flag, `ParsedArgs.watch`, watch mode integration, `baseline --watch` error |
-| `src/cli/config.ts` | Modified — add `watchDirs` to `CliConfig` |
-| `src/cli/commands/check.ts` | Modified — accept `fresh` option for cache-busting imports |
-| `src/cli/load-rules.ts` | Modified — add `importFresh` variant |
-| `src/core/project.ts` | Modified — rename `_resetProjectCache` → `resetProjectCache` |
-| `src/index.ts` | Modified — export `resetProjectCache` |
-| `docs/cli.md` | New — full CLI documentation page |
-| `docs/.vitepress/config.ts` | Modified — add CLI to sidebar |
-| `docs/getting-started.md` | Modified — replace inline CLI section with link |
-| `tests/cli/watch.test.ts` | New — 8 unit tests |
-| `tests/cli/watch-integration.test.ts` | New — 1 integration test |
+| File                                  | Change                                                                                                     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `src/cli/watch.ts`                    | New — `watchAndRerun`, `importFresh`, SIGINT handler                                                       |
+| `src/cli/index.ts`                    | Modified — add `--watch` / `-w` flag, `ParsedArgs.watch`, watch mode integration, `baseline --watch` error |
+| `src/cli/config.ts`                   | Modified — add `watchDirs` to `CliConfig`                                                                  |
+| `src/cli/commands/check.ts`           | Modified — accept `fresh` option for cache-busting imports                                                 |
+| `src/cli/load-rules.ts`               | Modified — add `importFresh` variant                                                                       |
+| `src/core/project.ts`                 | Modified — rename `_resetProjectCache` → `resetProjectCache`                                               |
+| `src/index.ts`                        | Modified — export `resetProjectCache`                                                                      |
+| `docs/cli.md`                         | New — full CLI documentation page                                                                          |
+| `docs/.vitepress/config.ts`           | Modified — add CLI to sidebar                                                                              |
+| `docs/getting-started.md`             | Modified — replace inline CLI section with link                                                            |
+| `tests/cli/watch.test.ts`             | New — 8 unit tests                                                                                         |
+| `tests/cli/watch-integration.test.ts` | New — 1 integration test                                                                                   |
 
 ## Out of Scope
 

@@ -66,9 +66,11 @@ export function project(tsConfigPath: string): ArchProject {
 }
 
 /**
- * Clear the project cache. Only for use in tests.
- * @internal
+ * Clear the project singleton cache.
+ *
+ * Used by watch mode to force fresh ts-morph Project creation on re-runs,
+ * and by tests for isolation between test cases.
  */
-export function _resetProjectCache(): void {
+export function resetProjectCache(): void {
   cache.clear()
 }

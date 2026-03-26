@@ -173,31 +173,11 @@ modules(p)
 
 ## CLI
 
-Run rules without a test runner:
+ts-archunit also runs standalone without a test runner — for pre-commit hooks, CI pipelines, or one-off audits. See the [CLI documentation](/cli) for all commands, options, watch mode, and config file setup.
 
 ```bash
-# Check rules
 npx ts-archunit check arch.rules.ts
-
-# Generate baseline for existing violations
-npx ts-archunit baseline --output arch-baseline.json
-
-# Check with baseline and diff-aware mode
-npx ts-archunit check arch.rules.ts --baseline arch-baseline.json --changed --base main
-```
-
-Optional config file:
-
-```typescript
-// ts-archunit.config.ts
-import { defineConfig } from 'ts-archunit'
-
-export default defineConfig({
-  project: 'tsconfig.json',
-  rules: ['arch.rules.ts'],
-  baseline: 'arch-baseline.json',
-  format: 'auto',
-})
+npx ts-archunit check arch.rules.ts --watch
 ```
 
 ## Next Steps

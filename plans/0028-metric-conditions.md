@@ -22,7 +22,12 @@ Metrics are filters: "find classes with complexity > N." The natural API is:
 
 ```typescript
 // Predicate: select, then assert they shouldn't exist
-classes(p).that().satisfy(haveCyclomaticComplexity({ greaterThan: 15 })).should().notExist().check()
+classes(p)
+  .that()
+  .satisfy(haveCyclomaticComplexity({ greaterThan: 15 }))
+  .should()
+  .notExist()
+  .check()
 
 // Or use as a condition directly when the threshold IS the rule
 classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
@@ -35,6 +40,7 @@ classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
 Cyclomatic complexity = 1 + number of decision points. ts-morph gives us `SyntaxKind` for each, so counting is straightforward:
 
 Decision points (each adds 1):
+
 - `IfStatement`
 - `ConditionalExpression` (ternary `? :`)
 - `ForStatement`, `ForInStatement`, `ForOfStatement`
@@ -50,7 +56,7 @@ This matches SonarQube's cyclomatic complexity definition and is the industry-st
 
 SonarQube distinguishes cyclomatic (McCabe) from cognitive complexity (penalizes nesting). Cognitive complexity is harder to compute correctly (nesting depth tracking, different weights for different constructs). Defer to a future plan. Cyclomatic alone covers 80% of the metric-rule use cases.
 
-**Note for docs:** SonarQube's default quality gate uses *cognitive* complexity (threshold 15), not cyclomatic. The "Common Thresholds" table should clarify this distinction so users migrating from SonarQube set appropriate thresholds.
+**Note for docs:** SonarQube's default quality gate uses _cognitive_ complexity (threshold 15), not cyclomatic. The "Common Thresholds" table should clarify this distinction so users migrating from SonarQube set appropriate thresholds.
 
 ### Scope: class-level and function-level
 
@@ -89,8 +95,8 @@ const DECISION_KINDS = new Set([
 /** Logical operator tokens that add branching */
 const LOGICAL_OPERATORS = new Set([
   SyntaxKind.AmpersandAmpersandToken, // &&
-  SyntaxKind.BarBarToken,             // ||
-  SyntaxKind.QuestionQuestionToken,   // ??
+  SyntaxKind.BarBarToken, // ||
+  SyntaxKind.QuestionQuestionToken, // ??
 ])
 
 /**
@@ -187,9 +193,7 @@ export function haveCyclomaticComplexity(opts: {
  * Uses ArchFunction.getBody() — works for all function kinds
  * (declarations, arrow functions, methods).
  */
-export function haveComplexity(opts: {
-  greaterThan: number
-}): Predicate<ArchFunction> {
+export function haveComplexity(opts: { greaterThan: number }): Predicate<ArchFunction> {
   return {
     description: `have cyclomatic complexity > ${String(opts.greaterThan)}`,
     test(fn: ArchFunction): boolean {
@@ -245,14 +249,24 @@ Condition factory functions for the `ts-archunit/rules/metrics` sub-path export.
 **Key change from earlier draft:** Class-level conditions iterate methods + constructors + getters + setters, matching the `searchClassBody` pattern in `src/helpers/body-traversal.ts`.
 
 ```typescript
-import type { ClassDeclaration, MethodDeclaration, ConstructorDeclaration, GetAccessorDeclaration, SetAccessorDeclaration } from 'ts-morph'
+import type {
+  ClassDeclaration,
+  MethodDeclaration,
+  ConstructorDeclaration,
+  GetAccessorDeclaration,
+  SetAccessorDeclaration,
+} from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { createViolation } from '../core/violation.js'
 import { cyclomaticComplexity, linesOfCode } from '../helpers/complexity.js'
 
 /** All callable members of a class: methods, constructors, getters, setters */
-type ClassMember = MethodDeclaration | ConstructorDeclaration | GetAccessorDeclaration | SetAccessorDeclaration
+type ClassMember =
+  | MethodDeclaration
+  | ConstructorDeclaration
+  | GetAccessorDeclaration
+  | SetAccessorDeclaration
 
 function getClassMembers(cls: ClassDeclaration): ClassMember[] {
   return [
@@ -576,7 +590,11 @@ The user imports everything from one path:
 
 ```typescript
 // Re-export function-level metric conditions
-export { maxFunctionComplexity, maxFunctionLines, maxFunctionParameters } from './metrics-function.js'
+export {
+  maxFunctionComplexity,
+  maxFunctionLines,
+  maxFunctionParameters,
+} from './metrics-function.js'
 ```
 
 ### `src/index.ts` — export predicates and helpers
@@ -610,20 +628,20 @@ Built-in metric rules for complexity, size, and method count thresholds.
 
 ## Class-Level Rules
 
-| Rule | What it checks |
-| --- | --- |
+| Rule                         | What it checks                                           |
+| ---------------------------- | -------------------------------------------------------- |
 | `maxCyclomaticComplexity(n)` | No method/constructor/getter/setter exceeds complexity N |
-| `maxClassLines(n)` | Class spans no more than N lines |
-| `maxMethodLines(n)` | No method/constructor/getter/setter exceeds N lines |
-| `maxMethods(n)` | Class has no more than N methods |
-| `maxParameters(n)` | No method/constructor has more than N parameters |
+| `maxClassLines(n)`           | Class spans no more than N lines                         |
+| `maxMethodLines(n)`          | No method/constructor/getter/setter exceeds N lines      |
+| `maxMethods(n)`              | Class has no more than N methods                         |
+| `maxParameters(n)`           | No method/constructor has more than N parameters         |
 
 ## Function-Level Rules
 
-| Rule | What it checks |
-| --- | --- |
-| `maxFunctionComplexity(n)` | Function complexity does not exceed N |
-| `maxFunctionLines(n)` | Function spans no more than N lines |
+| Rule                       | What it checks                         |
+| -------------------------- | -------------------------------------- |
+| `maxFunctionComplexity(n)` | Function complexity does not exceed N  |
+| `maxFunctionLines(n)`      | Function spans no more than N lines    |
 | `maxFunctionParameters(n)` | Function has no more than N parameters |
 
 ## How Lines Are Counted
@@ -634,13 +652,13 @@ If you need SonarQube-style NCLOC (non-comment lines of code), write a custom co
 
 ## Common Thresholds
 
-| Metric | Typical threshold | SonarQube default | Notes |
-| --- | --- | --- | --- |
-| Cyclomatic complexity | 10-20 | 15 (cognitive*) | *SonarQube defaults to cognitive complexity, not cyclomatic. Cyclomatic thresholds are typically higher. |
-| Class lines | 300-500 | 500 | |
-| Method/function lines | 30-60 | 60 | |
-| Method count | 10-20 | 20 | |
-| Parameters | 3-5 | 7 | |
+| Metric                | Typical threshold | SonarQube default | Notes                                                                                                     |
+| --------------------- | ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------- |
+| Cyclomatic complexity | 10-20             | 15 (cognitive\*)  | \*SonarQube defaults to cognitive complexity, not cyclomatic. Cyclomatic thresholds are typically higher. |
+| Class lines           | 300-500           | 500               |                                                                                                           |
+| Method/function lines | 30-60             | 60                |                                                                                                           |
+| Method count          | 10-20             | 20                |                                                                                                           |
+| Parameters            | 3-5               | 7                 |                                                                                                           |
 ```
 
 ### Update `docs/standard-rules.md`
@@ -736,22 +754,22 @@ Predicate tests (used in `.that().satisfy()`):
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `src/helpers/complexity.ts` | New — `cyclomaticComplexity()`, `linesOfCode()`, `methodCount()` |
-| `src/predicates/metrics.ts` | New — metric predicates for classes and functions |
-| `src/rules/metrics.ts` | New — `maxCyclomaticComplexity`, `maxClassLines`, `maxMethodLines`, `maxMethods`, `maxParameters`, + re-exports |
-| `src/rules/metrics-function.ts` | New — `maxFunctionComplexity`, `maxFunctionLines`, `maxFunctionParameters` |
-| `src/index.ts` | Modified — export predicates and `cyclomaticComplexity` helper |
-| `package.json` | Modified — add `./rules/metrics` sub-path export |
-| `docs/metrics.md` | New — metrics documentation page |
-| `docs/standard-rules.md` | Modified — add metrics section |
-| `docs/what-to-check.md` | Modified — add complexity/size category |
-| `tests/fixtures/metrics/` | New — fixture files with documented expected complexity values |
-| `tests/helpers/complexity.test.ts` | New — 15 unit tests |
-| `tests/rules/metrics.test.ts` | New — 15 condition tests |
-| `tests/rules/metrics-function.test.ts` | New — 7 function-level tests |
-| `tests/predicates/metrics.test.ts` | New — 7 predicate tests |
+| File                                   | Change                                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/helpers/complexity.ts`            | New — `cyclomaticComplexity()`, `linesOfCode()`, `methodCount()`                                                |
+| `src/predicates/metrics.ts`            | New — metric predicates for classes and functions                                                               |
+| `src/rules/metrics.ts`                 | New — `maxCyclomaticComplexity`, `maxClassLines`, `maxMethodLines`, `maxMethods`, `maxParameters`, + re-exports |
+| `src/rules/metrics-function.ts`        | New — `maxFunctionComplexity`, `maxFunctionLines`, `maxFunctionParameters`                                      |
+| `src/index.ts`                         | Modified — export predicates and `cyclomaticComplexity` helper                                                  |
+| `package.json`                         | Modified — add `./rules/metrics` sub-path export                                                                |
+| `docs/metrics.md`                      | New — metrics documentation page                                                                                |
+| `docs/standard-rules.md`               | Modified — add metrics section                                                                                  |
+| `docs/what-to-check.md`                | Modified — add complexity/size category                                                                         |
+| `tests/fixtures/metrics/`              | New — fixture files with documented expected complexity values                                                  |
+| `tests/helpers/complexity.test.ts`     | New — 15 unit tests                                                                                             |
+| `tests/rules/metrics.test.ts`          | New — 15 condition tests                                                                                        |
+| `tests/rules/metrics-function.test.ts` | New — 7 function-level tests                                                                                    |
+| `tests/predicates/metrics.test.ts`     | New — 7 predicate tests                                                                                         |
 
 ## Out of Scope
 
