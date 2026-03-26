@@ -88,12 +88,12 @@ Available on all entry points via `.that()`.
 
 ## Call Predicates
 
-| Export            | Signature                            | Description                                |
-| ----------------- | ------------------------------------ | ------------------------------------------ |
-| `onObject`        | `onObject(name: string)`             | Call is on the named object (e.g., `app`). |
-| `withMethod`      | `withMethod(name: string \| RegExp)` | Call method matches name or regex.         |
-| `withArgMatching` | `withArgMatching(re: RegExp)`        | Call has an argument matching regex.       |
-| `withStringArg`   | `withStringArg(value: string)`       | Call has a string argument with the value. |
+| Export            | Signature                                                   | Description                                                                 |
+| ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `onObject`        | `onObject(name: string)`                                    | Call is on the named object (e.g., `app`). Supports nested: `router.route`. |
+| `withMethod`      | `withMethod(nameOrRegex: string \| RegExp)`                 | Call method matches exact name or regex pattern.                            |
+| `withArgMatching` | `withArgMatching(index: number, pattern: string \| RegExp)` | Argument at index matches regex or exact string.                            |
+| `withStringArg`   | `withStringArg(index: number, glob: string)`                | String literal argument at index matches glob pattern.                      |
 
 ## Structural Conditions
 
@@ -181,39 +181,53 @@ Available on all entry points via `.that()`.
 
 ## Call Conditions
 
-| Export                          | Signature                                               | Description                                  |
-| ------------------------------- | ------------------------------------------------------- | -------------------------------------------- |
-| `callHaveCallbackContaining`    | `haveCallbackContaining(matcher: ExpressionMatcher)`    | Call's callback must contain expression.     |
-| `callNotHaveCallbackContaining` | `notHaveCallbackContaining(matcher: ExpressionMatcher)` | Call's callback must not contain expression. |
-| `callNotExist`                  | `notExist()`                                            | No calls should match.                       |
+| Export                          | Signature                                               | Description                                                         |
+| ------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------- |
+| `callHaveCallbackContaining`    | `haveCallbackContaining(matcher: ExpressionMatcher)`    | At least one callback argument must contain the matched expression. |
+| `callNotHaveCallbackContaining` | `notHaveCallbackContaining(matcher: ExpressionMatcher)` | No callback argument may contain the matched expression.            |
+| `callNotExist`                  | `notExist()`                                            | The filtered call set must be empty.                                |
+
+See [Call Rules](/calls) for usage examples.
 
 ## Pattern Templates
 
-| Export          | Signature                                        | Description                                  |
-| --------------- | ------------------------------------------------ | -------------------------------------------- |
-| `definePattern` | `definePattern(name: string, opts): ArchPattern` | Define a return type shape pattern.          |
-| `followPattern` | `followPattern(pattern: ArchPattern)`            | Condition: function must follow the pattern. |
+| Export               | Signature                                                                                             | Description                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `definePattern`      | `definePattern(name: string, opts: { returnShape: Record<string, PropertyConstraint> }): ArchPattern` | Define a return type shape pattern.                                               |
+| `followPattern`      | `followPattern(pattern: ArchPattern): Condition<ArchFunction>`                                        | Condition: function return type must match the pattern. Unwraps `Promise<T>`.     |
+| `PropertyConstraint` | `string \| TypeMatcher`                                                                               | `string` = regex on type text, `'T[]'` = any array, `TypeMatcher` = programmatic. |
+| `ArchPattern`        | type                                                                                                  | Pattern with `name` and `returnShape`.                                            |
+
+See [Pattern Templates](/patterns) for usage examples.
 
 ## Smell Detectors
 
-| Export                        | Signature                              | Description                                  |
-| ----------------------------- | -------------------------------------- | -------------------------------------------- |
-| `smells`                      | `smells(p: ArchProject): SmellBuilder` | Entry point for code smell detection.        |
-| `SmellBuilder`                | class                                  | Builder for smell detection rules.           |
-| `DuplicateBodiesBuilder`      | class                                  | Detect duplicate method/function bodies.     |
-| `InconsistentSiblingsBuilder` | class                                  | Detect inconsistent sibling implementations. |
-| `buildFingerprint`            | `buildFingerprint(node): Fingerprint`  | Build an AST fingerprint for comparison.     |
-| `computeSimilarity`           | `computeSimilarity(a, b): number`      | Compute similarity between two fingerprints. |
+| Export                        | Signature                                                                  | Description                                                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `smells.duplicateBodies`      | `smells.duplicateBodies(p: ArchProject): DuplicateBodiesBuilder`           | Detect functions with structurally similar AST bodies.                                                           |
+| `smells.inconsistentSiblings` | `smells.inconsistentSiblings(p: ArchProject): InconsistentSiblingsBuilder` | Detect sibling files missing a majority pattern.                                                                 |
+| `SmellBuilder`                | class                                                                      | Base builder: `inFolder`, `minLines`, `ignoreTests`, `ignorePaths`, `groupByFolder`, `because`, `warn`, `check`. |
+| `DuplicateBodiesBuilder`      | class                                                                      | Extends SmellBuilder. Adds `withMinSimilarity(n)`.                                                               |
+| `InconsistentSiblingsBuilder` | class                                                                      | Extends SmellBuilder. Adds `forPattern(matcher)`.                                                                |
+| `buildFingerprint`            | `buildFingerprint(node: Node): Fingerprint`                                | Build an AST fingerprint (kinds, calls, nodeCount) from a body node.                                             |
+| `computeSimilarity`           | `computeSimilarity(a: Fingerprint, b: Fingerprint): number`                | LCS-based similarity between two fingerprints, normalized to [0,1].                                              |
+
+See [Smell Detection](/smell-detection) for usage examples.
 
 ## Cross-Layer Validation
 
-| Export                    | Signature                                       | Description                                             |
-| ------------------------- | ----------------------------------------------- | ------------------------------------------------------- |
-| `crossLayer`              | `crossLayer(p: ArchProject): CrossLayerBuilder` | Entry point for cross-layer consistency rules.          |
-| `CrossLayerBuilder`       | class                                           | Builder for cross-layer rules.                          |
-| `haveMatchingCounterpart` | condition                                       | Each element in one layer has a counterpart in another. |
-| `haveConsistentExports`   | condition                                       | Layers export consistent symbol sets.                   |
-| `satisfyPairCondition`    | condition                                       | Custom pair condition for cross-layer checks.           |
+| Export                    | Signature                                                                                       | Description                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `crossLayer`              | `crossLayer(p: ArchProject): CrossLayerBuilder`                                                 | Entry point for cross-layer consistency rules.                           |
+| `CrossLayerBuilder`       | class                                                                                           | Builder: `.layer(name, glob)` (2+ required) then `.mapping(fn)`.         |
+| `MappedCrossLayerBuilder` | class                                                                                           | After `.mapping()`: provides `.forEachPair()`.                           |
+| `PairConditionBuilder`    | class                                                                                           | After `.forEachPair()`: provides `.should(condition)`.                   |
+| `PairFinalBuilder`        | class                                                                                           | Terminal: `.because()`, `.rule()`, `.check()`, `.warn()`, `.severity()`. |
+| `haveMatchingCounterpart` | `haveMatchingCounterpart(layers: Layer[]): PairCondition`                                       | Every left-layer file must have a counterpart in the right layer.        |
+| `haveConsistentExports`   | `haveConsistentExports(extractLeft, extractRight): PairCondition`                               | Every exported symbol in left file must appear in right file.            |
+| `satisfyPairCondition`    | `satisfyPairCondition(desc: string, fn: (pair: LayerPair) => Violation \| null): PairCondition` | Custom inline pair condition.                                            |
+
+See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Extension API
 
