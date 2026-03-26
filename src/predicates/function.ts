@@ -1,5 +1,6 @@
 import type { Predicate } from '../core/predicate.js'
 import type { ArchFunction } from '../models/arch-function.js'
+import type { TypeMatcher } from '../helpers/type-matchers.js'
 
 /**
  * Matches async functions (declared with the `async` keyword).
@@ -74,5 +75,59 @@ export function haveReturnType(pattern: RegExp | string): Predicate<ArchFunction
   return {
     description: `have return type matching ${String(regex)}`,
     test: (fn) => regex.test(fn.getReturnType().getText()),
+  }
+}
+
+/**
+ * Matches functions that have at least one rest parameter (...args).
+ */
+export function haveRestParameter(): Predicate<ArchFunction> {
+  return {
+    description: 'have a rest parameter',
+    test: (fn) => fn.getParameters().some((p) => p.isRestParameter()),
+  }
+}
+
+/**
+ * Matches functions that have at least one optional or default-valued parameter.
+ *
+ * Includes both `x?: string` (optional) and `x = 10` (default value).
+ */
+export function haveOptionalParameter(): Predicate<ArchFunction> {
+  return {
+    description: 'have an optional or default-valued parameter',
+    test: (fn) => fn.getParameters().some((p) => p.isOptional() || p.hasInitializer()),
+  }
+}
+
+/**
+ * Matches functions that have a parameter at the given index
+ * whose type matches the given TypeMatcher.
+ *
+ * Note: For rest parameters (...args: string[]), the type is string[] not string.
+ * Use arrayOf(isString()) or exactly('string[]') to match rest param types.
+ * For optional parameters (x?: string), TypeMatcher strips undefined automatically.
+ * Out-of-bounds or negative indices return false.
+ */
+export function haveParameterOfType(index: number, matcher: TypeMatcher): Predicate<ArchFunction> {
+  return {
+    description: `have parameter at index ${String(index)} with matching type`,
+    test: (fn) => {
+      const params = fn.getParameters()
+      const param = params[index]
+      if (!param) return false
+      return matcher(param.getType())
+    },
+  }
+}
+
+/**
+ * Matches functions that have a parameter whose name matches the given regex.
+ * Unlike haveParameterNamed (exact match), this accepts a regex.
+ */
+export function haveParameterNameMatching(pattern: RegExp): Predicate<ArchFunction> {
+  return {
+    description: `have a parameter name matching ${String(pattern)}`,
+    test: (fn) => fn.getParameters().some((p) => pattern.test(p.getName())),
   }
 }

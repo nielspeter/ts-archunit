@@ -64,6 +64,7 @@ functions(p)
 ### Predicates on ArchFunction
 
 All new predicates operate on `ArchFunction` which already exposes `getParameters(): ParameterDeclaration[]`. ts-morph's `ParameterDeclaration` has:
+
 - `.isRestParameter()` — `...args`
 - `.isOptional()` — `arg?: type`
 - `.hasInitializer()` — `arg = default`
@@ -124,10 +125,7 @@ export function haveOptionalParameter(): Predicate<ArchFunction> {
  * functions(p).that().haveParameterOfType(0, isString()).should()...
  * functions(p).that().haveParameterOfType(0, matching(/Event$/)).should()...
  */
-export function haveParameterOfType(
-  index: number,
-  matcher: TypeMatcher,
-): Predicate<ArchFunction> {
+export function haveParameterOfType(index: number, matcher: TypeMatcher): Predicate<ArchFunction> {
   return {
     description: `have parameter at index ${String(index)} with matching type`,
     test: (fn) => {
@@ -253,23 +251,31 @@ Add to `tests/fixtures/poc/src/`:
 
 ```typescript
 // signature-variants.ts
-export function withRest(...items: string[]): void { void items }
-export function withOptional(name?: string): void { void name }
-export function withDefault(count = 10): void { void count }
-export function allRequired(a: string, b: number): void { void [a, b] }
+export function withRest(...items: string[]): void {
+  void items
+}
+export function withOptional(name?: string): void {
+  void name
+}
+export function withDefault(count = 10): void {
+  void count
+}
+export function allRequired(a: string, b: number): void {
+  void [a, b]
+}
 ```
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `src/predicates/function.ts` | Modified — add haveRestParameter, haveOptionalParameter, haveParameterOfType, haveParameterMatching |
-| `src/builders/function-rule-builder.ts` | Modified — add 4 builder methods |
-| `src/index.ts` | Modified — export new predicates |
-| `tests/fixtures/poc/src/signature-variants.ts` | New — fixture with rest/optional/default params |
-| `tests/predicates/function-signature.test.ts` | New — 10 unit tests |
-| `tests/integration/function-rules.test.ts` | Modified — add 3 integration tests |
-| `tests/archunit/arch-rules.test.ts` | Modified — add API consistency dogfooding rule |
+| File                                           | Change                                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `src/predicates/function.ts`                   | Modified — add haveRestParameter, haveOptionalParameter, haveParameterOfType, haveParameterMatching |
+| `src/builders/function-rule-builder.ts`        | Modified — add 4 builder methods                                                                    |
+| `src/index.ts`                                 | Modified — export new predicates                                                                    |
+| `tests/fixtures/poc/src/signature-variants.ts` | New — fixture with rest/optional/default params                                                     |
+| `tests/predicates/function-signature.test.ts`  | New — 10 unit tests                                                                                 |
+| `tests/integration/function-rules.test.ts`     | Modified — add 3 integration tests                                                                  |
+| `tests/archunit/arch-rules.test.ts`            | Modified — add API consistency dogfooding rule                                                      |
 
 ## Out of Scope
 

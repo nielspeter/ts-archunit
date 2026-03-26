@@ -26,6 +26,7 @@ import {
   areExported as identityAreExported,
   areNotExported as identityAreNotExported,
 } from '../predicates/identity.js'
+import type { TypeMatcher } from '../helpers/type-matchers.js'
 import {
   areAsync as fnAreAsync,
   areNotAsync as fnAreNotAsync,
@@ -34,6 +35,10 @@ import {
   haveParameterCountLessThan as fnHaveParameterCountLessThan,
   haveParameterNamed as fnHaveParameterNamed,
   haveReturnType as fnHaveReturnType,
+  haveRestParameter as fnHaveRestParameter,
+  haveOptionalParameter as fnHaveOptionalParameter,
+  haveParameterOfType as fnHaveParameterOfType,
+  haveParameterNameMatching as fnHaveParameterNameMatching,
 } from '../predicates/function.js'
 
 /**
@@ -129,6 +134,22 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
 
   haveReturnType(pattern: RegExp | string): this {
     return this.addPredicate(fnHaveReturnType(pattern))
+  }
+
+  haveRestParameter(): this {
+    return this.addPredicate(fnHaveRestParameter())
+  }
+
+  haveOptionalParameter(): this {
+    return this.addPredicate(fnHaveOptionalParameter())
+  }
+
+  haveParameterOfType(index: number, matcher: TypeMatcher): this {
+    return this.addPredicate(fnHaveParameterOfType(index, matcher))
+  }
+
+  haveParameterNameMatching(pattern: RegExp): this {
+    return this.addPredicate(fnHaveParameterNameMatching(pattern))
   }
 
   // --- Condition methods ---
