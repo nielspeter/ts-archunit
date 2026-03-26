@@ -3,6 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
+import { isString } from '../../src/helpers/type-matchers.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -356,6 +357,48 @@ describe('functions() entry point integration', () => {
           .because('use shared parseOrder() utility')
           .check()
       }).toThrow(ArchRuleError)
+    })
+  })
+
+  // --- Plan 0029: Signature predicates integration tests ---
+
+  describe('haveRestParameter (full chain)', () => {
+    it('rest-parameter functions exist in the fixture', () => {
+      expect(() => {
+        functions(p).that().haveRestParameter().should().notExist().check()
+      }).toThrow(ArchRuleError) // withRest and withBoth have rest params
+    })
+  })
+
+  describe('haveOptionalParameter (full chain)', () => {
+    it('optional-parameter functions are exported', () => {
+      expect(() => {
+        functions(p)
+          .that()
+          .haveOptionalParameter()
+          .and()
+          .resideInFile('**/signature-variants.ts')
+          .should()
+          .beExported()
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  describe('haveParameterOfType (full chain)', () => {
+    it('filters by param type and asserts', () => {
+      // allRequired has (a: string, b: number) — filter to string first param,
+      // then assert they exist by checking notExist throws
+      expect(() => {
+        functions(p)
+          .that()
+          .resideInFile('**/signature-variants.ts')
+          .and()
+          .haveParameterOfType(0, isString())
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError) // allRequired, withOptional, withBoth match
     })
   })
 })
