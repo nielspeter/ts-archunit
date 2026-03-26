@@ -1,39 +1,11 @@
----
-layout: home
-hero:
-  name: ts-archunit
-  text: Architecture Testing for TypeScript
-  tagline: Stop architecture rot before it starts. Enforce structural rules as executable tests that run in CI.
-  actions:
-    - theme: brand
-      text: Get Started
-      link: /getting-started
-    - theme: alt
-      text: What Can It Check?
-      link: /what-to-check
-    - theme: alt
-      text: GitHub
-      link: https://github.com/NielsPeter/ts-archunit
+# ts-archunit
 
-features:
-  - icon: 🔍
-    title: Goes Beyond Import Checking
-    details: 'Other tools only check which files import which. ts-archunit inspects what happens <em>inside</em> your functions: banned calls, wrong constructors, missing patterns. No other TypeScript tool does this.'
-  - icon: 🛡️
-    title: Catches What Code Review Misses
-    details: 'Every PR looks correct in isolation. But across 40 repositories, you get 6 different pagination patterns, copy-pasted parsers, and orderBy fields that accept bare strings. ts-archunit catches the drift automatically.'
-  - icon: 🤖
-    title: AI Agent Guardrails
-    details: "AI agents generating code don't know your team's conventions. ts-archunit enforces them in CI — with clear messages explaining what's wrong, why it matters, and how to fix it."
-  - icon: 📐
-    title: Rules Read Like English
-    details: "<code>classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()</code> — if you can read this sentence, you can write architecture rules."
-  - icon: 🏗️
-    title: Gradual Adoption
-    details: 'Baseline mode records existing violations and only fails on new ones. Teams adopt rules incrementally without fixing 500 violations in one PR.'
-  - icon: ⚡
-    title: Powered by the TypeScript Compiler
-    details: 'Built on ts-morph — full access to the AST and type checker. Resolves through generics, Partial<>, Pick<>, and type aliases. Not a regex hack.'
+**Architecture testing for TypeScript.** Enforce structural rules across your codebase as executable tests that run in CI.
+
+Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](https://ts-morph.com/).
+
+[Get Started →](/getting-started) · [What Can It Check?](/what-to-check) · [GitHub](https://github.com/NielsPeter/ts-archunit)
+
 ---
 
 ## The Problem
@@ -42,47 +14,86 @@ Architecture decisions are documented in ADRs, discussed in reviews, agreed on i
 
 A real-world API project with 40 repositories grew organically over 18 months. A routine audit found:
 
-- **6 copy-pasted order-parsing functions** — all identical logic, different names
-- **6 different pagination patterns** — some capped at 1000, some unlimited, some didn't paginate at all
-- **`orderBy?: string`** on half the query options — a SQL injection surface hiding in plain sight
-- **Inline `parseInt`** in 4 repositories when a shared `extractCount()` helper existed
+```typescript
+// File A — manual Number(), no limit cap
+const skip = Number(request.query.skip) || 0
+const limit = Number(request.query.limit) || 100
 
-Each violation was introduced by a single PR that looked correct in isolation. Code review didn't catch them because no reviewer holds the full pattern inventory in their head.
+// File B — manual Number() with Math.min cap
+const skip = Number(request.query.skip) || 0
+const limit = Math.min(Number(request.query.limit) || 100, 1000)
 
-**ts-archunit prevents this.** Rules run in your test suite. CI catches violations on the PR that introduces them.
+// File C — conditional Number(), no cap
+skip: skip !== undefined ? Number(skip) : undefined,
+limit: limit !== undefined ? Number(limit) : undefined,
+```
 
-## What Makes It Different
+A shared utility `normalizePagination()` existed. Some endpoints used it. Most didn't.
 
-| Tool                     | Import paths | Body analysis | Type checking | Cycles | Baseline |
-| ------------------------ | ------------ | ------------- | ------------- | ------ | -------- |
-| **ts-archunit**          | ✅           | ✅            | ✅            | ✅     | ✅       |
-| dependency-cruiser       | ✅           | ❌            | ❌            | ✅     | ❌       |
-| eslint-plugin-boundaries | ✅           | ❌            | ❌            | ❌     | ❌       |
-| ts-arch (npm)            | ✅           | ❌            | ❌            | ❌     | ❌       |
+**Six different pagination patterns across 30 routes.** Each was introduced by a single PR that looked correct in isolation. Code review didn't catch them because no reviewer holds the full pattern inventory in their head.
 
-**Body analysis** is the key differentiator. Other tools can tell you "file A imports file B." ts-archunit can tell you "the `query()` method in `WebhookRepository` calls `parseInt` instead of `this.extractCount()`."
+The audit plan — just documenting what's wrong — was 433 lines. Before writing a single line of fix code.
 
-## 30-Second Example
+**ts-archunit prevents this.** Write the rule once, CI enforces it forever:
 
 ```typescript
-import { project, classes, call } from 'ts-archunit'
-
-const p = project('tsconfig.json')
-
-classes(p)
+functions(p)
   .that()
-  .extend('BaseRepository')
+  .haveNameMatching(/^parse\w+Order$/)
+  .and()
+  .resideInFolder('**/routes/**')
   .should()
-  .notContain(call('parseInt'))
+  .notExist()
   .rule({
-    id: 'repo/no-parseint',
-    because: 'BaseRepository provides extractCount() — inline parseInt diverges',
-    suggestion: 'Replace parseInt(x, 10) with this.extractCount(result)',
+    id: 'route/no-copy-paste',
+    because: 'Copy-pasted parsers diverge over time',
+    suggestion: 'Use the shared parseOrder() utility with a column map',
   })
   .check()
 ```
 
-When this rule fails, you see:
+---
+
+## What Other Tools Can't Do
+
+Every existing tool checks **which files import which**. That's useful, but it misses the real problems.
+
+ts-archunit checks what happens **inside** your functions:
+
+```typescript
+// "Repositories must use the shared helper, not inline parseInt"
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
+```
+
+```typescript
+// "Query options must use typed unions, not bare string"
+types(p)
+  .that()
+  .haveProperty('orderBy')
+  .should()
+  .havePropertyType('orderBy', notType(isString()))
+  .check()
+```
+
+```typescript
+// "No circular dependencies between feature modules"
+slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
+```
+
+| Capability                                         | ts-archunit | dependency-cruiser | eslint-plugin-boundaries |
+| -------------------------------------------------- | ----------- | ------------------ | ------------------------ |
+| Import path rules                                  | ✅          | ✅                 | ✅                       |
+| **Body analysis** (what's called inside functions) | ✅          | ❌                 | ❌                       |
+| **Type checking** (string vs typed union)          | ✅          | ❌                 | ❌                       |
+| Cycle detection                                    | ✅          | ✅                 | ❌                       |
+| Baseline (gradual adoption)                        | ✅          | ❌                 | ❌                       |
+| GitHub PR annotations                              | ✅          | ❌                 | ❌                       |
+
+---
+
+## What a Violation Looks Like
+
+When a rule fails, you don't just get "error." You get **why it matters and how to fix it**:
 
 ```
 Architecture Violation [repo/no-parseint]
@@ -92,18 +103,59 @@ Architecture Violation [repo/no-parseint]
 
       5 |   async query() {
       6 |     const countResult = await this.db.count('* as count').first()
-    > 7 |     const total = typeof countResult.count === 'string' ? parseInt(countResult.count, 10) : countResult.count
+    > 7 |     const total = typeof countResult.count === 'string'
+              ? parseInt(countResult.count, 10) : countResult.count
       8 |
 
   Why: BaseRepository provides extractCount() — inline parseInt diverges
   Fix: Replace parseInt(x, 10) with this.extractCount(result)
 ```
 
-The developer (or AI agent) knows exactly what's wrong, why, and how to fix it.
+In GitHub Actions, this appears **inline on the PR diff** — right where the violation was introduced.
 
-<style>
-:root {
-  --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #bd34fe 30%, #41d1ff);
-}
-</style>
+---
+
+## Rules Read Like English
+
+If you can read this sentence, you can write architecture rules:
+
+```typescript
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
+```
+
+The fluent API maps directly to the intent:
+
+- **`classes(p).that()`** — select which classes
+- **`.extend('BaseRepository')`** — filter to subclasses
+- **`.should().notContain(call('parseInt'))`** — assert what must be true
+- **`.check()`** — run and fail if violated
+
+---
+
+## Adopt Gradually
+
+You don't need to fix every violation to start. **Baseline mode** records existing violations and only fails on new ones:
+
+```typescript
+const baseline = withBaseline('arch-baseline.json')
+
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check({ baseline }) // only NEW violations fail
+```
+
+Teams adopt rules incrementally. As they fix legacy code, they regenerate the baseline to ratchet down.
+
+---
+
+## AI Agents Need Guardrails
+
+AI agents generating code don't know your team's conventions. Every agent PR looks correct in isolation — just like every human PR did.
+
+ts-archunit is the guardrail. Rules run in CI. Violations show up inline on the PR with clear messages explaining **what's wrong, why it matters, and how to fix it** — exactly the context an agent needs to self-correct.
+
+---
+
+## Ready to Start?
+
+[Get Started →](/getting-started) — install, write your first rule, run it in 5 minutes.
+
+[What Can It Check?](/what-to-check) — browse 8 categories of rules as one-liner examples.
