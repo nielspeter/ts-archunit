@@ -245,6 +245,91 @@ const format = detectFormat() // 'github' in CI, 'terminal' locally
 classes(p).should().notContain(call('eval')).check({ format })
 ```
 
+### Framework-Agnostic Route Matching
+
+Match call expressions by object and method — works with Express, Fastify, Hono, or any framework:
+
+```typescript
+import { calls, call, within } from 'ts-archunit'
+
+// Select route registrations
+const routes = calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+
+// Assert all routes have error handling
+routes.should().haveCallbackContaining(call('handleError')).check()
+```
+
+### Scoped Rules with `within()`
+
+Restrict rules to callback functions inside matched call expressions:
+
+```typescript
+// "Within route handlers, enforce normalizePagination"
+within(routes)
+  .functions()
+  .should()
+  .contain(call('normalizePagination'))
+  .rule({ id: 'route/pagination', because: 'All list endpoints must use shared pagination' })
+  .check()
+```
+
+### Pattern Templates
+
+Enforce return type shapes across functions:
+
+```typescript
+import { definePattern, functions } from 'ts-archunit'
+
+const paginatedCollection = definePattern('paginated-collection', {
+  returnShape: {
+    total: 'number',
+    skip: 'number',
+    limit: 'number',
+    items: 'T[]',
+  },
+})
+
+functions(p)
+  .that()
+  .resideInFolder('**/routes/**')
+  .should()
+  .followPattern(paginatedCollection)
+  .check()
+```
+
+### CLI
+
+Run rules without a test runner:
+
+```bash
+# Check rules
+npx ts-archunit check arch.rules.ts
+
+# Generate baseline for existing violations
+npx ts-archunit baseline --output arch-baseline.json
+
+# Check with baseline and diff-aware mode
+npx ts-archunit check arch.rules.ts --baseline arch-baseline.json --changed --base main
+```
+
+Optional config file:
+
+```typescript
+// ts-archunit.config.ts
+import { defineConfig } from 'ts-archunit'
+
+export default defineConfig({
+  project: 'tsconfig.json',
+  rules: ['arch.rules.ts'],
+  baseline: 'arch-baseline.json',
+  format: 'auto',
+})
+```
+
 ### Warnings (Non-Blocking Rules)
 
 ```typescript
@@ -332,6 +417,8 @@ classes(p).that().areExported().should().satisfy(haveJsDocOnPublicMethods).check
 | `functions(p)` | Functions, arrow functions, class methods | Naming, parameters, body analysis               |
 | `types(p)`     | Interfaces + type aliases                 | Property types, type safety                     |
 | `slices(p)`    | Groups of files                           | Cycles, layer ordering                          |
+| `calls(p)`     | Call expressions                          | Framework-agnostic route/handler matching       |
+| `within(sel)`  | Scoped callbacks                          | Rules inside matched call callbacks             |
 
 ## How It Works
 
