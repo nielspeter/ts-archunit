@@ -13,7 +13,71 @@ export interface WatchOptions {
   debounceMs?: number
 }
 
-const TS_FILE_RE = /\.[cm]?tsx?$/
+export const TS_FILE_RE = /\.[cm]?tsx?$/
+
+/**
+ * Scheduling logic for watch mode — extracted for testability.
+ *
+ * Debounces rapid triggers. If a trigger arrives while the callback
+ * is running, it queues a re-run after the current run completes.
+ */
+export class RunScheduler {
+  private debounceTimer: ReturnType<typeof setTimeout> | undefined
+  private running = false
+  private _pendingRerun = false
+  private readonly debounceMs: number
+  private readonly onRun: (trigger: string) => Promise<void>
+  public runCount = 0
+
+  constructor(onRun: (trigger: string) => Promise<void>, debounceMs = 250) {
+    this.onRun = onRun
+    this.debounceMs = debounceMs
+  }
+
+  get pendingRerun(): boolean {
+    return this._pendingRerun
+  }
+
+  get isRunning(): boolean {
+    return this.running
+  }
+
+  schedule(trigger: string): void {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer)
+    this.debounceTimer = setTimeout(() => {
+      if (this.running) {
+        this._pendingRerun = true
+        return
+      }
+      this.executeRun(trigger)
+    }, this.debounceMs)
+  }
+
+  private executeRun(trigger: string): void {
+    this.running = true
+    this._pendingRerun = false
+    this.runCount++
+    process.stdout.write('\x1B[2J\x1B[H') // clear screen, preserve scrollback
+    process.stdout.write(`Change detected: ${trigger}\n\n`)
+    this.onRun(trigger)
+      .catch((err: unknown) => {
+        // Rule failures are expected — swallow ArchRuleError, print others
+        if (!(err instanceof ArchRuleError)) {
+          if (err instanceof Error) {
+            console.error(err.message)
+          }
+        }
+      })
+      .finally(() => {
+        this.running = false
+        if (this._pendingRerun) {
+          this.executeRun('(queued change)')
+        } else {
+          process.stdout.write('\nWatching for changes...\n')
+        }
+      })
+  }
+}
 
 /**
  * Watch for file changes and re-run the callback.
@@ -29,44 +93,7 @@ const TS_FILE_RE = /\.[cm]?tsx?$/
  */
 export function watchAndRerun(options: WatchOptions): void {
   const { watchDirs, watchFiles, onChangeDetected, debounceMs = 250 } = options
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined
-  let running = false
-  let pendingRerun = false
-
-  const executeRun = (trigger: string): void => {
-    running = true
-    pendingRerun = false
-    process.stdout.write('\x1B[2J\x1B[H') // clear screen, preserve scrollback
-    process.stdout.write(`Change detected: ${trigger}\n\n`)
-    onChangeDetected()
-      .catch((err: unknown) => {
-        // Rule failures are expected — swallow ArchRuleError, print others
-        if (!(err instanceof ArchRuleError)) {
-          if (err instanceof Error) {
-            console.error(err.message)
-          }
-        }
-      })
-      .finally(() => {
-        running = false
-        if (pendingRerun) {
-          executeRun('(queued change)')
-        } else {
-          process.stdout.write('\nWatching for changes...\n')
-        }
-      })
-  }
-
-  const scheduleRun = (trigger: string): void => {
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      if (running) {
-        pendingRerun = true
-        return
-      }
-      executeRun(trigger)
-    }, debounceMs)
-  }
+  const scheduler = new RunScheduler(onChangeDetected, debounceMs)
 
   const watchers: Array<AsyncIterable<FileChangeInfo<string>>> = []
 
@@ -79,7 +106,7 @@ export function watchAndRerun(options: WatchOptions): void {
       try {
         for await (const event of watcher) {
           if (event.filename && TS_FILE_RE.test(event.filename)) {
-            scheduleRun(event.filename)
+            scheduler.schedule(event.filename)
           }
         }
       } catch (err: unknown) {
@@ -99,7 +126,7 @@ export function watchAndRerun(options: WatchOptions): void {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars -- must consume async iterator
         for await (const _event of watcher) {
-          scheduleRun(path.basename(file))
+          scheduler.schedule(path.basename(file))
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.message !== 'The operation was aborted') {
