@@ -15,7 +15,7 @@ ts-archunit turns architectural rules into tests. They run in your CI pipeline. 
 ## Install
 
 ```bash
-npm install -D ts-archunit
+npm install -D @nielspeter/ts-archunit
 ```
 
 Requires Node.js >= 24 and a `tsconfig.json`.

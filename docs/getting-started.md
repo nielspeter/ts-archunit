@@ -9,7 +9,7 @@
 ## Installation
 
 ```bash
-npm install -D ts-archunit
+npm install -D @nielspeter/ts-archunit
 ```
 
 ## Your First Rule
