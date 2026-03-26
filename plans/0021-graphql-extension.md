@@ -40,6 +40,8 @@ resolvers(p, 'src/resolvers/**')
 
 The `graphql` npm package is only needed by projects that have a GraphQL layer. It is listed as an `optionalPeerDependency` — not a hard dependency of ts-archunit. The sub-path export `ts-archunit/graphql` is only importable when `graphql` is installed. This follows ADR-004 (ESM sub-path exports) and the pattern established by `ts-archunit/rules/*` in plan 0024.
 
+**Runtime guard:** The entry point (`src/graphql/index.ts`) must check for the `graphql` package at import time and throw a clear error if missing. This prevents cryptic module-not-found errors when users import `ts-archunit/graphql` without `graphql` installed.
+
 ```json
 {
   "exports": {

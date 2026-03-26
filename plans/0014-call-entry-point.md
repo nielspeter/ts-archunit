@@ -266,12 +266,9 @@ export function withStringArg(
       const args = call.getArguments()
       if (index >= args.length) return false
       const arg = args[index]!
-      // Check if the argument is a string literal
-      if (!('getLiteralValue' in arg)) return false
-      // StringLiteral, NoSubstitutionTemplateLiteral
-      const text = (arg as { getLiteralValue(): unknown }).getLiteralValue()
-      if (typeof text !== 'string') return false
-      return isMatch(text)
+      // Use ts-morph type guard (ADR-005: no duck typing or as casts)
+      if (!Node.isStringLiteral(arg)) return false
+      return isMatch(arg.getLiteralValue())
     },
   }
 }
@@ -534,6 +531,26 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
    */
   notExist(): this {
     return this.addCondition(callNotExist())
+  }
+
+  // --- Public accessors (used by plan 0015 within()) ---
+
+  /**
+   * Get the underlying ArchProject.
+   * Used by within() to create scoped builders.
+   */
+  getArchProject(): ArchProject {
+    return this.project
+  }
+
+  /**
+   * Get the call expressions that match the current predicate chain.
+   * Used by within() to extract callbacks from matched calls.
+   */
+  getMatchedCalls(): ArchCall[] {
+    return this.getElements().filter((archCall) =>
+      this._predicates.every((p) => p.test(archCall)),
+    )
   }
 }
 

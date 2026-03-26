@@ -307,11 +307,10 @@ export class ScopedFunctionRuleBuilder extends FunctionRuleBuilder {
    * that loses the scoped element source.
    */
   protected override fork(): this {
-    const forked = new ScopedFunctionRuleBuilder(this.callSelection)
-    forked._predicates = [...this._predicates]
-    forked._conditions = []
-    forked._reason = undefined
-    return forked as this
+    // super.fork() uses Object.create + Object.assign which copies
+    // callSelection automatically. No need to duplicate field copying.
+    // (ADR-005: no as casts, no duplicate logic)
+    return super.fork()
   }
 }
 ```
@@ -706,6 +705,20 @@ Nested scoping is not supported in v1. Each `within()` operates on a `CallRuleBu
 | 15 | Fork preserves call selection context | `.should()` on scoped builder stays scoped |
 | 16 | Inherits all `FunctionRuleBuilder` methods | No methods lost in subclass |
 | 17 | Empty call selection yields empty elements | Scoped `getElements()` returns `[]` |
+
+## v1 Limitation: Inline Functions Only
+
+`within()` v1 only extracts **inline arrow functions and function expressions** from call arguments. It does NOT resolve named references:
+
+```typescript
+// ✅ WORKS — inline arrow function
+app.get('/users', (req, res) => { ... })
+
+// ❌ NOT SCOPED in v1 — named reference
+app.get('/users', userHandler)
+```
+
+Many projects use named handler references. If this proves too limiting in practice, reference resolution (following the function declaration via the type checker) can be added in a follow-up plan without breaking the `within()` API.
 
 ## Out of Scope
 
