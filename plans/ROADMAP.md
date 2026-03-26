@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-26
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 25 completed, 1 remaining (user guide)
+**Total Plans:** 26 completed, 0 remaining
 
 ---
 
@@ -33,8 +33,8 @@
 | **P2**   | ~~CLI Standalone Runner (0020)~~                                                 | 0.5 day   | COMPLETED 2026-03-26 |
 | **P2**   | ~~Standard Rules Library (0024)~~                                                | 1 day     | COMPLETED 2026-03-26 |
 | **P2**   | ~~Rich Rule Metadata (0025)~~                                                    | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | User Guide with VitePress (0023)                                                 | 1-2 days  | Not Started          |
-| **P3**   | ~~Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)~~              | 1 day     | COMPLETED 2026-03-26 |
+| **P2**   | ~~User Guide with VitePress (0023)~~                                             | 1 day     | COMPLETED 2026-03-26 |
+| **P3**   | ~~Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)~~             | 1 day     | COMPLETED 2026-03-26 |
 | **P3**   | ~~GraphQL Extension: Schema & Resolver Rules (0021)~~                            | 1 day     | COMPLETED 2026-03-26 |
 | **P4**   | ~~Cross-Layer Validation (0022)~~                                                | 1 day     | COMPLETED 2026-03-26 |
 
@@ -83,17 +83,17 @@
 - `ts-archunit/graphql` — schema + resolver rules with optional graphql peer dep
 - `crossLayer(p)` — route ↔ schema ↔ SDK consistency validation
 
+### Documentation
+
+- VitePress user guide with 13 pages (plan 0023)
+- GitHub Pages deployment workflow
+
 ### Not Yet Shipped
 
-- User guide (VitePress documentation site)
 - Watch mode for CLI
 
 ---
 
-## Remaining Plans
+## All Plans Complete
 
-```
-0023 - User Guide with VitePress + GitHub Pages
-```
-
-Everything else is built. 735 tests across 73 files.
+26 of 26 plans implemented. 735 tests across 73 files. Docs build in <2s.

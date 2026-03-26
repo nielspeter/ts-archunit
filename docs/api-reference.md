@@ -1,0 +1,421 @@
+# API Reference
+
+All public exports from `ts-archunit`, organized by category.
+
+## Entry Points
+
+| Export      | Signature                                        | Description                                                      |
+| ----------- | ------------------------------------------------ | ---------------------------------------------------------------- |
+| `project`   | `project(tsConfigPath: string): ArchProject`     | Load a TypeScript project. Cached per path.                      |
+| `modules`   | `modules(p: ArchProject): ModuleRuleBuilder`     | Rule builder for source files (imports/dependencies).            |
+| `classes`   | `classes(p: ArchProject): ClassRuleBuilder`      | Rule builder for class declarations.                             |
+| `functions` | `functions(p: ArchProject): FunctionRuleBuilder` | Rule builder for functions, arrow functions, class methods.      |
+| `types`     | `types(p: ArchProject): TypeRuleBuilder`         | Rule builder for interfaces and type aliases.                    |
+| `slices`    | `slices(p: ArchProject): SliceRuleBuilder`       | Rule builder for file groupings (cycles, layers).                |
+| `calls`     | `calls(p: ArchProject): CallRuleBuilder`         | Rule builder for call expressions.                               |
+| `within`    | `within(sel: CallRuleBuilder): ScopedContext`    | Scoped rule builder for callback functions inside matched calls. |
+
+## Rule Builders
+
+| Export                      | Description                                 |
+| --------------------------- | ------------------------------------------- |
+| `RuleBuilder`               | Base rule builder class.                    |
+| `ModuleRuleBuilder`         | Builder returned by `modules()`.            |
+| `ClassRuleBuilder`          | Builder returned by `classes()`.            |
+| `FunctionRuleBuilder`       | Builder returned by `functions()`.          |
+| `TypeRuleBuilder`           | Builder returned by `types()`.              |
+| `SliceRuleBuilder`          | Builder returned by `slices()`.             |
+| `CallRuleBuilder`           | Builder returned by `calls()`.              |
+| `ScopedFunctionRuleBuilder` | Builder returned by `within().functions()`. |
+
+## Identity Predicates
+
+Available on all entry points via `.that()`.
+
+| Export                 | Signature                         | Description               |
+| ---------------------- | --------------------------------- | ------------------------- |
+| `haveNameMatching`     | `haveNameMatching(re: RegExp)`    | Name matches regex.       |
+| `haveNameStartingWith` | `haveNameStartingWith(s: string)` | Name starts with string.  |
+| `haveNameEndingWith`   | `haveNameEndingWith(s: string)`   | Name ends with string.    |
+| `resideInFile`         | `resideInFile(glob: string)`      | File path matches glob.   |
+| `resideInFolder`       | `resideInFolder(glob: string)`    | Folder path matches glob. |
+| `areExported`          | `areExported`                     | Element is exported.      |
+| `areNotExported`       | `areNotExported`                  | Element is not exported.  |
+
+## Module Predicates
+
+| Export                   | Signature                         | Description                                      |
+| ------------------------ | --------------------------------- | ------------------------------------------------ |
+| `importFrom`             | `importFrom(glob: string)`        | Module imports from files matching glob.         |
+| `predicateNotImportFrom` | `notImportFrom(glob: string)`     | Module does not import from files matching glob. |
+| `exportSymbolNamed`      | `exportSymbolNamed(name: string)` | Module exports a symbol with the name.           |
+| `havePathMatching`       | `havePathMatching(re: RegExp)`    | Module file path matches regex.                  |
+
+## Class Predicates
+
+| Export                  | Signature                           | Description                           |
+| ----------------------- | ----------------------------------- | ------------------------------------- |
+| `extend`                | `extend(name: string)`              | Class extends the named base class.   |
+| `implement`             | `implement(name: string)`           | Class implements the named interface. |
+| `haveDecorator`         | `haveDecorator(name: string)`       | Class has the named decorator.        |
+| `haveDecoratorMatching` | `haveDecoratorMatching(re: RegExp)` | Class has a decorator matching regex. |
+| `areAbstract`           | `areAbstract`                       | Class is abstract.                    |
+| `classHaveMethodNamed`  | `haveMethodNamed(name: string)`     | Class has a method with the name.     |
+| `haveMethodMatching`    | `haveMethodMatching(re: RegExp)`    | Class has a method matching regex.    |
+| `havePropertyNamed`     | `havePropertyNamed(name: string)`   | Class has a property with the name.   |
+
+## Function Predicates
+
+| Export                          | Signature                                  | Description                             |
+| ------------------------------- | ------------------------------------------ | --------------------------------------- |
+| `areAsync`                      | `areAsync`                                 | Function is async.                      |
+| `areNotAsync`                   | `areNotAsync`                              | Function is not async.                  |
+| `haveParameterCount`            | `haveParameterCount(n: number)`            | Function has exactly n parameters.      |
+| `haveParameterCountGreaterThan` | `haveParameterCountGreaterThan(n: number)` | Function has more than n parameters.    |
+| `haveParameterCountLessThan`    | `haveParameterCountLessThan(n: number)`    | Function has fewer than n parameters.   |
+| `haveParameterNamed`            | `haveParameterNamed(name: string)`         | Function has a parameter with the name. |
+| `haveReturnType`                | `haveReturnType(type: string)`             | Function has the given return type.     |
+
+## Type Predicates
+
+| Export               | Signature                                      | Description                               |
+| -------------------- | ---------------------------------------------- | ----------------------------------------- |
+| `areInterfaces`      | `areInterfaces`                                | Type is an interface.                     |
+| `areTypeAliases`     | `areTypeAliases`                               | Type is a type alias.                     |
+| `haveProperty`       | `haveProperty(name: string)`                   | Type has a property with the name.        |
+| `havePropertyOfType` | `havePropertyOfType(name: string, re: RegExp)` | Property exists with type matching regex. |
+| `extendType`         | `extendType(name: string)`                     | Interface extends the named type.         |
+
+## Call Predicates
+
+| Export            | Signature                            | Description                                |
+| ----------------- | ------------------------------------ | ------------------------------------------ |
+| `onObject`        | `onObject(name: string)`             | Call is on the named object (e.g., `app`). |
+| `withMethod`      | `withMethod(name: string \| RegExp)` | Call method matches name or regex.         |
+| `withArgMatching` | `withArgMatching(re: RegExp)`        | Call has an argument matching regex.       |
+| `withStringArg`   | `withStringArg(value: string)`       | Call has a string argument with the value. |
+
+## Structural Conditions
+
+| Export                      | Signature                      | Description                                     |
+| --------------------------- | ------------------------------ | ----------------------------------------------- |
+| `notExist`                  | `notExist()`                   | No elements should match the predicates.        |
+| `beExported`                | `beExported()`                 | All matched elements should be exported.        |
+| `conditionResideInFile`     | `resideInFile(glob: string)`   | All elements should reside in matching files.   |
+| `conditionResideInFolder`   | `resideInFolder(glob: string)` | All elements should reside in matching folders. |
+| `conditionHaveNameMatching` | `haveNameMatching(re: RegExp)` | All elements should have names matching regex.  |
+
+## Class Conditions
+
+| Export                        | Signature                                 | Description                                 |
+| ----------------------------- | ----------------------------------------- | ------------------------------------------- |
+| `shouldExtend`                | `shouldExtend(name: string)`              | Class must extend the named base class.     |
+| `shouldImplement`             | `shouldImplement(name: string)`           | Class must implement the named interface.   |
+| `shouldHaveMethodNamed`       | `shouldHaveMethodNamed(name: string)`     | Class must have a method with the name.     |
+| `shouldNotHaveMethodMatching` | `shouldNotHaveMethodMatching(re: RegExp)` | Class must not have methods matching regex. |
+
+## Function Conditions
+
+| Export                     | Signature                      | Description                     |
+| -------------------------- | ------------------------------ | ------------------------------- |
+| `functionNotExist`         | `notExist()`                   | No functions should match.      |
+| `functionBeExported`       | `beExported()`                 | Function must be exported.      |
+| `functionBeAsync`          | `beAsync()`                    | Function must be async.         |
+| `functionHaveNameMatching` | `haveNameMatching(re: RegExp)` | Function name must match regex. |
+
+## Dependency Conditions
+
+| Export                    | Signature                               | Description                                         |
+| ------------------------- | --------------------------------------- | --------------------------------------------------- |
+| `onlyImportFrom`          | `onlyImportFrom(...globs: string[])`    | Module may only import from listed paths.           |
+| `conditionNotImportFrom`  | `notImportFrom(...globs: string[])`     | Module must not import from listed paths.           |
+| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(glob: string)` | Imports from matching paths must use `import type`. |
+
+## Body Analysis Matchers
+
+| Export       | Signature                              | Description                                |
+| ------------ | -------------------------------------- | ------------------------------------------ |
+| `call`       | `call(target: string \| RegExp)`       | Match function/method call expressions.    |
+| `newExpr`    | `newExpr(target: string \| RegExp)`    | Match constructor invocations (`new ...`). |
+| `access`     | `access(target: string \| RegExp)`     | Match property access expressions.         |
+| `expression` | `expression(target: string \| RegExp)` | Match any expression by text.              |
+
+## Body Analysis Conditions
+
+| Export                 | Signature                                        | Description                                      |
+| ---------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| `classContain`         | `classContain(matcher: ExpressionMatcher)`       | Class methods must contain expression.           |
+| `classNotContain`      | `classNotContain(matcher: ExpressionMatcher)`    | Class methods must not contain expression.       |
+| `classUseInsteadOf`    | `classUseInsteadOf(banned, replacement)`         | Ban expression in class, suggest replacement.    |
+| `functionContain`      | `functionContain(matcher: ExpressionMatcher)`    | Function body must contain expression.           |
+| `functionNotContain`   | `functionNotContain(matcher: ExpressionMatcher)` | Function body must not contain expression.       |
+| `functionUseInsteadOf` | `functionUseInsteadOf(banned, replacement)`      | Ban expression in function, suggest replacement. |
+
+## Type-Level Conditions
+
+| Export             | Signature                                              | Description                           |
+| ------------------ | ------------------------------------------------------ | ------------------------------------- |
+| `havePropertyType` | `havePropertyType(name: string, matcher: TypeMatcher)` | Property must match the type matcher. |
+
+## Type Matchers
+
+| Export              | Signature                                    | Description                             |
+| ------------------- | -------------------------------------------- | --------------------------------------- |
+| `isString`          | `isString(): TypeMatcher`                    | Type is `string`.                       |
+| `isNumber`          | `isNumber(): TypeMatcher`                    | Type is `number`.                       |
+| `isBoolean`         | `isBoolean(): TypeMatcher`                   | Type is `boolean`.                      |
+| `isUnionOfLiterals` | `isUnionOfLiterals(): TypeMatcher`           | Type is a union of literal types.       |
+| `isStringLiteral`   | `isStringLiteral(): TypeMatcher`             | Type is a string literal.               |
+| `arrayOf`           | `arrayOf(matcher: TypeMatcher): TypeMatcher` | Type is an array whose element matches. |
+| `matching`          | `matching(re: RegExp): TypeMatcher`          | Type text matches regex.                |
+| `exactly`           | `exactly(text: string): TypeMatcher`         | Type text matches exactly.              |
+| `notType`           | `notType(matcher: TypeMatcher): TypeMatcher` | Negates a type matcher.                 |
+
+## Slice Conditions
+
+| Export              | Signature                                | Description                               |
+| ------------------- | ---------------------------------------- | ----------------------------------------- |
+| `beFreeOfCycles`    | `beFreeOfCycles()`                       | No circular dependencies between slices.  |
+| `respectLayerOrder` | `respectLayerOrder(...layers: string[])` | Dependencies follow declared layer order. |
+| `notDependOn`       | `notDependOn(slice: string)`             | No slice depends on the named slice.      |
+
+## Call Conditions
+
+| Export                          | Signature                                               | Description                                  |
+| ------------------------------- | ------------------------------------------------------- | -------------------------------------------- |
+| `callHaveCallbackContaining`    | `haveCallbackContaining(matcher: ExpressionMatcher)`    | Call's callback must contain expression.     |
+| `callNotHaveCallbackContaining` | `notHaveCallbackContaining(matcher: ExpressionMatcher)` | Call's callback must not contain expression. |
+| `callNotExist`                  | `notExist()`                                            | No calls should match.                       |
+
+## Pattern Templates
+
+| Export          | Signature                                        | Description                                  |
+| --------------- | ------------------------------------------------ | -------------------------------------------- |
+| `definePattern` | `definePattern(name: string, opts): ArchPattern` | Define a return type shape pattern.          |
+| `followPattern` | `followPattern(pattern: ArchPattern)`            | Condition: function must follow the pattern. |
+
+## Smell Detectors
+
+| Export                        | Signature                              | Description                                  |
+| ----------------------------- | -------------------------------------- | -------------------------------------------- |
+| `smells`                      | `smells(p: ArchProject): SmellBuilder` | Entry point for code smell detection.        |
+| `SmellBuilder`                | class                                  | Builder for smell detection rules.           |
+| `DuplicateBodiesBuilder`      | class                                  | Detect duplicate method/function bodies.     |
+| `InconsistentSiblingsBuilder` | class                                  | Detect inconsistent sibling implementations. |
+| `buildFingerprint`            | `buildFingerprint(node): Fingerprint`  | Build an AST fingerprint for comparison.     |
+| `computeSimilarity`           | `computeSimilarity(a, b): number`      | Compute similarity between two fingerprints. |
+
+## Cross-Layer Validation
+
+| Export                    | Signature                                       | Description                                             |
+| ------------------------- | ----------------------------------------------- | ------------------------------------------------------- |
+| `crossLayer`              | `crossLayer(p: ArchProject): CrossLayerBuilder` | Entry point for cross-layer consistency rules.          |
+| `CrossLayerBuilder`       | class                                           | Builder for cross-layer rules.                          |
+| `haveMatchingCounterpart` | condition                                       | Each element in one layer has a counterpart in another. |
+| `haveConsistentExports`   | condition                                       | Layers export consistent symbol sets.                   |
+| `satisfyPairCondition`    | condition                                       | Custom pair condition for cross-layer checks.           |
+
+## Extension API
+
+| Export            | Signature                                    | Description                  |
+| ----------------- | -------------------------------------------- | ---------------------------- |
+| `definePredicate` | `definePredicate<T>(desc, fn): Predicate<T>` | Create a custom predicate.   |
+| `defineCondition` | `defineCondition<T>(desc, fn): Condition<T>` | Create a custom condition.   |
+| `and`             | `and(...predicates): Predicate`              | Combine predicates with AND. |
+| `or`              | `or(...predicates): Predicate`               | Combine predicates with OR.  |
+| `not`             | `not(predicate): Predicate`                  | Negate a predicate.          |
+
+## Utilities
+
+| Export                   | Signature                                        | Description                                      |
+| ------------------------ | ------------------------------------------------ | ------------------------------------------------ |
+| `createViolation`        | `createViolation(node, msg, ctx): ArchViolation` | Create a violation from a ts-morph node.         |
+| `getElementName`         | `getElementName(node): string`                   | Get the name of a ts-morph node.                 |
+| `getElementFile`         | `getElementFile(node): string`                   | Get the file path of a ts-morph node.            |
+| `getElementLine`         | `getElementLine(node): number`                   | Get the line number of a ts-morph node.          |
+| `generateCodeFrame`      | `generateCodeFrame(source, line, opts?): string` | Generate a code frame snippet.                   |
+| `formatViolations`       | `formatViolations(violations, opts?): string`    | Format violations for terminal output.           |
+| `formatViolationsPlain`  | `formatViolationsPlain(violations): string`      | Format violations as plain text.                 |
+| `formatViolationsJson`   | `formatViolationsJson(violations): string`       | Format violations as JSON.                       |
+| `formatViolationsGitHub` | `formatViolationsGitHub(violations): string`     | Format violations as GitHub Actions annotations. |
+| `detectFormat`           | `detectFormat(): OutputFormat`                   | Auto-detect output format from environment.      |
+| `isCI`                   | `isCI(): boolean`                                | True if running in a CI environment.             |
+| `ArchRuleError`          | class                                            | Error thrown by `.check()` on violations.        |
+
+## Check Options
+
+| Export              | Signature                                      | Description                                       |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| `withBaseline`      | `withBaseline(path: string): Baseline`         | Load a baseline file for gradual adoption.        |
+| `generateBaseline`  | `generateBaseline(violations, path): void`     | Write a baseline file from current violations.    |
+| `collectViolations` | `collectViolations(...rules): ArchViolation[]` | Collect violations from multiple rules.           |
+| `diffAware`         | `diffAware(base: string): DiffFilter`          | Only report violations in changed files.          |
+| `Baseline`          | class                                          | Baseline instance for filtering known violations. |
+| `DiffFilter`        | class                                          | Diff filter instance.                             |
+
+## ArchFunction Model
+
+| Export                         | Signature                                          | Description                              |
+| ------------------------------ | -------------------------------------------------- | ---------------------------------------- |
+| `collectFunctions`             | `collectFunctions(sourceFiles): ArchFunction[]`    | Collect all functions from source files. |
+| `fromFunctionDeclaration`      | `fromFunctionDeclaration(node): ArchFunction`      | Wrap a function declaration.             |
+| `fromArrowVariableDeclaration` | `fromArrowVariableDeclaration(node): ArchFunction` | Wrap an arrow function variable.         |
+| `fromMethodDeclaration`        | `fromMethodDeclaration(node): ArchFunction`        | Wrap a class method declaration.         |
+
+## Callback Extraction
+
+| Export             | Signature                                      | Description                                       |
+| ------------------ | ---------------------------------------------- | ------------------------------------------------- |
+| `extractCallbacks` | `extractCallbacks(calls): ExtractedCallback[]` | Extract callback functions from call expressions. |
+
+## Scoped Rules
+
+| Export                      | Signature                    | Description                                |
+| --------------------------- | ---------------------------- | ------------------------------------------ |
+| `within`                    | `within(sel): ScopedContext` | Create scoped rules from call selections.  |
+| `ScopedFunctionRuleBuilder` | class                        | Builder for function rules within a scope. |
+
+## CLI
+
+| Export         | Signature                                    | Description                    |
+| -------------- | -------------------------------------------- | ------------------------------ |
+| `defineConfig` | `defineConfig(config: CliConfig): CliConfig` | Define CLI configuration file. |
+
+## Types (TypeScript)
+
+| Export               | Kind | Description                                            |
+| -------------------- | ---- | ------------------------------------------------------ |
+| `ArchProject`        | type | Loaded TypeScript project.                             |
+| `Predicate`          | type | Predicate interface.                                   |
+| `Condition`          | type | Condition interface.                                   |
+| `ConditionContext`   | type | Context passed to condition evaluators.                |
+| `ArchViolation`      | type | Violation model.                                       |
+| `RuleMetadata`       | type | Rule metadata (`id`, `because`, `suggestion`, `docs`). |
+| `CheckOptions`       | type | Options for `.check()`.                                |
+| `OutputFormat`       | type | Output format (`'terminal' \| 'github' \| 'json'`).    |
+| `FormatOptions`      | type | Options for formatting functions.                      |
+| `CodeFrameOptions`   | type | Options for `generateCodeFrame()`.                     |
+| `ExpressionMatcher`  | type | Matcher returned by `call()`, `newExpr()`, etc.        |
+| `TypeMatcher`        | type | Matcher used with `havePropertyType()`.                |
+| `TypeDeclaration`    | type | Union of interface and type alias declarations.        |
+| `ArchFunction`       | type | Unified function/arrow/method model.                   |
+| `ArchCall`           | type | Model for matched call expressions.                    |
+| `Slice`              | type | A named group of source files.                         |
+| `SliceDefinition`    | type | Input to `assignedFrom()`.                             |
+| `Named`              | type | Element with a name.                                   |
+| `Located`            | type | Element with a file location.                          |
+| `Exportable`         | type | Element that can be exported.                          |
+| `BaselineEntry`      | type | Single entry in a baseline file.                       |
+| `BaselineFile`       | type | Structure of the baseline JSON file.                   |
+| `Layer`              | type | Layer definition for cross-layer validation.           |
+| `LayerPair`          | type | Pair of elements from two layers.                      |
+| `PairCondition`      | type | Condition for cross-layer pairs.                       |
+| `ArchPattern`        | type | Pattern template definition.                           |
+| `PropertyConstraint` | type | Property type constraint in a pattern.                 |
+| `Fingerprint`        | type | AST fingerprint for similarity detection.              |
+| `ScopedContext`      | type | Context returned by `within()`.                        |
+| `ExtractedCallback`  | type | Callback extracted from a call expression.             |
+| `CliConfig`          | type | CLI configuration object.                              |
+
+## GraphQL Extension (`ts-archunit/graphql`)
+
+Requires the optional `graphql` peer dependency.
+
+### Entry Points
+
+| Export          | Signature                                                           | Description                                 |
+| --------------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| `schema`        | `schema(p: ArchProject \| string, glob: string): SchemaRuleBuilder` | Rule builder for `.graphql` schema files.   |
+| `schemaFromSDL` | `schemaFromSDL(sdl: string, path?): SchemaRuleBuilder`              | Rule builder from raw SDL string.           |
+| `resolvers`     | `resolvers(p: ArchProject, glob: string): ResolverRuleBuilder`      | Rule builder for resolver TypeScript files. |
+
+### Schema Predicates
+
+| Export         | Signature                  | Description                                      |
+| -------------- | -------------------------- | ------------------------------------------------ |
+| `queries`      | `queries`                  | Select Query type fields.                        |
+| `mutations`    | `mutations`                | Select Mutation type fields.                     |
+| `typesNamed`   | `typesNamed(re: RegExp)`   | Select types matching regex.                     |
+| `returnListOf` | `returnListOf(re: RegExp)` | Select fields returning a list of matching type. |
+
+### Schema Conditions
+
+| Export                 | Signature                                    | Description                                |
+| ---------------------- | -------------------------------------------- | ------------------------------------------ |
+| `haveFields`           | `haveFields(...names: string[])`             | Type must have the named fields.           |
+| `acceptArgs`           | `acceptArgs(...names: string[])`             | Field must accept the named arguments.     |
+| `haveMatchingResolver` | `haveMatchingResolver(resolverGlob: string)` | Schema field has a matching resolver file. |
+
+### Resolver Predicates
+
+| Export                  | Signature                           | Description                                        |
+| ----------------------- | ----------------------------------- | -------------------------------------------------- |
+| `resolveFieldReturning` | `resolveFieldReturning(re: RegExp)` | Resolver resolves a field returning matching type. |
+
+### Schema Loader
+
+| Export               | Signature                                      | Description                                |
+| -------------------- | ---------------------------------------------- | ------------------------------------------ |
+| `loadSchemaFromGlob` | `loadSchemaFromGlob(root, glob): LoadedSchema` | Load schema from glob pattern.             |
+| `loadSchemaFromSDL`  | `loadSchemaFromSDL(sdl, path?): LoadedSchema`  | Load schema from SDL string.               |
+| `isGraphQLAvailable` | `isGraphQLAvailable(): boolean`                | Check if the graphql package is installed. |
+
+### Builders
+
+| Export                | Description                              |
+| --------------------- | ---------------------------------------- |
+| `SchemaRuleBuilder`   | Builder for schema architecture rules.   |
+| `ResolverRuleBuilder` | Builder for resolver architecture rules. |
+
+### Types
+
+| Export                  | Kind | Description                       |
+| ----------------------- | ---- | --------------------------------- |
+| `SchemaElement`         | type | Element in a GraphQL schema.      |
+| `LoadedSchema`          | type | Loaded and parsed GraphQL schema. |
+| `GraphQLSchemaLike`     | type | Schema interface.                 |
+| `GraphQLObjectTypeLike` | type | Object type interface.            |
+| `GraphQLFieldLike`      | type | Field interface.                  |
+| `GraphQLArgumentLike`   | type | Argument interface.               |
+| `GraphQLTypeLike`       | type | Type interface.                   |
+
+## Standard Rules (Sub-Path Imports)
+
+### `ts-archunit/rules/typescript`
+
+| Export                  | Description                                                              |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `noAnyProperties()`     | Class properties must not be typed as `any`.                             |
+| `noTypeAssertions()`    | Method bodies must not contain `as` type assertions (allows `as const`). |
+| `noNonNullAssertions()` | Method bodies must not contain non-null assertions (`!`).                |
+
+### `ts-archunit/rules/security`
+
+| Export                    | Description                         |
+| ------------------------- | ----------------------------------- |
+| `noEval()`                | No `eval()` calls in class methods. |
+| `noFunctionConstructor()` | No `new Function()` constructor.    |
+| `noConsoleLog()`          | No `console.log` calls.             |
+| `noProcessEnv()`          | No direct `process.env` access.     |
+
+### `ts-archunit/rules/errors`
+
+| Export              | Description                                  |
+| ------------------- | -------------------------------------------- |
+| `noGenericErrors()` | No `new Error()` -- use typed domain errors. |
+| `noTypeErrors()`    | No `new TypeError()`.                        |
+
+### `ts-archunit/rules/naming`
+
+| Export                           | Description                          |
+| -------------------------------- | ------------------------------------ |
+| `mustMatchName(re: RegExp)`      | Class name must match regex.         |
+| `mustNotEndWith(suffix: string)` | Class name must not end with suffix. |
+
+### `ts-archunit/rules/dependencies`
+
+| Export                      | Description                                       |
+| --------------------------- | ------------------------------------------------- |
+| `onlyDependOn(...globs)`    | Module may only import from listed paths.         |
+| `mustNotDependOn(...globs)` | Module must not import from listed paths.         |
+| `typeOnlyFrom(...globs)`    | Imports from listed paths must use `import type`. |

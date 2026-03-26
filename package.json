@@ -64,7 +64,10 @@
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "typescript",
@@ -97,6 +100,7 @@
     "prettier": "^3.8.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.57.2",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.1"
   }
 }
