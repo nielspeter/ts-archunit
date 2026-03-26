@@ -28,6 +28,34 @@ All public exports from `ts-archunit`, organized by category.
 | `CallRuleBuilder`           | Builder returned by `calls()`.              |
 | `ScopedFunctionRuleBuilder` | Builder returned by `within().functions()`. |
 
+## Rule Builder Methods
+
+Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`).
+
+| Method         | Signature                                       | Description                                                                       |
+| -------------- | ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| `.excluding()` | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element names. Warns on unused patterns. |
+| `.because()`   | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                    |
+| `.rule()`      | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                             |
+| `.check()`     | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                |
+| `.warn()`      | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                    |
+| `.severity()`  | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                  |
+
+## Exclusion Comments
+
+| Export                   | Signature                                                                              | Description                                               |
+| ------------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `parseExclusionComments` | `parseExclusionComments(source: string, file: string): ParseResult`                    | Parse `// ts-archunit-exclude` comments from source text. |
+| `isExcludedByComment`    | `isExcludedByComment(violation: ArchViolation, comments: ExclusionComment[]): boolean` | Check if a violation is covered by an exclusion comment.  |
+
+### Types
+
+| Export             | Kind | Description                                                                 |
+| ------------------ | ---- | --------------------------------------------------------------------------- |
+| `ExclusionComment` | type | Parsed exclusion comment with ruleId, reason, file, line, isBlock, endLine. |
+| `ExclusionWarning` | type | Warning about a malformed exclusion comment.                                |
+| `ParseResult`      | type | Result of parsing: `{ exclusions, warnings }`.                              |
+
 ## Identity Predicates
 
 Available on all entry points via `.that()`.

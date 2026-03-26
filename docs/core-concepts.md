@@ -163,6 +163,15 @@ repositories.should().notContain(newExpr('Error')).check()
 repositories.should().beExported().check()
 ```
 
+## Enforcement Model
+
+| Method                 | Behavior                              |
+| ---------------------- | ------------------------------------- |
+| `.check()`             | Fail on any violation                 |
+| `.warn()`              | Log violations, don't fail            |
+| `.check({ baseline })` | Fail only on new violations           |
+| `.excluding(...)`      | Permanently suppress named violations |
+
 ## `.check()` vs `.warn()`
 
 - **`.check()`** -- throws `ArchRuleError` on violations (test fails, CI blocks)
@@ -175,6 +184,22 @@ classes(p).that().extend('BaseRepository').should().notContain(call('parseInt'))
 // Soft rule: advisory
 classes(p).that().haveDecorator('Deprecated').should().notExist().warn()
 ```
+
+## `.excluding()`
+
+Permanently suppress specific violations while keeping the rule enforced for everything else:
+
+```typescript
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(call('parseInt'))
+  .excluding('LegacyRepo', /Compat$/)
+  .check()
+```
+
+See [Violation Reporting](/violation-reporting#excluding-intentional-violations) for full details including inline exclusion comments.
 
 ## Rule Metadata
 

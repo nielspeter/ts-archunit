@@ -21,12 +21,12 @@ Both address the same gap: the space between `.warn()` (never enforced) and `.ch
 
 The feature request correctly identifies that baseline mode and exclusions serve different purposes:
 
-| | Baseline | Exclusion |
-|---|---|---|
-| **Intent** | "We'll fix this" | "This is intentionally different" |
-| **Trend** | Decreases over time → ratchet to zero | Permanent — stays forever |
-| **Documentation** | Generated, not authored | Must explain why the exception exists |
-| **Mixing them** | Makes it impossible to tell which is which | — |
+|                   | Baseline                                   | Exclusion                             |
+| ----------------- | ------------------------------------------ | ------------------------------------- |
+| **Intent**        | "We'll fix this"                           | "This is intentionally different"     |
+| **Trend**         | Decreases over time → ratchet to zero      | Permanent — stays forever             |
+| **Documentation** | Generated, not authored                    | Must explain why the exception exists |
+| **Mixing them**   | Makes it impossible to tell which is which | —                                     |
 
 Without exclusions, rules with even one intentional exception can never be enforced with `.check()`.
 
@@ -50,13 +50,13 @@ async getImageUrl() {
 
 ### Why inline comments
 
-| Property | Inline comment | .excluding() on chain | Exclusion file |
-|----------|---------------|----------------------|----------------|
-| Survives refactoring | ✅ Moves with the code | ❌ Element rename breaks it | ❌ Element rename breaks it |
-| Visible when reading code | ✅ Right there | ❌ In test file, elsewhere | ❌ In separate file |
-| Familiar pattern | ✅ Every dev knows `eslint-disable` | ⚠️ New concept | ⚠️ New concept |
-| Forces documentation | ✅ Reason is required | ⚠️ Optional | ⚠️ Optional |
-| Auditable | ✅ `grep ts-archunit-exclude` | ✅ In test file | ✅ In one file |
+| Property                  | Inline comment                      | .excluding() on chain       | Exclusion file              |
+| ------------------------- | ----------------------------------- | --------------------------- | --------------------------- |
+| Survives refactoring      | ✅ Moves with the code              | ❌ Element rename breaks it | ❌ Element rename breaks it |
+| Visible when reading code | ✅ Right there                      | ❌ In test file, elsewhere  | ❌ In separate file         |
+| Familiar pattern          | ✅ Every dev knows `eslint-disable` | ⚠️ New concept              | ⚠️ New concept              |
+| Forces documentation      | ✅ Reason is required               | ⚠️ Optional                 | ⚠️ Optional                 |
+| Auditable                 | ✅ `grep ts-archunit-exclude`       | ✅ In test file             | ✅ In one file              |
 
 ### Syntax
 
@@ -111,8 +111,10 @@ For cases where inline comments aren't practical (e.g., generated code, third-pa
 
 ```typescript
 functions(p)
-  .that().resideInFolder('**/wrappers/**')
-  .should().notContain(newExpr('URLSearchParams'))
+  .that()
+  .resideInFolder('**/wrappers/**')
+  .should()
+  .notContain(newExpr('URLSearchParams'))
   .excluding('Asset.getImageUrl', 'Environment.sync')
   .rule({ id: 'sdk/no-manual-urlsearchparams' })
   .check()
@@ -173,14 +175,14 @@ Architecture Warning: unused exclusion 'Asset.getImageUrl' in rule sdk/no-manual
 
 ## Interaction with Existing Features
 
-| Feature | Interaction |
-|---------|-------------|
-| `.check()` | Exclusions filter violations before throwing |
-| `.warn()` | Exclusions filter violations before logging |
-| `withBaseline()` | Baseline applies first, then exclusions. Baseline is for temporary violations, exclusions for permanent ones. |
-| `diffAware()` | Diff filter applies after exclusions. A new violation in a changed file is reported even if other violations in the same file are excluded. |
-| `.rule({ id })` | Rule ID is required for inline exclusion comments. `.excluding()` works without a rule ID. |
-| `detectFormat('github')` | Excluded violations don't produce GitHub annotations. Unused exclusion warnings do. |
+| Feature                  | Interaction                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.check()`               | Exclusions filter violations before throwing                                                                                                |
+| `.warn()`                | Exclusions filter violations before logging                                                                                                 |
+| `withBaseline()`         | Baseline applies first, then exclusions. Baseline is for temporary violations, exclusions for permanent ones.                               |
+| `diffAware()`            | Diff filter applies after exclusions. A new violation in a changed file is reported even if other violations in the same file are excluded. |
+| `.rule({ id })`          | Rule ID is required for inline exclusion comments. `.excluding()` works without a rule ID.                                                  |
+| `detectFormat('github')` | Excluded violations don't produce GitHub annotations. Unused exclusion warnings do.                                                         |
 
 ---
 
@@ -199,22 +201,31 @@ Architecture Warning: unused exclusion 'Asset.getImageUrl' in rule sdk/no-manual
 
 ```typescript
 // cmless: SDK wrappers
-functions(p).that().resideInFolder('**/wrappers/**')
-  .should().notContain(newExpr('URLSearchParams'))
+functions(p)
+  .that()
+  .resideInFolder('**/wrappers/**')
+  .should()
+  .notContain(newExpr('URLSearchParams'))
   .excluding('Asset.getImageUrl', 'Environment.sync')
-  .check()  // ← now enforced
+  .check() // ← now enforced
 
 // cmless: route imports
-modules(p).that().resideInFolder('**/routes/**')
-  .should().onlyHaveTypeImportsFrom('**/repositories/**')
+modules(p)
+  .that()
+  .resideInFolder('**/routes/**')
+  .should()
+  .onlyHaveTypeImportsFrom('**/repositories/**')
   .excluding('internal-routes')
-  .check()  // ← now enforced
+  .check() // ← now enforced
 
 // cmless: repository base class
-classes(p).that().haveNameEndingWith('Repository')
-  .should().shouldExtend('BaseRepository')
+classes(p)
+  .that()
+  .haveNameEndingWith('Repository')
+  .should()
+  .shouldExtend('BaseRepository')
   .excluding(/Helper$/, /Mixin$/)
-  .check()  // ← now enforced
+  .check() // ← now enforced
 ```
 
 Phase 2 (inline comments) follows when teams need code-level exclusions.

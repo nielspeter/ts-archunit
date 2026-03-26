@@ -187,6 +187,14 @@ export type { BaselineEntry, BaselineFile } from './helpers/baseline.js'
 // Diff-aware mode
 export { diffAware, DiffFilter } from './helpers/diff-aware.js'
 
+// Exclusion comments
+export { parseExclusionComments, isExcludedByComment } from './helpers/exclusion-comments.js'
+export type {
+  ExclusionComment,
+  ExclusionWarning,
+  ParseResult,
+} from './helpers/exclusion-comments.js'
+
 // Baseline generation helper
 export { collectViolations } from './helpers/baseline-generator.js'
 

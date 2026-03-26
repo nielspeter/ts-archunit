@@ -100,6 +100,78 @@ classes(p)
   .check()
 ```
 
+## Excluding Intentional Violations
+
+Some violations are intentional -- they'll never be "fixed" because the code is correct. Use exclusions to suppress them while keeping the rule enforced for everything else.
+
+### Chain-level exclusion
+
+Exclude specific elements by name in the rule definition:
+
+```typescript
+functions(p)
+  .that()
+  .resideInFolder('**/wrappers/**')
+  .should()
+  .notContain(newExpr('URLSearchParams'))
+  .excluding('Asset.getImageUrl', 'Environment.sync')
+  .check() // enforced — excluded elements silently skipped
+```
+
+Supports exact strings and regex patterns:
+
+```typescript
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(call('parseInt'))
+  .excluding('LegacyRepo', /Compat$/)
+  .check()
+```
+
+If an exclusion pattern matches zero violations, a warning is emitted to help detect stale exclusions after renames.
+
+### Inline exclusion comments
+
+Exclude at the code level -- the exclusion moves with the code:
+
+```typescript
+// ts-archunit-exclude sdk/no-manual-urlsearchparams: builds image transform URL, not list pagination
+async getImageUrl() {
+  const params = new URLSearchParams()  // <- not flagged
+}
+```
+
+Block exclusions cover a range of lines:
+
+```typescript
+// ts-archunit-exclude-start sdk/no-manual-urlsearchparams: image URL builder
+async getImageUrl() {
+  const params = new URLSearchParams()
+  return params.toString()
+}
+// ts-archunit-exclude-end
+```
+
+Multiple rule IDs on one line:
+
+```typescript
+// ts-archunit-exclude rule-a, rule-b: shared reason for both rules
+doSomething()
+```
+
+Requires a `.rule({ id })` -- exclusion comments reference the rule by ID.
+Requires a reason -- undocumented exclusions are flagged as warnings.
+
+### Exclusions vs Baseline
+
+| Mechanism       | Purpose                               | Where defined               |
+| --------------- | ------------------------------------- | --------------------------- |
+| `.excluding()`  | Permanent intentional exceptions      | Test file (rule definition) |
+| Inline comments | Permanent exceptions at code level    | Source file                 |
+| Baseline        | Temporary violations to fix over time | `arch-baseline.json`        |
+
 ## Output Formats
 
 ### Terminal (Default)

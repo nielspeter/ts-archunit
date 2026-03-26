@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Complete
 - **Priority:** P2 — Enables enforcement of rules with intentional exceptions
 - **Effort:** 1-2 days
 - **Created:** 2026-03-26
@@ -22,11 +22,13 @@ Exclusion lives with the rule in the test file. Simple, covers the common case.
 
 ```typescript
 functions(p)
-  .that().resideInFolder('**/wrappers/**')
-  .should().notContain(newExpr('URLSearchParams'))
+  .that()
+  .resideInFolder('**/wrappers/**')
+  .should()
+  .notContain(newExpr('URLSearchParams'))
   .excluding('Asset.getImageUrl', 'Environment.sync')
   .rule({ id: 'sdk/no-manual-urlsearchparams' })
-  .check()  // enforced — excluded elements silently skipped
+  .check() // enforced — excluded elements silently skipped
 ```
 
 ### Phase 2: Inline exclusion comments
@@ -219,10 +221,7 @@ export function parseExclusionComments(sourceText: string, filePath: string): Ex
 /**
  * Check if a violation is covered by an exclusion comment.
  */
-export function isExcludedByComment(
-  violation: ArchViolation,
-  comments: ExclusionComment[],
-): boolean
+export function isExcludedByComment(violation: ArchViolation, comments: ExclusionComment[]): boolean
 ```
 
 ### Integration with RuleBuilder
@@ -240,6 +239,7 @@ When a rule has `.rule({ id })`, the evaluation pipeline:
 ### Validation
 
 - **Missing reason** → reported as a warning:
+
   ```
   Architecture Warning: undocumented exclusion at src/wrappers/asset.ts:42
     // ts-archunit-exclude sdk/no-manual-urlsearchparams
@@ -247,6 +247,7 @@ When a rule has `.rule({ id })`, the evaluation pipeline:
   ```
 
 - **Unknown rule ID** → reported as a warning:
+
   ```
   Architecture Warning: exclusion references unknown rule 'nonexistent/rule' at src/foo.ts:10
   ```
@@ -286,10 +287,10 @@ Exclude specific elements by name in the rule definition:
 
 \`\`\`typescript
 functions(p)
-  .that().resideInFolder('**/wrappers/**')
-  .should().notContain(newExpr('URLSearchParams'))
-  .excluding('Asset.getImageUrl', 'Environment.sync')
-  .check()  // enforced — excluded elements silently skipped
+.that().resideInFolder('**/wrappers/**')
+.should().notContain(newExpr('URLSearchParams'))
+.excluding('Asset.getImageUrl', 'Environment.sync')
+.check() // enforced — excluded elements silently skipped
 \`\`\`
 
 #### Inline exclusion comments
@@ -299,7 +300,7 @@ Exclude at the code level — the exclusion moves with the code:
 \`\`\`typescript
 // ts-archunit-exclude sdk/no-manual-urlsearchparams: builds image transform URL, not list pagination
 async getImageUrl() {
-  const params = new URLSearchParams()  // ← not flagged
+const params = new URLSearchParams() // ← not flagged
 }
 \`\`\`
 
@@ -312,12 +313,12 @@ Requires a reason — undocumented exclusions are flagged as warnings.
 Add to the enforcement model section:
 
 ```markdown
-| Method | Behavior |
-|--------|----------|
-| `.check()` | Fail on any violation |
-| `.warn()` | Log violations, don't fail |
-| `.check({ baseline })` | Fail only on new violations |
-| `.excluding(...)` | Permanently suppress named violations |
+| Method                 | Behavior                              |
+| ---------------------- | ------------------------------------- |
+| `.check()`             | Fail on any violation                 |
+| `.warn()`              | Log violations, don't fail            |
+| `.check({ baseline })` | Fail only on new violations           |
+| `.excluding(...)`      | Permanently suppress named violations |
 ```
 
 ### Update `docs/api-reference.md`
@@ -326,42 +327,42 @@ Add `.excluding()` to RuleBuilder methods table.
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/rule-builder.ts` | Modified — add `_exclusions`, `.excluding()`, `isExcluded()`, filter in `evaluate()`, copy in `fork()` |
-| `src/builders/slice-rule-builder.ts` | Modified — same exclusion support |
-| `src/helpers/exclusion-comments.ts` | New (Phase 2) — parse inline exclusion comments |
-| `src/index.ts` | Modified — export exclusion comment types (Phase 2) |
-| `docs/violation-reporting.md` | Modified — add exclusions section |
-| `docs/core-concepts.md` | Modified — add exclusion to enforcement model table |
-| `docs/api-reference.md` | Modified — add `.excluding()` method |
-| `tests/core/rule-builder-exclusions.test.ts` | New — 10 tests (Phase 1) |
-| `tests/helpers/exclusion-comments.test.ts` | New — 10 tests (Phase 2) |
+| File                                         | Change                                                                                                 |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `src/core/rule-builder.ts`                   | Modified — add `_exclusions`, `.excluding()`, `isExcluded()`, filter in `evaluate()`, copy in `fork()` |
+| `src/builders/slice-rule-builder.ts`         | Modified — same exclusion support                                                                      |
+| `src/helpers/exclusion-comments.ts`          | New (Phase 2) — parse inline exclusion comments                                                        |
+| `src/index.ts`                               | Modified — export exclusion comment types (Phase 2)                                                    |
+| `docs/violation-reporting.md`                | Modified — add exclusions section                                                                      |
+| `docs/core-concepts.md`                      | Modified — add exclusion to enforcement model table                                                    |
+| `docs/api-reference.md`                      | Modified — add `.excluding()` method                                                                   |
+| `tests/core/rule-builder-exclusions.test.ts` | New — 10 tests (Phase 1)                                                                               |
+| `tests/helpers/exclusion-comments.test.ts`   | New — 10 tests (Phase 2)                                                                               |
 
 ## Test Inventory
 
-| # | Test | Phase |
-|---|------|-------|
-| 1 | Suppresses violations matching exact element name | 1 |
-| 2 | Suppresses violations matching regex | 1 |
-| 3 | Does not suppress non-matching violations | 1 |
-| 4 | Multiple exclusion patterns | 1 |
-| 5 | Warns about unused exclusions | 1 |
-| 6 | Works with .check() — excluded don't throw | 1 |
-| 7 | Works with .warn() — excluded not logged | 1 |
-| 8 | Works with baseline — applied after baseline | 1 |
-| 9 | Preserved across named selections (fork) | 1 |
-| 10 | Unused exclusion warning includes rule ID | 1 |
-| 11 | Parses single-line exclusion comment | 2 |
-| 12 | Parses block exclusion (start/end) | 2 |
-| 13 | Parses multiple rule IDs (comma-separated) | 2 |
-| 14 | Rejects missing reason | 2 |
-| 15 | Handles nested block error | 2 |
-| 16 | isExcludedByComment matches line range | 2 |
-| 17 | isExcludedByComment matches single-line | 2 |
-| 18 | Wrong rule ID not matched | 2 |
-| 19 | Wrong file not matched | 2 |
-| 20 | End-to-end inline exclusion in full pipeline | 2 |
+| #   | Test                                              | Phase |
+| --- | ------------------------------------------------- | ----- |
+| 1   | Suppresses violations matching exact element name | 1     |
+| 2   | Suppresses violations matching regex              | 1     |
+| 3   | Does not suppress non-matching violations         | 1     |
+| 4   | Multiple exclusion patterns                       | 1     |
+| 5   | Warns about unused exclusions                     | 1     |
+| 6   | Works with .check() — excluded don't throw        | 1     |
+| 7   | Works with .warn() — excluded not logged          | 1     |
+| 8   | Works with baseline — applied after baseline      | 1     |
+| 9   | Preserved across named selections (fork)          | 1     |
+| 10  | Unused exclusion warning includes rule ID         | 1     |
+| 11  | Parses single-line exclusion comment              | 2     |
+| 12  | Parses block exclusion (start/end)                | 2     |
+| 13  | Parses multiple rule IDs (comma-separated)        | 2     |
+| 14  | Rejects missing reason                            | 2     |
+| 15  | Handles nested block error                        | 2     |
+| 16  | isExcludedByComment matches line range            | 2     |
+| 17  | isExcludedByComment matches single-line           | 2     |
+| 18  | Wrong rule ID not matched                         | 2     |
+| 19  | Wrong file not matched                            | 2     |
+| 20  | End-to-end inline exclusion in full pipeline      | 2     |
 
 ## Out of Scope
 

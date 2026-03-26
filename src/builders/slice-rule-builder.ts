@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
@@ -14,6 +15,7 @@ import {
   respectLayerOrder as respectLayerOrderCondition,
   notDependOn as notDependOnCondition,
 } from '../conditions/slice.js'
+import { parseExclusionComments, isExcludedByComment } from '../helpers/exclusion-comments.js'
 
 /**
  * Rule builder for slice-level architecture rules.
@@ -31,6 +33,7 @@ export class SliceRuleBuilder {
   private _conditions: Condition<Slice>[] = []
   private _reason?: string
   private _metadata?: RuleMetadata
+  private _exclusions: (string | RegExp)[] = []
 
   constructor(private readonly project: ArchProject) {}
 
@@ -105,6 +108,22 @@ export class SliceRuleBuilder {
    */
   notDependOn(...sliceNames: string[]): this {
     this._conditions.push(notDependOnCondition(...sliceNames))
+    return this
+  }
+
+  /**
+   * Exclude specific elements from violation reporting.
+   *
+   * Matched violations are silently suppressed. Use for permanent,
+   * intentional exceptions — not for temporary violations (use baseline for those).
+   *
+   * Matches against the violation's `element` field.
+   * Supports exact strings and regex patterns.
+   *
+   * Emits a warning if an exclusion matches zero violations (stale exclusion).
+   */
+  excluding(...patterns: (string | RegExp)[]): this {
+    this._exclusions.push(...patterns)
     return this
   }
 
@@ -205,10 +224,57 @@ export class SliceRuleBuilder {
       docs: this._metadata?.docs,
     }
 
-    const violations: ArchViolation[] = []
+    let violations: ArchViolation[] = []
     for (const condition of this._conditions) {
       violations.push(...condition.evaluate(this._slices, context))
     }
+
+    // Scan source files for inline exclusion comments (when rule has an ID)
+    if (this._metadata?.id && violations.length > 0) {
+      const filePaths = new Set(violations.map((v) => v.file))
+      const allComments = [...filePaths].flatMap((filePath) => {
+        try {
+          const sourceText = fs.readFileSync(filePath, 'utf-8')
+          const result = parseExclusionComments(sourceText, filePath)
+          for (const warning of result.warnings) {
+            console.warn(`[ts-archunit] ${warning.message}`)
+          }
+          return result.exclusions
+        } catch {
+          return []
+        }
+      })
+
+      if (allComments.length > 0) {
+        violations = violations.filter((v) => !isExcludedByComment(v, allComments))
+      }
+    }
+
+    // Filter exclusions — track which patterns matched for stale detection
+    if (this._exclusions.length > 0) {
+      const matchedPatterns = new Set<number>()
+      violations = violations.filter((v) => {
+        const matchIndex = this._exclusions.findIndex((pattern) =>
+          typeof pattern === 'string' ? v.element === pattern : pattern.test(v.element),
+        )
+        if (matchIndex >= 0) {
+          matchedPatterns.add(matchIndex)
+          return false
+        }
+        return true
+      })
+
+      const ruleId = this._metadata?.id ?? 'unnamed'
+      this._exclusions.forEach((pattern, index) => {
+        if (!matchedPatterns.has(index)) {
+          console.warn(
+            `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
+              `It matched zero violations — it may be stale after a rename.`,
+          )
+        }
+      })
+    }
+
     return violations
   }
 
