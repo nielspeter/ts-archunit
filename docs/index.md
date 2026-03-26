@@ -8,6 +8,54 @@ Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](
 
 ---
 
+## What ts-archunit Can Enforce
+
+**Layer & dependency rules**
+
+- Domain must not import from infrastructure
+- Controllers must go through services, not call repositories directly
+- Shared packages must not depend on app code
+- No circular dependencies between feature modules
+
+**Code patterns**
+
+- Repositories must use `this.extractCount()`, not inline `parseInt`
+- Services must throw typed errors (`NotFoundError`), not generic `Error`
+- Route handlers must call `normalizePagination()`, not manual `Number()`
+- SDK wrappers must use `buildQueryString()`, not raw `URLSearchParams`
+- No `eval()`, no `console.log` in production code
+
+**Naming & structure**
+
+- Controllers end with `Controller`, services end with `Service`
+- Repositories must extend `BaseRepository`
+- All services must be exported
+- DTOs live in the `dto/` folder, not scattered around
+
+**Type safety**
+
+- `orderBy` fields must be typed unions, not bare `string`
+- No `any` types on class properties
+- No `as` type assertions in method bodies
+- No `!` non-null assertions
+
+**API consistency**
+
+- All list endpoints return `{ items, total, skip, limit }`
+- No copy-pasted `parseXxxOrder()` functions across routes
+- Every route has schema validation
+- GraphQL collection types have standard pagination fields
+
+**Architecture boundaries**
+
+- Layer ordering: controllers → services → repositories → domain
+- Feature modules are cycle-free
+- Routes ↔ schemas ↔ SDK types stay in sync
+
+[See all rule examples →](/what-to-check)
+
+---
+
 ## Does This Sound Familiar?
 
 **"The domain layer imports from the database layer."**
