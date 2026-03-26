@@ -4,6 +4,8 @@ Architecture testing for TypeScript. Enforce structural rules across your codeba
 
 Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](https://ts-morph.com/).
 
+[Documentation](https://nielspeter.github.io/ts-archunit/) · [Getting Started](https://nielspeter.github.io/ts-archunit/getting-started) · [What Can It Check?](https://nielspeter.github.io/ts-archunit/what-to-check)
+
 ## Why
 
 Architecture decisions rot. Teams agree on patterns, document them in wikis, enforce them in code review — and discover months later that half the codebase diverged. AI agents generating code don't know about team conventions. Each PR looks correct in isolation.
