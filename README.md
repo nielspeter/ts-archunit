@@ -6,9 +6,9 @@ Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](
 
 ## Why
 
-Architecture decisions rot. Teams agree on patterns, document them in wikis, enforce them in code review — and discover months later that half the codebase diverged. A routine feature addition reveals that list endpoints have three different pagination patterns, repositories inline `parseInt` instead of using the shared helper, and `orderBy` fields accept bare `string` instead of typed unions.
+Architecture decisions rot. Teams agree on patterns, document them in wikis, enforce them in code review — and discover months later that half the codebase diverged. AI agents generating code don't know about team conventions. Each PR looks correct in isolation.
 
-ts-archunit turns architectural rules into tests. They run in your CI pipeline. Violations are caught on the PR that introduces them — not during a manual audit.
+ts-archunit turns architectural rules into tests. They run in your CI pipeline. Violations are caught on the PR that introduces them — with clear messages explaining what's wrong, why it matters, and how to fix it.
 
 ## Install
 
@@ -24,18 +24,7 @@ Create `arch.test.ts` in your test directory:
 
 ```typescript
 import { describe, it } from 'vitest' // or jest
-import {
-  project,
-  classes,
-  functions,
-  types,
-  modules,
-  slices,
-  call,
-  newExpr,
-  isString,
-  notType,
-} from 'ts-archunit'
+import { project, classes, functions, modules, slices, call, newExpr } from 'ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -46,6 +35,12 @@ describe('Architecture Rules', () => {
       .resideInFolder('**/domain/**')
       .should()
       .onlyImportFrom('**/domain/**', '**/shared/**')
+      .rule({
+        id: 'layer/domain-isolation',
+        because: 'Domain must be independent of infrastructure for testability',
+        suggestion: 'Move the import to a service that bridges domain and infrastructure',
+        docs: 'https://example.com/adr/clean-architecture',
+      })
       .check()
   })
 
@@ -55,7 +50,11 @@ describe('Architecture Rules', () => {
       .extend('BaseService')
       .should()
       .notContain(newExpr('Error'))
-      .because('use DomainError instead of generic Error')
+      .rule({
+        id: 'error/typed-errors',
+        because: 'Generic Error loses context and prevents consistent API error responses',
+        suggestion: 'Use NotFoundError, ValidationError, or DomainError instead',
+      })
       .check()
   })
 
@@ -67,7 +66,11 @@ describe('Architecture Rules', () => {
       .resideInFolder('**/routes/**')
       .should()
       .notExist()
-      .because('use the shared parseOrder() utility')
+      .rule({
+        id: 'route/no-copy-paste',
+        because: 'Copy-pasted parsers diverge over time',
+        suggestion: 'Use the shared parseOrder() utility with a column map',
+      })
       .check()
   })
 })
@@ -84,75 +87,68 @@ npx vitest run arch.test.ts
 ### Layer Enforcement
 
 ```typescript
-const layers = {
-  controllers: 'src/controllers/**',
-  services: 'src/services/**',
-  repositories: 'src/repositories/**',
-  domain: 'src/domain/**',
-}
-
-// Dependencies must flow downward
 slices(p)
-  .assignedFrom(layers)
+  .assignedFrom({
+    controllers: 'src/controllers/**',
+    services: 'src/services/**',
+    repositories: 'src/repositories/**',
+    domain: 'src/domain/**',
+  })
   .should()
   .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
-  .because('layers must not depend upward')
-  .check()
-
-// Domain must be framework-free
-modules(p)
-  .that()
-  .resideInFolder('**/domain/**')
-  .should()
-  .notImportFrom('**/controllers/**', '**/repositories/**')
+  .rule({
+    id: 'layer/direction',
+    because: 'Dependencies flow inward: controllers → services → repositories → domain',
+  })
   .check()
 ```
 
 ### Cycle Detection
 
 ```typescript
-// No circular dependencies between feature modules
-slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
+slices(p)
+  .matching('src/features/*/')
+  .should()
+  .beFreeOfCycles()
+  .rule({ id: 'arch/no-feature-cycles', because: 'Circular deps prevent independent deployment' })
+  .check()
 ```
 
 ### Body Analysis
 
-This is where ts-archunit goes beyond import-path checking. It inspects what happens _inside_ functions and methods:
+This is where ts-archunit goes beyond import-path checking. It inspects what happens _inside_ functions and class methods:
 
 ```typescript
-// Repositories must use the shared helper, not inline parseInt
-classes(p)
-  .that()
-  .extend('BaseRepository')
-  .should()
-  .notContain(call('parseInt'))
-  .because('use this.extractCount() from BaseRepository')
-  .check()
-
-// Or enforce both sides: ban the bad, require the good
+// Ban inline parseInt — use the shared helper
 classes(p)
   .that()
   .extend('BaseRepository')
   .should()
   .useInsteadOf(call('parseInt'), call('this.extractCount'))
+  .rule({
+    id: 'repo/no-parseint',
+    because: 'BaseRepository provides extractCount() which handles type coercion safely',
+    suggestion: 'Replace parseInt(x, 10) with this.extractCount(result)',
+  })
   .check()
 
-// Ban direct URLSearchParams construction in SDK wrappers
+// Ban new URLSearchParams in wrappers (catches class methods too)
 functions(p)
   .that()
   .resideInFolder('**/wrappers/**')
   .should()
   .notContain(newExpr('URLSearchParams'))
-  .because('use buildQueryString() utility')
+  .rule({ id: 'sdk/no-raw-urlsearchparams', suggestion: 'Use buildQueryString() utility' })
   .check()
 ```
 
 ### Type-Level Rules
 
-Check property types using the TypeScript type checker — resolves through aliases, `Partial<>`, `Pick<>`, etc.:
+Check property types using the TypeScript type checker — resolves through aliases, `Partial<>`, `Pick<>`:
 
 ```typescript
-// Query options must use typed unions, not bare string
+import { types, notType, isString } from 'ts-archunit'
+
 types(p)
   .that()
   .haveNameMatching(/Options$/)
@@ -160,41 +156,35 @@ types(p)
   .haveProperty('orderBy')
   .should()
   .havePropertyType('orderBy', notType(isString()))
-  .because('bare string orderBy is a SQL injection surface')
+  .rule({
+    id: 'type/no-bare-string-orderby',
+    because: 'Bare string orderBy passed to .orderBy() is a SQL injection surface',
+    suggestion: "Use a union type: orderBy?: 'created_at' | 'updated_at' | 'name'",
+  })
   .check()
 ```
 
-### Naming Conventions
+### Standard Rules
+
+Ready-to-use rules via categorized sub-path imports — no custom conditions needed:
 
 ```typescript
-// Controllers must end with Controller
-classes(p)
-  .that()
-  .resideInFolder('**/controllers/**')
-  .should()
-  .haveNameMatching(/Controller$/)
-  .check()
+import {
+  noAnyProperties,
+  noTypeAssertions,
+  noNonNullAssertions,
+} from 'ts-archunit/rules/typescript'
+import { noEval, noConsoleLog, noProcessEnv } from 'ts-archunit/rules/security'
+import { noGenericErrors } from 'ts-archunit/rules/errors'
+import { mustMatchName } from 'ts-archunit/rules/naming'
+import { onlyDependOn, mustNotDependOn } from 'ts-archunit/rules/dependencies'
 
-// Services must be exported
-classes(p).that().haveNameEndingWith('Service').should().beExported().check()
+classes(p).should().satisfy(noAnyProperties()).check()
+classes(p).should().satisfy(noTypeAssertions()).check()
+classes(p).should().satisfy(noEval()).check()
 ```
 
-### Class Structure
-
-```typescript
-// All repositories must extend BaseRepository
-classes(p)
-  .that()
-  .resideInFolder('**/repositories/**')
-  .and()
-  .haveNameEndingWith('Repository')
-  .should()
-  .shouldExtend('BaseRepository')
-  .check()
-
-// Services must have a findById method
-classes(p).that().extend('BaseService').should().shouldHaveMethodNamed('findById').check()
-```
+Available categories: `rules/typescript`, `rules/security`, `rules/errors`, `rules/naming`, `rules/dependencies`.
 
 ### Named Selections
 
@@ -203,19 +193,98 @@ Save predicate chains for reuse across multiple rules:
 ```typescript
 const repositories = classes(p).that().extend('BaseRepository')
 
-// Multiple rules on the same selection
 repositories.should().notContain(call('parseInt')).check()
 repositories.should().notContain(newExpr('Error')).check()
 repositories.should().beExported().check()
 ```
 
-### Warnings (Non-Blocking Rules)
+### Baseline Mode (Gradual Adoption)
 
-Not every rule should fail CI:
+Adopt rules in existing codebases without fixing every pre-existing violation first:
 
 ```typescript
-// Warn about deprecated patterns, don't block
-classes(p).that().haveDecorator('Deprecated').should().notExist().warn() // logs to stderr, does not throw
+import { withBaseline } from 'ts-archunit'
+
+const baseline = withBaseline('arch-baseline.json')
+
+// Only NEW violations fail — existing ones are recorded in the baseline
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check({ baseline })
+```
+
+Generate a baseline from current violations:
+
+```typescript
+import { collectViolations, generateBaseline } from 'ts-archunit'
+
+const violations = collectViolations(rule1, rule2, rule3)
+generateBaseline(violations, 'arch-baseline.json')
+```
+
+### Diff-Aware Mode
+
+Only report violations in files changed in the current PR:
+
+```typescript
+import { diffAware } from 'ts-archunit'
+
+classes(p)
+  .should()
+  .notContain(call('eval'))
+  .check({ diff: diffAware('main') })
+```
+
+### GitHub Actions Annotations
+
+Violations appear inline on PR diffs — automatically detected in GitHub Actions:
+
+```typescript
+import { detectFormat } from 'ts-archunit'
+
+const format = detectFormat() // 'github' in CI, 'terminal' locally
+
+classes(p).should().notContain(call('eval')).check({ format })
+```
+
+### Warnings (Non-Blocking Rules)
+
+```typescript
+classes(p).that().haveDecorator('Deprecated').should().notExist().warn()
+```
+
+## Rich Violation Messages
+
+Every rule can include why it exists, how to fix it, and where to learn more:
+
+```typescript
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(newExpr('Error'))
+  .rule({
+    id: 'repo/typed-errors',
+    because: 'Generic Error loses context and prevents consistent error handling',
+    suggestion: 'Replace new Error(msg) with new NotFoundError(entity, id)',
+    docs: 'https://example.com/adr/011#error-handling',
+  })
+  .check()
+```
+
+Output:
+
+```
+Architecture Violation [repo/typed-errors]
+
+  WebhookRepository.findById contains new 'Error' at line 42
+  at src/repositories/webhook.repository.ts:42
+
+    41 |     if (!result) {
+  > 42 |       throw new Error(`Webhook '${id}' not found`)
+    43 |     }
+
+  Why: Generic Error loses context and prevents consistent error handling
+  Fix: Replace new Error(msg) with new NotFoundError(entity, id)
+  Docs: https://example.com/adr/011#error-handling
 ```
 
 ## Custom Rules
@@ -223,31 +292,19 @@ classes(p).that().haveDecorator('Deprecated').should().notExist().warn() // logs
 Define your own predicates and conditions using the same interface as built-in ones:
 
 ```typescript
-import { definePredicate, defineCondition, classes } from 'ts-archunit'
+import { definePredicate, defineCondition, createViolation, classes } from 'ts-archunit'
 import type { ClassDeclaration } from 'ts-morph'
+import type { ArchViolation, ConditionContext } from 'ts-archunit'
 
-// Custom predicate: filter to classes with more than 10 methods
+// Custom predicate
 const hasTooManyMethods = definePredicate<ClassDeclaration>(
   'has more than 10 methods',
   (cls) => cls.getMethods().length > 10,
 )
 
-// Use in a rule
-classes(p)
-  .that()
-  .satisfy(hasTooManyMethods)
-  .should()
-  .notExist()
-  .because('classes with >10 methods should be split')
-  .check()
-```
+classes(p).that().satisfy(hasTooManyMethods).should().notExist().check()
 
-```typescript
-import { defineCondition, createViolation } from 'ts-archunit'
-import type { ClassDeclaration } from 'ts-morph'
-import type { ConditionContext, ArchViolation } from 'ts-archunit'
-
-// Custom condition: all public methods must have JSDoc
+// Custom condition
 const haveJsDocOnPublicMethods = defineCondition<ClassDeclaration>(
   'have JSDoc on all public methods',
   (elements, context) => {
@@ -268,29 +325,13 @@ classes(p).that().areExported().should().satisfy(haveJsDocOnPublicMethods).check
 
 ## Entry Points
 
-| Function       | Operates on                 | Use case                                        |
-| -------------- | --------------------------- | ----------------------------------------------- |
-| `modules(p)`   | Source files                | Import/dependency rules                         |
-| `classes(p)`   | Class declarations          | Inheritance, decorators, methods, body analysis |
-| `functions(p)` | Functions + arrow functions | Naming, parameters, body analysis               |
-| `types(p)`     | Interfaces + type aliases   | Property types, type safety                     |
-| `slices(p)`    | Groups of files             | Cycles, layer ordering                          |
-
-## Violation Output
-
-When a rule fails, you get actionable error messages with code frames:
-
-```
-Architecture violation (2 found)
-Reason: use this.extractCount() from BaseRepository
-
-  - ProductService: ProductService contains call to 'parseInt' at line 7 (src/services/product-service.ts:3)
-
-      1 | export class ProductService extends BaseService {
-      2 |   async getTotal(): Promise<number> {
-    > 3 |     return typeof result.count === 'string' ? parseInt(result.count, 10) : result.count
-      4 |   }
-```
+| Function       | Operates on                               | Use case                                        |
+| -------------- | ----------------------------------------- | ----------------------------------------------- |
+| `modules(p)`   | Source files                              | Import/dependency rules                         |
+| `classes(p)`   | Class declarations                        | Inheritance, decorators, methods, body analysis |
+| `functions(p)` | Functions, arrow functions, class methods | Naming, parameters, body analysis               |
+| `types(p)`     | Interfaces + type aliases                 | Property types, type safety                     |
+| `slices(p)`    | Groups of files                           | Cycles, layer ordering                          |
 
 ## How It Works
 
@@ -303,13 +344,13 @@ Rules run in your test suite. `.check()` throws on violations (test fails). `.wa
 
 ## Comparison
 
-| Tool                     | Import paths | Body analysis | Type checking | Cycles |
-| ------------------------ | ------------ | ------------- | ------------- | ------ |
-| **ts-archunit**          | Yes          | Yes           | Yes           | Yes    |
-| dependency-cruiser       | Yes          | No            | No            | Yes    |
-| eslint-plugin-boundaries | Yes          | No            | No            | No     |
-| ts-arch (npm)            | Yes          | No            | No            | No     |
-| ESLint rules             | Per-file     | No            | No            | No     |
+| Tool                     | Import paths | Body analysis | Type checking | Cycles | Baseline | GitHub annotations |
+| ------------------------ | ------------ | ------------- | ------------- | ------ | -------- | ------------------ |
+| **ts-archunit**          | Yes          | Yes           | Yes           | Yes    | Yes      | Yes                |
+| dependency-cruiser       | Yes          | No            | No            | Yes    | No       | No                 |
+| eslint-plugin-boundaries | Yes          | No            | No            | No     | No       | No                 |
+| ts-arch (npm)            | Yes          | No            | No            | No     | No       | No                 |
+| ESLint rules             | Per-file     | No            | No            | No     | No       | Yes                |
 
 ## Requirements
 
