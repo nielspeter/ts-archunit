@@ -1,6 +1,6 @@
 {
   "name": "@nielspeter/ts-archunit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Architecture testing for TypeScript",
   "type": "module",
   "exports": {
@@ -54,11 +54,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/NielsPeter/ts-archunit"
+    "url": "https://github.com/nielspeter/ts-archunit"
   },
-  "homepage": "https://github.com/NielsPeter/ts-archunit#readme",
+  "homepage": "https://github.com/nielspeter/ts-archunit#readme",
   "bugs": {
-    "url": "https://github.com/NielsPeter/ts-archunit/issues"
+    "url": "https://github.com/nielspeter/ts-archunit/issues"
   },
   "author": "Niels Peter",
   "scripts": {
