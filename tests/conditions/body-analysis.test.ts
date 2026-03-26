@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import { classContain, classNotContain, classUseInsteadOf } from '../../src/conditions/body-analysis.js'
+import {
+  classContain,
+  classNotContain,
+  classUseInsteadOf,
+} from '../../src/conditions/body-analysis.js'
 import { call, newExpr } from '../../src/helpers/matchers.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -83,19 +87,13 @@ describe('Body analysis conditions (class)', () => {
 
   describe('classUseInsteadOf()', () => {
     it('no violations when class uses good and avoids bad', () => {
-      const condition = classUseInsteadOf(
-        newExpr('Error'),
-        newExpr('DomainError'),
-      )
+      const condition = classUseInsteadOf(newExpr('Error'), newExpr('DomainError'))
       const violations = condition.evaluate([findClass('OrderService')], context)
       expect(violations).toHaveLength(0)
     })
 
     it('reports bad usage AND missing good', () => {
-      const condition = classUseInsteadOf(
-        newExpr('Error'),
-        newExpr('DomainError'),
-      )
+      const condition = classUseInsteadOf(newExpr('Error'), newExpr('DomainError'))
       const violations = condition.evaluate([findClass('ProductService')], context)
       // ProductService has new Error (bad) and no new DomainError (missing good)
       expect(violations.length).toBeGreaterThanOrEqual(2)
@@ -105,10 +103,7 @@ describe('Body analysis conditions (class)', () => {
     })
 
     it('has correct description', () => {
-      const condition = classUseInsteadOf(
-        newExpr('Error'),
-        newExpr('DomainError'),
-      )
+      const condition = classUseInsteadOf(newExpr('Error'), newExpr('DomainError'))
       expect(condition.description).toBe("use new 'DomainError' instead of new 'Error'")
     })
   })

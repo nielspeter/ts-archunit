@@ -297,10 +297,7 @@ describe('edge cases', () => {
 
   it('composing identity predicates: and(haveNameEndingWith("Service"), areExported())', () => {
     const classes = tsMorphProject.getSourceFiles().flatMap((sf) => sf.getClasses())
-    const pred = and<ClassDeclaration>(
-      haveNameEndingWith('Service'),
-      areExported(),
-    )
+    const pred = and<ClassDeclaration>(haveNameEndingWith('Service'), areExported())
     const matched = classes.filter((c) => pred.test(c))
     const names = matched.map((c) => c.getName())
     // BaseService is exported too (it's export abstract class)

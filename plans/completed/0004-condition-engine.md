@@ -356,10 +356,21 @@ export function notExist<T extends Node>(): Condition<T> {
 // Core interfaces
 export type { Condition, ConditionContext } from './core/condition.js'
 export type { ArchViolation } from './core/violation.js'
-export { createViolation, getElementName, getElementFile, getElementLine } from './core/violation.js'
+export {
+  createViolation,
+  getElementName,
+  getElementFile,
+  getElementLine,
+} from './core/violation.js'
 
 // Structural conditions
-export { resideInFile, resideInFolder, haveNameMatching, beExported, notExist } from './conditions/structural.js'
+export {
+  resideInFile,
+  resideInFolder,
+  haveNameMatching,
+  beExported,
+  notExist,
+} from './conditions/structural.js'
 ```
 
 **Note:** `Condition`, `ConditionContext`, and `ArchViolation` are exported as types only (they are interfaces). The factory functions and structural conditions are value exports.
@@ -368,14 +379,14 @@ export { resideInFile, resideInFolder, haveNameMatching, beExported, notExist } 
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `src/core/violation.ts` | **New** — `ArchViolation` interface, `getElementName`, `getElementFile`, `getElementLine`, `createViolation` |
-| `src/core/condition.ts` | **New** — `Condition<T>` interface, `ConditionContext` interface |
-| `src/conditions/helpers.ts` | **New** — `elementCondition` factory for per-element conditions |
-| `src/conditions/structural.ts` | **New** — `resideInFile`, `resideInFolder`, `haveNameMatching`, `beExported`, `notExist` |
-| `src/index.ts` | **Modified** — add public API exports for conditions and violations |
-| `tests/conditions/structural.test.ts` | **New** — tests for all structural conditions |
+| File                                  | Change                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `src/core/violation.ts`               | **New** — `ArchViolation` interface, `getElementName`, `getElementFile`, `getElementLine`, `createViolation` |
+| `src/core/condition.ts`               | **New** — `Condition<T>` interface, `ConditionContext` interface                                             |
+| `src/conditions/helpers.ts`           | **New** — `elementCondition` factory for per-element conditions                                              |
+| `src/conditions/structural.ts`        | **New** — `resideInFile`, `resideInFolder`, `haveNameMatching`, `beExported`, `notExist`                     |
+| `src/index.ts`                        | **Modified** — add public API exports for conditions and violations                                          |
+| `tests/conditions/structural.test.ts` | **New** — tests for all structural conditions                                                                |
 
 ---
 

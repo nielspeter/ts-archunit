@@ -40,10 +40,7 @@ describe('class conditions', () => {
 
     it('reports violations for multiple non-conforming classes', () => {
       const cond = shouldExtend('BaseService')
-      const violations = cond.evaluate(
-        [getClass('OrderService'), getClass('DomainError')],
-        ctx,
-      )
+      const violations = cond.evaluate([getClass('OrderService'), getClass('DomainError')], ctx)
       expect(violations).toHaveLength(1) // Only DomainError fails
     })
   })

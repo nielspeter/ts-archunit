@@ -65,34 +65,19 @@ describe('FunctionRuleBuilder', () => {
 
     it('haveNameMatching with string pattern', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveNameMatching('parseFoo')
-          .should()
-          .notExist()
-          .check()
+        functions(p).that().haveNameMatching('parseFoo').should().notExist().check()
       }).toThrow(ArchRuleError)
     })
 
     it('haveNameStartingWith filters by prefix', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveNameStartingWith('parse')
-          .should()
-          .notExist()
-          .check()
+        functions(p).that().haveNameStartingWith('parse').should().notExist().check()
       }).toThrow(ArchRuleError)
     })
 
     it('haveNameEndingWith filters by suffix', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveNameEndingWith('Order')
-          .should()
-          .notExist()
-          .check()
+        functions(p).that().haveNameEndingWith('Order').should().notExist().check()
       }).toThrow(ArchRuleError)
     })
 
@@ -127,12 +112,7 @@ describe('FunctionRuleBuilder', () => {
     it('areAsync filters async functions', () => {
       // No top-level async functions in the fixtures
       expect(() => {
-        functions(p)
-          .that()
-          .areAsync()
-          .should()
-          .notExist()
-          .check()
+        functions(p).that().areAsync().should().notExist().check()
       }).not.toThrow()
     })
 
@@ -152,12 +132,7 @@ describe('FunctionRuleBuilder', () => {
 
     it('haveParameterNamed filters by parameter name', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveParameterNamed('order')
-          .should()
-          .notExist()
-          .check()
+        functions(p).that().haveParameterNamed('order').should().notExist().check()
       }).toThrow(ArchRuleError)
     })
 
@@ -199,7 +174,9 @@ describe('FunctionRuleBuilder', () => {
     })
 
     it('named selection reuse works', () => {
-      const parsers = functions(p).that().haveNameMatching(/^parse/)
+      const parsers = functions(p)
+        .that()
+        .haveNameMatching(/^parse/)
 
       // Rule 1: parseXxxOrder should not exist
       expect(() => {

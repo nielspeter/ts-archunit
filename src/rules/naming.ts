@@ -23,7 +23,11 @@ export function mustMatchName(pattern: RegExp): Condition<ClassDeclaration> {
         const name = cls.getName() ?? '<anonymous>'
         if (!pattern.test(name)) {
           violations.push(
-            createViolation(cls, `${name} does not match naming convention ${String(pattern)}`, context),
+            createViolation(
+              cls,
+              `${name} does not match naming convention ${String(pattern)}`,
+              context,
+            ),
           )
         }
       }
@@ -48,9 +52,7 @@ export function mustNotEndWith(suffix: string): Condition<ClassDeclaration> {
       for (const cls of elements) {
         const name = cls.getName() ?? '<anonymous>'
         if (name.endsWith(suffix)) {
-          violations.push(
-            createViolation(cls, `${name} should not end with "${suffix}"`, context),
-          )
+          violations.push(createViolation(cls, `${name} should not end with "${suffix}"`, context))
         }
       }
       return violations

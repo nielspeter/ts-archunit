@@ -49,10 +49,7 @@ function findMatchesInBody(body: Node, matcher: ExpressionMatcher): Node[] {
  * Iterates over every method (instance and static), gets the body,
  * and tests each body against the matcher. Returns aggregated results.
  */
-export function searchClassBody(
-  cls: ClassDeclaration,
-  matcher: ExpressionMatcher,
-): MatchResult {
+export function searchClassBody(cls: ClassDeclaration, matcher: ExpressionMatcher): MatchResult {
   const matchingNodes: Node[] = []
 
   for (const method of cls.getMethods()) {
@@ -97,10 +94,7 @@ export function searchClassBody(
  * For expression-bodied arrows (`() => expr`), getDescendantsOfKind
  * still works — it walks the expression subtree.
  */
-export function searchFunctionBody(
-  fn: ArchFunction,
-  matcher: ExpressionMatcher,
-): MatchResult {
+export function searchFunctionBody(fn: ArchFunction, matcher: ExpressionMatcher): MatchResult {
   const body = fn.getBody()
   if (!body) {
     return { found: false, matchingNodes: [] }

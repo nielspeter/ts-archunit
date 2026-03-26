@@ -264,7 +264,7 @@ These predicates operate on `ArchFunction` directly. The identity predicates fro
 
 ### `src/builders/function-rule-builder.ts`
 
-```typescript
+````typescript
 import type { ArchProject } from '../core/project.js'
 import type { Predicate } from '../core/predicate.js'
 import { RuleBuilder } from '../core/rule-builder.js'
@@ -401,7 +401,7 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
 export function functions(p: ArchProject): FunctionRuleBuilder {
   return new FunctionRuleBuilder(p)
 }
-```
+````
 
 Key implementation notes:
 
@@ -511,8 +511,7 @@ export function haveNameMatching(pattern: RegExp): Condition<ArchFunction> {
       const name = fn.getName()
       return name !== undefined && pattern.test(name)
     },
-    (fn) =>
-      `${fn.getName() ?? '<anonymous>'} does not have a name matching ${String(pattern)}`,
+    (fn) => `${fn.getName() ?? '<anonymous>'} does not have a name matching ${String(pattern)}`,
   )
 }
 ```
@@ -525,7 +524,11 @@ export function haveNameMatching(pattern: RegExp): Condition<ArchFunction> {
 // Function entry point
 export { functions, FunctionRuleBuilder } from './builders/function-rule-builder.js'
 export type { ArchFunction } from './models/arch-function.js'
-export { collectFunctions, fromFunctionDeclaration, fromArrowVariableDeclaration } from './models/arch-function.js'
+export {
+  collectFunctions,
+  fromFunctionDeclaration,
+  fromArrowVariableDeclaration,
+} from './models/arch-function.js'
 
 // Function predicates
 export {
@@ -567,9 +570,7 @@ const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 const project = new Project({
   tsConfigFilePath: path.join(fixturesDir, 'tsconfig.json'),
 })
-const routesSf = project
-  .getSourceFiles()
-  .find((sf) => sf.getBaseName() === 'routes.ts')!
+const routesSf = project.getSourceFiles().find((sf) => sf.getBaseName() === 'routes.ts')!
 
 describe('ArchFunction model', () => {
   describe('fromFunctionDeclaration', () => {
@@ -892,34 +893,19 @@ describe('FunctionRuleBuilder', () => {
 
     it('haveNameMatching with string pattern', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveNameMatching('parseFoo')
-          .should()
-          .addCondition(notExist())
-          .check()
+        functions(p).that().haveNameMatching('parseFoo').should().addCondition(notExist()).check()
       }).toThrow(ArchRuleError)
     })
 
     it('haveNameStartingWith filters by prefix', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveNameStartingWith('parse')
-          .should()
-          .addCondition(notExist())
-          .check()
+        functions(p).that().haveNameStartingWith('parse').should().addCondition(notExist()).check()
       }).toThrow(ArchRuleError)
     })
 
     it('haveNameEndingWith filters by suffix', () => {
       expect(() => {
-        functions(p)
-          .that()
-          .haveNameEndingWith('Order')
-          .should()
-          .addCondition(notExist())
-          .check()
+        functions(p).that().haveNameEndingWith('Order').should().addCondition(notExist()).check()
       }).toThrow(ArchRuleError)
     })
 
@@ -955,12 +941,7 @@ describe('FunctionRuleBuilder', () => {
     it('areAsync filters async functions', () => {
       // No top-level async functions in the fixtures
       expect(() => {
-        functions(p)
-          .that()
-          .areAsync()
-          .should()
-          .addCondition(notExist())
-          .check()
+        functions(p).that().areAsync().should().addCondition(notExist()).check()
       }).not.toThrow()
     })
 
@@ -981,12 +962,7 @@ describe('FunctionRuleBuilder', () => {
     it('haveParameterNamed filters by parameter name', () => {
       // parseFooOrder has param "order"
       expect(() => {
-        functions(p)
-          .that()
-          .haveParameterNamed('order')
-          .should()
-          .addCondition(notExist())
-          .check()
+        functions(p).that().haveParameterNamed('order').should().addCondition(notExist()).check()
       }).toThrow(ArchRuleError)
     })
 
@@ -1029,7 +1005,9 @@ describe('FunctionRuleBuilder', () => {
     })
 
     it('named selection reuse works', () => {
-      const parsers = functions(p).that().haveNameMatching(/^parse/)
+      const parsers = functions(p)
+        .that()
+        .haveNameMatching(/^parse/)
 
       // Rule 1: parseXxxOrder should not exist
       expect(() => {
@@ -1085,6 +1063,7 @@ describe('FunctionRuleBuilder', () => {
 Note: The tests use `.addCondition()` directly because `addCondition` is a protected method on `RuleBuilder`. For this to work, `FunctionRuleBuilder` must expose it. Alternative: make the conditions top-level and pass them differently. However, looking at the existing builder pattern, the cleaner approach is to add a public `shouldSatisfy()` or to have conditions added via a method. Since the builder's `.should()` returns `this`, conditions can be registered by calling `.addCondition()`.
 
 **Correction:** `addCondition` is `protected`. Tests cannot call it directly. The builder needs to either:
+
 1. Expose condition methods on the builder (e.g., `builder.should().notExist()`)
 2. Accept conditions via a parameter to `.should()`
 
@@ -1116,74 +1095,74 @@ This is consistent with the test builder pattern and provides an escape hatch fo
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/models/arch-function.ts` | New — `ArchFunction` interface, factory functions, `collectFunctions` |
-| `src/predicates/function.ts` | New — `areAsync`, `areNotAsync`, `haveParameterCount`, `haveParameterCountGreaterThan`, `haveParameterCountLessThan`, `haveParameterNamed`, `haveReturnType` |
-| `src/conditions/function.ts` | New — `notExist`, `beExported`, `beAsync`, `haveNameMatching` for `ArchFunction` |
-| `src/builders/function-rule-builder.ts` | New — `FunctionRuleBuilder`, `functions()` entry point |
-| `src/index.ts` | Modified — export function entry point, predicates, conditions, model |
-| `tests/models/arch-function.test.ts` | New — 14 tests for ArchFunction model |
-| `tests/predicates/function.test.ts` | New — 13 tests for function predicates |
-| `tests/builders/function-rule-builder.test.ts` | New — 15 tests for FunctionRuleBuilder |
+| File                                           | Change                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/models/arch-function.ts`                  | New — `ArchFunction` interface, factory functions, `collectFunctions`                                                                                        |
+| `src/predicates/function.ts`                   | New — `areAsync`, `areNotAsync`, `haveParameterCount`, `haveParameterCountGreaterThan`, `haveParameterCountLessThan`, `haveParameterNamed`, `haveReturnType` |
+| `src/conditions/function.ts`                   | New — `notExist`, `beExported`, `beAsync`, `haveNameMatching` for `ArchFunction`                                                                             |
+| `src/builders/function-rule-builder.ts`        | New — `FunctionRuleBuilder`, `functions()` entry point                                                                                                       |
+| `src/index.ts`                                 | Modified — export function entry point, predicates, conditions, model                                                                                        |
+| `tests/models/arch-function.test.ts`           | New — 14 tests for ArchFunction model                                                                                                                        |
+| `tests/predicates/function.test.ts`            | New — 13 tests for function predicates                                                                                                                       |
+| `tests/builders/function-rule-builder.test.ts` | New — 15 tests for FunctionRuleBuilder                                                                                                                       |
 
 ## Test Inventory
 
-| # | Test | File | What it validates |
-|---|------|------|-------------------|
-| 1 | fromFunctionDeclaration: getName() | arch-function.test | Returns function name |
-| 2 | fromFunctionDeclaration: getSourceFile() | arch-function.test | Returns containing source file |
-| 3 | fromFunctionDeclaration: isExported() | arch-function.test | Reflects export status |
-| 4 | fromFunctionDeclaration: isAsync() | arch-function.test | Reflects async status |
-| 5 | fromFunctionDeclaration: getParameters() | arch-function.test | Returns parameter declarations |
-| 6 | fromFunctionDeclaration: getReturnType() | arch-function.test | Returns resolved return type |
-| 7 | fromFunctionDeclaration: getBody() | arch-function.test | Returns function body |
-| 8 | fromFunctionDeclaration: getNode() | arch-function.test | Returns FunctionDeclaration node |
-| 9 | fromFunctionDeclaration: getStartLineNumber() | arch-function.test | Returns valid line number |
-| 10 | fromArrowVariableDeclaration: getName() | arch-function.test | Returns variable name |
-| 11 | fromArrowVariableDeclaration: getSourceFile() | arch-function.test | Returns containing source file |
-| 12 | fromArrowVariableDeclaration: isExported() | arch-function.test | Checks VariableStatement export |
-| 13 | fromArrowVariableDeclaration: isAsync() | arch-function.test | Checks arrow function async |
-| 14 | fromArrowVariableDeclaration: getParameters() | arch-function.test | Returns arrow function params |
-| 15 | fromArrowVariableDeclaration: getReturnType() | arch-function.test | Returns resolved return type |
-| 16 | fromArrowVariableDeclaration: getBody() | arch-function.test | Returns arrow function body |
-| 17 | fromArrowVariableDeclaration: getNode() | arch-function.test | Returns VariableDeclaration node |
-| 18 | collectFunctions: collects both patterns | arch-function.test | FunctionDecl + arrow functions |
-| 19 | collectFunctions: excludes non-arrow vars | arch-function.test | Only arrow-initialized vars |
-| 20 | areAsync matches async functions | function.test | Predicate correctness |
-| 21 | areNotAsync matches non-async functions | function.test | Predicate correctness |
-| 22 | haveParameterCount exact match | function.test | Exact count matching |
-| 23 | haveParameterCount rejects different count | function.test | Negative case |
-| 24 | haveParameterCount zero params | function.test | Edge case: 0 parameters |
-| 25 | haveParameterCount description singular | function.test | "1 parameter" not "1 parameters" |
-| 26 | haveParameterCount description plural | function.test | "3 parameters" |
-| 27 | haveParameterCountGreaterThan matches | function.test | Strict greater than |
-| 28 | haveParameterCountGreaterThan rejects | function.test | Boundary: n == count |
-| 29 | haveParameterCountLessThan matches | function.test | Strict less than |
-| 30 | haveParameterCountLessThan rejects | function.test | Boundary: n == count |
-| 31 | haveParameterNamed matches | function.test | Finds parameter by name |
-| 32 | haveParameterNamed rejects | function.test | No matching parameter |
-| 33 | haveParameterNamed on arrow function | function.test | Works on both patterns |
-| 34 | haveReturnType with regex | function.test | Regex match on type text |
-| 35 | haveReturnType with string | function.test | String-to-regex conversion |
-| 36 | haveReturnType rejects | function.test | Non-matching pattern |
-| 37 | functions() returns FunctionRuleBuilder | builder.test | Entry point type |
-| 38 | Finds FunctionDeclarations | builder.test | Pattern 1 scanning |
-| 39 | Finds arrow function VariableDeclarations | builder.test | Pattern 2 scanning |
-| 40 | haveNameMatching with regex | builder.test | Identity predicate wiring |
-| 41 | haveNameMatching with string | builder.test | String pattern wiring |
-| 42 | haveNameStartingWith | builder.test | Identity predicate wiring |
-| 43 | haveNameEndingWith | builder.test | Identity predicate wiring |
-| 44 | resideInFile with glob | builder.test | File path predicate |
-| 45 | areExported filters | builder.test | Export predicate wiring |
-| 46 | areAsync filters | builder.test | Function predicate wiring |
-| 47 | haveParameterCount on builder | builder.test | Function predicate wiring |
-| 48 | haveParameterNamed on builder | builder.test | Function predicate wiring |
-| 49 | haveReturnType on builder | builder.test | Function predicate wiring |
-| 50 | Detects parseXxxOrder anti-pattern (3 violations) | builder.test | Real-world rule, both patterns |
-| 51 | Named selection reuse | builder.test | Fork semantics |
-| 52 | .that().and() chains predicates | builder.test | Multi-predicate chaining |
-| 53 | .should() forks builder | builder.test | Named selection safety |
+| #   | Test                                              | File               | What it validates                |
+| --- | ------------------------------------------------- | ------------------ | -------------------------------- |
+| 1   | fromFunctionDeclaration: getName()                | arch-function.test | Returns function name            |
+| 2   | fromFunctionDeclaration: getSourceFile()          | arch-function.test | Returns containing source file   |
+| 3   | fromFunctionDeclaration: isExported()             | arch-function.test | Reflects export status           |
+| 4   | fromFunctionDeclaration: isAsync()                | arch-function.test | Reflects async status            |
+| 5   | fromFunctionDeclaration: getParameters()          | arch-function.test | Returns parameter declarations   |
+| 6   | fromFunctionDeclaration: getReturnType()          | arch-function.test | Returns resolved return type     |
+| 7   | fromFunctionDeclaration: getBody()                | arch-function.test | Returns function body            |
+| 8   | fromFunctionDeclaration: getNode()                | arch-function.test | Returns FunctionDeclaration node |
+| 9   | fromFunctionDeclaration: getStartLineNumber()     | arch-function.test | Returns valid line number        |
+| 10  | fromArrowVariableDeclaration: getName()           | arch-function.test | Returns variable name            |
+| 11  | fromArrowVariableDeclaration: getSourceFile()     | arch-function.test | Returns containing source file   |
+| 12  | fromArrowVariableDeclaration: isExported()        | arch-function.test | Checks VariableStatement export  |
+| 13  | fromArrowVariableDeclaration: isAsync()           | arch-function.test | Checks arrow function async      |
+| 14  | fromArrowVariableDeclaration: getParameters()     | arch-function.test | Returns arrow function params    |
+| 15  | fromArrowVariableDeclaration: getReturnType()     | arch-function.test | Returns resolved return type     |
+| 16  | fromArrowVariableDeclaration: getBody()           | arch-function.test | Returns arrow function body      |
+| 17  | fromArrowVariableDeclaration: getNode()           | arch-function.test | Returns VariableDeclaration node |
+| 18  | collectFunctions: collects both patterns          | arch-function.test | FunctionDecl + arrow functions   |
+| 19  | collectFunctions: excludes non-arrow vars         | arch-function.test | Only arrow-initialized vars      |
+| 20  | areAsync matches async functions                  | function.test      | Predicate correctness            |
+| 21  | areNotAsync matches non-async functions           | function.test      | Predicate correctness            |
+| 22  | haveParameterCount exact match                    | function.test      | Exact count matching             |
+| 23  | haveParameterCount rejects different count        | function.test      | Negative case                    |
+| 24  | haveParameterCount zero params                    | function.test      | Edge case: 0 parameters          |
+| 25  | haveParameterCount description singular           | function.test      | "1 parameter" not "1 parameters" |
+| 26  | haveParameterCount description plural             | function.test      | "3 parameters"                   |
+| 27  | haveParameterCountGreaterThan matches             | function.test      | Strict greater than              |
+| 28  | haveParameterCountGreaterThan rejects             | function.test      | Boundary: n == count             |
+| 29  | haveParameterCountLessThan matches                | function.test      | Strict less than                 |
+| 30  | haveParameterCountLessThan rejects                | function.test      | Boundary: n == count             |
+| 31  | haveParameterNamed matches                        | function.test      | Finds parameter by name          |
+| 32  | haveParameterNamed rejects                        | function.test      | No matching parameter            |
+| 33  | haveParameterNamed on arrow function              | function.test      | Works on both patterns           |
+| 34  | haveReturnType with regex                         | function.test      | Regex match on type text         |
+| 35  | haveReturnType with string                        | function.test      | String-to-regex conversion       |
+| 36  | haveReturnType rejects                            | function.test      | Non-matching pattern             |
+| 37  | functions() returns FunctionRuleBuilder           | builder.test       | Entry point type                 |
+| 38  | Finds FunctionDeclarations                        | builder.test       | Pattern 1 scanning               |
+| 39  | Finds arrow function VariableDeclarations         | builder.test       | Pattern 2 scanning               |
+| 40  | haveNameMatching with regex                       | builder.test       | Identity predicate wiring        |
+| 41  | haveNameMatching with string                      | builder.test       | String pattern wiring            |
+| 42  | haveNameStartingWith                              | builder.test       | Identity predicate wiring        |
+| 43  | haveNameEndingWith                                | builder.test       | Identity predicate wiring        |
+| 44  | resideInFile with glob                            | builder.test       | File path predicate              |
+| 45  | areExported filters                               | builder.test       | Export predicate wiring          |
+| 46  | areAsync filters                                  | builder.test       | Function predicate wiring        |
+| 47  | haveParameterCount on builder                     | builder.test       | Function predicate wiring        |
+| 48  | haveParameterNamed on builder                     | builder.test       | Function predicate wiring        |
+| 49  | haveReturnType on builder                         | builder.test       | Function predicate wiring        |
+| 50  | Detects parseXxxOrder anti-pattern (3 violations) | builder.test       | Real-world rule, both patterns   |
+| 51  | Named selection reuse                             | builder.test       | Fork semantics                   |
+| 52  | .that().and() chains predicates                   | builder.test       | Multi-predicate chaining         |
+| 53  | .should() forks builder                           | builder.test       | Named selection safety           |
 
 ## Out of Scope
 

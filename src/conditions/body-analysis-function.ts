@@ -53,9 +53,7 @@ export function functionContain(matcher: ExpressionMatcher): Condition<ArchFunct
 /**
  * Function body must NOT contain any node matching the matcher.
  */
-export function functionNotContain(
-  matcher: ExpressionMatcher,
-): Condition<ArchFunction> {
+export function functionNotContain(matcher: ExpressionMatcher): Condition<ArchFunction> {
   return {
     description: `not contain ${matcher.description}`,
     evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {

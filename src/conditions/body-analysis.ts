@@ -40,9 +40,7 @@ export function classContain(matcher: ExpressionMatcher): Condition<ClassDeclara
  * Violation for EACH matching node found in any method.
  * Reports the specific line where the violation occurs.
  */
-export function classNotContain(
-  matcher: ExpressionMatcher,
-): Condition<ClassDeclaration> {
+export function classNotContain(matcher: ExpressionMatcher): Condition<ClassDeclaration> {
   return {
     description: `not contain ${matcher.description}`,
     evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {

@@ -45,12 +45,7 @@ describe('ClassRuleBuilder', () => {
 
     it('haveNameEndingWith() filters by suffix', () => {
       expect(() => {
-        new ClassRuleBuilder(p)
-          .that()
-          .haveNameEndingWith('Service')
-          .should()
-          .beExported()
-          .check()
+        new ClassRuleBuilder(p).that().haveNameEndingWith('Service').should().beExported().check()
       }).not.toThrow()
     })
 
@@ -74,24 +69,14 @@ describe('ClassRuleBuilder', () => {
     it('extend() filters to subclasses', () => {
       // All BaseService subclasses are exported
       expect(() => {
-        new ClassRuleBuilder(p)
-          .that()
-          .extend('BaseService')
-          .should()
-          .beExported()
-          .check()
+        new ClassRuleBuilder(p).that().extend('BaseService').should().beExported().check()
       }).not.toThrow()
     })
 
     it('areAbstract() filters to abstract classes', () => {
       // BaseService is abstract and exported
       expect(() => {
-        new ClassRuleBuilder(p)
-          .that()
-          .areAbstract()
-          .should()
-          .shouldExtend('SomethingElse')
-          .check()
+        new ClassRuleBuilder(p).that().areAbstract().should().shouldExtend('SomethingElse').check()
       }).toThrow(ArchRuleError) // BaseService doesn't extend anything
     })
 

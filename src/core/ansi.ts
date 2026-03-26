@@ -1,7 +1,5 @@
 const enabled =
-  typeof process !== 'undefined' &&
-  !process.env['NO_COLOR'] &&
-  process.stdout?.isTTY === true
+  typeof process !== 'undefined' && !process.env['NO_COLOR'] && process.stdout?.isTTY === true
 
 function wrap(code: number, resetCode: number): (text: string) => string {
   if (!enabled) return (text) => text

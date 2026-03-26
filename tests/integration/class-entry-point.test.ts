@@ -41,12 +41,7 @@ describe('classes() entry point integration', () => {
 
   it('classes with getTotal should extend BaseService', () => {
     expect(() => {
-      classes(p)
-        .that()
-        .haveMethodNamed('getTotal')
-        .should()
-        .shouldExtend('BaseService')
-        .check()
+      classes(p).that().haveMethodNamed('getTotal').should().shouldExtend('BaseService').check()
     }).not.toThrow()
   })
 

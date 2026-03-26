@@ -10,35 +10,46 @@
 
 ## Purpose
 
-Implement body analysis — the ability to inspect what happens *inside* function and method bodies. This is the feature that sets ts-archunit apart from every other TypeScript architecture tool. After this plan, users can write rules like:
+Implement body analysis — the ability to inspect what happens _inside_ function and method bodies. This is the feature that sets ts-archunit apart from every other TypeScript architecture tool. After this plan, users can write rules like:
 
 ```typescript
 // Services extending BaseService must not call parseInt directly
-classes(p).that().extend('BaseService')
-  .should().notContain(call('parseInt'))
+classes(p)
+  .that()
+  .extend('BaseService')
+  .should()
+  .notContain(call('parseInt'))
   .because('use this.normalizeCount() instead')
   .check()
 
 // Services must throw DomainError, not generic Error
-classes(p).that().extend('BaseService')
-  .should().notContain(newExpr('Error'))
+classes(p)
+  .that()
+  .extend('BaseService')
+  .should()
+  .notContain(newExpr('Error'))
   .because('use DomainError for domain-specific errors')
   .check()
 
 // Enforce use of DomainError instead of Error (combined check)
-classes(p).that().extend('BaseService')
-  .should().useInsteadOf(newExpr('Error'), newExpr('DomainError'))
+classes(p)
+  .that()
+  .extend('BaseService')
+  .should()
+  .useInsteadOf(newExpr('Error'), newExpr('DomainError'))
   .check()
 
 // Functions must not access process.env directly
-functions(p).that().resideInFolder('**/domain/**')
-  .should().notContain(access('process.env'))
+functions(p)
+  .that()
+  .resideInFolder('**/domain/**')
+  .should()
+  .notContain(access('process.env'))
   .because('use Config injection instead')
   .check()
 
 // Escape hatch: match any expression by text
-functions(p).should().notContain(expression('eval'))
-  .check()
+functions(p).should().notContain(expression('eval')).check()
 ```
 
 ### Design Decision: Matcher Objects (Not AST Visitors)
@@ -332,10 +343,7 @@ function findMatchesInBody(body: Node, matcher: ExpressionMatcher): Node[] {
  * Iterates over every method (instance and static), gets the body,
  * and tests each body against the matcher. Returns aggregated results.
  */
-export function searchClassBody(
-  cls: ClassDeclaration,
-  matcher: ExpressionMatcher,
-): MatchResult {
+export function searchClassBody(cls: ClassDeclaration, matcher: ExpressionMatcher): MatchResult {
   const matchingNodes: Node[] = []
 
   for (const method of cls.getMethods()) {
@@ -380,10 +388,7 @@ export function searchClassBody(
  * For expression-bodied arrows (`() => expr`), getDescendantsOfKind
  * still works — it walks the expression subtree.
  */
-export function searchFunctionBody(
-  fn: ArchFunction,
-  matcher: ExpressionMatcher,
-): MatchResult {
+export function searchFunctionBody(fn: ArchFunction, matcher: ExpressionMatcher): MatchResult {
   const body = fn.getBody()
   if (!body) {
     return { found: false, matchingNodes: [] }
@@ -450,9 +455,7 @@ export function classContain(matcher: ExpressionMatcher): Condition<ClassDeclara
  * Violation for EACH matching node found in any method.
  * Reports the specific line where the violation occurs.
  */
-export function classNotContain(
-  matcher: ExpressionMatcher,
-): Condition<ClassDeclaration> {
+export function classNotContain(matcher: ExpressionMatcher): Condition<ClassDeclaration> {
   return {
     description: `not contain ${matcher.description}`,
     evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
@@ -585,9 +588,7 @@ export function functionContain(matcher: ExpressionMatcher): Condition<ArchFunct
 /**
  * Function body must NOT contain any node matching the matcher.
  */
-export function functionNotContain(
-  matcher: ExpressionMatcher,
-): Condition<ArchFunction> {
+export function functionNotContain(matcher: ExpressionMatcher): Condition<ArchFunction> {
   return {
     description: `not contain ${matcher.description}`,
     evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {
@@ -733,7 +734,11 @@ export type { ExpressionMatcher } from './helpers/matchers.js'
 
 // Body analysis conditions (for advanced composition)
 export { classContain, classNotContain, classUseInsteadOf } from './conditions/body-analysis.js'
-export { functionContain, functionNotContain, functionUseInsteadOf } from './conditions/body-analysis-function.js'
+export {
+  functionContain,
+  functionNotContain,
+  functionUseInsteadOf,
+} from './conditions/body-analysis-function.js'
 ```
 
 ## Phase 5: Tests
@@ -866,9 +871,7 @@ describe('ExpressionMatcher helpers', () => {
 
   describe('access()', () => {
     it('has syntaxKinds for PropertyAccessExpression', () => {
-      expect(access('process.env').syntaxKinds).toEqual([
-        SyntaxKind.PropertyAccessExpression,
-      ])
+      expect(access('process.env').syntaxKinds).toEqual([SyntaxKind.PropertyAccessExpression])
     })
 
     it('has meaningful description', () => {
@@ -972,7 +975,11 @@ describe('Body traversal', () => {
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import { classContain, classNotContain, classUseInsteadOf } from '../../src/conditions/body-analysis.js'
+import {
+  classContain,
+  classNotContain,
+  classUseInsteadOf,
+} from '../../src/conditions/body-analysis.js'
 import { call, newExpr } from '../../src/helpers/matchers.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -1054,19 +1061,13 @@ describe('Body analysis conditions (class)', () => {
 
   describe('classUseInsteadOf()', () => {
     it('no violations when class uses good and avoids bad', () => {
-      const condition = classUseInsteadOf(
-        newExpr('Error'),
-        newExpr('DomainError'),
-      )
+      const condition = classUseInsteadOf(newExpr('Error'), newExpr('DomainError'))
       const violations = condition.evaluate([findClass('OrderService')], context)
       expect(violations).toHaveLength(0)
     })
 
     it('reports bad usage AND missing good', () => {
-      const condition = classUseInsteadOf(
-        newExpr('Error'),
-        newExpr('DomainError'),
-      )
+      const condition = classUseInsteadOf(newExpr('Error'), newExpr('DomainError'))
       const violations = condition.evaluate([findClass('ProductService')], context)
       // ProductService has new Error (bad) and no new DomainError (missing good)
       expect(violations.length).toBeGreaterThanOrEqual(2)
@@ -1076,10 +1077,7 @@ describe('Body analysis conditions (class)', () => {
     })
 
     it('has correct description', () => {
-      const condition = classUseInsteadOf(
-        newExpr('Error'),
-        newExpr('DomainError'),
-      )
+      const condition = classUseInsteadOf(newExpr('Error'), newExpr('DomainError'))
       expect(condition.description).toBe("use new 'DomainError' instead of new 'Error'")
     })
   })
@@ -1168,70 +1166,70 @@ Note: The integration tests are sketched as comments because they depend on plan
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/helpers/matchers.ts` | New -- `ExpressionMatcher` interface, `call()`, `access()`, `newExpr()`, `expression()` helpers |
-| `src/helpers/body-traversal.ts` | New -- `searchClassBody()`, `searchFunctionBody()`, `findMatchesInBody()` |
-| `src/conditions/body-analysis.ts` | New -- `classContain()`, `classNotContain()`, `classUseInsteadOf()` |
-| `src/conditions/body-analysis-function.ts` | New -- `functionContain()`, `functionNotContain()`, `functionUseInsteadOf()` |
-| `src/builders/class-rule-builder.ts` | Modified -- add `contain()`, `notContain()`, `useInsteadOf()` methods |
-| `src/builders/function-rule-builder.ts` | Modified -- add `contain()`, `notContain()`, `useInsteadOf()` methods |
-| `src/index.ts` | Modified -- export matchers, ExpressionMatcher type, body analysis conditions |
-| `tests/helpers/matchers.test.ts` | New -- 20 tests for matcher helpers |
-| `tests/helpers/body-traversal.test.ts` | New -- 8 tests for body traversal |
-| `tests/conditions/body-analysis.test.ts` | New -- 12 tests for class body conditions |
-| `tests/integration/body-analysis.test.ts` | New -- 5 integration tests (stubbed until builders are wired) |
+| File                                       | Change                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `src/helpers/matchers.ts`                  | New -- `ExpressionMatcher` interface, `call()`, `access()`, `newExpr()`, `expression()` helpers |
+| `src/helpers/body-traversal.ts`            | New -- `searchClassBody()`, `searchFunctionBody()`, `findMatchesInBody()`                       |
+| `src/conditions/body-analysis.ts`          | New -- `classContain()`, `classNotContain()`, `classUseInsteadOf()`                             |
+| `src/conditions/body-analysis-function.ts` | New -- `functionContain()`, `functionNotContain()`, `functionUseInsteadOf()`                    |
+| `src/builders/class-rule-builder.ts`       | Modified -- add `contain()`, `notContain()`, `useInsteadOf()` methods                           |
+| `src/builders/function-rule-builder.ts`    | Modified -- add `contain()`, `notContain()`, `useInsteadOf()` methods                           |
+| `src/index.ts`                             | Modified -- export matchers, ExpressionMatcher type, body analysis conditions                   |
+| `tests/helpers/matchers.test.ts`           | New -- 20 tests for matcher helpers                                                             |
+| `tests/helpers/body-traversal.test.ts`     | New -- 8 tests for body traversal                                                               |
+| `tests/conditions/body-analysis.test.ts`   | New -- 12 tests for class body conditions                                                       |
+| `tests/integration/body-analysis.test.ts`  | New -- 5 integration tests (stubbed until builders are wired)                                   |
 
 ## Test Inventory
 
-| # | Test | File | What it validates |
-|---|------|------|-------------------|
-| 1 | call() matches parseInt with exact string | matchers.test | PoC finding: getExpression().getText() === 'parseInt' |
-| 2 | call() rejects non-matching name | matchers.test | Exact match semantics |
-| 3 | call() matches this.normalizeCount | matchers.test | Dotted chain matching |
-| 4 | call() normalizes optional chaining | matchers.test | PoC finding: `this?.foo` -> `this.foo` |
-| 5 | call() matches with regex | matchers.test | Regex variant |
-| 6 | call() regex rejects non-matching | matchers.test | Regex negative case |
-| 7 | call() does not match NewExpression | matchers.test | Type safety: SyntaxKind filtering |
-| 8 | call() has correct syntaxKinds | matchers.test | Targeted traversal setup |
-| 9 | call() string description | matchers.test | Violation message readability |
-| 10 | call() regex description | matchers.test | Violation message readability |
-| 11 | newExpr() matches new Error | matchers.test | PoC finding: getExpression().getText() === 'Error' |
-| 12 | newExpr() distinguishes Error from DomainError | matchers.test | PoC finding: exact match, not substring |
-| 13 | newExpr() matches with regex | matchers.test | Regex variant |
-| 14 | newExpr() does not match CallExpression | matchers.test | Type safety |
-| 15 | newExpr() has correct syntaxKinds | matchers.test | Targeted traversal setup |
-| 16 | access() has correct syntaxKinds | matchers.test | PropertyAccessExpression targeting |
-| 17 | access() has meaningful description | matchers.test | Violation message readability |
-| 18 | expression() has no syntaxKinds | matchers.test | Broad traversal (all nodes) |
-| 19 | expression() string description | matchers.test | Violation message readability |
-| 20 | expression() regex description | matchers.test | Violation message readability |
-| 21 | searchClassBody finds parseInt in ProductService | body-traversal.test | PoC parity: bad service detection |
-| 22 | searchClassBody does NOT find parseInt in OrderService | body-traversal.test | PoC parity: good service passes |
-| 23 | searchClassBody finds new Error in ProductService | body-traversal.test | NewExpression traversal |
-| 24 | searchClassBody does NOT find new Error in OrderService | body-traversal.test | DomainError != Error |
-| 25 | searchClassBody finds new DomainError in OrderService | body-traversal.test | Positive NewExpression match |
-| 26 | searchClassBody finds nested parseInt | body-traversal.test | PoC finding: getDescendantsOfKind walks subtree |
-| 27 | searchClassBody finds multiple violations | body-traversal.test | EdgeCaseService.withMultiple |
-| 28 | searchClassBody returns nodes with line numbers | body-traversal.test | Violation reporting data |
-| 29 | classContain passes when present | body-analysis.test | Positive contain semantics |
-| 30 | classContain fails when absent | body-analysis.test | Negative contain semantics |
-| 31 | classContain has correct description | body-analysis.test | Description composition |
-| 32 | classNotContain passes when absent | body-analysis.test | Positive notContain semantics |
-| 33 | classNotContain fails when present | body-analysis.test | Negative notContain semantics |
-| 34 | classNotContain reports per-node violations | body-analysis.test | Multiple violations from one class |
-| 35 | classNotContain violation includes line number | body-analysis.test | Precise location reporting |
-| 36 | classNotContain passes for DomainError class | body-analysis.test | Error vs DomainError specificity |
-| 37 | classNotContain fails for Error class | body-analysis.test | NewExpression condition |
-| 38 | classUseInsteadOf no violations for good class | body-analysis.test | OrderService passes both checks |
-| 39 | classUseInsteadOf reports bad and missing good | body-analysis.test | ProductService: has bad, missing good |
-| 40 | classUseInsteadOf has correct description | body-analysis.test | Description composition |
-| 41 | multiple elements checked independently | body-analysis.test | OrderService passes, ProductService fails |
-| 42 | E2E: notContain(call) via builder chain | integration.test | Full fluent API |
-| 43 | E2E: notContain(newExpr) via builder chain | integration.test | Full fluent API |
-| 44 | E2E: useInsteadOf via builder chain | integration.test | Combined condition |
-| 45 | E2E: andShould chains body conditions | integration.test | Multiple conditions |
-| 46 | E2E: regex matchers via builder | integration.test | Regex through full chain |
+| #   | Test                                                    | File                | What it validates                                     |
+| --- | ------------------------------------------------------- | ------------------- | ----------------------------------------------------- |
+| 1   | call() matches parseInt with exact string               | matchers.test       | PoC finding: getExpression().getText() === 'parseInt' |
+| 2   | call() rejects non-matching name                        | matchers.test       | Exact match semantics                                 |
+| 3   | call() matches this.normalizeCount                      | matchers.test       | Dotted chain matching                                 |
+| 4   | call() normalizes optional chaining                     | matchers.test       | PoC finding: `this?.foo` -> `this.foo`                |
+| 5   | call() matches with regex                               | matchers.test       | Regex variant                                         |
+| 6   | call() regex rejects non-matching                       | matchers.test       | Regex negative case                                   |
+| 7   | call() does not match NewExpression                     | matchers.test       | Type safety: SyntaxKind filtering                     |
+| 8   | call() has correct syntaxKinds                          | matchers.test       | Targeted traversal setup                              |
+| 9   | call() string description                               | matchers.test       | Violation message readability                         |
+| 10  | call() regex description                                | matchers.test       | Violation message readability                         |
+| 11  | newExpr() matches new Error                             | matchers.test       | PoC finding: getExpression().getText() === 'Error'    |
+| 12  | newExpr() distinguishes Error from DomainError          | matchers.test       | PoC finding: exact match, not substring               |
+| 13  | newExpr() matches with regex                            | matchers.test       | Regex variant                                         |
+| 14  | newExpr() does not match CallExpression                 | matchers.test       | Type safety                                           |
+| 15  | newExpr() has correct syntaxKinds                       | matchers.test       | Targeted traversal setup                              |
+| 16  | access() has correct syntaxKinds                        | matchers.test       | PropertyAccessExpression targeting                    |
+| 17  | access() has meaningful description                     | matchers.test       | Violation message readability                         |
+| 18  | expression() has no syntaxKinds                         | matchers.test       | Broad traversal (all nodes)                           |
+| 19  | expression() string description                         | matchers.test       | Violation message readability                         |
+| 20  | expression() regex description                          | matchers.test       | Violation message readability                         |
+| 21  | searchClassBody finds parseInt in ProductService        | body-traversal.test | PoC parity: bad service detection                     |
+| 22  | searchClassBody does NOT find parseInt in OrderService  | body-traversal.test | PoC parity: good service passes                       |
+| 23  | searchClassBody finds new Error in ProductService       | body-traversal.test | NewExpression traversal                               |
+| 24  | searchClassBody does NOT find new Error in OrderService | body-traversal.test | DomainError != Error                                  |
+| 25  | searchClassBody finds new DomainError in OrderService   | body-traversal.test | Positive NewExpression match                          |
+| 26  | searchClassBody finds nested parseInt                   | body-traversal.test | PoC finding: getDescendantsOfKind walks subtree       |
+| 27  | searchClassBody finds multiple violations               | body-traversal.test | EdgeCaseService.withMultiple                          |
+| 28  | searchClassBody returns nodes with line numbers         | body-traversal.test | Violation reporting data                              |
+| 29  | classContain passes when present                        | body-analysis.test  | Positive contain semantics                            |
+| 30  | classContain fails when absent                          | body-analysis.test  | Negative contain semantics                            |
+| 31  | classContain has correct description                    | body-analysis.test  | Description composition                               |
+| 32  | classNotContain passes when absent                      | body-analysis.test  | Positive notContain semantics                         |
+| 33  | classNotContain fails when present                      | body-analysis.test  | Negative notContain semantics                         |
+| 34  | classNotContain reports per-node violations             | body-analysis.test  | Multiple violations from one class                    |
+| 35  | classNotContain violation includes line number          | body-analysis.test  | Precise location reporting                            |
+| 36  | classNotContain passes for DomainError class            | body-analysis.test  | Error vs DomainError specificity                      |
+| 37  | classNotContain fails for Error class                   | body-analysis.test  | NewExpression condition                               |
+| 38  | classUseInsteadOf no violations for good class          | body-analysis.test  | OrderService passes both checks                       |
+| 39  | classUseInsteadOf reports bad and missing good          | body-analysis.test  | ProductService: has bad, missing good                 |
+| 40  | classUseInsteadOf has correct description               | body-analysis.test  | Description composition                               |
+| 41  | multiple elements checked independently                 | body-analysis.test  | OrderService passes, ProductService fails             |
+| 42  | E2E: notContain(call) via builder chain                 | integration.test    | Full fluent API                                       |
+| 43  | E2E: notContain(newExpr) via builder chain              | integration.test    | Full fluent API                                       |
+| 44  | E2E: useInsteadOf via builder chain                     | integration.test    | Combined condition                                    |
+| 45  | E2E: andShould chains body conditions                   | integration.test    | Multiple conditions                                   |
+| 46  | E2E: regex matchers via builder                         | integration.test    | Regex through full chain                              |
 
 ## Out of Scope
 

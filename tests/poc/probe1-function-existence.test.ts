@@ -13,9 +13,7 @@ describe('Probe 1: Function Existence — find elements by name/location', () =>
   describe('FunctionDeclaration by name regex', () => {
     const pattern = /^parse\w+Order$/
 
-    const allFunctions = project
-      .getSourceFiles()
-      .flatMap((sf) => sf.getFunctions())
+    const allFunctions = project.getSourceFiles().flatMap((sf) => sf.getFunctions())
 
     const matched = allFunctions.filter((fn) => {
       const name = fn.getName()

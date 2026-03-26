@@ -11,9 +11,7 @@ const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 const project = new Project({
   tsConfigFilePath: path.join(fixturesDir, 'tsconfig.json'),
 })
-const routesSf = project
-  .getSourceFiles()
-  .find((sf) => sf.getBaseName() === 'routes.ts')!
+const routesSf = project.getSourceFiles().find((sf) => sf.getBaseName() === 'routes.ts')!
 
 describe('ArchFunction model', () => {
   describe('fromFunctionDeclaration', () => {

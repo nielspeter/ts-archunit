@@ -28,23 +28,28 @@ describe('The Dependency Rule', () => {
   it('dependencies point inward', () => {
     slices(p)
       .assignedFrom(layers)
-      .should().respectLayerOrder('presentation', 'infrastructure', 'application', 'domain')
+      .should()
+      .respectLayerOrder('presentation', 'infrastructure', 'application', 'domain')
       .because('Clean Architecture: dependencies point inward')
       .check()
   })
 
   it('domain has no outward dependencies', () => {
     modules(p)
-      .that().resideInFolder('**/domain/**')
-      .should().onlyImportFrom('**/domain/**', '**/shared/**')
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .onlyImportFrom('**/domain/**', '**/shared/**')
       .because('domain must not depend on application, infrastructure, or presentation')
       .check()
   })
 
   it('application depends only on domain', () => {
     modules(p)
-      .that().resideInFolder('**/application/**')
-      .should().onlyImportFrom('**/application/**', '**/domain/**', '**/shared/**')
+      .that()
+      .resideInFolder('**/application/**')
+      .should()
+      .onlyImportFrom('**/application/**', '**/domain/**', '**/shared/**')
       .because('use cases depend on domain, not on infrastructure')
       .check()
   })
@@ -55,15 +60,19 @@ describe('The Dependency Rule', () => {
 describe('Domain Layer', () => {
   it('no framework imports in domain', () => {
     modules(p)
-      .that().resideInFolder('**/domain/**')
-      .should().notImportFrom('**/node_modules/express/**')
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .notImportFrom('**/node_modules/express/**')
       .check()
   })
 
   it('entities must be exported', () => {
     classes(p)
-      .that().resideInFolder('**/domain/**')
-      .should().beExported()
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .beExported()
       .because('domain entities are used by application layer')
       .check()
   })
@@ -80,14 +89,16 @@ describe('No Cycles', () => {
         application: 'src/application/**',
         domain: 'src/domain/**',
       })
-      .should().beFreeOfCycles()
+      .should()
+      .beFreeOfCycles()
       .check()
   })
 
   it('no circular dependencies between domain aggregates', () => {
     slices(p)
       .matching('src/domain/*/')
-      .should().beFreeOfCycles()
+      .should()
+      .beFreeOfCycles()
       .because('aggregates must be independently consistent')
       .check()
   })

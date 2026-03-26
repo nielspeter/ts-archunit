@@ -17,8 +17,10 @@ The motivating use case from the PoC (plan 0001, cmless plan 0212): enforcing th
 ```typescript
 // The rule this plan enables:
 types(project)
-  .that().haveProperty('sortBy')
-  .should().havePropertyType('sortBy', not(isString()))
+  .that()
+  .haveProperty('sortBy')
+  .should()
+  .havePropertyType('sortBy', not(isString()))
   .because('sortBy must be a union of string literals, not bare string')
   .check()
 ```
@@ -177,8 +179,8 @@ export function exactly(typeText: string): TypeMatcher {
 Note on `not()`: This is a _type matcher_ combinator, separate from the predicate combinator `not()` in `src/core/predicate.ts`. They operate at different levels — predicate `not()` inverts element filtering, matcher `not()` inverts type matching within a condition. Users import from different paths or use the namespace to disambiguate:
 
 ```typescript
-import { not } from 'ts-archunit/helpers/type-matchers'  // type matcher
-import { not as notPredicate } from 'ts-archunit'         // predicate combinator
+import { not } from 'ts-archunit/helpers/type-matchers' // type matcher
+import { not as notPredicate } from 'ts-archunit' // predicate combinator
 ```
 
 In practice, they rarely appear in the same file. The `not()` in a `.should().havePropertyType()` call is always the type matcher version.
@@ -253,10 +255,7 @@ export function haveProperty(name: string): Predicate<TypeDeclaration> {
  * @example
  * types(project).that().havePropertyOfType('sortBy', isString())
  */
-export function havePropertyOfType(
-  name: string,
-  matcher: TypeMatcher,
-): Predicate<TypeDeclaration> {
+export function havePropertyOfType(name: string, matcher: TypeMatcher): Predicate<TypeDeclaration> {
   return {
     description: `have property "${name}" of matching type`,
     test: (element) => {
@@ -501,9 +500,7 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
    * Combine with `.that().haveProperty(name)` to ensure the property exists.
    */
   havePropertyType(name: string, matcher: TypeMatcher): this {
-    return this.addCondition(
-      havePropertyType(name, matcher) as Condition<TypeDeclaration>,
-    )
+    return this.addCondition(havePropertyType(name, matcher) as Condition<TypeDeclaration>)
   }
 
   // --- Identity predicates (delegated to shared predicates) ---
@@ -632,9 +629,7 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
   // --- Type-specific conditions ---
 
   havePropertyType(name: string, matcher: TypeMatcher): this {
-    return this.addCondition(
-      havePropertyType(name, matcher) as Condition<TypeDeclaration>,
-    )
+    return this.addCondition(havePropertyType(name, matcher) as Condition<TypeDeclaration>)
   }
 
   // --- Identity predicates (convenience wrappers) ---
@@ -1005,7 +1000,9 @@ describe('type predicates', () => {
 
   describe('havePropertyOfType()', () => {
     it('matches when property type satisfies matcher', () => {
-      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnsafeOptions'))).toBe(true)
+      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnsafeOptions'))).toBe(
+        true,
+      )
     })
 
     it('rejects when property type does not satisfy matcher', () => {
@@ -1013,12 +1010,16 @@ describe('type predicates', () => {
     })
 
     it('rejects when property does not exist', () => {
-      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnrelatedOptions'))).toBe(false)
+      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnrelatedOptions'))).toBe(
+        false,
+      )
     })
 
     it('resolves through Partial<> for property type matching', () => {
       expect(
-        havePropertyOfType('sortBy', isUnionOfLiterals()).test(getTypeAlias('PartialStrictOptions')),
+        havePropertyOfType('sortBy', isUnionOfLiterals()).test(
+          getTypeAlias('PartialStrictOptions'),
+        ),
       ).toBe(true)
     })
   })
@@ -1146,8 +1147,10 @@ describe('types() integration', () => {
     // This is THE motivating use case from cmless plan 0212
     expect(() => {
       types(p)
-        .that().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .because('sortBy must be a union of string literals, not bare string')
         .check()
     }).toThrow(ArchRuleError)
@@ -1156,9 +1159,12 @@ describe('types() integration', () => {
   it('passes when all sortBy properties are unions of literals (filtered)', () => {
     expect(() => {
       types(p)
-        .that().haveProperty('sortBy')
-        .and().haveNameMatching(/^Safe|^Aliased|^Partial|^Picked|^SingleLiteral|^ExplicitUndefined/)
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .and()
+        .haveNameMatching(/^Safe|^Aliased|^Partial|^Picked|^SingleLiteral|^ExplicitUndefined/)
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
     }).not.toThrow()
   })
@@ -1166,8 +1172,12 @@ describe('types() integration', () => {
   it('filters to only interfaces', () => {
     expect(() => {
       types(p)
-        .that().areInterfaces().and().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .areInterfaces()
+        .and()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
     }).toThrow(ArchRuleError) // UnsafeOptions is an interface with bare string
   })
@@ -1175,8 +1185,12 @@ describe('types() integration', () => {
   it('filters to only type aliases', () => {
     expect(() => {
       types(p)
-        .that().areTypeAliases().and().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .areTypeAliases()
+        .and()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
     }).not.toThrow() // all type aliases with sortBy use unions
   })
@@ -1184,8 +1198,10 @@ describe('types() integration', () => {
   it('violation message includes the type name and property', () => {
     try {
       types(p)
-        .that().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
       expect.unreachable('should have thrown')
     } catch (error) {
@@ -1206,18 +1222,17 @@ describe('types() integration', () => {
     // Rule 2: same selection, different condition (just pass)
     // This verifies should() forks correctly
     expect(() => {
-      sortByTypes
-        .should()
-        .havePropertyType('direction', not(isString()))
-        .check()
+      sortByTypes.should().havePropertyType('direction', not(isString())).check()
     }).not.toThrow()
   })
 
   it('supports .because() in the full chain', () => {
     try {
       types(p)
-        .that().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .because('untyped sortBy allows invalid column names at runtime')
         .check()
       expect.unreachable('should have thrown')
@@ -1231,9 +1246,12 @@ describe('types() integration', () => {
   it('works with isUnionOfLiterals matcher end-to-end', () => {
     expect(() => {
       types(p)
-        .that().haveNameMatching(/^Safe/)
-        .and().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', isUnionOfLiterals())
+        .that()
+        .haveNameMatching(/^Safe/)
+        .and()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', isUnionOfLiterals())
         .check()
     }).not.toThrow()
   })
@@ -1242,76 +1260,76 @@ describe('types() integration', () => {
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/helpers/type-matchers.ts` | New — `TypeMatcher` type alias and matcher functions (`not`, `isString`, `isNumber`, `isBoolean`, `isUnionOfLiterals`, `isStringLiteral`, `arrayOf`, `matching`, `exactly`) |
-| `src/predicates/type.ts` | New — `TypeDeclaration` type alias, type predicates (`areInterfaces`, `areTypeAliases`, `haveProperty`, `havePropertyOfType`, `extendType`) |
-| `src/conditions/type-level.ts` | New — `havePropertyType` condition |
-| `src/builders/type-rule-builder.ts` | New — `TypeRuleBuilder` extending `RuleBuilder<TypeDeclaration>` |
-| `src/builders/type-rule-builder.ts` | New — `types()` entry function |
-| `src/index.ts` | Modified — export entry point, builder, predicates, conditions, matchers |
-| `tests/helpers/type-matchers.test.ts` | New — 20 tests for type matchers |
-| `tests/predicates/type.test.ts` | New — 11 tests for type predicates |
-| `tests/conditions/type-level.test.ts` | New — 8 tests for `havePropertyType` condition |
-| `tests/integration/type-rules.test.ts` | New — 8 tests for end-to-end `types()` rules |
+| File                                   | Change                                                                                                                                                                      |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/helpers/type-matchers.ts`         | New — `TypeMatcher` type alias and matcher functions (`not`, `isString`, `isNumber`, `isBoolean`, `isUnionOfLiterals`, `isStringLiteral`, `arrayOf`, `matching`, `exactly`) |
+| `src/predicates/type.ts`               | New — `TypeDeclaration` type alias, type predicates (`areInterfaces`, `areTypeAliases`, `haveProperty`, `havePropertyOfType`, `extendType`)                                 |
+| `src/conditions/type-level.ts`         | New — `havePropertyType` condition                                                                                                                                          |
+| `src/builders/type-rule-builder.ts`    | New — `TypeRuleBuilder` extending `RuleBuilder<TypeDeclaration>`                                                                                                            |
+| `src/builders/type-rule-builder.ts`    | New — `types()` entry function                                                                                                                                              |
+| `src/index.ts`                         | Modified — export entry point, builder, predicates, conditions, matchers                                                                                                    |
+| `tests/helpers/type-matchers.test.ts`  | New — 20 tests for type matchers                                                                                                                                            |
+| `tests/predicates/type.test.ts`        | New — 11 tests for type predicates                                                                                                                                          |
+| `tests/conditions/type-level.test.ts`  | New — 8 tests for `havePropertyType` condition                                                                                                                              |
+| `tests/integration/type-rules.test.ts` | New — 8 tests for end-to-end `types()` rules                                                                                                                                |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `isString()` matches bare string type | Core matcher — UnsafeOptions.sortBy |
-| 2 | `isString()` rejects string literal union | Core matcher — SafeOptions.sortBy |
-| 3 | `isString()` rejects number type | Type discrimination |
-| 4 | `isNumber()` matches bare number | Core matcher — UnrelatedOptions.limit |
-| 5 | `isNumber()` rejects string | Type discrimination |
-| 6 | `isBoolean()` rejects string | Type discrimination |
-| 7 | `not()` inverts a matcher | Combinator — not(isString()) on bare string |
-| 8 | `not()` passes when inner fails | Combinator — not(isString()) on union |
-| 9 | `isUnionOfLiterals()` matches string literal union | Core matcher — SafeOptions |
-| 10 | `isUnionOfLiterals()` rejects bare string | Core matcher — UnsafeOptions |
-| 11 | `isUnionOfLiterals()` rejects single literal | Edge case — SingleLiteralOptions |
-| 12 | `isUnionOfLiterals()` resolves through type alias | AliasedOptions -> SortColumn |
-| 13 | `isUnionOfLiterals()` resolves through Partial<> | PartialStrictOptions |
-| 14 | `isUnionOfLiterals()` resolves through Pick<> | PickedOptions |
-| 15 | `isUnionOfLiterals()` strips explicit undefined | ExplicitUndefinedOptions |
-| 16 | `isStringLiteral()` matches single literal | SingleLiteralOptions |
-| 17 | `isStringLiteral('created_at')` matches specific value | Value matching |
-| 18 | `isStringLiteral('wrong')` rejects wrong value | Value matching |
-| 19 | `isStringLiteral()` rejects bare string | Type discrimination |
-| 20 | `isStringLiteral()` rejects union | Type discrimination |
-| 21 | `matching()` matches type text regex | Escape hatch — string text |
-| 22 | `matching()` rejects non-matching | Escape hatch negative |
-| 23 | `exactly()` matches exact type text | Exact match |
-| 24 | `exactly()` rejects different text | Exact match negative |
-| 25 | `arrayOf()` rejects non-array | Guard clause |
-| 26 | `areInterfaces()` matches InterfaceDeclaration | Type guard predicate |
-| 27 | `areInterfaces()` rejects TypeAliasDeclaration | Type guard predicate |
-| 28 | `areTypeAliases()` matches TypeAliasDeclaration | Type guard predicate |
-| 29 | `areTypeAliases()` rejects InterfaceDeclaration | Type guard predicate |
-| 30 | `haveProperty()` matches interface with property | Property existence |
-| 31 | `haveProperty()` rejects interface without property | Property existence negative |
-| 32 | `haveProperty()` matches Partial<> type alias | Mapped type resolution |
-| 33 | `haveProperty()` matches Pick<> type alias | Mapped type resolution |
-| 34 | `havePropertyOfType()` matches when type satisfies matcher | Property type predicate |
-| 35 | `havePropertyOfType()` rejects when type doesn't satisfy | Property type negative |
-| 36 | `havePropertyOfType()` rejects when property missing | Guard clause |
-| 37 | `havePropertyOfType()` resolves through Partial<> | Mapped type resolution |
-| 38 | `havePropertyType` condition: violation for bare string | Core condition — UnsafeOptions |
-| 39 | `havePropertyType` condition: no violation for union | Core condition — SafeOptions |
-| 40 | `havePropertyType` condition: no violation for aliased union | Type alias resolution |
-| 41 | `havePropertyType` condition: no violation for Partial<> | Mapped type resolution |
-| 42 | `havePropertyType` condition: no violation for Pick<> | Mapped type resolution |
-| 43 | `havePropertyType` condition: skips elements without property | Guard behavior |
-| 44 | `havePropertyType` condition: isUnionOfLiterals matcher | Alternative matcher |
-| 45 | `havePropertyType` condition: multiple elements at once | Batch evaluation |
-| 46 | Integration: enforces no bare string on sortBy | End-to-end motivating use case |
-| 47 | Integration: passes when filtered to safe types | Predicate + condition combo |
-| 48 | Integration: filters to only interfaces | areInterfaces() predicate |
-| 49 | Integration: filters to only type aliases | areTypeAliases() predicate |
-| 50 | Integration: violation message includes type name | Error reporting |
-| 51 | Integration: named selection reuses predicates | Fork semantics |
-| 52 | Integration: .because() in full chain | Reason propagation |
-| 53 | Integration: isUnionOfLiterals end-to-end | Alternative matcher E2E |
+| #   | Test                                                          | What it validates                           |
+| --- | ------------------------------------------------------------- | ------------------------------------------- |
+| 1   | `isString()` matches bare string type                         | Core matcher — UnsafeOptions.sortBy         |
+| 2   | `isString()` rejects string literal union                     | Core matcher — SafeOptions.sortBy           |
+| 3   | `isString()` rejects number type                              | Type discrimination                         |
+| 4   | `isNumber()` matches bare number                              | Core matcher — UnrelatedOptions.limit       |
+| 5   | `isNumber()` rejects string                                   | Type discrimination                         |
+| 6   | `isBoolean()` rejects string                                  | Type discrimination                         |
+| 7   | `not()` inverts a matcher                                     | Combinator — not(isString()) on bare string |
+| 8   | `not()` passes when inner fails                               | Combinator — not(isString()) on union       |
+| 9   | `isUnionOfLiterals()` matches string literal union            | Core matcher — SafeOptions                  |
+| 10  | `isUnionOfLiterals()` rejects bare string                     | Core matcher — UnsafeOptions                |
+| 11  | `isUnionOfLiterals()` rejects single literal                  | Edge case — SingleLiteralOptions            |
+| 12  | `isUnionOfLiterals()` resolves through type alias             | AliasedOptions -> SortColumn                |
+| 13  | `isUnionOfLiterals()` resolves through Partial<>              | PartialStrictOptions                        |
+| 14  | `isUnionOfLiterals()` resolves through Pick<>                 | PickedOptions                               |
+| 15  | `isUnionOfLiterals()` strips explicit undefined               | ExplicitUndefinedOptions                    |
+| 16  | `isStringLiteral()` matches single literal                    | SingleLiteralOptions                        |
+| 17  | `isStringLiteral('created_at')` matches specific value        | Value matching                              |
+| 18  | `isStringLiteral('wrong')` rejects wrong value                | Value matching                              |
+| 19  | `isStringLiteral()` rejects bare string                       | Type discrimination                         |
+| 20  | `isStringLiteral()` rejects union                             | Type discrimination                         |
+| 21  | `matching()` matches type text regex                          | Escape hatch — string text                  |
+| 22  | `matching()` rejects non-matching                             | Escape hatch negative                       |
+| 23  | `exactly()` matches exact type text                           | Exact match                                 |
+| 24  | `exactly()` rejects different text                            | Exact match negative                        |
+| 25  | `arrayOf()` rejects non-array                                 | Guard clause                                |
+| 26  | `areInterfaces()` matches InterfaceDeclaration                | Type guard predicate                        |
+| 27  | `areInterfaces()` rejects TypeAliasDeclaration                | Type guard predicate                        |
+| 28  | `areTypeAliases()` matches TypeAliasDeclaration               | Type guard predicate                        |
+| 29  | `areTypeAliases()` rejects InterfaceDeclaration               | Type guard predicate                        |
+| 30  | `haveProperty()` matches interface with property              | Property existence                          |
+| 31  | `haveProperty()` rejects interface without property           | Property existence negative                 |
+| 32  | `haveProperty()` matches Partial<> type alias                 | Mapped type resolution                      |
+| 33  | `haveProperty()` matches Pick<> type alias                    | Mapped type resolution                      |
+| 34  | `havePropertyOfType()` matches when type satisfies matcher    | Property type predicate                     |
+| 35  | `havePropertyOfType()` rejects when type doesn't satisfy      | Property type negative                      |
+| 36  | `havePropertyOfType()` rejects when property missing          | Guard clause                                |
+| 37  | `havePropertyOfType()` resolves through Partial<>             | Mapped type resolution                      |
+| 38  | `havePropertyType` condition: violation for bare string       | Core condition — UnsafeOptions              |
+| 39  | `havePropertyType` condition: no violation for union          | Core condition — SafeOptions                |
+| 40  | `havePropertyType` condition: no violation for aliased union  | Type alias resolution                       |
+| 41  | `havePropertyType` condition: no violation for Partial<>      | Mapped type resolution                      |
+| 42  | `havePropertyType` condition: no violation for Pick<>         | Mapped type resolution                      |
+| 43  | `havePropertyType` condition: skips elements without property | Guard behavior                              |
+| 44  | `havePropertyType` condition: isUnionOfLiterals matcher       | Alternative matcher                         |
+| 45  | `havePropertyType` condition: multiple elements at once       | Batch evaluation                            |
+| 46  | Integration: enforces no bare string on sortBy                | End-to-end motivating use case              |
+| 47  | Integration: passes when filtered to safe types               | Predicate + condition combo                 |
+| 48  | Integration: filters to only interfaces                       | areInterfaces() predicate                   |
+| 49  | Integration: filters to only type aliases                     | areTypeAliases() predicate                  |
+| 50  | Integration: violation message includes type name             | Error reporting                             |
+| 51  | Integration: named selection reuses predicates                | Fork semantics                              |
+| 52  | Integration: .because() in full chain                         | Reason propagation                          |
+| 53  | Integration: isUnionOfLiterals end-to-end                     | Alternative matcher E2E                     |
 
 ## Out of Scope
 

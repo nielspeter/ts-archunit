@@ -20,10 +20,7 @@ Where `modules(p)` operates on individual source files, `slices(p)` operates on 
 
 ```typescript
 // Cycle detection across feature modules
-slices(project)
-  .matching('src/features/*/')
-  .should().beFreeOfCycles()
-  .check()
+slices(project).matching('src/features/*/').should().beFreeOfCycles().check()
 
 // Layered architecture enforcement
 const layers = {
@@ -34,7 +31,8 @@ const layers = {
 }
 slices(project)
   .assignedFrom(layers)
-  .should().respectLayerOrder('presentation', 'application', 'persistence', 'domain')
+  .should()
+  .respectLayerOrder('presentation', 'application', 'persistence', 'domain')
   .because('layers must not depend upward')
   .check()
 ```
@@ -145,10 +143,7 @@ export function resolveByMatching(project: ArchProject, glob: string): Slice[] {
  *   domain: 'src/domain/**',
  * })
  */
-export function resolveByDefinition(
-  project: ArchProject,
-  definition: SliceDefinition,
-): Slice[] {
+export function resolveByDefinition(project: ArchProject, definition: SliceDefinition): Slice[] {
   const sourceFiles = project.getSourceFiles()
   const entries = Object.entries(definition)
   const matchers = entries.map(([name, glob]) => ({
@@ -1133,19 +1128,13 @@ describe('SliceRuleBuilder with matching()', () => {
 
   it('detects cycles between feature slices', () => {
     expect(() => {
-      slices(p)
-        .matching('src/feature-')
-        .should().beFreeOfCycles()
-        .check()
+      slices(p).matching('src/feature-').should().beFreeOfCycles().check()
     }).toThrow(ArchRuleError)
   })
 
   it('passes beFreeOfCycles when slices are acyclic', () => {
     expect(() => {
-      slices(p)
-        .matching('src/feature-c')
-        .should().beFreeOfCycles()
-        .check()
+      slices(p).matching('src/feature-c').should().beFreeOfCycles().check()
     }).not.toThrow()
   })
 })
@@ -1161,7 +1150,8 @@ describe('SliceRuleBuilder with assignedFrom()', () => {
           services: '**/services/**',
           domain: '**/domain/**',
         })
-        .should().respectLayerOrder('controllers', 'services', 'domain')
+        .should()
+        .respectLayerOrder('controllers', 'services', 'domain')
         .check()
     }).not.toThrow()
   })
@@ -1175,7 +1165,8 @@ describe('SliceRuleBuilder with assignedFrom()', () => {
           domain: '**/domain/**',
           bad: '**/bad/**',
         })
-        .should().respectLayerOrder('controllers', 'services', 'domain', 'bad')
+        .should()
+        .respectLayerOrder('controllers', 'services', 'domain', 'bad')
         .check()
     }).toThrow(ArchRuleError)
   })
@@ -1187,7 +1178,8 @@ describe('SliceRuleBuilder with assignedFrom()', () => {
           domain: '**/domain/**',
           services: '**/services/**',
         })
-        .should().notDependOn('controllers')
+        .should()
+        .notDependOn('controllers')
         .check()
     }).not.toThrow()
   })
@@ -1199,7 +1191,8 @@ describe('SliceRuleBuilder with assignedFrom()', () => {
           bad: '**/bad/**',
           controllers: '**/controllers/**',
         })
-        .should().notDependOn('controllers')
+        .should()
+        .notDependOn('controllers')
         .check()
     }).toThrow(ArchRuleError)
   })
@@ -1212,7 +1205,8 @@ describe('SliceRuleBuilder chain methods', () => {
     try {
       slices(p)
         .matching('src/feature-')
-        .should().beFreeOfCycles()
+        .should()
+        .beFreeOfCycles()
         .because('features must not have circular deps')
         .check()
       expect.unreachable('should have thrown')
@@ -1224,28 +1218,19 @@ describe('SliceRuleBuilder chain methods', () => {
 
   it('.warn() does not throw', () => {
     expect(() => {
-      slices(p)
-        .matching('src/feature-')
-        .should().beFreeOfCycles()
-        .warn()
+      slices(p).matching('src/feature-').should().beFreeOfCycles().warn()
     }).not.toThrow()
   })
 
   it('.severity("error") throws on violations', () => {
     expect(() => {
-      slices(p)
-        .matching('src/feature-')
-        .should().beFreeOfCycles()
-        .severity('error')
+      slices(p).matching('src/feature-').should().beFreeOfCycles().severity('error')
     }).toThrow(ArchRuleError)
   })
 
   it('.severity("warn") does not throw', () => {
     expect(() => {
-      slices(p)
-        .matching('src/feature-')
-        .should().beFreeOfCycles()
-        .severity('warn')
+      slices(p).matching('src/feature-').should().beFreeOfCycles().severity('warn')
     }).not.toThrow()
   })
 
@@ -1257,8 +1242,10 @@ describe('SliceRuleBuilder chain methods', () => {
           services: '**/services/**',
           domain: '**/domain/**',
         })
-        .should().respectLayerOrder('controllers', 'services', 'domain')
-        .andShould().beFreeOfCycles()
+        .should()
+        .respectLayerOrder('controllers', 'services', 'domain')
+        .andShould()
+        .beFreeOfCycles()
         .check()
     }).not.toThrow()
   })
@@ -1282,55 +1269,55 @@ export { slices, SliceRuleBuilder } from './builders/slice-rule-builder.js'
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/models/slice.ts` | New — `Slice` interface, `SliceDefinition` type, `resolveByMatching`, `resolveByDefinition` |
-| `src/helpers/tarjan.ts` | New — Tarjan's SCC algorithm, `AdjacencyList` type |
-| `src/helpers/slice-graph.ts` | New — `buildSliceDependencyGraph`, `findSliceDependencyDetails` |
-| `src/conditions/slice.ts` | New — `beFreeOfCycles`, `respectLayerOrder`, `notDependOn` conditions |
-| `src/builders/slice-rule-builder.ts` | New — `SliceRuleBuilder` class + `slices()` entry function |
-| `src/index.ts` | Modified — export slice types, conditions, and `slices()` entry point |
-| `tests/fixtures/slices/` | New — fixture project with domain/services/controllers/bad/feature-a/feature-b/feature-c |
-| `tests/helpers/tarjan.test.ts` | New — 7 tests for Tarjan's SCC algorithm |
-| `tests/models/slice.test.ts` | New — 6 tests for slice resolution |
-| `tests/conditions/slice.test.ts` | New — 6 tests for slice conditions |
-| `tests/builders/slice-rule-builder.test.ts` | New — 12 tests for builder + entry point |
+| File                                        | Change                                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `src/models/slice.ts`                       | New — `Slice` interface, `SliceDefinition` type, `resolveByMatching`, `resolveByDefinition` |
+| `src/helpers/tarjan.ts`                     | New — Tarjan's SCC algorithm, `AdjacencyList` type                                          |
+| `src/helpers/slice-graph.ts`                | New — `buildSliceDependencyGraph`, `findSliceDependencyDetails`                             |
+| `src/conditions/slice.ts`                   | New — `beFreeOfCycles`, `respectLayerOrder`, `notDependOn` conditions                       |
+| `src/builders/slice-rule-builder.ts`        | New — `SliceRuleBuilder` class + `slices()` entry function                                  |
+| `src/index.ts`                              | Modified — export slice types, conditions, and `slices()` entry point                       |
+| `tests/fixtures/slices/`                    | New — fixture project with domain/services/controllers/bad/feature-a/feature-b/feature-c    |
+| `tests/helpers/tarjan.test.ts`              | New — 7 tests for Tarjan's SCC algorithm                                                    |
+| `tests/models/slice.test.ts`                | New — 6 tests for slice resolution                                                          |
+| `tests/conditions/slice.test.ts`            | New — 6 tests for slice conditions                                                          |
+| `tests/builders/slice-rule-builder.test.ts` | New — 12 tests for builder + entry point                                                    |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `tarjanSCC` returns empty for a DAG | No false positives on acyclic graphs |
-| 2 | `tarjanSCC` detects a two-node cycle | Basic cycle detection |
-| 3 | `tarjanSCC` detects a three-node cycle | Multi-node cycle |
-| 4 | `tarjanSCC` detects multiple independent cycles | Multiple SCCs |
-| 5 | `tarjanSCC` ignores self-loops | Size-1 SCCs filtered |
-| 6 | `tarjanSCC` handles disconnected graph | Edge case: no edges |
-| 7 | `tarjanSCC` handles mixed cycle + acyclic branches | Partial graph cycle |
-| 8 | `resolveByMatching` creates slices from directories | Glob-based slice discovery |
-| 9 | `resolveByMatching` assigns files to correct slice | File-to-slice mapping |
-| 10 | `resolveByMatching` returns empty for no matches | Negative case |
-| 11 | `resolveByDefinition` creates slices from explicit defs | Definition-based slices |
-| 12 | `resolveByDefinition` assigns files correctly | File counting per slice |
-| 13 | `resolveByDefinition` first match wins | Overlap resolution |
-| 14 | `beFreeOfCycles` detects cycles between features | Cycle condition: fail |
-| 15 | `beFreeOfCycles` passes for acyclic slices | Cycle condition: pass |
-| 16 | `respectLayerOrder` passes for correct layer flow | Layer condition: pass |
-| 17 | `respectLayerOrder` detects upward dependency | Layer condition: fail |
-| 18 | `notDependOn` passes when no forbidden deps | Isolation condition: pass |
-| 19 | `notDependOn` detects forbidden dependency | Isolation condition: fail |
-| 20 | `slices()` returns SliceRuleBuilder | Entry point type |
-| 21 | `matching()` + `beFreeOfCycles` detects cycles | End-to-end: cycle |
-| 22 | `matching()` + `beFreeOfCycles` passes for acyclic | End-to-end: no cycle |
-| 23 | `assignedFrom()` + `respectLayerOrder` passes | End-to-end: layers pass |
-| 24 | `assignedFrom()` + `respectLayerOrder` fails | End-to-end: layers fail |
-| 25 | `assignedFrom()` + `notDependOn` passes | End-to-end: isolation pass |
-| 26 | `assignedFrom()` + `notDependOn` fails | End-to-end: isolation fail |
-| 27 | `.because()` includes reason in error | Rationale wiring |
-| 28 | `.warn()` does not throw | Warn terminal method |
-| 29 | `.severity('error')` throws | Severity: error |
-| 30 | `.severity('warn')` does not throw | Severity: warn |
-| 31 | Multiple conditions with `.andShould()` | Condition chaining |
+| #   | Test                                                    | What it validates                    |
+| --- | ------------------------------------------------------- | ------------------------------------ |
+| 1   | `tarjanSCC` returns empty for a DAG                     | No false positives on acyclic graphs |
+| 2   | `tarjanSCC` detects a two-node cycle                    | Basic cycle detection                |
+| 3   | `tarjanSCC` detects a three-node cycle                  | Multi-node cycle                     |
+| 4   | `tarjanSCC` detects multiple independent cycles         | Multiple SCCs                        |
+| 5   | `tarjanSCC` ignores self-loops                          | Size-1 SCCs filtered                 |
+| 6   | `tarjanSCC` handles disconnected graph                  | Edge case: no edges                  |
+| 7   | `tarjanSCC` handles mixed cycle + acyclic branches      | Partial graph cycle                  |
+| 8   | `resolveByMatching` creates slices from directories     | Glob-based slice discovery           |
+| 9   | `resolveByMatching` assigns files to correct slice      | File-to-slice mapping                |
+| 10  | `resolveByMatching` returns empty for no matches        | Negative case                        |
+| 11  | `resolveByDefinition` creates slices from explicit defs | Definition-based slices              |
+| 12  | `resolveByDefinition` assigns files correctly           | File counting per slice              |
+| 13  | `resolveByDefinition` first match wins                  | Overlap resolution                   |
+| 14  | `beFreeOfCycles` detects cycles between features        | Cycle condition: fail                |
+| 15  | `beFreeOfCycles` passes for acyclic slices              | Cycle condition: pass                |
+| 16  | `respectLayerOrder` passes for correct layer flow       | Layer condition: pass                |
+| 17  | `respectLayerOrder` detects upward dependency           | Layer condition: fail                |
+| 18  | `notDependOn` passes when no forbidden deps             | Isolation condition: pass            |
+| 19  | `notDependOn` detects forbidden dependency              | Isolation condition: fail            |
+| 20  | `slices()` returns SliceRuleBuilder                     | Entry point type                     |
+| 21  | `matching()` + `beFreeOfCycles` detects cycles          | End-to-end: cycle                    |
+| 22  | `matching()` + `beFreeOfCycles` passes for acyclic      | End-to-end: no cycle                 |
+| 23  | `assignedFrom()` + `respectLayerOrder` passes           | End-to-end: layers pass              |
+| 24  | `assignedFrom()` + `respectLayerOrder` fails            | End-to-end: layers fail              |
+| 25  | `assignedFrom()` + `notDependOn` passes                 | End-to-end: isolation pass           |
+| 26  | `assignedFrom()` + `notDependOn` fails                  | End-to-end: isolation fail           |
+| 27  | `.because()` includes reason in error                   | Rationale wiring                     |
+| 28  | `.warn()` does not throw                                | Warn terminal method                 |
+| 29  | `.severity('error')` throws                             | Severity: error                      |
+| 30  | `.severity('warn')` does not throw                      | Severity: warn                       |
+| 31  | Multiple conditions with `.andShould()`                 | Condition chaining                   |
 
 ## Out of Scope
 

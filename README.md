@@ -24,31 +24,49 @@ Create `arch.test.ts` in your test directory:
 
 ```typescript
 import { describe, it } from 'vitest' // or jest
-import { project, classes, functions, types, modules, slices, call, newExpr, isString, notType } from 'ts-archunit'
+import {
+  project,
+  classes,
+  functions,
+  types,
+  modules,
+  slices,
+  call,
+  newExpr,
+  isString,
+  notType,
+} from 'ts-archunit'
 
 const p = project('tsconfig.json')
 
 describe('Architecture Rules', () => {
   it('domain must not import from infrastructure', () => {
     modules(p)
-      .that().resideInFolder('**/domain/**')
-      .should().onlyImportFrom('**/domain/**', '**/shared/**')
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .onlyImportFrom('**/domain/**', '**/shared/**')
       .check()
   })
 
   it('services must use shared error classes', () => {
     classes(p)
-      .that().extend('BaseService')
-      .should().notContain(newExpr('Error'))
+      .that()
+      .extend('BaseService')
+      .should()
+      .notContain(newExpr('Error'))
       .because('use DomainError instead of generic Error')
       .check()
   })
 
   it('no copy-pasted order parsers', () => {
     functions(p)
-      .that().haveNameMatching(/^parse\w+Order$/)
-      .and().resideInFolder('**/routes/**')
-      .should().notExist()
+      .that()
+      .haveNameMatching(/^parse\w+Order$/)
+      .and()
+      .resideInFolder('**/routes/**')
+      .should()
+      .notExist()
       .because('use the shared parseOrder() utility')
       .check()
   })
@@ -76,14 +94,17 @@ const layers = {
 // Dependencies must flow downward
 slices(p)
   .assignedFrom(layers)
-  .should().respectLayerOrder('controllers', 'services', 'repositories', 'domain')
+  .should()
+  .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
   .because('layers must not depend upward')
   .check()
 
 // Domain must be framework-free
 modules(p)
-  .that().resideInFolder('**/domain/**')
-  .should().notImportFrom('**/controllers/**', '**/repositories/**')
+  .that()
+  .resideInFolder('**/domain/**')
+  .should()
+  .notImportFrom('**/controllers/**', '**/repositories/**')
   .check()
 ```
 
@@ -91,10 +112,7 @@ modules(p)
 
 ```typescript
 // No circular dependencies between feature modules
-slices(p)
-  .matching('src/features/*/')
-  .should().beFreeOfCycles()
-  .check()
+slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 ```
 
 ### Body Analysis
@@ -104,21 +122,27 @@ This is where ts-archunit goes beyond import-path checking. It inspects what hap
 ```typescript
 // Repositories must use the shared helper, not inline parseInt
 classes(p)
-  .that().extend('BaseRepository')
-  .should().notContain(call('parseInt'))
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(call('parseInt'))
   .because('use this.extractCount() from BaseRepository')
   .check()
 
 // Or enforce both sides: ban the bad, require the good
 classes(p)
-  .that().extend('BaseRepository')
-  .should().useInsteadOf(call('parseInt'), call('this.extractCount'))
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .useInsteadOf(call('parseInt'), call('this.extractCount'))
   .check()
 
 // Ban direct URLSearchParams construction in SDK wrappers
 functions(p)
-  .that().resideInFolder('**/wrappers/**')
-  .should().notContain(newExpr('URLSearchParams'))
+  .that()
+  .resideInFolder('**/wrappers/**')
+  .should()
+  .notContain(newExpr('URLSearchParams'))
   .because('use buildQueryString() utility')
   .check()
 ```
@@ -130,9 +154,12 @@ Check property types using the TypeScript type checker — resolves through alia
 ```typescript
 // Query options must use typed unions, not bare string
 types(p)
-  .that().haveNameMatching(/Options$/)
-  .and().haveProperty('orderBy')
-  .should().havePropertyType('orderBy', notType(isString()))
+  .that()
+  .haveNameMatching(/Options$/)
+  .and()
+  .haveProperty('orderBy')
+  .should()
+  .havePropertyType('orderBy', notType(isString()))
   .because('bare string orderBy is a SQL injection surface')
   .check()
 ```
@@ -142,15 +169,14 @@ types(p)
 ```typescript
 // Controllers must end with Controller
 classes(p)
-  .that().resideInFolder('**/controllers/**')
-  .should().haveNameMatching(/Controller$/)
+  .that()
+  .resideInFolder('**/controllers/**')
+  .should()
+  .haveNameMatching(/Controller$/)
   .check()
 
 // Services must be exported
-classes(p)
-  .that().haveNameEndingWith('Service')
-  .should().beExported()
-  .check()
+classes(p).that().haveNameEndingWith('Service').should().beExported().check()
 ```
 
 ### Class Structure
@@ -158,16 +184,16 @@ classes(p)
 ```typescript
 // All repositories must extend BaseRepository
 classes(p)
-  .that().resideInFolder('**/repositories/**')
-  .and().haveNameEndingWith('Repository')
-  .should().shouldExtend('BaseRepository')
+  .that()
+  .resideInFolder('**/repositories/**')
+  .and()
+  .haveNameEndingWith('Repository')
+  .should()
+  .shouldExtend('BaseRepository')
   .check()
 
 // Services must have a findById method
-classes(p)
-  .that().extend('BaseService')
-  .should().shouldHaveMethodNamed('findById')
-  .check()
+classes(p).that().extend('BaseService').should().shouldHaveMethodNamed('findById').check()
 ```
 
 ### Named Selections
@@ -189,10 +215,7 @@ Not every rule should fail CI:
 
 ```typescript
 // Warn about deprecated patterns, don't block
-classes(p)
-  .that().haveDecorator('Deprecated')
-  .should().notExist()
-  .warn() // logs to stderr, does not throw
+classes(p).that().haveDecorator('Deprecated').should().notExist().warn() // logs to stderr, does not throw
 ```
 
 ## Custom Rules
@@ -211,8 +234,10 @@ const hasTooManyMethods = definePredicate<ClassDeclaration>(
 
 // Use in a rule
 classes(p)
-  .that().satisfy(hasTooManyMethods)
-  .should().notExist()
+  .that()
+  .satisfy(hasTooManyMethods)
+  .should()
+  .notExist()
   .because('classes with >10 methods should be split')
   .check()
 ```
@@ -238,21 +263,18 @@ const haveJsDocOnPublicMethods = defineCondition<ClassDeclaration>(
   },
 )
 
-classes(p)
-  .that().areExported()
-  .should().satisfy(haveJsDocOnPublicMethods)
-  .check()
+classes(p).that().areExported().should().satisfy(haveJsDocOnPublicMethods).check()
 ```
 
 ## Entry Points
 
-| Function | Operates on | Use case |
-|----------|-------------|----------|
-| `modules(p)` | Source files | Import/dependency rules |
-| `classes(p)` | Class declarations | Inheritance, decorators, methods, body analysis |
-| `functions(p)` | Functions + arrow functions | Naming, parameters, body analysis |
-| `types(p)` | Interfaces + type aliases | Property types, type safety |
-| `slices(p)` | Groups of files | Cycles, layer ordering |
+| Function       | Operates on                 | Use case                                        |
+| -------------- | --------------------------- | ----------------------------------------------- |
+| `modules(p)`   | Source files                | Import/dependency rules                         |
+| `classes(p)`   | Class declarations          | Inheritance, decorators, methods, body analysis |
+| `functions(p)` | Functions + arrow functions | Naming, parameters, body analysis               |
+| `types(p)`     | Interfaces + type aliases   | Property types, type safety                     |
+| `slices(p)`    | Groups of files             | Cycles, layer ordering                          |
 
 ## Violation Output
 
@@ -281,13 +303,13 @@ Rules run in your test suite. `.check()` throws on violations (test fails). `.wa
 
 ## Comparison
 
-| Tool | Import paths | Body analysis | Type checking | Cycles |
-|------|-------------|---------------|---------------|--------|
-| **ts-archunit** | Yes | Yes | Yes | Yes |
-| dependency-cruiser | Yes | No | No | Yes |
-| eslint-plugin-boundaries | Yes | No | No | No |
-| ts-arch (npm) | Yes | No | No | No |
-| ESLint rules | Per-file | No | No | No |
+| Tool                     | Import paths | Body analysis | Type checking | Cycles |
+| ------------------------ | ------------ | ------------- | ------------- | ------ |
+| **ts-archunit**          | Yes          | Yes           | Yes           | Yes    |
+| dependency-cruiser       | Yes          | No            | No            | Yes    |
+| eslint-plugin-boundaries | Yes          | No            | No            | No     |
+| ts-arch (npm)            | Yes          | No            | No            | No     |
+| ESLint rules             | Per-file     | No            | No            | No     |
 
 ## Requirements
 

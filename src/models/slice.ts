@@ -46,9 +46,8 @@ export function resolveByMatching(project: ArchProject, glob: string): Slice[] {
   // Prepend ** if the glob is not already absolute or globbed at the root,
   // so it matches anywhere in an absolute file path.
   // Append */** to match: the slice directory segment (*) + any files inside (/**)
-  const fullGlob = glob.startsWith('/') || glob.startsWith('**')
-    ? glob + '*/**'
-    : '**/' + glob + '*/**'
+  const fullGlob =
+    glob.startsWith('/') || glob.startsWith('**') ? glob + '*/**' : '**/' + glob + '*/**'
   const isMatch = picomatch(fullGlob)
   const sourceFiles = project.getSourceFiles()
   const sliceMap = new Map<string, SourceFile[]>()
@@ -98,17 +97,16 @@ export function resolveByMatching(project: ArchProject, glob: string): Slice[] {
  *   domain: 'src/domain/**',
  * })
  */
-export function resolveByDefinition(
-  project: ArchProject,
-  definition: SliceDefinition,
-): Slice[] {
+export function resolveByDefinition(project: ArchProject, definition: SliceDefinition): Slice[] {
   const sourceFiles = project.getSourceFiles()
   const entries = Object.entries(definition)
-  const matchers = entries.map(([name, glob]): { name: string; isMatch: picomatch.Matcher; files: SourceFile[] } => ({
-    name,
-    isMatch: picomatch(glob),
-    files: [],
-  }))
+  const matchers = entries.map(
+    ([name, glob]): { name: string; isMatch: picomatch.Matcher; files: SourceFile[] } => ({
+      name,
+      isMatch: picomatch(glob),
+      files: [],
+    }),
+  )
 
   for (const sf of sourceFiles) {
     const filePath = sf.getFilePath()

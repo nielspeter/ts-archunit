@@ -22,8 +22,10 @@ After this plan, users can write rules like:
 
 ```typescript
 modules(project)
-  .that().resideInFolder('**/domain/**')
-  .should().onlyImportFrom('**/domain/**', '**/shared/**')
+  .that()
+  .resideInFolder('**/domain/**')
+  .should()
+  .onlyImportFrom('**/domain/**', '**/shared/**')
   .because('domain modules must not depend on infrastructure')
   .check()
 ```
@@ -301,9 +303,7 @@ import {
   notImportFrom as notImportFromCondition,
   onlyHaveTypeImportsFrom as onlyHaveTypeImportsFromCondition,
 } from '../conditions/dependency.js'
-import {
-  notExist,
-} from '../conditions/structural.js'
+import { notExist } from '../conditions/structural.js'
 
 /**
  * Rule builder for module-level (SourceFile) architecture rules.
@@ -825,8 +825,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.onlyImportFrom() passes when domain imports are allowed', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/domain/**')
-          .should().onlyImportFrom('**/domain/**', '**/shared/**')
+          .that()
+          .resideInFolder('**/domain/**')
+          .should()
+          .onlyImportFrom('**/domain/**', '**/shared/**')
           .check()
       }).not.toThrow()
     })
@@ -834,8 +836,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.onlyImportFrom() fails when imports violate the constraint', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/bad/**')
-          .should().onlyImportFrom('**/domain/**')
+          .that()
+          .resideInFolder('**/bad/**')
+          .should()
+          .onlyImportFrom('**/domain/**')
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -843,8 +847,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.notImportFromCondition() passes when no forbidden imports exist', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/domain/**')
-          .should().notImportFromCondition('**/infra/**')
+          .that()
+          .resideInFolder('**/domain/**')
+          .should()
+          .notImportFromCondition('**/infra/**')
           .check()
       }).not.toThrow()
     })
@@ -852,8 +858,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.notImportFromCondition() fails when forbidden imports exist', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/bad/**')
-          .should().notImportFromCondition('**/infra/**')
+          .that()
+          .resideInFolder('**/bad/**')
+          .should()
+          .notImportFromCondition('**/infra/**')
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -861,8 +869,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.onlyHaveTypeImportsFrom() validates type-only imports', () => {
       expect(() => {
         modules(p)
-          .that().havePathMatching('**/bad/non-type-import.ts')
-          .should().onlyHaveTypeImportsFrom('**/domain/**')
+          .that()
+          .havePathMatching('**/bad/non-type-import.ts')
+          .should()
+          .onlyHaveTypeImportsFrom('**/domain/**')
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -872,8 +882,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('includes reason in error message', () => {
       try {
         modules(p)
-          .that().resideInFolder('**/bad/**')
-          .should().onlyImportFrom('**/domain/**')
+          .that()
+          .resideInFolder('**/bad/**')
+          .should()
+          .onlyImportFrom('**/domain/**')
           .because('bad modules should only use domain')
           .check()
         expect.unreachable('should have thrown')
@@ -926,51 +938,51 @@ export { modules, ModuleRuleBuilder } from './builders/module-rule-builder.js'
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/predicates/module.ts` | New — `importFrom`, `notImportFrom`, `exportSymbolNamed`, `havePathMatching` predicates |
-| `src/conditions/dependency.ts` | New — `onlyImportFrom`, `notImportFrom`, `onlyHaveTypeImportsFrom` conditions |
-| `src/builders/module-rule-builder.ts` | New — `ModuleRuleBuilder` class + `modules()` entry function |
-| `src/index.ts` | Modified — export module predicates, dependency conditions, and `modules()` entry point |
-| `tests/fixtures/modules/` | New — fixture project with domain/shared/infra/bad module structure |
-| `tests/predicates/module.test.ts` | New — 8 tests for module predicates |
-| `tests/conditions/dependency.test.ts` | New — 8 tests for dependency conditions |
-| `tests/builders/module-rule-builder.test.ts` | New — 13 tests for builder + entry point |
+| File                                         | Change                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `src/predicates/module.ts`                   | New — `importFrom`, `notImportFrom`, `exportSymbolNamed`, `havePathMatching` predicates |
+| `src/conditions/dependency.ts`               | New — `onlyImportFrom`, `notImportFrom`, `onlyHaveTypeImportsFrom` conditions           |
+| `src/builders/module-rule-builder.ts`        | New — `ModuleRuleBuilder` class + `modules()` entry function                            |
+| `src/index.ts`                               | Modified — export module predicates, dependency conditions, and `modules()` entry point |
+| `tests/fixtures/modules/`                    | New — fixture project with domain/shared/infra/bad module structure                     |
+| `tests/predicates/module.test.ts`            | New — 8 tests for module predicates                                                     |
+| `tests/conditions/dependency.test.ts`        | New — 8 tests for dependency conditions                                                 |
+| `tests/builders/module-rule-builder.test.ts` | New — 13 tests for builder + entry point                                                |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `importFrom` matches module with matching import | Predicate: positive match |
-| 2 | `importFrom` rejects module with no matching import | Predicate: negative match |
-| 3 | `importFrom` resolves absolute import paths | Import resolution works |
-| 4 | `notImportFrom` matches module without forbidden import | Predicate: positive |
-| 5 | `notImportFrom` rejects module with forbidden import | Predicate: negative |
-| 6 | `exportSymbolNamed` matches module exporting the symbol | Export predicate |
-| 7 | `exportSymbolNamed` rejects module not exporting it | Export predicate negative |
-| 8 | `havePathMatching` matches by file path | Path glob predicate |
-| 9 | `onlyImportFrom` passes when all imports are allowed | Allowlist condition: pass |
-| 10 | `onlyImportFrom` reports violations for disallowed imports | Allowlist condition: fail |
-| 11 | `onlyImportFrom` passes for modules with no imports | Vacuous truth |
-| 12 | `onlyImportFrom` checks multiple modules, reports per import | Multi-element evaluation |
-| 13 | `notImportFrom` condition passes when no forbidden imports | Denylist condition: pass |
-| 14 | `notImportFrom` condition reports forbidden import violations | Denylist condition: fail |
-| 15 | `onlyHaveTypeImportsFrom` passes for type-only imports | Type import: pass |
-| 16 | `onlyHaveTypeImportsFrom` fails for value imports from matching paths | Type import: fail |
-| 17 | `onlyHaveTypeImportsFrom` ignores non-matching paths | Selective checking |
-| 18 | `modules()` returns ModuleRuleBuilder | Entry point type |
-| 19 | `modules()` has access to project source files | getElements wiring |
-| 20 | `.resideInFolder()` filters modules by folder | Identity predicate wiring |
-| 21 | `.importFrom()` filters modules by import | Module predicate wiring |
-| 22 | `.havePathMatching()` filters by path | Module predicate wiring |
-| 23 | `.exportSymbolNamed()` filters by export | Module predicate wiring |
-| 24 | `.onlyImportFrom()` passes valid dependency rules | Condition wiring: pass |
-| 25 | `.onlyImportFrom()` fails invalid dependency rules | Condition wiring: fail |
-| 26 | `.notImportFromCondition()` passes when clean | Condition wiring: pass |
-| 27 | `.notImportFromCondition()` fails when dirty | Condition wiring: fail |
-| 28 | `.onlyHaveTypeImportsFrom()` validates type-only imports | Condition wiring |
-| 29 | Full chain with `.because()` includes reason | End-to-end with rationale |
-| 30 | Named selections reuse predicates across rules | Fork semantics with real modules |
+| #   | Test                                                                  | What it validates                |
+| --- | --------------------------------------------------------------------- | -------------------------------- |
+| 1   | `importFrom` matches module with matching import                      | Predicate: positive match        |
+| 2   | `importFrom` rejects module with no matching import                   | Predicate: negative match        |
+| 3   | `importFrom` resolves absolute import paths                           | Import resolution works          |
+| 4   | `notImportFrom` matches module without forbidden import               | Predicate: positive              |
+| 5   | `notImportFrom` rejects module with forbidden import                  | Predicate: negative              |
+| 6   | `exportSymbolNamed` matches module exporting the symbol               | Export predicate                 |
+| 7   | `exportSymbolNamed` rejects module not exporting it                   | Export predicate negative        |
+| 8   | `havePathMatching` matches by file path                               | Path glob predicate              |
+| 9   | `onlyImportFrom` passes when all imports are allowed                  | Allowlist condition: pass        |
+| 10  | `onlyImportFrom` reports violations for disallowed imports            | Allowlist condition: fail        |
+| 11  | `onlyImportFrom` passes for modules with no imports                   | Vacuous truth                    |
+| 12  | `onlyImportFrom` checks multiple modules, reports per import          | Multi-element evaluation         |
+| 13  | `notImportFrom` condition passes when no forbidden imports            | Denylist condition: pass         |
+| 14  | `notImportFrom` condition reports forbidden import violations         | Denylist condition: fail         |
+| 15  | `onlyHaveTypeImportsFrom` passes for type-only imports                | Type import: pass                |
+| 16  | `onlyHaveTypeImportsFrom` fails for value imports from matching paths | Type import: fail                |
+| 17  | `onlyHaveTypeImportsFrom` ignores non-matching paths                  | Selective checking               |
+| 18  | `modules()` returns ModuleRuleBuilder                                 | Entry point type                 |
+| 19  | `modules()` has access to project source files                        | getElements wiring               |
+| 20  | `.resideInFolder()` filters modules by folder                         | Identity predicate wiring        |
+| 21  | `.importFrom()` filters modules by import                             | Module predicate wiring          |
+| 22  | `.havePathMatching()` filters by path                                 | Module predicate wiring          |
+| 23  | `.exportSymbolNamed()` filters by export                              | Module predicate wiring          |
+| 24  | `.onlyImportFrom()` passes valid dependency rules                     | Condition wiring: pass           |
+| 25  | `.onlyImportFrom()` fails invalid dependency rules                    | Condition wiring: fail           |
+| 26  | `.notImportFromCondition()` passes when clean                         | Condition wiring: pass           |
+| 27  | `.notImportFromCondition()` fails when dirty                          | Condition wiring: fail           |
+| 28  | `.onlyHaveTypeImportsFrom()` validates type-only imports              | Condition wiring                 |
+| 29  | Full chain with `.because()` includes reason                          | End-to-end with rationale        |
+| 30  | Named selections reuse predicates across rules                        | Fork semantics with real modules |
 
 ## Out of Scope
 

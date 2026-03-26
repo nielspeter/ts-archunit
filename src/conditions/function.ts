@@ -91,7 +91,6 @@ export function haveNameMatching(pattern: RegExp): Condition<ArchFunction> {
       const name = fn.getName()
       return name !== undefined && pattern.test(name)
     },
-    (fn) =>
-      `${fn.getName() ?? '<anonymous>'} does not have a name matching ${String(pattern)}`,
+    (fn) => `${fn.getName() ?? '<anonymous>'} does not have a name matching ${String(pattern)}`,
   )
 }

@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import { noAnyProperties, noTypeAssertions, noNonNullAssertions } from '../../src/rules/typescript.js'
+import {
+  noAnyProperties,
+  noTypeAssertions,
+  noNonNullAssertions,
+} from '../../src/rules/typescript.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/rules')
 

@@ -2,11 +2,7 @@ import type { ClassDeclaration } from 'ts-morph'
 import { RuleBuilder } from '../core/rule-builder.js'
 import type { ArchProject } from '../core/project.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
-import {
-  classContain,
-  classNotContain,
-  classUseInsteadOf,
-} from '../conditions/body-analysis.js'
+import { classContain, classNotContain, classUseInsteadOf } from '../conditions/body-analysis.js'
 
 // Identity predicates (plan 0003)
 import {

@@ -72,8 +72,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.onlyImportFrom() passes when domain imports are allowed', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/domain/**')
-          .should().onlyImportFrom('**/domain/**', '**/shared/**')
+          .that()
+          .resideInFolder('**/domain/**')
+          .should()
+          .onlyImportFrom('**/domain/**', '**/shared/**')
           .check()
       }).not.toThrow()
     })
@@ -81,8 +83,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.onlyImportFrom() fails when imports violate the constraint', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/bad/**')
-          .should().onlyImportFrom('**/domain/**')
+          .that()
+          .resideInFolder('**/bad/**')
+          .should()
+          .onlyImportFrom('**/domain/**')
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -90,8 +94,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.notImportFromCondition() passes when no forbidden imports exist', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/domain/**')
-          .should().notImportFromCondition('**/infra/**')
+          .that()
+          .resideInFolder('**/domain/**')
+          .should()
+          .notImportFromCondition('**/infra/**')
           .check()
       }).not.toThrow()
     })
@@ -99,8 +105,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.notImportFromCondition() fails when forbidden imports exist', () => {
       expect(() => {
         modules(p)
-          .that().resideInFolder('**/bad/**')
-          .should().notImportFromCondition('**/infra/**')
+          .that()
+          .resideInFolder('**/bad/**')
+          .should()
+          .notImportFromCondition('**/infra/**')
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -108,8 +116,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('.onlyHaveTypeImportsFrom() validates type-only imports', () => {
       expect(() => {
         modules(p)
-          .that().havePathMatching('**/bad/non-type-import.ts')
-          .should().onlyHaveTypeImportsFrom('**/domain/**')
+          .that()
+          .havePathMatching('**/bad/non-type-import.ts')
+          .should()
+          .onlyHaveTypeImportsFrom('**/domain/**')
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -119,8 +129,10 @@ describe('ModuleRuleBuilder fluent chain', () => {
     it('includes reason in error message', () => {
       try {
         modules(p)
-          .that().resideInFolder('**/bad/**')
-          .should().onlyImportFrom('**/domain/**')
+          .that()
+          .resideInFolder('**/bad/**')
+          .should()
+          .onlyImportFrom('**/domain/**')
           .because('bad modules should only use domain')
           .check()
         expect.unreachable('should have thrown')

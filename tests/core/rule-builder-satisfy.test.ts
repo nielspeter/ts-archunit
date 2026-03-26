@@ -40,21 +40,18 @@ const elements: TestElement[] = [
 
 describe('.satisfy() with custom predicate', () => {
   it('filters elements using a custom predicate', () => {
-    const isService = definePredicate<TestElement>(
-      'is a service',
-      (el) => el.name.endsWith('Service'),
+    const isService = definePredicate<TestElement>('is a service', (el) =>
+      el.name.endsWith('Service'),
     )
 
-    const alwaysFail = defineCondition<TestElement>(
-      'always fail',
-      (els, ctx) =>
-        els.map((el) => ({
-          rule: ctx.rule,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: 'fail',
-        })),
+    const alwaysFail = defineCondition<TestElement>('always fail', (els, ctx) =>
+      els.map((el) => ({
+        rule: ctx.rule,
+        element: el.name,
+        file: el.file,
+        line: el.line,
+        message: 'fail',
+      })),
     )
 
     const builder = new TestRuleBuilder(stubProject, elements)
@@ -65,10 +62,7 @@ describe('.satisfy() with custom predicate', () => {
       const archError = error as ArchRuleError
       // Only services matched the predicate, not helperUtil
       expect(archError.violations).toHaveLength(2)
-      expect(archError.violations.map((v) => v.element)).toEqual([
-        'UserService',
-        'OrderService',
-      ])
+      expect(archError.violations.map((v) => v.element)).toEqual(['UserService', 'OrderService'])
     }
   })
 
@@ -78,16 +72,14 @@ describe('.satisfy() with custom predicate', () => {
       test: (el) => el.name === 'helperUtil',
     }
 
-    const alwaysFail = defineCondition<TestElement>(
-      'fail',
-      (els, ctx) =>
-        els.map((el) => ({
-          rule: ctx.rule,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: 'fail',
-        })),
+    const alwaysFail = defineCondition<TestElement>('fail', (els, ctx) =>
+      els.map((el) => ({
+        rule: ctx.rule,
+        element: el.name,
+        file: el.file,
+        line: el.line,
+        message: 'fail',
+      })),
     )
 
     const builder = new TestRuleBuilder(stubProject, elements)
@@ -147,9 +139,8 @@ describe('.satisfy() with custom condition', () => {
 
 describe('.satisfy() with built-in chain methods', () => {
   it('custom predicate combines with built-in conditions via andShould()', () => {
-    const isService = definePredicate<TestElement>(
-      'is a service',
-      (el) => el.name.endsWith('Service'),
+    const isService = definePredicate<TestElement>('is a service', (el) =>
+      el.name.endsWith('Service'),
     )
 
     const alwaysPass = defineCondition<TestElement>('pass', () => [])
@@ -161,22 +152,19 @@ describe('.satisfy() with built-in chain methods', () => {
   })
 
   it('works with named selections', () => {
-    const isService = definePredicate<TestElement>(
-      'is a service',
-      (el) => el.name.endsWith('Service'),
+    const isService = definePredicate<TestElement>('is a service', (el) =>
+      el.name.endsWith('Service'),
     )
 
     const alwaysPass = defineCondition<TestElement>('pass', () => [])
-    const alwaysFail = defineCondition<TestElement>(
-      'fail',
-      (els, ctx) =>
-        els.map((el) => ({
-          rule: ctx.rule,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: 'fail',
-        })),
+    const alwaysFail = defineCondition<TestElement>('fail', (els, ctx) =>
+      els.map((el) => ({
+        rule: ctx.rule,
+        element: el.name,
+        file: el.file,
+        line: el.line,
+        message: 'fail',
+      })),
     )
 
     const services = new TestRuleBuilder(stubProject, elements).that().satisfy(isService)

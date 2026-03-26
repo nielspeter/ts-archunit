@@ -5,9 +5,8 @@ import type { ConditionContext } from '../../src/core/condition.js'
 
 describe('definePredicate', () => {
   it('creates a Predicate with the given description and test', () => {
-    const pred = definePredicate<{ name: string }>(
-      'has name starting with "X"',
-      (el) => el.name.startsWith('X'),
+    const pred = definePredicate<{ name: string }>('has name starting with "X"', (el) =>
+      el.name.startsWith('X'),
     )
     expect(pred.description).toBe('has name starting with "X"')
     expect(pred.test({ name: 'Xavier' })).toBe(true)
@@ -58,17 +57,15 @@ describe('defineCondition', () => {
   })
 
   it('propagates because from context', () => {
-    const cond = defineCondition<{ name: string }>(
-      'always fail',
-      (elements, context) =>
-        elements.map((el) => ({
-          rule: context.rule,
-          element: el.name,
-          file: 'test.ts',
-          line: 1,
-          message: 'failed',
-          because: context.because,
-        })),
+    const cond = defineCondition<{ name: string }>('always fail', (elements, context) =>
+      elements.map((el) => ({
+        rule: context.rule,
+        element: el.name,
+        file: 'test.ts',
+        line: 1,
+        message: 'failed',
+        because: context.because,
+      })),
     )
 
     const ctx: ConditionContext = { rule: 'r', because: 'reasons' }

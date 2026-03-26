@@ -207,8 +207,7 @@ export function shouldExtend(className: string): Condition<ClassDeclaration> {
 export function shouldImplement(interfaceName: string): Condition<ClassDeclaration> {
   return elementCondition<ClassDeclaration>(
     `implement "${interfaceName}"`,
-    (cls) =>
-      cls.getImplements().some((impl) => impl.getExpression().getText() === interfaceName),
+    (cls) => cls.getImplements().some((impl) => impl.getExpression().getText() === interfaceName),
     (cls) => `${getElementName(cls)} does not implement "${interfaceName}"`,
   )
 }
@@ -723,10 +722,7 @@ describe('class conditions', () => {
 
     it('reports violations for multiple non-conforming classes', () => {
       const cond = shouldExtend('BaseService')
-      const violations = cond.evaluate(
-        [getClass('OrderService'), getClass('DomainError')],
-        ctx,
-      )
+      const violations = cond.evaluate([getClass('OrderService'), getClass('DomainError')], ctx)
       expect(violations).toHaveLength(1) // Only DomainError fails
     })
   })
@@ -829,12 +825,7 @@ describe('ClassRuleBuilder', () => {
 
     it('haveNameEndingWith() filters by suffix', () => {
       expect(() => {
-        new ClassRuleBuilder(p)
-          .that()
-          .haveNameEndingWith('Service')
-          .should()
-          .beExported()
-          .check()
+        new ClassRuleBuilder(p).that().haveNameEndingWith('Service').should().beExported().check()
       }).not.toThrow()
     })
 
@@ -858,24 +849,14 @@ describe('ClassRuleBuilder', () => {
     it('extend() filters to subclasses', () => {
       // All BaseService subclasses are exported
       expect(() => {
-        new ClassRuleBuilder(p)
-          .that()
-          .extend('BaseService')
-          .should()
-          .beExported()
-          .check()
+        new ClassRuleBuilder(p).that().extend('BaseService').should().beExported().check()
       }).not.toThrow()
     })
 
     it('areAbstract() filters to abstract classes', () => {
       // BaseService is abstract and exported
       expect(() => {
-        new ClassRuleBuilder(p)
-          .that()
-          .areAbstract()
-          .should()
-          .shouldExtend('SomethingElse')
-          .check()
+        new ClassRuleBuilder(p).that().areAbstract().should().shouldExtend('SomethingElse').check()
       }).toThrow(ArchRuleError) // BaseService doesn't extend anything
     })
 
@@ -1019,12 +1000,7 @@ describe('classes() entry point integration', () => {
 
   it('classes with getTotal should extend BaseService', () => {
     expect(() => {
-      classes(p)
-        .that()
-        .haveMethodNamed('getTotal')
-        .should()
-        .shouldExtend('BaseService')
-        .check()
+      classes(p).that().haveMethodNamed('getTotal').should().shouldExtend('BaseService').check()
     }).not.toThrow()
   })
 
@@ -1056,70 +1032,70 @@ describe('classes() entry point integration', () => {
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/predicates/class.ts` | New -- 8 class-specific predicate functions |
-| `src/conditions/class.ts` | New -- 4 class-specific condition functions |
-| `src/builders/class-rule-builder.ts` | New -- `ClassRuleBuilder` extending `RuleBuilder<ClassDeclaration>` |
-| `src/builders/class-rule-builder.ts` | New -- `classes(p)` entry point function |
-| `src/predicates/index.ts` | Modified -- re-export class predicates |
-| `src/index.ts` | Modified -- export classes entry point, ClassRuleBuilder, class predicates/conditions |
-| `tests/fixtures/poc/src/decorated.ts` | New -- fixture with decorators and implements clauses |
-| `tests/fixtures/poc/tsconfig.json` | Modified -- add `experimentalDecorators: true` |
-| `tests/predicates/class.test.ts` | New -- 14 tests for class predicates |
-| `tests/conditions/class.test.ts` | New -- 7 tests for class conditions |
-| `tests/builders/class-rule-builder.test.ts` | New -- 10 tests for builder wiring and named selections |
-| `tests/integration/class-entry-point.test.ts` | New -- 5 end-to-end tests via `classes()` |
+| File                                          | Change                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `src/predicates/class.ts`                     | New -- 8 class-specific predicate functions                                           |
+| `src/conditions/class.ts`                     | New -- 4 class-specific condition functions                                           |
+| `src/builders/class-rule-builder.ts`          | New -- `ClassRuleBuilder` extending `RuleBuilder<ClassDeclaration>`                   |
+| `src/builders/class-rule-builder.ts`          | New -- `classes(p)` entry point function                                              |
+| `src/predicates/index.ts`                     | Modified -- re-export class predicates                                                |
+| `src/index.ts`                                | Modified -- export classes entry point, ClassRuleBuilder, class predicates/conditions |
+| `tests/fixtures/poc/src/decorated.ts`         | New -- fixture with decorators and implements clauses                                 |
+| `tests/fixtures/poc/tsconfig.json`            | Modified -- add `experimentalDecorators: true`                                        |
+| `tests/predicates/class.test.ts`              | New -- 14 tests for class predicates                                                  |
+| `tests/conditions/class.test.ts`              | New -- 7 tests for class conditions                                                   |
+| `tests/builders/class-rule-builder.test.ts`   | New -- 10 tests for builder wiring and named selections                               |
+| `tests/integration/class-entry-point.test.ts` | New -- 5 end-to-end tests via `classes()`                                             |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `extend()` matches subclasses | PoC finding: `getExtends()?.getExpression().getText()` |
-| 2 | `extend()` rejects non-subclasses | No extends clause or different base |
-| 3 | `extend()` rejects different base class | Specificity of class name match |
-| 4 | `extend()` has meaningful description | Violation message readability |
-| 5 | `areAbstract()` matches abstract classes | `isAbstract()` check |
-| 6 | `areAbstract()` rejects concrete classes | Negative case |
-| 7 | `haveMethodNamed()` matches by method name | `getMethod(name)` check |
-| 8 | `haveMethodNamed()` rejects missing method | Negative case |
-| 9 | `haveMethodMatching()` matches by regex | Regex against method names |
-| 10 | `haveMethodMatching()` rejects non-matching | Negative regex case |
-| 11 | `havePropertyNamed()` matches by property | `getProperty(name)` check |
-| 12 | `havePropertyNamed()` rejects missing property | Negative case |
-| 13 | `implement()` matches implementing class | `getImplements()` expression text |
-| 14 | `implement()` rejects non-implementing class | Negative case |
-| 15 | `implement()` handles multiple interfaces | Specificity with multiple implements |
-| 16 | `haveDecorator()` matches decorated class | `getDecorators()` name check |
-| 17 | `haveDecorator()` rejects undecorated class | Negative case |
-| 18 | `haveDecoratorMatching()` matches by regex | Regex against decorator names |
-| 19 | `haveDecoratorMatching()` rejects non-matching | Negative regex case |
-| 20 | `shouldExtend()` passes for valid extends | Condition passes |
-| 21 | `shouldExtend()` reports violation for missing extends | Condition fails with message |
-| 22 | `shouldExtend()` counts violations correctly | Multiple elements, partial match |
-| 23 | `shouldImplement()` passes for implementing class | Condition passes |
-| 24 | `shouldImplement()` reports violation | Condition fails |
-| 25 | `shouldHaveMethodNamed()` passes | Condition passes |
-| 26 | `shouldHaveMethodNamed()` reports violation | Condition fails with method name |
-| 27 | `shouldNotHaveMethodMatching()` passes | No methods match forbidden regex |
-| 28 | `shouldNotHaveMethodMatching()` reports violation with names | Lists matching methods |
-| 29 | Builder `getElements()` returns all classes | All fixture classes found |
-| 30 | Builder `haveNameMatching()` wires identity predicate | Predicate filters correctly |
-| 31 | Builder `haveNameEndingWith()` wires identity predicate | Suffix predicate |
-| 32 | Builder `areExported()` wires identity predicate | Export predicate |
-| 33 | Builder `extend()` wires class predicate | Class-specific filter |
-| 34 | Builder `areAbstract()` wires class predicate | Abstract filter |
-| 35 | Builder `haveMethodNamed()` wires class predicate | Method presence filter |
-| 36 | Builder `shouldExtend()` wires class condition | Class-specific assertion |
-| 37 | Builder `shouldHaveMethodNamed()` wires class condition | Method assertion |
-| 38 | Builder `shouldNotHaveMethodMatching()` wires class condition | Negative method assertion |
-| 39 | Builder named selections work | Fork semantics from plan 0005 |
-| 40 | Builder `because()` propagates reason | Reason in violation message |
-| 41 | Integration: `classes(p)` returns builder | Entry function works |
-| 42 | Integration: full predicate-condition chain | End-to-end grammar |
-| 43 | Integration: abstract class notExist assertion | Structural condition wiring |
-| 44 | Integration: method presence via entry point | Entry -> predicate -> condition |
-| 45 | Integration: compound predicate chain | `.and()` with multiple predicates |
+| #   | Test                                                          | What it validates                                      |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------ |
+| 1   | `extend()` matches subclasses                                 | PoC finding: `getExtends()?.getExpression().getText()` |
+| 2   | `extend()` rejects non-subclasses                             | No extends clause or different base                    |
+| 3   | `extend()` rejects different base class                       | Specificity of class name match                        |
+| 4   | `extend()` has meaningful description                         | Violation message readability                          |
+| 5   | `areAbstract()` matches abstract classes                      | `isAbstract()` check                                   |
+| 6   | `areAbstract()` rejects concrete classes                      | Negative case                                          |
+| 7   | `haveMethodNamed()` matches by method name                    | `getMethod(name)` check                                |
+| 8   | `haveMethodNamed()` rejects missing method                    | Negative case                                          |
+| 9   | `haveMethodMatching()` matches by regex                       | Regex against method names                             |
+| 10  | `haveMethodMatching()` rejects non-matching                   | Negative regex case                                    |
+| 11  | `havePropertyNamed()` matches by property                     | `getProperty(name)` check                              |
+| 12  | `havePropertyNamed()` rejects missing property                | Negative case                                          |
+| 13  | `implement()` matches implementing class                      | `getImplements()` expression text                      |
+| 14  | `implement()` rejects non-implementing class                  | Negative case                                          |
+| 15  | `implement()` handles multiple interfaces                     | Specificity with multiple implements                   |
+| 16  | `haveDecorator()` matches decorated class                     | `getDecorators()` name check                           |
+| 17  | `haveDecorator()` rejects undecorated class                   | Negative case                                          |
+| 18  | `haveDecoratorMatching()` matches by regex                    | Regex against decorator names                          |
+| 19  | `haveDecoratorMatching()` rejects non-matching                | Negative regex case                                    |
+| 20  | `shouldExtend()` passes for valid extends                     | Condition passes                                       |
+| 21  | `shouldExtend()` reports violation for missing extends        | Condition fails with message                           |
+| 22  | `shouldExtend()` counts violations correctly                  | Multiple elements, partial match                       |
+| 23  | `shouldImplement()` passes for implementing class             | Condition passes                                       |
+| 24  | `shouldImplement()` reports violation                         | Condition fails                                        |
+| 25  | `shouldHaveMethodNamed()` passes                              | Condition passes                                       |
+| 26  | `shouldHaveMethodNamed()` reports violation                   | Condition fails with method name                       |
+| 27  | `shouldNotHaveMethodMatching()` passes                        | No methods match forbidden regex                       |
+| 28  | `shouldNotHaveMethodMatching()` reports violation with names  | Lists matching methods                                 |
+| 29  | Builder `getElements()` returns all classes                   | All fixture classes found                              |
+| 30  | Builder `haveNameMatching()` wires identity predicate         | Predicate filters correctly                            |
+| 31  | Builder `haveNameEndingWith()` wires identity predicate       | Suffix predicate                                       |
+| 32  | Builder `areExported()` wires identity predicate              | Export predicate                                       |
+| 33  | Builder `extend()` wires class predicate                      | Class-specific filter                                  |
+| 34  | Builder `areAbstract()` wires class predicate                 | Abstract filter                                        |
+| 35  | Builder `haveMethodNamed()` wires class predicate             | Method presence filter                                 |
+| 36  | Builder `shouldExtend()` wires class condition                | Class-specific assertion                               |
+| 37  | Builder `shouldHaveMethodNamed()` wires class condition       | Method assertion                                       |
+| 38  | Builder `shouldNotHaveMethodMatching()` wires class condition | Negative method assertion                              |
+| 39  | Builder named selections work                                 | Fork semantics from plan 0005                          |
+| 40  | Builder `because()` propagates reason                         | Reason in violation message                            |
+| 41  | Integration: `classes(p)` returns builder                     | Entry function works                                   |
+| 42  | Integration: full predicate-condition chain                   | End-to-end grammar                                     |
+| 43  | Integration: abstract class notExist assertion                | Structural condition wiring                            |
+| 44  | Integration: method presence via entry point                  | Entry -> predicate -> condition                        |
+| 45  | Integration: compound predicate chain                         | `.and()` with multiple predicates                      |
 
 ## Out of Scope
 

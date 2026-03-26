@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import { noEval, noFunctionConstructor, noProcessEnv, noConsoleLog } from '../../src/rules/security.js'
+import {
+  noEval,
+  noFunctionConstructor,
+  noProcessEnv,
+  noConsoleLog,
+} from '../../src/rules/security.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/rules')
 

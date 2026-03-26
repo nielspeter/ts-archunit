@@ -121,9 +121,7 @@ describe('ExpressionMatcher helpers', () => {
 
   describe('access()', () => {
     it('has syntaxKinds for PropertyAccessExpression', () => {
-      expect(access('process.env').syntaxKinds).toEqual([
-        SyntaxKind.PropertyAccessExpression,
-      ])
+      expect(access('process.env').syntaxKinds).toEqual([SyntaxKind.PropertyAccessExpression])
     })
 
     it('has meaningful description', () => {

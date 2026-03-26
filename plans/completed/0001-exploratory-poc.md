@@ -23,11 +23,11 @@ All three probes pass (28 tests). ts-morph can support the spec's DSL. See `poc/
 
 Validate that ts-morph can support the core capabilities ts-archunit needs. Three capabilities, three probes:
 
-| Capability | Spec reference | Probe |
-| --- | --- | --- |
-| **Find elements by name/location** — functions, classes, interfaces matched by regex and file path glob | Predicates (Section 5) | Probe 1 |
-| **Inspect method bodies** — detect specific calls (`parseInt`, `this.normalizeCount`), constructors (`new Error`, `new URLSearchParams`), and property access chains inside function/method bodies | Body Analysis (Section 6.3) | Probe 2 |
-| **Query the type system** — distinguish `string` from `'a' \| 'b'`, resolve through type aliases, `Partial<>`, `Pick<>`, and optional properties | Type-Level Conditions (Section 6.4) | Probe 3 |
+| Capability                                                                                                                                                                                         | Spec reference                      | Probe   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------- |
+| **Find elements by name/location** — functions, classes, interfaces matched by regex and file path glob                                                                                            | Predicates (Section 5)              | Probe 1 |
+| **Inspect method bodies** — detect specific calls (`parseInt`, `this.normalizeCount`), constructors (`new Error`, `new URLSearchParams`), and property access chains inside function/method bodies | Body Analysis (Section 6.3)         | Probe 2 |
+| **Query the type system** — distinguish `string` from `'a' \| 'b'`, resolve through type aliases, `Partial<>`, `Pick<>`, and optional properties                                                   | Type-Level Conditions (Section 6.4) | Probe 3 |
 
 If ts-morph can do these three things reliably, the spec's DSL is implementable. If it can't, we need to adjust the spec before building anything.
 
@@ -61,9 +61,7 @@ export abstract class BaseService {
   protected db: Record<string, unknown> = {}
 
   protected normalizeCount(result: { count: string | number }): number {
-    return typeof result.count === 'string'
-      ? parseInt(result.count, 10)
-      : result.count
+    return typeof result.count === 'string' ? parseInt(result.count, 10) : result.count
   }
 
   protected toError(entity: string, id: string): never {
@@ -118,9 +116,7 @@ export class ProductService extends BaseService {
   async getTotal(): Promise<number> {
     const result = { count: '42' }
     // BAD: inline parseInt instead of this.normalizeCount()
-    return typeof result.count === 'string'
-      ? parseInt(result.count, 10)
-      : result.count
+    return typeof result.count === 'string' ? parseInt(result.count, 10) : result.count
   }
 
   async findById(id: string) {
@@ -298,9 +294,11 @@ export interface ExplicitUndefinedOptions {
 **Assertions:**
 
 ### Finding classes by extends
+
 1. Find all classes where `getExtends()?.getExpression().getText() === 'BaseService'` — expect `OrderService`, `ProductService`, `EdgeCaseService`
 
 ### CallExpression matching
+
 2. `ProductService.getTotal()` — find `parseInt` via `getDescendantsOfKind(SyntaxKind.CallExpression)`, match `getExpression().getText() === 'parseInt'`
 3. `OrderService.getTotal()` — find `this.normalizeCount` call, match `getExpression().getText() === 'this.normalizeCount'`
 4. `OrderService.getTotal()` — verify NO `parseInt` call exists
@@ -309,6 +307,7 @@ export interface ExplicitUndefinedOptions {
 7. `EdgeCaseService.withNesting()` — verify `parseInt` is found even when nested inside `Math.max(0, parseInt(...))`
 
 ### NewExpression matching
+
 8. `ProductService.findById()` — find `new Error(...)`, match `getExpression().getText() === 'Error'`
 9. `OrderService.findById()` — find `new DomainError(...)`, verify expression text is `'DomainError'` not `'Error'`
 10. `ProductService.buildUrl()` — find `new URLSearchParams()`
@@ -316,6 +315,7 @@ export interface ExplicitUndefinedOptions {
 12. `EdgeCaseService.withMultiple()` — verify both `parseInt` and `new Error` and `new URLSearchParams` are found in the same method
 
 **Success criteria:**
+
 - `CallExpression` matching by identifier and property access works
 - `NewExpression` matching correctly distinguishes `Error` from `DomainError`
 - Optional chaining behavior documented
@@ -332,20 +332,21 @@ export interface ExplicitUndefinedOptions {
 1. Load `tests/fixtures/poc/` with ts-morph (needs tsconfig for type resolution)
 2. For each interface/type, get `sortBy` property and check its type:
 
-| Type | `getNonNullableType().isString()` | Expected |
-| --- | --- | --- |
-| `UnsafeOptions.sortBy` | `true` | VIOLATION — bare string |
-| `SafeOptions.sortBy` | `false` | pass — union of literals |
-| `AliasedOptions.sortBy` | `false` | pass — alias resolves to union |
-| `PartialStrictOptions.sortBy` | `false` | pass — Partial resolves |
-| `PickedOptions.sortBy` | `false` | pass — Pick resolves |
-| `SingleLiteralOptions.sortBy` | `false` | pass — single literal, not string |
-| `UnrelatedOptions` | N/A | no `sortBy` property |
-| `ExplicitUndefinedOptions.sortBy` | `false` | pass — union of literals + undefined |
+| Type                              | `getNonNullableType().isString()` | Expected                             |
+| --------------------------------- | --------------------------------- | ------------------------------------ |
+| `UnsafeOptions.sortBy`            | `true`                            | VIOLATION — bare string              |
+| `SafeOptions.sortBy`              | `false`                           | pass — union of literals             |
+| `AliasedOptions.sortBy`           | `false`                           | pass — alias resolves to union       |
+| `PartialStrictOptions.sortBy`     | `false`                           | pass — Partial resolves              |
+| `PickedOptions.sortBy`            | `false`                           | pass — Pick resolves                 |
+| `SingleLiteralOptions.sortBy`     | `false`                           | pass — single literal, not string    |
+| `UnrelatedOptions`                | N/A                               | no `sortBy` property                 |
+| `ExplicitUndefinedOptions.sortBy` | `false`                           | pass — union of literals + undefined |
 
 3. Also verify for unions: `getNonNullableType().isUnion()` returns `true` and each union member `isStringLiteral()` returns `true`
 
 **Key questions to answer:**
+
 - Does `getNonNullableType()` correctly strip `undefined` from optional properties?
 - Does `isString()` return `false` for a union of string literals?
 - Do `Partial<>` and `Pick<>` resolve before we check?

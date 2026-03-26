@@ -297,14 +297,14 @@ export {
 
 ## Files Changed
 
-| File | Change | Purpose |
-|------|--------|---------|
-| `src/core/predicate.ts` | New | `Predicate<T>` interface, `and()`, `or()`, `not()` combinators |
-| `src/core/index.ts` | New | Barrel export for core module |
-| `src/predicates/identity.ts` | New | `Named`, `Located`, `Exportable` interfaces + all 7 identity predicate factory functions |
-| `src/predicates/index.ts` | New | Barrel export for predicates module |
-| `src/index.ts` | Modified | Re-export public API from core + predicates |
-| `tests/predicates/identity.test.ts` | New | Unit tests with mock objects + integration tests with ts-morph fixtures |
+| File                                | Change   | Purpose                                                                                  |
+| ----------------------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `src/core/predicate.ts`             | New      | `Predicate<T>` interface, `and()`, `or()`, `not()` combinators                           |
+| `src/core/index.ts`                 | New      | Barrel export for core module                                                            |
+| `src/predicates/identity.ts`        | New      | `Named`, `Located`, `Exportable` interfaces + all 7 identity predicate factory functions |
+| `src/predicates/index.ts`           | New      | Barrel export for predicates module                                                      |
+| `src/index.ts`                      | Modified | Re-export public API from core + predicates                                              |
+| `tests/predicates/identity.test.ts` | New      | Unit tests with mock objects + integration tests with ts-morph fixtures                  |
 
 ---
 
@@ -316,78 +316,78 @@ All tests grouped by category. Unit tests use plain objects satisfying the struc
 
 #### Predicate interface & combinators
 
-| # | Test | Type |
-|---|------|------|
-| 1 | `Predicate` — `test()` returns boolean, `description` is readable | Unit |
-| 2 | `and()` — returns true only when all predicates match | Unit |
-| 3 | `and()` — description joins with " and " | Unit |
-| 4 | `and()` — short-circuits on first false (verify with spy) | Unit |
-| 5 | `or()` — returns true when any predicate matches | Unit |
-| 6 | `or()` — description joins with " or " | Unit |
-| 7 | `not()` — inverts the predicate result | Unit |
-| 8 | `not()` — description wraps with "not (...)" | Unit |
-| 9 | Nested composition — `and(not(p1), or(p2, p3))` works correctly | Unit |
+| #   | Test                                                              | Type |
+| --- | ----------------------------------------------------------------- | ---- |
+| 1   | `Predicate` — `test()` returns boolean, `description` is readable | Unit |
+| 2   | `and()` — returns true only when all predicates match             | Unit |
+| 3   | `and()` — description joins with " and "                          | Unit |
+| 4   | `and()` — short-circuits on first false (verify with spy)         | Unit |
+| 5   | `or()` — returns true when any predicate matches                  | Unit |
+| 6   | `or()` — description joins with " or "                            | Unit |
+| 7   | `not()` — inverts the predicate result                            | Unit |
+| 8   | `not()` — description wraps with "not (...)"                      | Unit |
+| 9   | Nested composition — `and(not(p1), or(p2, p3))` works correctly   | Unit |
 
 #### `haveNameMatching`
 
-| # | Test | Type |
-|---|------|------|
-| 10 | Matches class name with RegExp `/Service$/` | Unit |
-| 11 | Does not match class with non-matching name | Unit |
-| 12 | Handles string pattern — converts to RegExp | Unit |
-| 13 | Returns false for unnamed element (`getName()` returns `undefined`) | Unit |
-| 14 | Against ts-morph: matches `OrderService` from `good-service.ts` | Integration |
-| 15 | Against ts-morph: matches `parseFooOrder` function from `routes.ts` | Integration |
+| #   | Test                                                                | Type        |
+| --- | ------------------------------------------------------------------- | ----------- |
+| 10  | Matches class name with RegExp `/Service$/`                         | Unit        |
+| 11  | Does not match class with non-matching name                         | Unit        |
+| 12  | Handles string pattern — converts to RegExp                         | Unit        |
+| 13  | Returns false for unnamed element (`getName()` returns `undefined`) | Unit        |
+| 14  | Against ts-morph: matches `OrderService` from `good-service.ts`     | Integration |
+| 15  | Against ts-morph: matches `parseFooOrder` function from `routes.ts` | Integration |
 
 #### `haveNameStartingWith` / `haveNameEndingWith`
 
-| # | Test | Type |
-|---|------|------|
-| 16 | `haveNameStartingWith('parse')` matches `parseFooOrder` | Unit |
-| 17 | `haveNameStartingWith('parse')` does not match `listItems` | Unit |
-| 18 | `haveNameEndingWith('Service')` matches `OrderService` | Unit |
-| 19 | `haveNameEndingWith('Service')` does not match `DomainError` | Unit |
-| 20 | Both return false for unnamed elements | Unit |
-| 21 | Against ts-morph: `haveNameEndingWith('Service')` finds all 4 service classes | Integration |
+| #   | Test                                                                          | Type        |
+| --- | ----------------------------------------------------------------------------- | ----------- |
+| 16  | `haveNameStartingWith('parse')` matches `parseFooOrder`                       | Unit        |
+| 17  | `haveNameStartingWith('parse')` does not match `listItems`                    | Unit        |
+| 18  | `haveNameEndingWith('Service')` matches `OrderService`                        | Unit        |
+| 19  | `haveNameEndingWith('Service')` does not match `DomainError`                  | Unit        |
+| 20  | Both return false for unnamed elements                                        | Unit        |
+| 21  | Against ts-morph: `haveNameEndingWith('Service')` finds all 4 service classes | Integration |
 
 #### `resideInFile`
 
-| # | Test | Type |
-|---|------|------|
-| 22 | Matches file path with glob `**/routes.ts` | Unit (mock `getSourceFile()`) |
-| 23 | Does not match non-matching file path | Unit |
-| 24 | Against ts-morph: classes from `bad-service.ts` matched by `**/bad-service.ts` | Integration |
-| 25 | Against ts-morph: `**/src/*.ts` matches all fixture source files | Integration |
+| #   | Test                                                                           | Type                          |
+| --- | ------------------------------------------------------------------------------ | ----------------------------- |
+| 22  | Matches file path with glob `**/routes.ts`                                     | Unit (mock `getSourceFile()`) |
+| 23  | Does not match non-matching file path                                          | Unit                          |
+| 24  | Against ts-morph: classes from `bad-service.ts` matched by `**/bad-service.ts` | Integration                   |
+| 25  | Against ts-morph: `**/src/*.ts` matches all fixture source files               | Integration                   |
 
 #### `resideInFolder`
 
-| # | Test | Type |
-|---|------|------|
-| 26 | Matches directory portion of file path | Unit |
-| 27 | Does not match when file is in different folder | Unit |
-| 28 | Glob `**/poc/src` matches fixture files in `tests/fixtures/poc/src/` | Integration |
-| 29 | Glob `**/nonexistent/**` matches nothing | Integration |
-| 30 | Handles nested folders correctly — `**/fixtures/**` matches `tests/fixtures/poc/src/` | Integration |
+| #   | Test                                                                                  | Type        |
+| --- | ------------------------------------------------------------------------------------- | ----------- |
+| 26  | Matches directory portion of file path                                                | Unit        |
+| 27  | Does not match when file is in different folder                                       | Unit        |
+| 28  | Glob `**/poc/src` matches fixture files in `tests/fixtures/poc/src/`                  | Integration |
+| 29  | Glob `**/nonexistent/**` matches nothing                                              | Integration |
+| 30  | Handles nested folders correctly — `**/fixtures/**` matches `tests/fixtures/poc/src/` | Integration |
 
 #### `areExported` / `areNotExported`
 
-| # | Test | Type |
-|---|------|------|
-| 31 | `areExported()` returns true for exported element | Unit |
-| 32 | `areExported()` returns false for non-exported element | Unit |
-| 33 | `areNotExported()` inverts — true for non-exported | Unit |
-| 34 | Against ts-morph: `OrderService` is exported | Integration |
-| 35 | Against ts-morph: `StrictOptions` in `options.ts` is NOT exported | Integration |
+| #   | Test                                                              | Type        |
+| --- | ----------------------------------------------------------------- | ----------- |
+| 31  | `areExported()` returns true for exported element                 | Unit        |
+| 32  | `areExported()` returns false for non-exported element            | Unit        |
+| 33  | `areNotExported()` inverts — true for non-exported                | Unit        |
+| 34  | Against ts-morph: `OrderService` is exported                      | Integration |
+| 35  | Against ts-morph: `StrictOptions` in `options.ts` is NOT exported | Integration |
 
 #### Edge cases
 
-| # | Test | Type |
-|---|------|------|
-| 36 | Anonymous class expression — `getName()` returns undefined, name predicates return false | Integration |
-| 37 | Composing identity predicates: `and(haveNameEndingWith('Service'), areExported())` | Integration |
-| 38 | Composing with not: `not(areExported())` equivalent to `areNotExported()` | Unit |
-| 39 | Empty predicate list: `and()` with no predicates returns true (vacuous truth) | Unit |
-| 40 | Empty predicate list: `or()` with no predicates returns false | Unit |
+| #   | Test                                                                                     | Type        |
+| --- | ---------------------------------------------------------------------------------------- | ----------- |
+| 36  | Anonymous class expression — `getName()` returns undefined, name predicates return false | Integration |
+| 37  | Composing identity predicates: `and(haveNameEndingWith('Service'), areExported())`       | Integration |
+| 38  | Composing with not: `not(areExported())` equivalent to `areNotExported()`                | Unit        |
+| 39  | Empty predicate list: `and()` with no predicates returns true (vacuous truth)            | Unit        |
+| 40  | Empty predicate list: `or()` with no predicates returns false                            | Unit        |
 
 ---
 

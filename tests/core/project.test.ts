@@ -62,9 +62,7 @@ describe('project()', () => {
 
   describe('error handling', () => {
     it('throws a clear error for a non-existent tsconfig', () => {
-      expect(() => project('/does/not/exist/tsconfig.json')).toThrowError(
-        /tsconfig not found/,
-      )
+      expect(() => project('/does/not/exist/tsconfig.json')).toThrowError(/tsconfig not found/)
     })
 
     it('includes the resolved path in the error message', () => {
@@ -73,9 +71,7 @@ describe('project()', () => {
     })
 
     it('includes a hint about valid paths in the error message', () => {
-      expect(() => project('/nope/tsconfig.json')).toThrowError(
-        /Provide a valid path/,
-      )
+      expect(() => project('/nope/tsconfig.json')).toThrowError(/Provide a valid path/)
     })
   })
 

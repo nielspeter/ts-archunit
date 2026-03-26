@@ -20,8 +20,7 @@ export function shouldExtend(className: string): Condition<ClassDeclaration> {
 export function shouldImplement(interfaceName: string): Condition<ClassDeclaration> {
   return elementCondition<ClassDeclaration>(
     `implement "${interfaceName}"`,
-    (cls) =>
-      cls.getImplements().some((impl) => impl.getExpression().getText() === interfaceName),
+    (cls) => cls.getImplements().some((impl) => impl.getExpression().getText() === interfaceName),
     (cls) => `${getElementName(cls)} does not implement "${interfaceName}"`,
   )
 }

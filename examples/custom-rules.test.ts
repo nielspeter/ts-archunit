@@ -30,25 +30,29 @@ const hasManyMethods = (max: number) =>
   )
 
 // Predicate: async functions (works on ArchFunction wrapper)
-const isToplevelExport = definePredicate<ArchFunction>(
-  'is a top-level export',
-  (fn) => fn.isExported(),
+const isToplevelExport = definePredicate<ArchFunction>('is a top-level export', (fn) =>
+  fn.isExported(),
 )
 
 describe('Custom Predicates', () => {
   it('no god classes (>15 methods)', () => {
     classes(p)
-      .that().satisfy(hasManyMethods(15))
-      .should().notExist()
+      .that()
+      .satisfy(hasManyMethods(15))
+      .should()
+      .notExist()
       .because('split large classes into focused services')
       .check()
   })
 
   it('all top-level exports must be async', () => {
     functions(p)
-      .that().satisfy(isToplevelExport)
-      .and().resideInFolder('**/handlers/**')
-      .should().beAsync()
+      .that()
+      .satisfy(isToplevelExport)
+      .and()
+      .resideInFolder('**/handlers/**')
+      .should()
+      .beAsync()
       .because('route handlers must be async')
       .check()
   })
@@ -63,8 +67,7 @@ const haveJsDocOnPublicMethods = defineCondition<ClassDeclaration>(
     const violations: ArchViolation[] = []
     for (const cls of elements) {
       for (const method of cls.getMethods()) {
-        const isPublic =
-          method.getScope() === undefined || method.getScope() === 'public'
+        const isPublic = method.getScope() === undefined || method.getScope() === 'public'
         if (isPublic && method.getJsDocs().length === 0) {
           violations.push(
             createViolation(
@@ -140,24 +143,30 @@ const noMagicNumbers = defineCondition<ClassDeclaration>(
 describe('Custom Conditions', () => {
   it('exported classes must have JSDoc on public methods', () => {
     classes(p)
-      .that().areExported()
-      .should().satisfy(haveJsDocOnPublicMethods)
+      .that()
+      .areExported()
+      .should()
+      .satisfy(haveJsDocOnPublicMethods)
       .because('public API must be documented')
       .warn() // advisory, not blocking
   })
 
   it('domain entities must not have public fields', () => {
     classes(p)
-      .that().resideInFolder('**/domain/**')
-      .should().satisfy(noPublicFields)
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .satisfy(noPublicFields)
       .because('encapsulate state behind methods')
       .check()
   })
 
   it('services should not use magic numbers', () => {
     classes(p)
-      .that().haveNameEndingWith('Service')
-      .should().satisfy(noMagicNumbers)
+      .that()
+      .haveNameEndingWith('Service')
+      .should()
+      .satisfy(noMagicNumbers)
       .because('extract constants for readability')
       .warn()
   })

@@ -13,7 +13,11 @@
 Ship ready-to-use architecture rules as categorized sub-path exports. Users import what they need without writing custom conditions:
 
 ```typescript
-import { noAnyProperties, noTypeAssertions, noNonNullAssertions } from 'ts-archunit/rules/typescript'
+import {
+  noAnyProperties,
+  noTypeAssertions,
+  noNonNullAssertions,
+} from 'ts-archunit/rules/typescript'
 import { noEval, noConsoleLog, noProcessEnv } from 'ts-archunit/rules/security'
 import { noGenericErrors } from 'ts-archunit/rules/errors'
 ```
@@ -56,12 +60,14 @@ Each category gets its own entry point in `package.json` exports:
 ```
 
 **Why sub-paths, not one flat export:**
+
 - Users import only what they need — no autocomplete pollution
 - Categories are self-documenting — `rules/security` is obvious
 - Scales: adding a new category doesn't touch existing imports
 - Follows the pattern planned for `ts-archunit/graphql` (plan 0021)
 
 **Why not `ts-archunit/rules` as a single flat export:**
+
 - Would grow into a grab bag of 30+ rules
 - No structure — users can't tell which rules relate to what
 - Adding rules changes the flat export surface
@@ -116,7 +122,7 @@ import { createViolation } from '../core/violation.js'
  * @example
  * import { noAnyProperties } from 'ts-archunit/rules/typescript'
  *
- * classes(p).that().resideInFolder('**/src/**')
+ * classes(p).that().resideInFolder('**/ src /**')
  *   .should().satisfy(noAnyProperties())
  *   .because('any bypasses the type checker')
  *   .check()
@@ -194,7 +200,7 @@ export function noTypeAssertions(): Condition<ClassDeclaration> {
  * @example
  * import { noNonNullAssertions } from 'ts-archunit/rules/typescript'
  *
- * classes(p).that().resideInFolder('**/domain/**')
+ * classes(p).that().resideInFolder('**/ domain /**')
  *   .should().satisfy(noNonNullAssertions())
  *   .check()
  */
@@ -267,7 +273,7 @@ export function noFunctionConstructor(): Condition<ClassDeclaration> {
  * @example
  * import { noProcessEnv } from 'ts-archunit/rules/security'
  *
- * classes(p).that().resideInFolder('**/domain/**')
+ * classes(p).that().resideInFolder('**/ domain /**')
  *   .should().satisfy(noProcessEnv())
  *   .because('use Config injection instead')
  *   .check()
@@ -284,7 +290,7 @@ export function noProcessEnv(): Condition<ClassDeclaration> {
  * @example
  * import { noConsoleLog } from 'ts-archunit/rules/security'
  *
- * classes(p).that().resideInFolder('**/src/**')
+ * classes(p).that().resideInFolder('**/ src /**')
  *   .should().satisfy(noConsoleLog())
  *   .check()
  */
@@ -347,7 +353,7 @@ import { createViolation } from '../core/violation.js'
  * @example
  * import { mustMatchName } from 'ts-archunit/rules/naming'
  *
- * classes(p).that().resideInFolder('**/controllers/**')
+ * classes(p).that().resideInFolder('**/ controllers /**')
  *   .should().satisfy(mustMatchName(/Controller$/))
  *   .check()
  */
@@ -360,7 +366,11 @@ export function mustMatchName(pattern: RegExp): Condition<ClassDeclaration> {
         const name = cls.getName() ?? '<anonymous>'
         if (!pattern.test(name)) {
           violations.push(
-            createViolation(cls, `${name} does not match naming convention ${String(pattern)}`, context),
+            createViolation(
+              cls,
+              `${name} does not match naming convention ${String(pattern)}`,
+              context,
+            ),
           )
         }
       }
@@ -376,7 +386,7 @@ export function mustMatchName(pattern: RegExp): Condition<ClassDeclaration> {
  * import { mustNotEndWith } from 'ts-archunit/rules/naming'
  *
  * // JPA entities should not have Entity suffix
- * classes(p).that().resideInFolder('**/domain/**')
+ * classes(p).that().resideInFolder('**/ domain /**')
  *   .should().satisfy(mustNotEndWith('Entity'))
  *   .check()
  */
@@ -388,9 +398,7 @@ export function mustNotEndWith(suffix: string): Condition<ClassDeclaration> {
       for (const cls of elements) {
         const name = cls.getName() ?? '<anonymous>'
         if (name.endsWith(suffix)) {
-          violations.push(
-            createViolation(cls, `${name} should not end with "${suffix}"`, context),
-          )
+          violations.push(createViolation(cls, `${name} should not end with "${suffix}"`, context))
         }
       }
       return violations
@@ -528,31 +536,31 @@ tests/fixtures/rules/
 
 ### Test inventory per category
 
-| Category | Tests |
-|----------|-------|
-| typescript | 8 — noAnyProperties (pass/fail), noTypeAssertions (pass/fail/as const allowed), noNonNullAssertions (pass/fail) |
-| security | 6 — noEval, noFunctionConstructor, noProcessEnv, noConsoleLog (pass/fail each) |
-| errors | 4 — noGenericErrors (pass/fail), noTypeErrors (pass/fail) |
-| naming | 4 — mustMatchName (pass/fail), mustNotEndWith (pass/fail) |
-| dependencies | 4 — onlyDependOn, mustNotDependOn (pass/fail each) |
+| Category     | Tests                                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| typescript   | 8 — noAnyProperties (pass/fail), noTypeAssertions (pass/fail/as const allowed), noNonNullAssertions (pass/fail) |
+| security     | 6 — noEval, noFunctionConstructor, noProcessEnv, noConsoleLog (pass/fail each)                                  |
+| errors       | 4 — noGenericErrors (pass/fail), noTypeErrors (pass/fail)                                                       |
+| naming       | 4 — mustMatchName (pass/fail), mustNotEndWith (pass/fail)                                                       |
+| dependencies | 4 — onlyDependOn, mustNotDependOn (pass/fail each)                                                              |
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/rules/typescript.ts` | New — noAnyProperties, noTypeAssertions, noNonNullAssertions |
-| `src/rules/security.ts` | New — noEval, noFunctionConstructor, noProcessEnv, noConsoleLog |
-| `src/rules/errors.ts` | New — noGenericErrors, noTypeErrors |
-| `src/rules/naming.ts` | New — mustMatchName, mustNotEndWith |
-| `src/rules/dependencies.ts` | New — onlyDependOn, mustNotDependOn, typeOnlyFrom |
-| `package.json` | Modified — add sub-path exports for each category |
-| `tests/archunit/arch-rules.test.ts` | Modified — use standard rules instead of inline conditions |
-| `tests/fixtures/rules/` | New — fixtures with type safety violations |
-| `tests/rules/typescript.test.ts` | New |
-| `tests/rules/security.test.ts` | New |
-| `tests/rules/errors.test.ts` | New |
-| `tests/rules/naming.test.ts` | New |
-| `tests/rules/dependencies.test.ts` | New |
+| File                                | Change                                                          |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `src/rules/typescript.ts`           | New — noAnyProperties, noTypeAssertions, noNonNullAssertions    |
+| `src/rules/security.ts`             | New — noEval, noFunctionConstructor, noProcessEnv, noConsoleLog |
+| `src/rules/errors.ts`               | New — noGenericErrors, noTypeErrors                             |
+| `src/rules/naming.ts`               | New — mustMatchName, mustNotEndWith                             |
+| `src/rules/dependencies.ts`         | New — onlyDependOn, mustNotDependOn, typeOnlyFrom               |
+| `package.json`                      | Modified — add sub-path exports for each category               |
+| `tests/archunit/arch-rules.test.ts` | Modified — use standard rules instead of inline conditions      |
+| `tests/fixtures/rules/`             | New — fixtures with type safety violations                      |
+| `tests/rules/typescript.test.ts`    | New                                                             |
+| `tests/rules/security.test.ts`      | New                                                             |
+| `tests/rules/errors.test.ts`        | New                                                             |
+| `tests/rules/naming.test.ts`        | New                                                             |
+| `tests/rules/dependencies.test.ts`  | New                                                             |
 
 ## Out of Scope
 
@@ -565,9 +573,9 @@ tests/fixtures/rules/
 
 When demand emerges:
 
-| Category | Potential rules |
-|----------|----------------|
-| `rules/async` | noFloatingPromises, noCallbackPattern, noSyncFileOps |
+| Category             | Potential rules                                         |
+| -------------------- | ------------------------------------------------------- |
+| `rules/async`        | noFloatingPromises, noCallbackPattern, noSyncFileOps    |
 | `rules/immutability` | noMutableProperties, noLetDeclarations, noArrayMutation |
-| `rules/testing` | testFilesMatchSource, noSkippedTests, noFocusedTests |
-| `rules/react` | noClassComponents, useEffectCleanup (separate package) |
+| `rules/testing`      | testFilesMatchSource, noSkippedTests, noFocusedTests    |
+| `rules/react`        | noClassComponents, useEffectCleanup (separate package)  |

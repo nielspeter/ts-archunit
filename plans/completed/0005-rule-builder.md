@@ -452,21 +452,36 @@ describe('RuleBuilder', () => {
     it('passes when no violations exist', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       expect(() => {
-        builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysPass()).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .should()
+          .withCondition(alwaysPass())
+          .check()
       }).not.toThrow()
     })
 
     it('throws ArchRuleError when violations exist', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       expect(() => {
-        builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysFail('violated')).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .should()
+          .withCondition(alwaysFail('violated'))
+          .check()
       }).toThrow(ArchRuleError)
     })
 
     it('includes violation details in the error', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       try {
-        builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysFail('bad')).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .should()
+          .withCondition(alwaysFail('bad'))
+          .check()
         expect.unreachable('should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(ArchRuleError)
@@ -482,7 +497,12 @@ describe('RuleBuilder', () => {
     it('logs violations to stderr but does not throw', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const builder = new TestRuleBuilder(stubProject, elements)
-      builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysFail('warning')).warn()
+      builder
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .should()
+        .withCondition(alwaysFail('warning'))
+        .warn()
       expect(warnSpy).toHaveBeenCalledOnce()
       expect(warnSpy.mock.calls[0]?.[0]).toContain('warning: UserService')
       warnSpy.mockRestore()
@@ -491,7 +511,12 @@ describe('RuleBuilder', () => {
     it('does not log when there are no violations', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const builder = new TestRuleBuilder(stubProject, elements)
-      builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysPass()).warn()
+      builder
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .should()
+        .withCondition(alwaysPass())
+        .warn()
       expect(warnSpy).not.toHaveBeenCalled()
       warnSpy.mockRestore()
     })
@@ -501,7 +526,13 @@ describe('RuleBuilder', () => {
     it('attaches reason to the error message', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       try {
-        builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysFail('bad')).because('services must follow the pattern').check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .should()
+          .withCondition(alwaysFail('bad'))
+          .because('services must follow the pattern')
+          .check()
         expect.unreachable('should have thrown')
       } catch (error) {
         const archError = error as ArchRuleError
@@ -514,27 +545,49 @@ describe('RuleBuilder', () => {
     it('fails when any condition has violations', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       expect(() => {
-        builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysPass()).andShould().withCondition(alwaysFail('second')).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .should()
+          .withCondition(alwaysPass())
+          .andShould()
+          .withCondition(alwaysFail('second'))
+          .check()
       }).toThrow(ArchRuleError)
     })
 
     it('passes when all conditions pass', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       expect(() => {
-        builder.that().withPredicate(nameMatches(/Service$/)).should().withCondition(alwaysPass()).andShould().withCondition(alwaysPass()).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .should()
+          .withCondition(alwaysPass())
+          .andShould()
+          .withCondition(alwaysPass())
+          .check()
       }).not.toThrow()
     })
   })
 
   describe('named selections', () => {
     it('reuses predicate chain across multiple rules', () => {
-      const services = new TestRuleBuilder(stubProject, elements).that().withPredicate(nameMatches(/Service$/))
-      expect(() => { services.should().withCondition(alwaysPass()).check() }).not.toThrow()
-      expect(() => { services.should().withCondition(alwaysFail('bad')).check() }).toThrow(ArchRuleError)
+      const services = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+      expect(() => {
+        services.should().withCondition(alwaysPass()).check()
+      }).not.toThrow()
+      expect(() => {
+        services.should().withCondition(alwaysFail('bad')).check()
+      }).toThrow(ArchRuleError)
     })
 
     it('.should() does not mutate the original builder', () => {
-      const services = new TestRuleBuilder(stubProject, elements).that().withPredicate(nameMatches(/Service$/))
+      const services = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/Service$/))
       const rule1 = services.should().withCondition(alwaysFail('rule1'))
       const rule2 = services.should().withCondition(alwaysPass())
       expect(() => rule1.check()).toThrow(ArchRuleError)
@@ -546,7 +599,12 @@ describe('RuleBuilder', () => {
     it('.check() passes when no elements match predicates', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       expect(() => {
-        builder.that().withPredicate(nameMatches(/^NothingMatchesThis$/)).should().withCondition(alwaysFail('unreachable')).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/^NothingMatchesThis$/))
+          .should()
+          .withCondition(alwaysFail('unreachable'))
+          .check()
       }).not.toThrow()
     })
 
@@ -579,7 +637,14 @@ describe('RuleBuilder', () => {
     it('ANDs multiple predicates together', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
       try {
-        builder.that().withPredicate(nameMatches(/Service$/)).and().withPredicate(isExported()).should().withCondition(alwaysFail('found')).check()
+        builder
+          .that()
+          .withPredicate(nameMatches(/Service$/))
+          .and()
+          .withPredicate(isExported())
+          .should()
+          .withCondition(alwaysFail('found'))
+          .check()
         expect.unreachable('should have thrown')
       } catch (error) {
         const archError = error as ArchRuleError
@@ -682,13 +747,22 @@ describe('rule chain integration (PoC fixtures)', () => {
 
   it('filters files with predicates before evaluating conditions', () => {
     expect(() => {
-      new SourceFileRuleBuilder(p).that().fileNameContains('base-service').should().haveClassNamed('BaseService').check()
+      new SourceFileRuleBuilder(p)
+        .that()
+        .fileNameContains('base-service')
+        .should()
+        .haveClassNamed('BaseService')
+        .check()
     }).not.toThrow()
   })
 
   it('chains because() with check()', () => {
     try {
-      new SourceFileRuleBuilder(p).should().haveClassNamed('NonExistent').because('every file should define this class').check()
+      new SourceFileRuleBuilder(p)
+        .should()
+        .haveClassNamed('NonExistent')
+        .because('every file should define this class')
+        .check()
       expect.unreachable('should have thrown')
     } catch (error) {
       const archError = error as ArchRuleError
@@ -709,7 +783,13 @@ import type { ArchViolation } from '../../src/core/violation.js'
 describe('ArchRuleError', () => {
   it('formats a single violation', () => {
     const violations: ArchViolation[] = [
-      { rule: 'test rule', element: 'ProductService.getTotal', file: 'src/service.ts', line: 42, message: 'bad call to parseInt' },
+      {
+        rule: 'test rule',
+        element: 'ProductService.getTotal',
+        file: 'src/service.ts',
+        line: 42,
+        message: 'bad call to parseInt',
+      },
     ]
     const error = new ArchRuleError(violations)
     expect(error.name).toBe('ArchRuleError')
@@ -756,43 +836,43 @@ describe('ArchRuleError', () => {
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/errors.ts` | New — `ArchRuleError` class, `formatViolations` helper |
-| `src/core/rule-builder.ts` | New — abstract `RuleBuilder<T>` base class |
-| `src/index.ts` | Modified — export `RuleBuilder` and `ArchRuleError` |
-| `tests/core/errors.test.ts` | New — 5 tests for ArchRuleError formatting |
-| `tests/core/rule-builder.test.ts` | New — 14 tests covering builder mechanics |
-| `tests/integration/rule-chain.test.ts` | New — 4 integration tests with real ts-morph project |
+| File                                   | Change                                                 |
+| -------------------------------------- | ------------------------------------------------------ |
+| `src/core/errors.ts`                   | New — `ArchRuleError` class, `formatViolations` helper |
+| `src/core/rule-builder.ts`             | New — abstract `RuleBuilder<T>` base class             |
+| `src/index.ts`                         | Modified — export `RuleBuilder` and `ArchRuleError`    |
+| `tests/core/errors.test.ts`            | New — 5 tests for ArchRuleError formatting             |
+| `tests/core/rule-builder.test.ts`      | New — 14 tests covering builder mechanics              |
+| `tests/integration/rule-chain.test.ts` | New — 4 integration tests with real ts-morph project   |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `.check()` passes when no violations exist | Basic passing chain |
-| 2 | `.check()` throws ArchRuleError when violations exist | Basic failing chain |
-| 3 | `.check()` includes violation details in error | Error message has element names and locations |
-| 4 | `.warn()` logs but does not throw | Violations go to stderr, no exception |
-| 5 | `.warn()` does not log when no violations | Clean output for passing rules |
-| 6 | `.because()` attaches reason to error message | Reason string in ArchRuleError |
-| 7 | `.andShould()` fails when any condition fails | AND semantics |
-| 8 | `.andShould()` passes when all pass | AND semantics |
-| 9 | Named selection reuses predicates across rules | Same predicates, different conditions |
-| 10 | `.should()` does not mutate the original builder | Fork semantics |
-| 11 | Empty predicate match set passes `.check()` | Vacuous truth |
-| 12 | Empty element list passes `.check()` | No elements, no violations |
-| 13 | `.severity('error')` behaves like `.check()` | Severity alias |
-| 14 | `.severity('warn')` behaves like `.warn()` | Severity alias |
-| 15 | Multiple predicates are ANDed | `.and()` narrows the set |
-| 16 | ArchRuleError formats single violation | Error formatting |
-| 17 | ArchRuleError formats multiple violations | Pluralization |
-| 18 | ArchRuleError includes reason | `.because()` in message |
-| 19 | ArchRuleError exposes violations array | Programmatic access |
-| 20 | ArchRuleError extends Error | Instanceof check |
-| 21 | Integration: passing rule with real ts-morph | End-to-end with PoC fixtures |
-| 22 | Integration: failing rule with real ts-morph | End-to-end throws ArchRuleError |
-| 23 | Integration: predicates filter before conditions | Predicate narrowing on real files |
-| 24 | Integration: because() in full chain | Reason propagates through pipeline |
+| #   | Test                                                  | What it validates                             |
+| --- | ----------------------------------------------------- | --------------------------------------------- |
+| 1   | `.check()` passes when no violations exist            | Basic passing chain                           |
+| 2   | `.check()` throws ArchRuleError when violations exist | Basic failing chain                           |
+| 3   | `.check()` includes violation details in error        | Error message has element names and locations |
+| 4   | `.warn()` logs but does not throw                     | Violations go to stderr, no exception         |
+| 5   | `.warn()` does not log when no violations             | Clean output for passing rules                |
+| 6   | `.because()` attaches reason to error message         | Reason string in ArchRuleError                |
+| 7   | `.andShould()` fails when any condition fails         | AND semantics                                 |
+| 8   | `.andShould()` passes when all pass                   | AND semantics                                 |
+| 9   | Named selection reuses predicates across rules        | Same predicates, different conditions         |
+| 10  | `.should()` does not mutate the original builder      | Fork semantics                                |
+| 11  | Empty predicate match set passes `.check()`           | Vacuous truth                                 |
+| 12  | Empty element list passes `.check()`                  | No elements, no violations                    |
+| 13  | `.severity('error')` behaves like `.check()`          | Severity alias                                |
+| 14  | `.severity('warn')` behaves like `.warn()`            | Severity alias                                |
+| 15  | Multiple predicates are ANDed                         | `.and()` narrows the set                      |
+| 16  | ArchRuleError formats single violation                | Error formatting                              |
+| 17  | ArchRuleError formats multiple violations             | Pluralization                                 |
+| 18  | ArchRuleError includes reason                         | `.because()` in message                       |
+| 19  | ArchRuleError exposes violations array                | Programmatic access                           |
+| 20  | ArchRuleError extends Error                           | Instanceof check                              |
+| 21  | Integration: passing rule with real ts-morph          | End-to-end with PoC fixtures                  |
+| 22  | Integration: failing rule with real ts-morph          | End-to-end throws ArchRuleError               |
+| 23  | Integration: predicates filter before conditions      | Predicate narrowing on real files             |
+| 24  | Integration: because() in full chain                  | Reason propagates through pipeline            |
 
 ## Out of Scope
 

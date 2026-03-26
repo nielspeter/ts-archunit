@@ -95,8 +95,6 @@ describe('notDependOn', () => {
     const condition = notDependOn('controllers')
     const violations = condition.evaluate(layerSlices, ctx)
     expect(violations.length).toBeGreaterThan(0)
-    expect(violations.some((v) => v.message.includes('forbidden slice "controllers"'))).toBe(
-      true,
-    )
+    expect(violations.some((v) => v.message.includes('forbidden slice "controllers"'))).toBe(true)
   })
 })

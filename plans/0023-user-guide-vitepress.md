@@ -88,9 +88,7 @@ export default defineConfig({
       },
       {
         text: 'Reference',
-        items: [
-          { text: 'API Reference', link: '/api-reference' },
-        ],
+        items: [{ text: 'API Reference', link: '/api-reference' }],
       },
     ],
 
@@ -160,6 +158,7 @@ features:
 ### `docs/getting-started.md`
 
 Content:
+
 1. Prerequisites (Node 24+, tsconfig.json, vitest or jest)
 2. Installation (`npm install -D ts-archunit`)
 3. First rule file (`arch.test.ts`)
@@ -200,18 +199,19 @@ This is the "sell" page. If a user reads only one page after the landing page, i
 
 Content:
 
-**Before/After motivation** (inspired by ArchUnit Section 7.1) — open with a comparison showing raw ts-morph code (10-15 lines of AST traversal from the PoC probes) vs the ts-archunit one-liner. This motivates *why* the fluent chain exists before explaining how it works.
+**Before/After motivation** (inspired by ArchUnit Section 7.1) — open with a comparison showing raw ts-morph code (10-15 lines of AST traversal from the PoC probes) vs the ts-archunit one-liner. This motivates _why_ the fluent chain exists before explaining how it works.
 
 ```typescript
 // WITHOUT ts-archunit: 12 lines of manual AST traversal
 const project = new Project({ tsConfigFilePath: 'tsconfig.json' })
-const classes = project.getSourceFiles()
-  .flatMap(sf => sf.getClasses())
-  .filter(cls => cls.getExtends()?.getExpression().getText() === 'BaseService')
+const classes = project
+  .getSourceFiles()
+  .flatMap((sf) => sf.getClasses())
+  .filter((cls) => cls.getExtends()?.getExpression().getText() === 'BaseService')
 for (const cls of classes) {
   for (const method of cls.getMethods()) {
     const calls = method.getDescendantsOfKind(SyntaxKind.CallExpression)
-    if (calls.some(c => c.getExpression().getText() === 'parseInt')) {
+    if (calls.some((c) => c.getExpression().getText() === 'parseInt')) {
       throw new Error(`${cls.getName()} calls parseInt`)
     }
   }
@@ -394,25 +394,25 @@ In repo settings: Pages → Source → GitHub Actions.
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `package.json` | Add vitepress devDependency + docs scripts |
-| `.gitignore` | Add docs/.vitepress/dist/ and docs/.vitepress/cache/ |
-| `docs/.vitepress/config.ts` | VitePress configuration |
-| `docs/index.md` | Landing page with hero + features |
-| `docs/getting-started.md` | Install, first rule, CI integration |
-| `docs/what-to-check.md` | Recipe gallery — 8 rule categories as one-liners |
-| `docs/core-concepts.md` | Project, chain, predicates, conditions |
-| `docs/modules.md` | Module entry point + dependency rules |
-| `docs/classes.md` | Class entry point + class predicates/conditions |
-| `docs/functions.md` | Function entry point + ArchFunction |
-| `docs/types.md` | Type entry point + type matchers |
-| `docs/body-analysis.md` | Matchers, conditions, examples |
-| `docs/slices.md` | Slice resolution, cycles, layers |
-| `docs/custom-rules.md` | definePredicate, defineCondition, satisfy |
-| `docs/violation-reporting.md` | Output, code frames, error handling |
-| `docs/api-reference.md` | All exports table |
-| `.github/workflows/docs.yml` | GitHub Pages deployment |
+| File                          | Change                                               |
+| ----------------------------- | ---------------------------------------------------- |
+| `package.json`                | Add vitepress devDependency + docs scripts           |
+| `.gitignore`                  | Add docs/.vitepress/dist/ and docs/.vitepress/cache/ |
+| `docs/.vitepress/config.ts`   | VitePress configuration                              |
+| `docs/index.md`               | Landing page with hero + features                    |
+| `docs/getting-started.md`     | Install, first rule, CI integration                  |
+| `docs/what-to-check.md`       | Recipe gallery — 8 rule categories as one-liners     |
+| `docs/core-concepts.md`       | Project, chain, predicates, conditions               |
+| `docs/modules.md`             | Module entry point + dependency rules                |
+| `docs/classes.md`             | Class entry point + class predicates/conditions      |
+| `docs/functions.md`           | Function entry point + ArchFunction                  |
+| `docs/types.md`               | Type entry point + type matchers                     |
+| `docs/body-analysis.md`       | Matchers, conditions, examples                       |
+| `docs/slices.md`              | Slice resolution, cycles, layers                     |
+| `docs/custom-rules.md`        | definePredicate, defineCondition, satisfy            |
+| `docs/violation-reporting.md` | Output, code frames, error handling                  |
+| `docs/api-reference.md`       | All exports table                                    |
+| `.github/workflows/docs.yml`  | GitHub Pages deployment                              |
 
 ## Out of Scope
 

@@ -158,9 +158,7 @@ Minimal ANSI escape code helpers. No external dependency — just the standard S
 
 ```typescript
 const enabled =
-  typeof process !== 'undefined' &&
-  !process.env['NO_COLOR'] &&
-  process.stdout?.isTTY === true
+  typeof process !== 'undefined' && !process.env['NO_COLOR'] && process.stdout?.isTTY === true
 
 function wrap(code: number, resetCode: number): (text: string) => string {
   if (!enabled) return (text) => text
@@ -228,7 +226,11 @@ export function formatViolations(
     const ruleLine = `  ${dim('Rule:')} ${v.rule}`
 
     // Reason line (from .because())
-    const reasonLine = v.because ? `  ${dim('Reason:')} ${v.because}` : reason ? `  ${dim('Reason:')} ${reason}` : ''
+    const reasonLine = v.because
+      ? `  ${dim('Reason:')} ${v.because}`
+      : reason
+        ? `  ${dim('Reason:')} ${reason}`
+        : ''
 
     // Location: relative path + element
     const relativePath = path.relative(cwd, v.file)
@@ -258,10 +260,7 @@ export function formatViolations(
  * Used by ArchRuleError.message — error messages should be plain text
  * since they may be captured by test runners, serialized, or logged to files.
  */
-export function formatViolationsPlain(
-  violations: ArchViolation[],
-  reason?: string,
-): string {
+export function formatViolationsPlain(violations: ArchViolation[], reason?: string): string {
   if (violations.length === 0) return ''
 
   const header = `Architecture violation${violations.length === 1 ? '' : 's'} (${String(violations.length)} found)`
@@ -269,7 +268,9 @@ export function formatViolationsPlain(
 
   const details = violations
     .map((v, i) => {
-      const parts = [`  [${String(i + 1)}/${String(violations.length)}] ${v.element}: ${v.message} (${v.file}:${String(v.line)})`]
+      const parts = [
+        `  [${String(i + 1)}/${String(violations.length)}] ${v.element}: ${v.message} (${v.file}:${String(v.line)})`,
+      ]
       if (v.codeFrame) parts.push(v.codeFrame)
       if (v.suggestion) parts.push(`  Suggestion: ${v.suggestion}`)
       return parts.join('\n')
@@ -353,51 +354,51 @@ Exported so users can build custom reporters or format violations in their own w
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/code-frame.ts` | New — `generateCodeFrame()` pure function |
-| `src/core/ansi.ts` | New — minimal ANSI color helpers (`bold`, `red`, `yellow`, `cyan`, `dim`, `gray`) |
-| `src/core/format.ts` | New — `formatViolations()` (rich) and `formatViolationsPlain()` (plain) |
-| `src/core/violation.ts` | Modified — add `codeFrame?` and `suggestion?` fields to `ArchViolation`; update `createViolation` context type and code frame generation |
-| `src/core/errors.ts` | Modified — replace inline formatter with `formatViolationsPlain` |
-| `src/core/rule-builder.ts` | Modified — `.warn()` uses `formatViolations` for rich output |
-| `src/core/index.ts` | Modified — export new modules |
-| `src/index.ts` | Modified — export new modules |
-| `tests/core/code-frame.test.ts` | New — tests for code frame generation |
-| `tests/core/format.test.ts` | New — tests for both formatters |
-| `tests/core/ansi.test.ts` | New — tests for ANSI color helpers |
-| `tests/core/violation.test.ts` | Modified — test `codeFrame` and `suggestion` fields on `createViolation` output |
+| File                            | Change                                                                                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/code-frame.ts`        | New — `generateCodeFrame()` pure function                                                                                                |
+| `src/core/ansi.ts`              | New — minimal ANSI color helpers (`bold`, `red`, `yellow`, `cyan`, `dim`, `gray`)                                                        |
+| `src/core/format.ts`            | New — `formatViolations()` (rich) and `formatViolationsPlain()` (plain)                                                                  |
+| `src/core/violation.ts`         | Modified — add `codeFrame?` and `suggestion?` fields to `ArchViolation`; update `createViolation` context type and code frame generation |
+| `src/core/errors.ts`            | Modified — replace inline formatter with `formatViolationsPlain`                                                                         |
+| `src/core/rule-builder.ts`      | Modified — `.warn()` uses `formatViolations` for rich output                                                                             |
+| `src/core/index.ts`             | Modified — export new modules                                                                                                            |
+| `src/index.ts`                  | Modified — export new modules                                                                                                            |
+| `tests/core/code-frame.test.ts` | New — tests for code frame generation                                                                                                    |
+| `tests/core/format.test.ts`     | New — tests for both formatters                                                                                                          |
+| `tests/core/ansi.test.ts`       | New — tests for ANSI color helpers                                                                                                       |
+| `tests/core/violation.test.ts`  | Modified — test `codeFrame` and `suggestion` fields on `createViolation` output                                                          |
 
 ## Test Inventory
 
-| # | Test | File | What it validates |
-|---|------|------|-------------------|
-| 1 | generates a code frame with default 3-line context | `code-frame.test.ts` | Lines before/after target are included |
-| 2 | marks the target line with `>` | `code-frame.test.ts` | Arrow marker on correct line |
-| 3 | right-aligns line numbers in the gutter | `code-frame.test.ts` | Gutter width matches largest line number |
-| 4 | clamps context at file start (target near line 1) | `code-frame.test.ts` | No negative indices, no blank lines above |
-| 5 | clamps context at file end (target near last line) | `code-frame.test.ts` | No out-of-bounds, no blank lines below |
-| 6 | respects custom `contextLines` option | `code-frame.test.ts` | 1-line context shows only 3 lines total |
-| 7 | returns empty string for out-of-range line | `code-frame.test.ts` | Line 0, line > length both return `''` |
-| 8 | handles single-line file | `code-frame.test.ts` | No crash, shows the one line with `>` |
-| 9 | handles empty source text | `code-frame.test.ts` | Returns empty string |
-| 10 | `formatViolationsPlain` includes counter per violation | `format.test.ts` | `[1/3]` numbering |
-| 11 | `formatViolationsPlain` includes reason | `format.test.ts` | `Reason:` line present |
-| 12 | `formatViolationsPlain` includes code frame when present | `format.test.ts` | Code frame text in output |
-| 13 | `formatViolationsPlain` includes suggestion when present | `format.test.ts` | `Suggestion:` line present |
-| 14 | `formatViolationsPlain` omits code frame when absent | `format.test.ts` | No extra blank lines |
-| 15 | `formatViolationsPlain` returns empty string for no violations | `format.test.ts` | Edge case |
-| 16 | `formatViolations` includes ANSI codes when enabled | `format.test.ts` | Contains `\x1b[` sequences (mock TTY) |
-| 17 | `formatViolations` includes violation counter | `format.test.ts` | `[1 of 3]` in output |
-| 18 | `formatViolations` shows relative file paths | `format.test.ts` | Absolute path converted to relative |
-| 19 | `formatViolations` includes suggestion in yellow | `format.test.ts` | Suggestion text present |
-| 20 | ANSI helpers produce correct escape sequences | `ansi.test.ts` | `bold('x')` wraps with SGR 1/22 |
-| 21 | ANSI helpers are no-ops when `NO_COLOR` is set | `ansi.test.ts` | Returns plain text |
-| 22 | `createViolation` populates `codeFrame` field | `violation.test.ts` | Code frame string is non-empty |
-| 23 | `createViolation` populates `suggestion` field when provided | `violation.test.ts` | Suggestion present in output |
-| 24 | `createViolation` omits `suggestion` when not provided | `violation.test.ts` | Field is `undefined` |
-| 25 | `ArchRuleError` message includes code frames | `errors.test.ts` | Existing tests updated to verify new format |
-| 26 | `.warn()` produces colored output | `rule-builder.test.ts` | `console.warn` receives ANSI-formatted string |
+| #   | Test                                                           | File                   | What it validates                             |
+| --- | -------------------------------------------------------------- | ---------------------- | --------------------------------------------- |
+| 1   | generates a code frame with default 3-line context             | `code-frame.test.ts`   | Lines before/after target are included        |
+| 2   | marks the target line with `>`                                 | `code-frame.test.ts`   | Arrow marker on correct line                  |
+| 3   | right-aligns line numbers in the gutter                        | `code-frame.test.ts`   | Gutter width matches largest line number      |
+| 4   | clamps context at file start (target near line 1)              | `code-frame.test.ts`   | No negative indices, no blank lines above     |
+| 5   | clamps context at file end (target near last line)             | `code-frame.test.ts`   | No out-of-bounds, no blank lines below        |
+| 6   | respects custom `contextLines` option                          | `code-frame.test.ts`   | 1-line context shows only 3 lines total       |
+| 7   | returns empty string for out-of-range line                     | `code-frame.test.ts`   | Line 0, line > length both return `''`        |
+| 8   | handles single-line file                                       | `code-frame.test.ts`   | No crash, shows the one line with `>`         |
+| 9   | handles empty source text                                      | `code-frame.test.ts`   | Returns empty string                          |
+| 10  | `formatViolationsPlain` includes counter per violation         | `format.test.ts`       | `[1/3]` numbering                             |
+| 11  | `formatViolationsPlain` includes reason                        | `format.test.ts`       | `Reason:` line present                        |
+| 12  | `formatViolationsPlain` includes code frame when present       | `format.test.ts`       | Code frame text in output                     |
+| 13  | `formatViolationsPlain` includes suggestion when present       | `format.test.ts`       | `Suggestion:` line present                    |
+| 14  | `formatViolationsPlain` omits code frame when absent           | `format.test.ts`       | No extra blank lines                          |
+| 15  | `formatViolationsPlain` returns empty string for no violations | `format.test.ts`       | Edge case                                     |
+| 16  | `formatViolations` includes ANSI codes when enabled            | `format.test.ts`       | Contains `\x1b[` sequences (mock TTY)         |
+| 17  | `formatViolations` includes violation counter                  | `format.test.ts`       | `[1 of 3]` in output                          |
+| 18  | `formatViolations` shows relative file paths                   | `format.test.ts`       | Absolute path converted to relative           |
+| 19  | `formatViolations` includes suggestion in yellow               | `format.test.ts`       | Suggestion text present                       |
+| 20  | ANSI helpers produce correct escape sequences                  | `ansi.test.ts`         | `bold('x')` wraps with SGR 1/22               |
+| 21  | ANSI helpers are no-ops when `NO_COLOR` is set                 | `ansi.test.ts`         | Returns plain text                            |
+| 22  | `createViolation` populates `codeFrame` field                  | `violation.test.ts`    | Code frame string is non-empty                |
+| 23  | `createViolation` populates `suggestion` field when provided   | `violation.test.ts`    | Suggestion present in output                  |
+| 24  | `createViolation` omits `suggestion` when not provided         | `violation.test.ts`    | Field is `undefined`                          |
+| 25  | `ArchRuleError` message includes code frames                   | `errors.test.ts`       | Existing tests updated to verify new format   |
+| 26  | `.warn()` produces colored output                              | `rule-builder.test.ts` | `console.warn` receives ANSI-formatted string |
 
 ## Out of Scope
 

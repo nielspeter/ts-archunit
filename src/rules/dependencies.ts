@@ -1,10 +1,6 @@
 import type { SourceFile } from 'ts-morph'
 import type { Condition } from '../core/condition.js'
-import {
-  onlyImportFrom,
-  notImportFrom,
-  onlyHaveTypeImportsFrom,
-} from '../conditions/dependency.js'
+import { onlyImportFrom, notImportFrom, onlyHaveTypeImportsFrom } from '../conditions/dependency.js'
 
 /**
  * Module must only import from allowed paths.

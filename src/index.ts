@@ -9,7 +9,12 @@ export { and, or, not } from './core/predicate.js'
 // Core — condition interface & violation model
 export type { Condition, ConditionContext } from './core/condition.js'
 export type { ArchViolation } from './core/violation.js'
-export { createViolation, getElementName, getElementFile, getElementLine } from './core/violation.js'
+export {
+  createViolation,
+  getElementName,
+  getElementFile,
+  getElementLine,
+} from './core/violation.js'
 
 // Core — rule builder & error
 export { RuleBuilder } from './core/rule-builder.js'
@@ -89,7 +94,11 @@ export {
 // Function entry point
 export { functions, FunctionRuleBuilder } from './builders/function-rule-builder.js'
 export type { ArchFunction } from './models/arch-function.js'
-export { collectFunctions, fromFunctionDeclaration, fromArrowVariableDeclaration } from './models/arch-function.js'
+export {
+  collectFunctions,
+  fromFunctionDeclaration,
+  fromArrowVariableDeclaration,
+} from './models/arch-function.js'
 
 // Function predicates
 export {

@@ -62,8 +62,7 @@ export function haveNameMatching<T extends Node>(regex: RegExp): Condition<T> {
   return elementCondition<T>(
     `have name matching ${String(regex)}`,
     (element) => regex.test(getElementName(element)),
-    (element) =>
-      `${getElementName(element)} does not have a name matching ${String(regex)}`,
+    (element) => `${getElementName(element)} does not have a name matching ${String(regex)}`,
   )
 }
 

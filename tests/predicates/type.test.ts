@@ -71,7 +71,9 @@ describe('type predicates', () => {
 
   describe('havePropertyOfType()', () => {
     it('matches when property type satisfies matcher', () => {
-      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnsafeOptions'))).toBe(true)
+      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnsafeOptions'))).toBe(
+        true,
+      )
     })
 
     it('rejects when property type does not satisfy matcher', () => {
@@ -79,12 +81,16 @@ describe('type predicates', () => {
     })
 
     it('rejects when property does not exist', () => {
-      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnrelatedOptions'))).toBe(false)
+      expect(havePropertyOfType('sortBy', isString()).test(getInterface('UnrelatedOptions'))).toBe(
+        false,
+      )
     })
 
     it('resolves through Partial<> for property type matching', () => {
       expect(
-        havePropertyOfType('sortBy', isUnionOfLiterals()).test(getTypeAlias('PartialStrictOptions')),
+        havePropertyOfType('sortBy', isUnionOfLiterals()).test(
+          getTypeAlias('PartialStrictOptions'),
+        ),
       ).toBe(true)
     })
   })

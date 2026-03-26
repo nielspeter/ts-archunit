@@ -18,7 +18,7 @@ The goal is zero-boilerplate extensibility. Users who need a rule that ts-archun
 
 ### `src/core/define.ts`
 
-```typescript
+````typescript
 import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
@@ -71,7 +71,7 @@ export function defineCondition<T>(
 ): Condition<T> {
   return { description, evaluate }
 }
-```
+````
 
 Both functions are trivial wrappers that construct the interface object. The value is discoverability: users import `definePredicate` / `defineCondition` rather than constructing raw objects, and the JSDoc guides them toward correct usage.
 
@@ -83,7 +83,7 @@ Add a public `.satisfy()` method to `RuleBuilder<T>` that accepts either a `Pred
 
 Add the following method to the `RuleBuilder<T>` class, in the "Chain methods" section after `andShould()`:
 
-```typescript
+````typescript
 /**
  * Plug in a custom predicate or condition.
  *
@@ -108,7 +108,7 @@ satisfy(custom: Predicate<T> | Condition<T>): this {
   }
   return this.addCondition(custom as Condition<T>)
 }
-```
+````
 
 The structural dispatch works because `Predicate<T>` has `test()` and `Condition<T>` has `evaluate()` — they share no methods. If a user somehow creates an object with both `test` and `evaluate`, the predicate path wins (filter before assert is the safer default).
 
@@ -135,9 +135,8 @@ import type { ArchViolation } from '../../src/core/violation.js'
 
 describe('definePredicate', () => {
   it('creates a Predicate with the given description and test', () => {
-    const pred = definePredicate<{ name: string }>(
-      'has name starting with "X"',
-      (el) => el.name.startsWith('X'),
+    const pred = definePredicate<{ name: string }>('has name starting with "X"', (el) =>
+      el.name.startsWith('X'),
     )
     expect(pred.description).toBe('has name starting with "X"')
     expect(pred.test({ name: 'Xavier' })).toBe(true)
@@ -151,8 +150,8 @@ describe('definePredicate', () => {
 
     const combined = and(isLong, not(startsWithA))
     expect(combined.test('BobbyTables')).toBe(true)
-    expect(combined.test('Alice')).toBe(false)  // starts with A
-    expect(combined.test('Bob')).toBe(false)    // too short
+    expect(combined.test('Alice')).toBe(false) // starts with A
+    expect(combined.test('Bob')).toBe(false) // too short
   })
 })
 
@@ -189,17 +188,15 @@ describe('defineCondition', () => {
   })
 
   it('propagates because from context', () => {
-    const cond = defineCondition<{ name: string }>(
-      'always fail',
-      (elements, context) =>
-        elements.map((el) => ({
-          rule: context.rule,
-          element: el.name,
-          file: 'test.ts',
-          line: 1,
-          message: 'failed',
-          because: context.because,
-        })),
+    const cond = defineCondition<{ name: string }>('always fail', (elements, context) =>
+      elements.map((el) => ({
+        rule: context.rule,
+        element: el.name,
+        file: 'test.ts',
+        line: 1,
+        message: 'failed',
+        because: context.because,
+      })),
     )
 
     const ctx: ConditionContext = { rule: 'r', because: 'reasons' }
@@ -254,21 +251,18 @@ const elements: TestElement[] = [
 
 describe('.satisfy() with custom predicate', () => {
   it('filters elements using a custom predicate', () => {
-    const isService = definePredicate<TestElement>(
-      'is a service',
-      (el) => el.name.endsWith('Service'),
+    const isService = definePredicate<TestElement>('is a service', (el) =>
+      el.name.endsWith('Service'),
     )
 
-    const alwaysFail = defineCondition<TestElement>(
-      'always fail',
-      (els, ctx) =>
-        els.map((el) => ({
-          rule: ctx.rule,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: 'fail',
-        })),
+    const alwaysFail = defineCondition<TestElement>('always fail', (els, ctx) =>
+      els.map((el) => ({
+        rule: ctx.rule,
+        element: el.name,
+        file: el.file,
+        line: el.line,
+        message: 'fail',
+      })),
     )
 
     const builder = new TestRuleBuilder(stubProject, elements)
@@ -279,10 +273,7 @@ describe('.satisfy() with custom predicate', () => {
       const archError = error as ArchRuleError
       // Only services matched the predicate, not helperUtil
       expect(archError.violations).toHaveLength(2)
-      expect(archError.violations.map((v) => v.element)).toEqual([
-        'UserService',
-        'OrderService',
-      ])
+      expect(archError.violations.map((v) => v.element)).toEqual(['UserService', 'OrderService'])
     }
   })
 
@@ -292,16 +283,14 @@ describe('.satisfy() with custom predicate', () => {
       test: (el) => el.name === 'helperUtil',
     }
 
-    const alwaysFail = defineCondition<TestElement>(
-      'fail',
-      (els, ctx) =>
-        els.map((el) => ({
-          rule: ctx.rule,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: 'fail',
-        })),
+    const alwaysFail = defineCondition<TestElement>('fail', (els, ctx) =>
+      els.map((el) => ({
+        rule: ctx.rule,
+        element: el.name,
+        file: el.file,
+        line: el.line,
+        message: 'fail',
+      })),
     )
 
     const builder = new TestRuleBuilder(stubProject, elements)
@@ -361,9 +350,8 @@ describe('.satisfy() with custom condition', () => {
 
 describe('.satisfy() with built-in chain methods', () => {
   it('custom predicate combines with built-in conditions via andShould()', () => {
-    const isService = definePredicate<TestElement>(
-      'is a service',
-      (el) => el.name.endsWith('Service'),
+    const isService = definePredicate<TestElement>('is a service', (el) =>
+      el.name.endsWith('Service'),
     )
 
     const alwaysPass = defineCondition<TestElement>('pass', () => [])
@@ -375,22 +363,19 @@ describe('.satisfy() with built-in chain methods', () => {
   })
 
   it('works with named selections', () => {
-    const isService = definePredicate<TestElement>(
-      'is a service',
-      (el) => el.name.endsWith('Service'),
+    const isService = definePredicate<TestElement>('is a service', (el) =>
+      el.name.endsWith('Service'),
     )
 
     const alwaysPass = defineCondition<TestElement>('pass', () => [])
-    const alwaysFail = defineCondition<TestElement>(
-      'fail',
-      (els, ctx) =>
-        els.map((el) => ({
-          rule: ctx.rule,
-          element: el.name,
-          file: el.file,
-          line: el.line,
-          message: 'fail',
-        })),
+    const alwaysFail = defineCondition<TestElement>('fail', (els, ctx) =>
+      els.map((el) => ({
+        rule: ctx.rule,
+        element: el.name,
+        file: el.file,
+        line: el.line,
+        message: 'fail',
+      })),
     )
 
     const services = new TestRuleBuilder(stubProject, elements).that().satisfy(isService)
@@ -403,28 +388,28 @@ describe('.satisfy() with built-in chain methods', () => {
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/define.ts` | New — `definePredicate()` and `defineCondition()` factory functions |
-| `src/core/rule-builder.ts` | Modified — add public `satisfy()` method with structural type dispatch |
-| `src/index.ts` | Modified — export `definePredicate` and `defineCondition` |
-| `tests/core/define.test.ts` | New — 4 tests for factory functions |
-| `tests/core/rule-builder-satisfy.test.ts` | New — 6 tests for `.satisfy()` integration |
+| File                                      | Change                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| `src/core/define.ts`                      | New — `definePredicate()` and `defineCondition()` factory functions    |
+| `src/core/rule-builder.ts`                | Modified — add public `satisfy()` method with structural type dispatch |
+| `src/index.ts`                            | Modified — export `definePredicate` and `defineCondition`              |
+| `tests/core/define.test.ts`               | New — 4 tests for factory functions                                    |
+| `tests/core/rule-builder-satisfy.test.ts` | New — 6 tests for `.satisfy()` integration                             |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | `definePredicate` creates predicate with description and test | Factory produces correct `Predicate<T>` |
-| 2 | `definePredicate` result works with `and`/`or`/`not` combinators | Composability with existing predicate algebra |
-| 3 | `defineCondition` creates condition with description and evaluate | Factory produces correct `Condition<T>` |
-| 4 | `defineCondition` propagates `because` from context | Reason flows through to violations |
-| 5 | `.satisfy()` filters with custom predicate | Predicate dispatch and element filtering |
-| 6 | `.satisfy()` dispatches raw `Predicate` by structural type | `test` key detection |
-| 7 | `.satisfy()` evaluates custom condition | Condition dispatch and violation reporting |
-| 8 | `.satisfy()` dispatches raw `Condition` by structural type | `evaluate` key detection |
-| 9 | `.satisfy()` combines with `andShould()` and other chain methods | Interop with existing builder |
-| 10 | `.satisfy()` works with named selections | Fork semantics preserved |
+| #   | Test                                                              | What it validates                             |
+| --- | ----------------------------------------------------------------- | --------------------------------------------- |
+| 1   | `definePredicate` creates predicate with description and test     | Factory produces correct `Predicate<T>`       |
+| 2   | `definePredicate` result works with `and`/`or`/`not` combinators  | Composability with existing predicate algebra |
+| 3   | `defineCondition` creates condition with description and evaluate | Factory produces correct `Condition<T>`       |
+| 4   | `defineCondition` propagates `because` from context               | Reason flows through to violations            |
+| 5   | `.satisfy()` filters with custom predicate                        | Predicate dispatch and element filtering      |
+| 6   | `.satisfy()` dispatches raw `Predicate` by structural type        | `test` key detection                          |
+| 7   | `.satisfy()` evaluates custom condition                           | Condition dispatch and violation reporting    |
+| 8   | `.satisfy()` dispatches raw `Condition` by structural type        | `evaluate` key detection                      |
+| 9   | `.satisfy()` combines with `andShould()` and other chain methods  | Interop with existing builder                 |
+| 10  | `.satisfy()` works with named selections                          | Fork semantics preserved                      |
 
 ## Out of Scope
 

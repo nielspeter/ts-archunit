@@ -14,8 +14,10 @@ describe('types() integration', () => {
     // This is THE motivating use case from cmless plan 0212
     expect(() => {
       types(p)
-        .that().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .because('sortBy must be a union of string literals, not bare string')
         .check()
     }).toThrow(ArchRuleError)
@@ -24,9 +26,12 @@ describe('types() integration', () => {
   it('passes when all sortBy properties are unions of literals (filtered)', () => {
     expect(() => {
       types(p)
-        .that().haveProperty('sortBy')
-        .and().haveNameMatching(/^Safe|^Aliased|^Partial|^Picked|^SingleLiteral|^ExplicitUndefined/)
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .and()
+        .haveNameMatching(/^Safe|^Aliased|^Partial|^Picked|^SingleLiteral|^ExplicitUndefined/)
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
     }).not.toThrow()
   })
@@ -34,8 +39,12 @@ describe('types() integration', () => {
   it('filters to only interfaces', () => {
     expect(() => {
       types(p)
-        .that().areInterfaces().and().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .areInterfaces()
+        .and()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
     }).toThrow(ArchRuleError) // UnsafeOptions is an interface with bare string
   })
@@ -43,8 +52,12 @@ describe('types() integration', () => {
   it('filters to only type aliases', () => {
     expect(() => {
       types(p)
-        .that().areTypeAliases().and().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .areTypeAliases()
+        .and()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
     }).not.toThrow() // all type aliases with sortBy use unions
   })
@@ -52,8 +65,10 @@ describe('types() integration', () => {
   it('violation message includes the type name and property', () => {
     try {
       types(p)
-        .that().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .check()
       expect.unreachable('should have thrown')
     } catch (error) {
@@ -74,18 +89,17 @@ describe('types() integration', () => {
     // Rule 2: same selection, different condition (just pass)
     // This verifies should() forks correctly
     expect(() => {
-      sortByTypes
-        .should()
-        .havePropertyType('direction', not(isString()))
-        .check()
+      sortByTypes.should().havePropertyType('direction', not(isString())).check()
     }).not.toThrow()
   })
 
   it('supports .because() in the full chain', () => {
     try {
       types(p)
-        .that().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', not(isString()))
+        .that()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', not(isString()))
         .because('untyped sortBy allows invalid column names at runtime')
         .check()
       expect.unreachable('should have thrown')
@@ -99,9 +113,12 @@ describe('types() integration', () => {
   it('works with isUnionOfLiterals matcher end-to-end', () => {
     expect(() => {
       types(p)
-        .that().haveNameMatching(/^Safe/)
-        .and().haveProperty('sortBy')
-        .should().havePropertyType('sortBy', isUnionOfLiterals())
+        .that()
+        .haveNameMatching(/^Safe/)
+        .and()
+        .haveProperty('sortBy')
+        .should()
+        .havePropertyType('sortBy', isUnionOfLiterals())
         .check()
     }).not.toThrow()
   })

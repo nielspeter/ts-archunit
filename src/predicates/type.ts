@@ -59,10 +59,7 @@ export function haveProperty(name: string): Predicate<TypeDeclaration> {
  * @example
  * types(project).that().havePropertyOfType('sortBy', isString())
  */
-export function havePropertyOfType(
-  name: string,
-  matcher: TypeMatcher,
-): Predicate<TypeDeclaration> {
+export function havePropertyOfType(name: string, matcher: TypeMatcher): Predicate<TypeDeclaration> {
   return {
     description: `have property "${name}" of matching type`,
     test: (element) => {

@@ -206,9 +206,7 @@ describe('project()', () => {
 
   describe('error handling', () => {
     it('throws a clear error for a non-existent tsconfig', () => {
-      expect(() => project('/does/not/exist/tsconfig.json')).toThrowError(
-        /tsconfig not found/,
-      )
+      expect(() => project('/does/not/exist/tsconfig.json')).toThrowError(/tsconfig not found/)
     })
 
     it('includes the resolved path in the error message', () => {
@@ -217,9 +215,7 @@ describe('project()', () => {
     })
 
     it('includes a hint about valid paths in the error message', () => {
-      expect(() => project('/nope/tsconfig.json')).toThrowError(
-        /Provide a valid path/,
-      )
+      expect(() => project('/nope/tsconfig.json')).toThrowError(/Provide a valid path/)
     })
   })
 
@@ -235,26 +231,26 @@ describe('project()', () => {
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/project.ts` | New — `ArchProject` interface, `project()` function, singleton cache, `_resetProjectCache()` |
-| `src/index.ts` | Modified — export `project` and `ArchProject` |
-| `tests/core/project.test.ts` | New — 9 tests covering loading, caching, error handling, path resolution |
+| File                         | Change                                                                                       |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `src/core/project.ts`        | New — `ArchProject` interface, `project()` function, singleton cache, `_resetProjectCache()` |
+| `src/index.ts`               | Modified — export `project` and `ArchProject`                                                |
+| `tests/core/project.test.ts` | New — 9 tests covering loading, caching, error handling, path resolution                     |
 
 ## Test Inventory
 
-| # | Test | What it validates |
-|---|------|-------------------|
-| 1 | loads a project from a tsconfig path | Basic loading works, tsConfigPath is set, `_project` exists |
-| 2 | returns source files matching the tsconfig include | `getSourceFiles()` returns the expected fixture files |
-| 3 | returns the same instance for the same path | Singleton cache works for identical paths |
-| 4 | returns the same instance for relative and absolute paths | `path.resolve()` normalizes before cache lookup |
-| 5 | returns different instances for different tsconfig files | Cache is keyed per-project, not global |
-| 6 | returns a fresh instance after cache reset | `_resetProjectCache()` works for test isolation |
-| 7 | throws a clear error for a non-existent tsconfig | Error message includes "tsconfig not found" |
-| 8 | includes the resolved path in the error message | User can see which path failed |
-| 9 | includes a hint about valid paths | Error message is actionable |
-| 10 | exposes the resolved absolute path as tsConfigPath | Relative input produces absolute `tsConfigPath` |
+| #   | Test                                                      | What it validates                                           |
+| --- | --------------------------------------------------------- | ----------------------------------------------------------- |
+| 1   | loads a project from a tsconfig path                      | Basic loading works, tsConfigPath is set, `_project` exists |
+| 2   | returns source files matching the tsconfig include        | `getSourceFiles()` returns the expected fixture files       |
+| 3   | returns the same instance for the same path               | Singleton cache works for identical paths                   |
+| 4   | returns the same instance for relative and absolute paths | `path.resolve()` normalizes before cache lookup             |
+| 5   | returns different instances for different tsconfig files  | Cache is keyed per-project, not global                      |
+| 6   | returns a fresh instance after cache reset                | `_resetProjectCache()` works for test isolation             |
+| 7   | throws a clear error for a non-existent tsconfig          | Error message includes "tsconfig not found"                 |
+| 8   | includes the resolved path in the error message           | User can see which path failed                              |
+| 9   | includes a hint about valid paths                         | Error message is actionable                                 |
+| 10  | exposes the resolved absolute path as tsConfigPath        | Relative input produces absolute `tsConfigPath`             |
 
 ## Out of Scope
 
