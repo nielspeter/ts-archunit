@@ -4,7 +4,8 @@
     "target": "ES2024",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "noEmit": true
+    "noEmit": true,
+    "experimentalDecorators": true
   },
   "include": ["src"]
 }

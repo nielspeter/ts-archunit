@@ -8,3 +8,5 @@ export {
   areExported,
   areNotExported,
 } from './identity.js'
+
+export * as classPredicates from './class.js'

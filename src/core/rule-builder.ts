@@ -3,6 +3,7 @@ import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
 import { ArchRuleError } from './errors.js'
+import { formatViolations } from './format.js'
 
 /**
  * Abstract base class for all rule builders.
@@ -58,6 +59,22 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
+   * Plug in a custom predicate or condition.
+   *
+   * After `.that()` — pass a `Predicate<T>` to filter elements.
+   * After `.should()` — pass a `Condition<T>` to assert against filtered elements.
+   *
+   * Dispatch is structural: if the object has a `test` method it is treated
+   * as a predicate; if it has `evaluate` it is treated as a condition.
+   */
+  satisfy(custom: Predicate<T> | Condition<T>): this {
+    if ('test' in custom) {
+      return this.addPredicate(custom)
+    }
+    return this.addCondition(custom)
+  }
+
+  /**
    * Attach a human-readable rationale to the rule.
    * Included in violation messages when `.check()` throws.
    */
@@ -86,13 +103,7 @@ export abstract class RuleBuilder<T> {
   warn(): void {
     const violations = this.evaluate()
     if (violations.length > 0) {
-      const formatted = violations
-        .map((v) => `  - ${v.element}: ${v.message} (${v.file}:${String(v.line)})`)
-        .join('\n')
-      const reasonLine = this._reason ? `\nReason: ${this._reason}` : ''
-      console.warn(
-        `Architecture warning${violations.length === 1 ? '' : 's'} (${String(violations.length)} found)${reasonLine}\n${formatted}`,
-      )
+      console.warn(formatViolations(violations, this._reason))
     }
   }
 

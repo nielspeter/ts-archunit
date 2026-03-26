@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-25
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 6 completed, ~17 remaining
+**Total Plans:** 14 completed, ~9 remaining
 
 ---
 
@@ -17,14 +17,14 @@
 | **P0**   | ~~Predicate Engine & Identity Predicates (0003)~~                            | 1 day     | COMPLETED 2026-03-25 |
 | **P0**   | ~~Condition Engine & Structural Conditions (0004)~~                          | 1 day     | COMPLETED 2026-03-25 |
 | **P0**   | ~~Fluent Rule Builder & `.check()` / `.warn()` (0005)~~                      | 1 day     | COMPLETED 2026-03-25 |
-| **P1**   | Violation Reporting & Code Frames (0006)                                     | 1-2 days  | Not Started |
-| **P1**   | Module Entry Point & Dependency Conditions (0007)                            | 1-2 days  | Not Started |
-| **P1**   | Class Entry Point & Class Predicates/Conditions (0008)                       | 1-2 days  | Not Started |
-| **P1**   | Function Entry Point & Function Predicates (0009)                            | 1 day     | Not Started |
-| **P1**   | Type Entry Point & Type-Level Conditions (0010)                              | 1-2 days  | Not Started |
-| **P1**   | Body Analysis: `call()`, `access()`, `newExpr()`, `expression()` (0011)      | 2-3 days  | Not Started |
-| **P1**   | Slice Entry Point & Cycle/Layer Conditions (0012)                            | 2-3 days  | Not Started |
-| **P1**   | Custom Predicates, Conditions & `definePredicate` / `defineCondition` (0013) | 1 day     | Not Started |
+| **P1**   | ~~Violation Reporting & Code Frames (0006)~~                                 | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Module Entry Point & Dependency Conditions (0007)~~                        | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Class Entry Point & Class Predicates/Conditions (0008)~~                   | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Function Entry Point & Function Predicates (0009)~~                        | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Type Entry Point & Type-Level Conditions (0010)~~                          | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Body Analysis: `call()`, `access()`, `newExpr()`, `expression()` (0011)~~  | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Slice Entry Point & Cycle/Layer Conditions (0012)~~                        | 1 day     | COMPLETED 2026-03-26 |
+| **P1**   | ~~Custom Predicates, Conditions & `definePredicate` / `defineCondition` (0013)~~ | 0.5 day | COMPLETED 2026-03-26 |
 | **P2**   | Call Entry Point & Call Predicates (0014)                                    | 2-3 days  | Not Started |
 | **P2**   | Named Selections, `within()` & Scoped Rules (0015)                           | 1-2 days  | Not Started |
 | **P2**   | Baseline Mode & Diff-Aware Mode (0016)                                       | 1-2 days  | Not Started |

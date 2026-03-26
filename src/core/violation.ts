@@ -1,10 +1,10 @@
 import type { Node } from 'ts-morph'
+import { generateCodeFrame } from './code-frame.js'
 
 /**
  * A single architecture rule violation.
  *
  * Represents one element that failed to satisfy a condition.
- * Basic structure — extended with codeFrame and suggestion in plan 0006.
  */
 export interface ArchViolation {
   /** Human-readable rule description (from the fluent chain) */
@@ -19,6 +19,10 @@ export interface ArchViolation {
   message: string
   /** Optional rationale provided via .because() */
   because?: string
+  /** Source code snippet around the violation line */
+  codeFrame?: string
+  /** Actionable suggestion for fixing the violation (e.g. "Replace parseInt() with this.extractCount()") */
+  suggestion?: string
 }
 
 /**
@@ -60,14 +64,18 @@ export function getElementLine(node: Node): number {
 export function createViolation(
   node: Node,
   message: string,
-  context: { rule: string; because?: string },
+  context: { rule: string; because?: string; suggestion?: string },
 ): ArchViolation {
+  const line = getElementLine(node)
+  const sourceText = node.getSourceFile().getFullText()
   return {
     rule: context.rule,
     element: getElementName(node),
     file: getElementFile(node),
-    line: getElementLine(node),
+    line,
     message,
     because: context.because,
+    suggestion: context.suggestion,
+    codeFrame: generateCodeFrame(sourceText, line),
   }
 }

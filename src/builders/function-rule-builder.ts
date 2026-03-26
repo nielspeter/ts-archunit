@@ -1,0 +1,218 @@
+import type { ArchProject } from '../core/project.js'
+import type { Condition } from '../core/condition.js'
+import { RuleBuilder } from '../core/rule-builder.js'
+import type { ExpressionMatcher } from '../helpers/matchers.js'
+import {
+  functionContain,
+  functionNotContain,
+  functionUseInsteadOf,
+} from '../conditions/body-analysis-function.js'
+import type { ArchFunction } from '../models/arch-function.js'
+import { collectFunctions } from '../models/arch-function.js'
+import {
+  notExist as fnNotExist,
+  beExported as fnBeExported,
+  beAsync as fnBeAsync,
+  haveNameMatching as fnConditionHaveNameMatching,
+} from '../conditions/function.js'
+import {
+  haveNameMatching as identityHaveNameMatching,
+  haveNameStartingWith as identityHaveNameStartingWith,
+  haveNameEndingWith as identityHaveNameEndingWith,
+  resideInFile as identityResideInFile,
+  resideInFolder as identityResideInFolder,
+  areExported as identityAreExported,
+  areNotExported as identityAreNotExported,
+} from '../predicates/identity.js'
+import {
+  areAsync as fnAreAsync,
+  areNotAsync as fnAreNotAsync,
+  haveParameterCount as fnHaveParameterCount,
+  haveParameterCountGreaterThan as fnHaveParameterCountGreaterThan,
+  haveParameterCountLessThan as fnHaveParameterCountLessThan,
+  haveParameterNamed as fnHaveParameterNamed,
+  haveReturnType as fnHaveReturnType,
+} from '../predicates/function.js'
+
+/**
+ * Rule builder for function-level architecture rules.
+ *
+ * Operates on both FunctionDeclarations and const arrow functions,
+ * unified through the ArchFunction model.
+ *
+ * @example
+ * ```typescript
+ * // All parseXxxOrder functions should not exist
+ * functions(project)
+ *   .that().haveNameMatching(/^parse\w+Order$/)
+ *   .should(notExist())
+ *   .because('use shared parseOrder() utility instead')
+ *   .check()
+ *
+ * // No function should have more than 5 parameters
+ * functions(project)
+ *   .that().haveParameterCountGreaterThan(5)
+ *   .should(notExist())
+ *   .because('functions with many parameters are hard to use')
+ *   .check()
+ *
+ * // All exported async functions should have names starting with a verb
+ * functions(project)
+ *   .that().areExported().and().areAsync()
+ *   .should().haveNameMatching(/^(get|find|create|update|delete|fetch|load|save)/)
+ *   .because('async functions should use verb prefixes')
+ *   .check()
+ * ```
+ */
+export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
+  protected getElements(): ArchFunction[] {
+    return this.project.getSourceFiles().flatMap(collectFunctions)
+  }
+
+  // --- Identity predicates (delegated to plan 0003 generics) ---
+
+  haveNameMatching(pattern: RegExp | string): this {
+    return this.addPredicate(identityHaveNameMatching<ArchFunction>(pattern))
+  }
+
+  haveNameStartingWith(prefix: string): this {
+    return this.addPredicate(identityHaveNameStartingWith<ArchFunction>(prefix))
+  }
+
+  haveNameEndingWith(suffix: string): this {
+    return this.addPredicate(identityHaveNameEndingWith<ArchFunction>(suffix))
+  }
+
+  resideInFile(glob: string): this {
+    return this.addPredicate(identityResideInFile<ArchFunction>(glob))
+  }
+
+  resideInFolder(glob: string): this {
+    return this.addPredicate(identityResideInFolder<ArchFunction>(glob))
+  }
+
+  areExported(): this {
+    return this.addPredicate(identityAreExported<ArchFunction>())
+  }
+
+  areNotExported(): this {
+    return this.addPredicate(identityAreNotExported<ArchFunction>())
+  }
+
+  // --- Function-specific predicates ---
+
+  areAsync(): this {
+    return this.addPredicate(fnAreAsync())
+  }
+
+  areNotAsync(): this {
+    return this.addPredicate(fnAreNotAsync())
+  }
+
+  haveParameterCount(n: number): this {
+    return this.addPredicate(fnHaveParameterCount(n))
+  }
+
+  haveParameterCountGreaterThan(n: number): this {
+    return this.addPredicate(fnHaveParameterCountGreaterThan(n))
+  }
+
+  haveParameterCountLessThan(n: number): this {
+    return this.addPredicate(fnHaveParameterCountLessThan(n))
+  }
+
+  haveParameterNamed(name: string): this {
+    return this.addPredicate(fnHaveParameterNamed(name))
+  }
+
+  haveReturnType(pattern: RegExp | string): this {
+    return this.addPredicate(fnHaveReturnType(pattern))
+  }
+
+  // --- Condition methods ---
+
+  /**
+   * Register a condition. Public API for passing standalone conditions
+   * (like notExist(), beExported()) into the builder chain.
+   */
+  withCondition(condition: Condition<ArchFunction>): this {
+    return this.addCondition(condition)
+  }
+
+  /**
+   * The filtered function set must be empty.
+   */
+  notExist(): this {
+    return this.addCondition(fnNotExist())
+  }
+
+  /**
+   * Functions must be exported from their module.
+   */
+  beExported(): this {
+    return this.addCondition(fnBeExported())
+  }
+
+  /**
+   * Functions must be async.
+   */
+  beAsync(): this {
+    return this.addCondition(fnBeAsync())
+  }
+
+  /**
+   * Functions must have a name matching the given pattern.
+   */
+  conditionHaveNameMatching(pattern: RegExp): this {
+    return this.addCondition(fnConditionHaveNameMatching(pattern))
+  }
+
+  // --- Body analysis condition methods (plan 0011) ---
+
+  /**
+   * Assert that the function body contains at least one match.
+   */
+  contain(matcher: ExpressionMatcher): this {
+    return this.addCondition(functionContain(matcher))
+  }
+
+  /**
+   * Assert that the function body does NOT contain any match.
+   * Produces one violation per matching node found.
+   */
+  notContain(matcher: ExpressionMatcher): this {
+    return this.addCondition(functionNotContain(matcher))
+  }
+
+  /**
+   * Assert: must NOT contain 'bad' AND must contain 'good'.
+   * Better violation messages than combining notContain + contain separately.
+   */
+  useInsteadOf(bad: ExpressionMatcher, good: ExpressionMatcher): this {
+    return this.addCondition(functionUseInsteadOf(bad, good))
+  }
+}
+
+/**
+ * Entry point for function-level architecture rules.
+ *
+ * Scans all source files in the project for both FunctionDeclarations
+ * and const arrow functions (VariableDeclaration with ArrowFunction initializer).
+ *
+ * @example
+ * ```typescript
+ * import { project, functions } from 'ts-archunit'
+ *
+ * const p = project('tsconfig.json')
+ *
+ * // All parseXxxOrder functions should not exist
+ * functions(p)
+ *   .that().haveNameMatching(/^parse\w+Order$/)
+ *   .should(notExist())
+ *   .because('use shared parseOrder() utility instead')
+ *   .check()
+ * ```
+ */
+export function functions(p: ArchProject): FunctionRuleBuilder {
+  return new FunctionRuleBuilder(p)
+}

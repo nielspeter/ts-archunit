@@ -141,7 +141,9 @@ describe('RuleBuilder', () => {
         .withCondition(alwaysFail('warning'))
         .warn()
       expect(warnSpy).toHaveBeenCalledOnce()
-      expect(warnSpy.mock.calls[0]?.[0]).toContain('warning: UserService')
+      const output = warnSpy.mock.calls[0]?.[0] as string
+      expect(output).toContain('UserService')
+      expect(output).toContain('Architecture Violation')
       warnSpy.mockRestore()
     })
 
