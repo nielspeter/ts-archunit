@@ -94,15 +94,19 @@ Available on all entry points via `.that()`.
 
 ## Function Predicates
 
-| Export                          | Signature                                  | Description                             |
-| ------------------------------- | ------------------------------------------ | --------------------------------------- |
-| `areAsync`                      | `areAsync`                                 | Function is async.                      |
-| `areNotAsync`                   | `areNotAsync`                              | Function is not async.                  |
-| `haveParameterCount`            | `haveParameterCount(n: number)`            | Function has exactly n parameters.      |
-| `haveParameterCountGreaterThan` | `haveParameterCountGreaterThan(n: number)` | Function has more than n parameters.    |
-| `haveParameterCountLessThan`    | `haveParameterCountLessThan(n: number)`    | Function has fewer than n parameters.   |
-| `haveParameterNamed`            | `haveParameterNamed(name: string)`         | Function has a parameter with the name. |
-| `haveReturnType`                | `haveReturnType(type: string)`             | Function has the given return type.     |
+| Export                          | Signature                                        | Description                                           |
+| ------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
+| `areAsync`                      | `areAsync`                                       | Function is async.                                    |
+| `areNotAsync`                   | `areNotAsync`                                    | Function is not async.                                |
+| `haveParameterCount`            | `haveParameterCount(n: number)`                  | Function has exactly n parameters.                    |
+| `haveParameterCountGreaterThan` | `haveParameterCountGreaterThan(n: number)`       | Function has more than n parameters.                  |
+| `haveParameterCountLessThan`    | `haveParameterCountLessThan(n: number)`          | Function has fewer than n parameters.                 |
+| `haveParameterNamed`            | `haveParameterNamed(name: string)`               | Function has a parameter with the name.               |
+| `haveReturnType`                | `haveReturnType(type: string)`                   | Function has the given return type.                   |
+| `haveRestParameter`             | `haveRestParameter()`                            | Function has a `...args` rest parameter.              |
+| `haveOptionalParameter`         | `haveOptionalParameter()`                        | Function has an optional or default-valued parameter. |
+| `haveParameterOfType`           | `haveParameterOfType(i: number, m: TypeMatcher)` | Parameter at index i matches the TypeMatcher.         |
+| `haveParameterNameMatching`     | `haveParameterNameMatching(re: RegExp)`          | Function has a parameter name matching regex.         |
 
 ## Type Predicates
 

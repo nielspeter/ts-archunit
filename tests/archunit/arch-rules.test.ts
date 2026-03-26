@@ -374,3 +374,32 @@ describe('No console.log in Source', () => {
       .check()
   })
 })
+
+// ─── API Consistency (plan 0029 dogfooding) ─────────────────────────
+
+describe('API Consistency', () => {
+  it('module predicate functions must not accept a single "glob" parameter', () => {
+    // Regression guard for the .notImportFrom() variadic bug.
+    // Module predicates like importFrom/notImportFrom should accept ...globs
+    // so users can write .notImportFrom('fastify', 'knex', 'bullmq').
+    // Note: identity predicates (resideInFile, resideInFolder) are legitimately
+    // single-glob — you match one location pattern, not a blacklist.
+    functions(p)
+      .that()
+      .resideInFolder('**/src/predicates/module**')
+      .and()
+      .areExported()
+      .and()
+      .haveParameterNamed('glob')
+      .and()
+      .haveParameterCount(1)
+      .should()
+      .notExist()
+      .rule({
+        id: 'api/no-single-glob-predicates',
+        because: 'Single-glob predicates silently ignore extra arguments — use ...globs variadic',
+        suggestion: 'Change (glob: string) to (...globs: string[]) to match condition variants',
+      })
+      .check()
+  })
+})

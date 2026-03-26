@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-03-26
+
+### Added
+
+- Function signature predicates (plan 0029):
+  - `haveRestParameter()` — matches functions with `...args` parameters
+  - `haveOptionalParameter()` — matches functions with optional or default-valued parameters
+  - `haveParameterOfType(index, matcher)` — type-checks parameter at position using TypeMatcher
+  - `haveParameterNameMatching(regex)` — matches parameter names by pattern
+- Builder methods on `FunctionRuleBuilder` for all 4 new predicates
+- Dogfooding architecture rule: module predicates must not accept single `glob` parameter
+- `.notImportFrom()` and `.importFrom()` now accept multiple globs (variadic)
+
+### Fixed
+
+- `.excluding()` now matches against `violation.element`, `violation.file`, and `violation.message` (was element-only, BUG-0001)
+- `.notImportFrom('fastify', 'knex', 'bullmq')` no longer silently ignores arguments 2+
+
 ## [0.1.0] - 2026-03-26
 
 ### Added (post-v1: plans 0027, 0028)

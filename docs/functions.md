@@ -34,15 +34,19 @@ functions(p).that().resideInFolder('**/handlers/**').should().beAsync().check()
 
 All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on functions. In addition:
 
-| Predicate                          | Description                                  | Example                                    |
-| ---------------------------------- | -------------------------------------------- | ------------------------------------------ |
-| `areAsync`                         | Function is async                            | `.that().areAsync()`                       |
-| `areNotAsync`                      | Function is not async                        | `.that().areNotAsync()`                    |
-| `haveParameterCount(n)`            | Function has exactly n parameters            | `.that().haveParameterCount(0)`            |
-| `haveParameterCountGreaterThan(n)` | Function has more than n parameters          | `.that().haveParameterCountGreaterThan(5)` |
-| `haveParameterCountLessThan(n)`    | Function has fewer than n parameters         | `.that().haveParameterCountLessThan(2)`    |
-| `haveParameterNamed(name)`         | Function has a parameter with the given name | `.that().haveParameterNamed('ctx')`        |
-| `haveReturnType(type)`             | Function has the given return type           | `.that().haveReturnType('Promise')`        |
+| Predicate                          | Description                                          | Example                                      |
+| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------- |
+| `areAsync`                         | Function is async                                    | `.that().areAsync()`                         |
+| `areNotAsync`                      | Function is not async                                | `.that().areNotAsync()`                      |
+| `haveParameterCount(n)`            | Function has exactly n parameters                    | `.that().haveParameterCount(0)`              |
+| `haveParameterCountGreaterThan(n)` | Function has more than n parameters                  | `.that().haveParameterCountGreaterThan(5)`   |
+| `haveParameterCountLessThan(n)`    | Function has fewer than n parameters                 | `.that().haveParameterCountLessThan(2)`      |
+| `haveParameterNamed(name)`         | Function has a parameter with the given name         | `.that().haveParameterNamed('ctx')`          |
+| `haveReturnType(type)`             | Function has the given return type                   | `.that().haveReturnType('Promise')`          |
+| `haveRestParameter()`              | Function has a `...args` rest parameter              | `.that().haveRestParameter()`                |
+| `haveOptionalParameter()`          | Function has an optional or default-valued parameter | `.that().haveOptionalParameter()`            |
+| `haveParameterOfType(i, matcher)`  | Parameter at index i matches the TypeMatcher         | `.that().haveParameterOfType(0, isString())` |
+| `haveParameterNameMatching(regex)` | Function has a parameter name matching regex         | `.that().haveParameterNameMatching(/^ctx/)`  |
 
 ## Available Conditions
 
@@ -114,6 +118,38 @@ functions(p)
   .should()
   .notExist()
   .because('functions with many parameters should use an options object')
+  .check()
+```
+
+### No Rest Parameters in Route Handlers
+
+```typescript
+functions(p)
+  .that()
+  .resideInFolder('**/routes/**')
+  .and()
+  .haveRestParameter()
+  .should()
+  .notExist()
+  .because('route handlers must have explicitly typed parameters')
+  .check()
+```
+
+### Event Handlers Must Accept an Event Parameter
+
+```typescript
+import { matching } from 'ts-archunit'
+
+functions(p)
+  .that()
+  .haveNameMatching(/^handle/)
+  .and()
+  .haveParameterOfType(0, matching(/Event$/))
+  .and()
+  .haveParameterCountGreaterThan(1)
+  .should()
+  .notExist()
+  .because('event handlers should accept exactly one Event parameter')
   .check()
 ```
 

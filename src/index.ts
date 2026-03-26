@@ -111,6 +111,10 @@ export {
   haveParameterCountLessThan,
   haveParameterNamed,
   haveReturnType,
+  haveRestParameter,
+  haveOptionalParameter,
+  haveParameterOfType,
+  haveParameterNameMatching,
 } from './predicates/function.js'
 
 // Function conditions
