@@ -148,7 +148,7 @@ Tests:
 ```typescript
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
-import type { CheckOptions } from '../core/check-options.js'
+import type { OutputFormat } from '../core/check-options.js'
 import { ArchRuleError } from '../core/errors.js'
 import { formatViolations } from '../core/format.js'
 
@@ -203,7 +203,7 @@ export abstract class SmellBuilder {
   }
 
   /** Run detection and throw on violations. */
-  check(options?: CheckOptions): void {
+  check(options?: { format?: OutputFormat }): void {
     const violations = this.detect()
     if (violations.length > 0) {
       throw new ArchRuleError(this.describe(), violations, options)
@@ -211,7 +211,7 @@ export abstract class SmellBuilder {
   }
 
   /** Run detection and log violations without throwing. */
-  warn(options?: CheckOptions): void {
+  warn(options?: { format?: OutputFormat }): void {
     const violations = this.detect()
     if (violations.length > 0) {
       const message = formatViolations(this.describe(), violations)
@@ -400,10 +400,10 @@ Test cases:
 
 ### Test fixtures
 
-Create minimal fixture projects under `test/fixtures/smells/`:
+Create minimal fixture projects under `tests/fixtures/smells/`:
 
 ```
-test/fixtures/smells/
+tests/fixtures/smells/
 ├── duplicate-bodies/
 │   ├── tsconfig.json
 │   ├── file-a.ts          # parseWebhookOrder — the original
@@ -431,7 +431,7 @@ test/fixtures/smells/
 | `src/smells/__tests__/fingerprint.test.ts` | Fingerprint + similarity tests |
 | `src/smells/__tests__/duplicate-bodies.test.ts` | Integration tests |
 | `src/smells/__tests__/inconsistent-siblings.test.ts` | Integration tests |
-| `test/fixtures/smells/**` | Fixture projects |
+| `tests/fixtures/smells/**` | Fixture projects |
 
 ## Out of Scope
 

@@ -426,6 +426,7 @@ import {
 } from '../predicates/call.js'
 import {
   haveCallbackContaining as conditionHaveCallbackContaining,
+  notHaveCallbackContaining as conditionNotHaveCallbackContaining,
   notExist as callNotExist,
 } from '../conditions/call.js'
 
@@ -539,7 +540,7 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
    * Get the underlying ArchProject.
    * Used by within() to create scoped builders.
    */
-  getArchProject(): ArchProject {
+  getProject(): ArchProject {
     return this.project
   }
 
