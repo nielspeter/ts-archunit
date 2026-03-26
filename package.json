@@ -7,6 +7,26 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./rules/typescript": {
+      "types": "./dist/rules/typescript.d.ts",
+      "import": "./dist/rules/typescript.js"
+    },
+    "./rules/security": {
+      "types": "./dist/rules/security.d.ts",
+      "import": "./dist/rules/security.js"
+    },
+    "./rules/errors": {
+      "types": "./dist/rules/errors.d.ts",
+      "import": "./dist/rules/errors.js"
+    },
+    "./rules/naming": {
+      "types": "./dist/rules/naming.d.ts",
+      "import": "./dist/rules/naming.js"
+    },
+    "./rules/dependencies": {
+      "types": "./dist/rules/dependencies.d.ts",
+      "import": "./dist/rules/dependencies.js"
     }
   },
   "files": [

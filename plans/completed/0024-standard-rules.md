@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Done
 - **Priority:** P2 — High adoption impact, low effort per rule
 - **Effort:** 1-2 days
 - **Created:** 2026-03-26
