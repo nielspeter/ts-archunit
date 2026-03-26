@@ -36,6 +36,7 @@ export default defineConfig({
           { text: 'Cross-Layer Validation', link: '/cross-layer' },
           { text: 'Smell Detection', link: '/smell-detection' },
           { text: 'GraphQL Rules', link: '/graphql' },
+          { text: 'Standard Rules', link: '/standard-rules' },
           { text: 'Custom Rules', link: '/custom-rules' },
           { text: 'Violation Reporting', link: '/violation-reporting' },
         ],

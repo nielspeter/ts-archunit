@@ -28,6 +28,10 @@
       "types": "./dist/rules/dependencies.d.ts",
       "import": "./dist/rules/dependencies.js"
     },
+    "./rules/code-quality": {
+      "types": "./dist/rules/code-quality.d.ts",
+      "import": "./dist/rules/code-quality.js"
+    },
     "./graphql": {
       "types": "./dist/graphql/index.d.ts",
       "import": "./dist/graphql/index.js"
