@@ -77,34 +77,35 @@ Update `evaluate()` to filter exclusions:
 private evaluate(): ArchViolation[] {
   // ... existing predicate filtering and condition evaluation ...
 
-  // Filter exclusions
+  // Filter exclusions — track which patterns matched for stale detection
   if (this._exclusions.length > 0) {
-    const beforeCount = violations.length
-    violations = violations.filter((v) => !this.isExcluded(v))
-    const excludedCount = beforeCount - violations.length
+    const matchedPatterns = new Set<number>()
+    violations = violations.filter((v) => {
+      const matchIndex = this._exclusions.findIndex((pattern) =>
+        typeof pattern === 'string'
+          ? v.element === pattern
+          : pattern.test(v.element),
+      )
+      if (matchIndex >= 0) {
+        matchedPatterns.add(matchIndex)
+        return false // suppress this violation
+      }
+      return true // keep this violation
+    })
 
-    // Warn about unused exclusions
-    for (const pattern of this._exclusions) {
-      const matched = excludedCount > 0 // simplified — see implementation
-      if (!matched) {
+    // Warn about each unused exclusion pattern individually
+    const ruleId = this._metadata?.id ?? 'unnamed'
+    this._exclusions.forEach((pattern, index) => {
+      if (!matchedPatterns.has(index)) {
         console.warn(
-          `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${this._metadata?.id ?? 'unnamed'}'. ` +
-          `It matched zero violations — it may be stale after a rename.`
+          `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
+          `It matched zero violations — it may be stale after a rename.`,
         )
       }
-    }
+    })
   }
 
   return violations
-}
-
-private isExcluded(violation: ArchViolation): boolean {
-  return this._exclusions.some((pattern) => {
-    if (typeof pattern === 'string') {
-      return violation.element === pattern
-    }
-    return pattern.test(violation.element)
-  })
 }
 ```
 
