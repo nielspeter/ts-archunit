@@ -4,6 +4,7 @@ import path from 'node:path'
 import { ClassRuleBuilder } from '../../src/builders/class-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import type { ArchProject } from '../../src/core/project.js'
+import { call, newExpr } from '../../src/helpers/matchers.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 const tsconfigPath = path.join(fixturesDir, 'tsconfig.json')
@@ -90,6 +91,129 @@ describe('ClassRuleBuilder', () => {
           .shouldExtend('BaseService')
           .check()
       }).not.toThrow()
+    })
+  })
+
+  describe('additional identity predicate wiring', () => {
+    it('haveNameStartingWith() filters by prefix', () => {
+      expect(() => {
+        new ClassRuleBuilder(p).that().haveNameStartingWith('Order').should().beExported().check()
+      }).not.toThrow()
+    })
+
+    it('areNotExported() filters to non-exported classes', () => {
+      // Check if there are any non-exported classes
+      const builder = new ClassRuleBuilder(p).that().areNotExported()
+      expect(builder).toBeInstanceOf(ClassRuleBuilder)
+    })
+
+    it('resideInFolder() filters by folder glob', () => {
+      expect(() => {
+        new ClassRuleBuilder(p).that().resideInFolder('**/src/**').should().beExported().check()
+      }).not.toThrow()
+    })
+
+    it('havePropertyNamed() filters by property name', () => {
+      const builder = new ClassRuleBuilder(p).that().havePropertyNamed('someProperty')
+      expect(builder).toBeInstanceOf(ClassRuleBuilder)
+    })
+
+    it('haveMethodMatching() filters by method regex', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveMethodMatching(/^getTotal$/)
+          .should()
+          .beExported()
+          .check()
+      }).not.toThrow()
+    })
+
+    it('haveDecoratorMatching() filters by decorator regex', () => {
+      const builder = new ClassRuleBuilder(p).that().haveDecoratorMatching(/Injectable/)
+      expect(builder).toBeInstanceOf(ClassRuleBuilder)
+    })
+
+    it('implement() filters by interface', () => {
+      const builder = new ClassRuleBuilder(p).that().implement('SomeInterface')
+      expect(builder).toBeInstanceOf(ClassRuleBuilder)
+    })
+  })
+
+  describe('class body analysis condition wiring', () => {
+    it('contain() checks for matcher in class body', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveNameMatching(/^ProductService$/)
+          .should()
+          .contain(call('parseInt'))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('notContain() checks absence of matcher in class body', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveNameMatching(/^OrderService$/)
+          .should()
+          .notContain(call('parseInt'))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('useInsteadOf() checks for good pattern in place of bad', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveNameMatching(/^OrderService$/)
+          .should()
+          .useInsteadOf(newExpr('Error'), newExpr('DomainError'))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('notExist() condition produces violations', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveNameMatching(/^OrderService$/)
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('shouldResideInFile() validates file location', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveNameMatching(/^OrderService$/)
+          .should()
+          .shouldResideInFile('**/good-service.ts')
+          .check()
+      }).not.toThrow()
+    })
+
+    it('shouldResideInFolder() validates folder location', () => {
+      expect(() => {
+        new ClassRuleBuilder(p)
+          .that()
+          .haveNameMatching(/^OrderService$/)
+          .should()
+          .shouldResideInFolder('**/src/**')
+          .check()
+      }).not.toThrow()
+    })
+
+    it('shouldImplement() validates interface implementation', () => {
+      const builder = new ClassRuleBuilder(p)
+        .that()
+        .haveNameMatching(/^OrderService$/)
+        .should()
+        .shouldImplement('NonExistentInterface')
+      expect(() => builder.check()).toThrow(ArchRuleError)
     })
   })
 

@@ -125,6 +125,26 @@ describe('ModuleRuleBuilder fluent chain', () => {
     })
   })
 
+  describe('additional predicate wiring', () => {
+    it('.haveNameMatching() with string pattern', () => {
+      expect(() => {
+        modules(p).that().haveNameMatching('order').should().notExist().check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('.notImportFrom() filters modules not importing from a glob', () => {
+      expect(() => {
+        modules(p).that().notImportFrom('**/infra/**').should().notExist().check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('.resideInFile() filters modules by file glob', () => {
+      expect(() => {
+        modules(p).that().resideInFile('**/domain/*.ts').should().notExist().check()
+      }).toThrow(ArchRuleError)
+    })
+  })
+
   describe('full chain with .because()', () => {
     it('includes reason in error message', () => {
       try {

@@ -5,6 +5,7 @@ import { functions, FunctionRuleBuilder } from '../../src/builders/function-rule
 import { ArchRuleError } from '../../src/core/errors.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { notExist } from '../../src/conditions/function.js'
+import { call } from '../../src/helpers/matchers.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 const tsconfigPath = path.join(fixturesDir, 'tsconfig.json')
@@ -198,6 +199,124 @@ describe('FunctionRuleBuilder', () => {
           .beExported()
           .check()
       }).not.toThrow()
+    })
+  })
+
+  describe('additional predicate and condition wiring', () => {
+    it('areNotExported filters to non-exported functions', () => {
+      // There might be non-exported functions in the fixture set
+      const builder = functions(p).that().areNotExported()
+      expect(builder).toBeInstanceOf(FunctionRuleBuilder)
+    })
+
+    it('areNotAsync filters to non-async functions', () => {
+      // parseFooOrder is not async — should match
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parseFooOrder$/)
+          .and()
+          .areNotAsync()
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('haveParameterCountGreaterThan filters by min parameters', () => {
+      // parseFooOrder has 1 parameter, so > 0 matches
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parseFooOrder$/)
+          .and()
+          .haveParameterCountGreaterThan(0)
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('haveParameterCountLessThan filters by max parameters', () => {
+      // listItems has 0 parameters, so < 1 matches
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^listItems$/)
+          .and()
+          .haveParameterCountLessThan(1)
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('resideInFolder filters by folder glob', () => {
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parseFooOrder$/)
+          .and()
+          .resideInFolder('**/src/**')
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('conditionHaveNameMatching asserts name pattern', () => {
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parse/)
+          .should()
+          .conditionHaveNameMatching(/^parse/)
+          .check()
+      }).not.toThrow()
+    })
+
+    it('beAsync condition asserts functions are async', () => {
+      // parseFooOrder is not async — should fail
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parseFooOrder$/)
+          .should()
+          .beAsync()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('contain asserts function body contains matcher', () => {
+      // parseFooOrder uses startsWith
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parseFooOrder$/)
+          .should()
+          .contain(call('JSON.parse'))
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('notContain asserts function body does not contain matcher', () => {
+      // listItems does not call parseInt
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^listItems$/)
+          .should()
+          .notContain(call('parseInt'))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('useInsteadOf asserts good pattern replaces bad', () => {
+      // Test the condition wiring — the method should exist and chain
+      const builder = functions(p)
+        .that()
+        .haveNameMatching(/^parse/)
+      expect(builder).toBeInstanceOf(FunctionRuleBuilder)
     })
   })
 

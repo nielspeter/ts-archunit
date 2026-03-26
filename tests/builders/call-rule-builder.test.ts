@@ -167,6 +167,101 @@ describe('CallRuleBuilder', () => {
     })
   })
 
+  describe('additional predicate wiring', () => {
+    it('.haveNameStartingWith() filters by name prefix', () => {
+      expect(() => {
+        calls(p).that().haveNameStartingWith('app.').should().notExist().check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('.haveNameEndingWith() filters by name suffix', () => {
+      expect(() => {
+        calls(p).that().haveNameEndingWith('.get').should().notExist().check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('.resideInFolder() filters by folder glob', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .resideInFolder('**/src/**')
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .resideInFolder('**/nonexistent/**')
+          .should()
+          .notExist()
+          .check()
+      }).not.toThrow()
+    })
+
+    it('.withArgMatching() filters calls by argument text', () => {
+      // Argument text includes quotes: '/api/users'
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withArgMatching(0, /\/api/)
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('.withMethod() with regex matches multiple methods', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod(/^(get|post)$/)
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('.notHaveCallbackContaining() passes when callback does NOT contain match', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod('get')
+          .and()
+          .withStringArg(0, '/api/users')
+          .should()
+          .notHaveCallbackContaining(call('db.query'))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('.notHaveCallbackContaining() fails when callback DOES contain match', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod('get')
+          .and()
+          .withStringArg(0, '/api/users')
+          .should()
+          .notHaveCallbackContaining(call('handleError'))
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+  })
+
   describe('getProject and getMatchedCalls', () => {
     it('getProject() returns the project', () => {
       const builder = calls(p)

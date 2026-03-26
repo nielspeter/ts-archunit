@@ -97,6 +97,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.19.15",
     "@types/picomatch": "^4.0.2",
+    "@vitest/coverage-v8": "^4.1.1",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
     "graphql": "^16.13.2",
