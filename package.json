@@ -61,7 +61,7 @@
     "prepublishOnly": "npm run validate && npm run build",
     "validate": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "fix": "npm run lint:fix && npm run format",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli/bin.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/ tests/",
