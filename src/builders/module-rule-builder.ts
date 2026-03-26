@@ -69,17 +69,17 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
   // --- Module-specific predicates (from predicates/module.ts) ---
 
   /**
-   * Filter modules that import from a path matching the given glob.
+   * Filter modules that import from a path matching any of the given globs.
    */
-  importFrom(glob: string): this {
-    return this.addPredicate(importFromPredicate(glob))
+  importFrom(...globs: string[]): this {
+    return this.addPredicate(importFromPredicate(...globs))
   }
 
   /**
-   * Filter modules that do NOT import from a path matching the given glob.
+   * Filter modules that do NOT import from any path matching the given globs.
    */
-  notImportFrom(glob: string): this {
-    return this.addPredicate(notImportFromPredicate(glob))
+  notImportFrom(...globs: string[]): this {
+    return this.addPredicate(notImportFromPredicate(...globs))
   }
 
   /**

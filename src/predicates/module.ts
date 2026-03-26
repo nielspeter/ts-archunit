@@ -14,33 +14,35 @@ function getImportPaths(sourceFile: SourceFile): string[] {
 }
 
 /**
- * Matches modules that import from a path matching the given glob.
+ * Matches modules that import from a path matching any of the given globs.
  *
- * The glob is matched against resolved absolute import paths.
- * For external (non-resolvable) imports, it matches against the raw specifier.
+ * The globs are matched against resolved absolute import paths.
+ * For external (non-resolvable) imports, they match against the raw specifier.
  *
  * @example
  * modules(p).that().importFrom('** /infrastructure/**')
+ * modules(p).that().importFrom('fastify', 'knex', 'bullmq')
  */
-export function importFrom(glob: string): Predicate<SourceFile> {
-  const isMatch = picomatch(glob)
+export function importFrom(...globs: string[]): Predicate<SourceFile> {
+  const matchers = globs.map((g) => picomatch(g))
   return {
-    description: `import from "${glob}"`,
-    test: (sourceFile) => getImportPaths(sourceFile).some((p) => isMatch(p)),
+    description: `import from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    test: (sourceFile) => getImportPaths(sourceFile).some((p) => matchers.some((m) => m(p))),
   }
 }
 
 /**
- * Matches modules that do NOT import from a path matching the given glob.
+ * Matches modules that do NOT import from any path matching the given globs.
  *
  * @example
  * modules(p).that().notImportFrom('** /legacy/**')
+ * modules(p).that().notImportFrom('fastify', 'knex', 'bullmq')
  */
-export function notImportFrom(glob: string): Predicate<SourceFile> {
-  const isMatch = picomatch(glob)
+export function notImportFrom(...globs: string[]): Predicate<SourceFile> {
+  const matchers = globs.map((g) => picomatch(g))
   return {
-    description: `not import from "${glob}"`,
-    test: (sourceFile) => !getImportPaths(sourceFile).some((p) => isMatch(p)),
+    description: `not import from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    test: (sourceFile) => !getImportPaths(sourceFile).some((p) => matchers.some((m) => m(p))),
   }
 }
 
