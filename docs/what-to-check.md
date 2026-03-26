@@ -91,6 +91,36 @@ functions(p)
   .check()
 ```
 
+## Function Signatures
+
+```typescript
+// No rest parameters in route handlers (forces explicit typing)
+functions(p)
+  .that()
+  .resideInFolder('**/routes/**')
+  .and()
+  .haveRestParameter()
+  .should()
+  .notExist()
+  .check()
+
+// Event handlers must accept exactly one Event parameter
+functions(p)
+  .that()
+  .haveNameMatching(/^handle/)
+  .and()
+  .haveParameterOfType(0, matching(/Event$/))
+  .and()
+  .haveParameterCountGreaterThan(1)
+  .should()
+  .notExist()
+  .because('event handlers should accept exactly one Event parameter')
+  .check()
+
+// Exported functions with optional params must document defaults
+functions(p).that().areExported().and().haveOptionalParameter().should().beExported().check()
+```
+
 ## Class Structure
 
 ```typescript
