@@ -1,0 +1,31 @@
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  posts: [Post!]!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  body: String!
+  author: User!
+}
+
+type UserCollection {
+  total: Int!
+  skip: Int!
+  limit: Int!
+  items: [User!]!
+}
+
+type PostCollection {
+  total: Int!
+  skip: Int!
+  limit: Int!
+  items: [Post!]!
+}
+
+type BadCollection {
+  items: [User!]!
+}

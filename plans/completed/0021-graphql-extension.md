@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Done
 - **Priority:** P3 — Build when users ask for it
 - **Effort:** 3-5 days
 - **Created:** 2026-03-26

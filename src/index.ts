@@ -219,6 +219,24 @@ export { definePattern } from './helpers/pattern.js'
 export type { ArchPattern, PropertyConstraint } from './helpers/pattern.js'
 export { followPattern } from './conditions/pattern.js'
 
+// Smell detectors (plan 0018)
+export { smells } from './smells/index.js'
+export { SmellBuilder } from './smells/smell-builder.js'
+export { DuplicateBodiesBuilder } from './smells/duplicate-bodies.js'
+export { InconsistentSiblingsBuilder } from './smells/inconsistent-siblings.js'
+export type { Fingerprint } from './smells/fingerprint.js'
+export { buildFingerprint, computeSimilarity } from './smells/fingerprint.js'
+
+// Cross-layer validation (plan 0022)
+export type { Layer, LayerPair } from './models/cross-layer.js'
+export type { PairCondition } from './core/pair-condition.js'
+export { crossLayer, CrossLayerBuilder } from './builders/cross-layer-builder.js'
+export {
+  haveMatchingCounterpart,
+  haveConsistentExports,
+  satisfyPairCondition,
+} from './conditions/cross-layer.js'
+
 // CLI config (plan 0020)
 export { defineConfig } from './cli/config.js'
 export type { CliConfig } from './cli/config.js'

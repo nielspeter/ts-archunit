@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Done
 - **Priority:** P4 — Research; hardest extension, needs real-world validation
 - **Effort:** 3-5 days
 - **Created:** 2026-03-26

@@ -1,0 +1,6 @@
+type Query {
+  users(skip: Int, limit: Int): [User!]!
+  user(id: ID!): User
+  posts(skip: Int, limit: Int): [Post!]!
+  post(id: ID!): Post
+}

@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-26
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 22 completed, 4 remaining
+**Total Plans:** 25 completed, 1 remaining (user guide)
 
 ---
 
@@ -34,9 +34,9 @@
 | **P2**   | ~~Standard Rules Library (0024)~~                                                | 1 day     | COMPLETED 2026-03-26 |
 | **P2**   | ~~Rich Rule Metadata (0025)~~                                                    | 0.5 day   | COMPLETED 2026-03-26 |
 | **P2**   | User Guide with VitePress (0023)                                                 | 1-2 days  | Not Started          |
-| **P3**   | Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)                 | 2-3 days  | Not Started          |
-| **P3**   | GraphQL Extension: Schema & Resolver Rules (0021)                                | 3-5 days  | Not Started          |
-| **P4**   | Cross-Layer Validation (0022)                                                    | 3-5 days  | Not Started          |
+| **P3**   | ~~Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)~~              | 1 day     | COMPLETED 2026-03-26 |
+| **P3**   | ~~GraphQL Extension: Schema & Resolver Rules (0021)~~                            | 1 day     | COMPLETED 2026-03-26 |
+| **P4**   | ~~Cross-Layer Validation (0022)~~                                                | 1 day     | COMPLETED 2026-03-26 |
 
 ---
 
@@ -45,12 +45,14 @@
 **658 tests across 66 files. All checks pass.**
 
 ### Core (P0)
+
 - `project('tsconfig.json')` with singleton caching
 - `Predicate<T>` + `Condition<T>` interfaces with combinators
 - `RuleBuilder<T>` with fluent `.that().should().check()` chain
 - `.because()`, `.warn()`, `.severity()`, `.rule({ id, because, suggestion, docs })`
 
 ### Entry Points (P1)
+
 - `modules(p)` — import/dependency rules, type-only import enforcement
 - `classes(p)` — inheritance, decorators, methods, body analysis
 - `functions(p)` — function declarations, arrow functions, class methods
@@ -59,11 +61,13 @@
 - `calls(p)` — framework-agnostic call expression matching (P2)
 
 ### Body Analysis (P1) — the differentiator
+
 - `call()`, `newExpr()`, `access()`, `expression()` matchers
 - `contain()`, `notContain()`, `useInsteadOf()` conditions
 - Optional chaining normalization, nested call detection
 
 ### Advanced Features (P2)
+
 - `within(selection).functions()` — scoped rules inside matched callbacks
 - `withBaseline()` + `diffAware()` — gradual adoption for existing codebases
 - `detectFormat()` — GitHub Actions annotations, JSON, terminal output
@@ -73,10 +77,14 @@
 - `definePredicate()` + `defineCondition()` + `.satisfy()` — extension API
 - 14 standard rules via `ts-archunit/rules/*` sub-path exports
 
+### P3 + P4
+
+- `smells.duplicateBodies()` + `smells.inconsistentSiblings()` — AST fingerprint similarity
+- `ts-archunit/graphql` — schema + resolver rules with optional graphql peer dep
+- `crossLayer(p)` — route ↔ schema ↔ SDK consistency validation
+
 ### Not Yet Shipped
-- Smell detectors (duplicate bodies, inconsistent siblings)
-- GraphQL extension (`ts-archunit/graphql`)
-- Cross-layer validation (route ↔ schema ↔ SDK consistency)
+
 - User guide (VitePress documentation site)
 - Watch mode for CLI
 
@@ -84,20 +92,8 @@
 
 ## Remaining Plans
 
-### P2: Documentation
 ```
 0023 - User Guide with VitePress + GitHub Pages
 ```
 
-### P3: Nice-to-have
-```
-0018 - Smell Detectors (duplicate body detection, inconsistent siblings)
-0021 - GraphQL Extension (ts-archunit/graphql sub-path, schema + resolver rules)
-```
-
-### P4: Research
-```
-0022 - Cross-Layer Validation (route ↔ schema ↔ SDK consistency)
-```
-
-Build when users ask for them.
+Everything else is built. 735 tests across 73 files.
