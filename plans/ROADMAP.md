@@ -35,6 +35,7 @@
 | **P3**   | GraphQL Extension: Schema & Resolver Rules (0021)                            | 3-5 days  | Not Started |
 | **P4**   | Cross-Layer Validation (0022)                                                | 3-5 days  | Not Started |
 | **P2**   | User Guide with VitePress (0023)                                             | 1-2 days  | Not Started |
+| **P2**   | Standard Rules Library (0024)                                                | 1-2 days  | Not Started |
 
 ---
 
