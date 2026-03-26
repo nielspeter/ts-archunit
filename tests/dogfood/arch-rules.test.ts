@@ -11,6 +11,7 @@ import {
   classes,
   functions,
   types,
+  slices,
   call,
   newExpr,
   defineCondition,
@@ -186,6 +187,57 @@ describe('Architecture', () => {
       .that().resideInFolder('**/src/predicates/**')
       .should().notImportFrom('**/src/conditions/**')
       .because('predicates and conditions are independent')
+      .check()
+  })
+
+  it('models must not import from builders', () => {
+    modules(p)
+      .that().resideInFolder('**/src/models/**')
+      .should().notImportFrom('**/src/builders/**')
+      .because('models are lower-level than builders')
+      .check()
+  })
+
+  it('conditions must not import from builders', () => {
+    modules(p)
+      .that().resideInFolder('**/src/conditions/**')
+      .should().notImportFrom('**/src/builders/**')
+      .because('conditions are lower-level than builders')
+      .check()
+  })
+
+  it('no cycles between source modules', () => {
+    slices(p)
+      .assignedFrom({
+        core: '**/src/core/**',
+        builders: '**/src/builders/**',
+        predicates: '**/src/predicates/**',
+        conditions: '**/src/conditions/**',
+        helpers: '**/src/helpers/**',
+        models: '**/src/models/**',
+      })
+      .should().beFreeOfCycles()
+      .because('source modules must have a clean dependency graph')
+      .check()
+  })
+})
+
+// ─── No console.log ──────────────────────────────────────────────────
+
+describe('No console.log in Source', () => {
+  it('source classes must not call console.log', () => {
+    classes(p)
+      .that().resideInFolder('**/ts-archunit/src/**')
+      .should().notContain(call('console.log'))
+      .because('use console.warn for warnings or throw for errors')
+      .check()
+  })
+
+  it('source functions must not call console.log', () => {
+    functions(p)
+      .that().resideInFolder('**/ts-archunit/src/**')
+      .should().notContain(call('console.log'))
+      .because('use console.warn for warnings or throw for errors')
       .check()
   })
 })
