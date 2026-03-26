@@ -169,3 +169,16 @@ export { beFreeOfCycles, respectLayerOrder, notDependOn } from './conditions/sli
 
 // Slice entry point
 export { slices, SliceRuleBuilder } from './builders/slice-rule-builder.js'
+
+// Check options
+export type { CheckOptions } from './core/check-options.js'
+
+// Baseline mode
+export { withBaseline, generateBaseline, Baseline } from './helpers/baseline.js'
+export type { BaselineEntry, BaselineFile } from './helpers/baseline.js'
+
+// Diff-aware mode
+export { diffAware, DiffFilter } from './helpers/diff-aware.js'
+
+// Baseline generation helper
+export { collectViolations } from './helpers/baseline-generator.js'

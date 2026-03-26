@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-26
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 15 completed, ~10 remaining
+**Total Plans:** 16 completed, ~9 remaining
 
 ---
 
@@ -27,7 +27,7 @@
 | **P1**   | ~~Custom Predicates, Conditions & `definePredicate` / `defineCondition` (0013)~~ | 0.5 day   | COMPLETED 2026-03-26 |
 | **P2**   | ~~Standard Rules Library (0024)~~                                                | 1 day     | COMPLETED 2026-03-26 |
 | **P2**   | User Guide with VitePress (0023)                                                 | 1-2 days  | Not Started          |
-| **P2**   | Baseline Mode & Diff-Aware Mode (0016)                                           | 1-2 days  | Not Started          |
+| **P2**   | ~~Baseline Mode & Diff-Aware Mode (0016)~~                                       | 1 day     | COMPLETED 2026-03-26 |
 | **P2**   | Output Formats: JSON, GitHub Annotations (0019)                                  | 1 day     | Not Started          |
 | **P2**   | Call Entry Point & Call Predicates (0014)                                        | 2-3 days  | Not Started          |
 | **P2**   | Named Selections, `within()` & Scoped Rules (0015)                               | 1-2 days  | Not Started          |
@@ -64,6 +64,7 @@ Priority order: documentation first, then gradual adoption, then CI integration.
 ```
 
 **Why this order:**
+
 - **0023 first** — no docs = no users. The README is good for discovery, but a user guide is needed for adoption.
 - **0016 second** — without baseline mode, teams can't turn on rules in existing codebases. "Fix 500 violations before your first rule works" kills adoption.
 - **0019 third** — JSON output enables tooling integration. GitHub annotations make violations appear inline on PR diffs — this is the "wow" moment.

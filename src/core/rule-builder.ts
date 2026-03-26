@@ -2,6 +2,7 @@ import type { ArchProject } from './project.js'
 import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
+import type { CheckOptions } from './check-options.js'
 import { ArchRuleError } from './errors.js'
 import { formatViolations } from './format.js'
 
@@ -88,9 +89,22 @@ export abstract class RuleBuilder<T> {
   /**
    * Execute the rule and throw `ArchRuleError` if any violations are found.
    * This is the primary terminal method — use in test assertions.
+   *
+   * @param options - Optional baseline and diff filtering
    */
-  check(): void {
-    const violations = this.evaluate()
+  check(options?: CheckOptions): void {
+    let violations = this.evaluate()
+
+    // Apply baseline filter — remove known violations
+    if (options?.baseline) {
+      violations = options.baseline.filterNew(violations)
+    }
+
+    // Apply diff filter — only violations in changed files
+    if (options?.diff) {
+      violations = options.diff.filterToChanged(violations)
+    }
+
     if (violations.length > 0) {
       throw new ArchRuleError(violations, this._reason)
     }
@@ -99,9 +113,20 @@ export abstract class RuleBuilder<T> {
   /**
    * Execute the rule and log violations to stderr. Does not throw.
    * Use for rules that should warn but not fail CI.
+   *
+   * @param options - Optional baseline and diff filtering
    */
-  warn(): void {
-    const violations = this.evaluate()
+  warn(options?: CheckOptions): void {
+    let violations = this.evaluate()
+
+    if (options?.baseline) {
+      violations = options.baseline.filterNew(violations)
+    }
+
+    if (options?.diff) {
+      violations = options.diff.filterToChanged(violations)
+    }
+
     if (violations.length > 0) {
       console.warn(formatViolations(violations, this._reason))
     }

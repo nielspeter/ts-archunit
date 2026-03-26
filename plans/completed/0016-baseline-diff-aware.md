@@ -28,18 +28,22 @@ const p = project('tsconfig.json')
 const baseline = withBaseline('arch-baseline.json')
 
 // Only NEW violations fail (violations in baseline are ignored)
-classes(p).that().extend('BaseRepository')
-  .should().notContain(call('parseInt'))
-  .check({ baseline })
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check({ baseline })
 
 // Only violations in files changed since main
-classes(p).that().extend('BaseRepository')
-  .should().notContain(call('parseInt'))
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(call('parseInt'))
   .check({ diff: diffAware('main') })
 
 // Both combined: only new violations in changed files
-classes(p).that().extend('BaseRepository')
-  .should().notContain(call('parseInt'))
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(call('parseInt'))
   .check({ baseline, diff: diffAware('main') })
 ```
 
@@ -51,7 +55,7 @@ The CLI plan (0020) will add `npx ts-archunit baseline --output` as a wrapper ar
 
 The baseline file is a JSON file recording known violations. Each entry identifies a violation by rule + file + content hash (not line number — lines drift as code changes).
 
-```typescript
+````typescript
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
@@ -154,10 +158,7 @@ export function withBaseline(baselinePath: string): Baseline {
  * generateBaseline(violations, 'arch-baseline.json')
  * ```
  */
-export function generateBaseline(
-  violations: ArchViolation[],
-  outputPath: string,
-): void {
+export function generateBaseline(violations: ArchViolation[], outputPath: string): void {
   const resolved = path.resolve(outputPath)
   const baselineDir = path.dirname(resolved)
 
@@ -207,7 +208,7 @@ export class Baseline {
     return this.knownHashes.size
   }
 }
-```
+````
 
 ### Why content hash, not line numbers
 
@@ -426,9 +427,7 @@ import { generateBaseline } from './baseline.js'
  * )
  * generateBaseline(violations, 'arch-baseline.json')
  */
-export function collectViolations(
-  ...builders: Array<{ check: () => void }>
-): ArchViolation[] {
+export function collectViolations(...builders: Array<{ check: () => void }>): ArchViolation[] {
   const allViolations: ArchViolation[] = []
 
   for (const builder of builders) {
@@ -451,7 +450,7 @@ export function collectViolations(
 ```typescript
 import { project, classes, call, newExpr } from 'ts-archunit'
 import { collectViolations } from 'ts-archunit' // exported from index
-import { generateBaseline } from 'ts-archunit'  // exported from index
+import { generateBaseline } from 'ts-archunit' // exported from index
 
 const p = project('tsconfig.json')
 
@@ -471,9 +470,7 @@ Actually, better approach — avoid the cast entirely by importing `ArchRuleErro
 ```typescript
 import { ArchRuleError } from '../core/errors.js'
 
-export function collectViolations(
-  ...builders: Array<{ check: () => void }>
-): ArchViolation[] {
+export function collectViolations(...builders: Array<{ check: () => void }>): ArchViolation[] {
   const allViolations: ArchViolation[] = []
 
   for (const builder of builders) {
@@ -552,19 +549,19 @@ No special fixtures needed — tests use the existing PoC fixtures with rules th
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/helpers/baseline.ts` | New — BaselineEntry, BaselineFile, Baseline class, withBaseline, generateBaseline, hashViolation |
-| `src/helpers/diff-aware.ts` | New — DiffFilter class, diffAware |
-| `src/helpers/baseline-generator.ts` | New — collectViolations helper |
-| `src/core/check-options.ts` | New — CheckOptions interface |
-| `src/core/rule-builder.ts` | Modified — check() and warn() accept CheckOptions |
-| `src/builders/slice-rule-builder.ts` | Modified — check() and warn() accept CheckOptions |
-| `src/index.ts` | Modified — export baseline, diff-aware, check options |
-| `tests/helpers/baseline.test.ts` | New — 10 tests |
-| `tests/helpers/diff-aware.test.ts` | New — 3 tests |
-| `tests/core/rule-builder-options.test.ts` | New — 6 tests |
-| `tests/integration/baseline.test.ts` | New — 2 tests |
+| File                                      | Change                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `src/helpers/baseline.ts`                 | New — BaselineEntry, BaselineFile, Baseline class, withBaseline, generateBaseline, hashViolation |
+| `src/helpers/diff-aware.ts`               | New — DiffFilter class, diffAware                                                                |
+| `src/helpers/baseline-generator.ts`       | New — collectViolations helper                                                                   |
+| `src/core/check-options.ts`               | New — CheckOptions interface                                                                     |
+| `src/core/rule-builder.ts`                | Modified — check() and warn() accept CheckOptions                                                |
+| `src/builders/slice-rule-builder.ts`      | Modified — check() and warn() accept CheckOptions                                                |
+| `src/index.ts`                            | Modified — export baseline, diff-aware, check options                                            |
+| `tests/helpers/baseline.test.ts`          | New — 10 tests                                                                                   |
+| `tests/helpers/diff-aware.test.ts`        | New — 3 tests                                                                                    |
+| `tests/core/rule-builder-options.test.ts` | New — 6 tests                                                                                    |
+| `tests/integration/baseline.test.ts`      | New — 2 tests                                                                                    |
 
 ## Out of Scope
 

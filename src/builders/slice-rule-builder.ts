@@ -1,6 +1,7 @@
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
+import type { CheckOptions } from '../core/check-options.js'
 import { ArchRuleError } from '../core/errors.js'
 import type { Slice, SliceDefinition } from '../models/slice.js'
 import { resolveByMatching, resolveByDefinition } from '../models/slice.js'
@@ -112,9 +113,20 @@ export class SliceRuleBuilder {
 
   /**
    * Execute the rule and throw `ArchRuleError` if any violations are found.
+   *
+   * @param options - Optional baseline and diff filtering
    */
-  check(): void {
-    const violations = this.evaluate()
+  check(options?: CheckOptions): void {
+    let violations = this.evaluate()
+
+    if (options?.baseline) {
+      violations = options.baseline.filterNew(violations)
+    }
+
+    if (options?.diff) {
+      violations = options.diff.filterToChanged(violations)
+    }
+
     if (violations.length > 0) {
       throw new ArchRuleError(violations, this._reason)
     }
@@ -122,9 +134,20 @@ export class SliceRuleBuilder {
 
   /**
    * Execute the rule and log violations to stderr. Does not throw.
+   *
+   * @param options - Optional baseline and diff filtering
    */
-  warn(): void {
-    const violations = this.evaluate()
+  warn(options?: CheckOptions): void {
+    let violations = this.evaluate()
+
+    if (options?.baseline) {
+      violations = options.baseline.filterNew(violations)
+    }
+
+    if (options?.diff) {
+      violations = options.diff.filterToChanged(violations)
+    }
+
     if (violations.length > 0) {
       const formatted = violations
         .map((v) => `  - ${v.element}: ${v.message} (${v.file}:${String(v.line)})`)
