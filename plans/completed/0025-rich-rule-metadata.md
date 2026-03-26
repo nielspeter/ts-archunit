@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Not Started
+- **State:** Completed
 - **Priority:** P2 — Critical for developer experience and AI agent feedback loops
 - **Effort:** 0.5-1 day
 - **Created:** 2026-03-26
@@ -20,6 +20,7 @@ Reason: ADR-011: dependencies flow inward
 ```
 
 This tells you WHAT's wrong but not:
+
 - **WHY** it matters — what's the risk? what breaks?
 - **HOW** to fix it — what should the code look like instead?
 - **WHERE** to learn more — link to ADR, docs, or wiki
@@ -34,12 +35,15 @@ Replace `.because(string)` with a richer `.rule(metadata)` that includes all con
 
 ```typescript
 classes(p)
-  .that().extend('BaseRepository')
-  .should().notContain(newExpr('Error'))
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .notContain(newExpr('Error'))
   .rule({
     id: 'repo/typed-errors',
     because: 'Generic Error loses context and prevents consistent error handling across the API',
-    suggestion: 'Replace `new Error(msg)` with `new NotFoundError(entity, id)` or `new ValidationError(msg)`',
+    suggestion:
+      'Replace `new Error(msg)` with `new NotFoundError(entity, id)` or `new ValidationError(msg)`',
     docs: 'https://docs.cmless.io/adr/011#error-handling',
   })
   .check()
@@ -83,6 +87,7 @@ export interface RuleMetadata {
 ### Enhanced violation output
 
 Terminal:
+
 ```
 Architecture Violation [repo/typed-errors]
 
@@ -99,23 +104,27 @@ Architecture Violation [repo/typed-errors]
 ```
 
 GitHub annotation:
+
 ```
 ::error file=src/repositories/webhook.repository.ts,line=42,title=repo/typed-errors::Generic Error loses context. Fix: Replace new Error(msg) with new NotFoundError(entity, id). Docs: https://docs.cmless.io/adr/011
 ```
 
 JSON:
+
 ```json
 {
-  "violations": [{
-    "rule": "repo/typed-errors",
-    "element": "WebhookRepository.findById",
-    "file": "src/repositories/webhook.repository.ts",
-    "line": 42,
-    "message": "WebhookRepository.findById contains new 'Error' at line 42",
-    "because": "Generic Error loses context and prevents consistent error handling",
-    "suggestion": "Replace `new Error(msg)` with `new NotFoundError(entity, id)`",
-    "docs": "https://docs.cmless.io/adr/011#error-handling"
-  }]
+  "violations": [
+    {
+      "rule": "repo/typed-errors",
+      "element": "WebhookRepository.findById",
+      "file": "src/repositories/webhook.repository.ts",
+      "line": 42,
+      "message": "WebhookRepository.findById contains new 'Error' at line 42",
+      "because": "Generic Error loses context and prevents consistent error handling",
+      "suggestion": "Replace `new Error(msg)` with `new NotFoundError(entity, id)`",
+      "docs": "https://docs.cmless.io/adr/011#error-handling"
+    }
+  ]
 }
 ```
 
@@ -244,9 +253,7 @@ if (v.docs) message += `. Docs: ${v.docs}`
 Use ruleId as the title if present:
 
 ```typescript
-const title = v.ruleId
-  ? `Architecture Violation: ${v.ruleId}`
-  : `Architecture Violation: ${v.rule}`
+const title = v.ruleId ? `Architecture Violation: ${v.ruleId}` : `Architecture Violation: ${v.rule}`
 ```
 
 ### JSON formatter
@@ -259,7 +266,7 @@ Add `.rule(metadata)` to SliceRuleBuilder with the same pattern.
 
 ## Phase 6: Tests
 
-1. **`.rule()` attaches metadata** — check _metadata is set
+1. **`.rule()` attaches metadata** — check \_metadata is set
 2. **`.rule()` sets because from metadata** — backward compatible
 3. **`.because()` still works alone** — no regression
 4. **Terminal format shows Why/Fix/Docs** — when present
@@ -267,23 +274,23 @@ Add `.rule(metadata)` to SliceRuleBuilder with the same pattern.
 6. **GitHub format includes suggestion in message** — appended
 7. **JSON format includes all metadata fields** — ruleId, suggestion, docs
 8. **ArchViolation has new fields** — ruleId, docs populated from context
-9. **Named selections preserve metadata** — fork copies _metadata
+9. **Named selections preserve metadata** — fork copies \_metadata
 10. **Slice builder supports .rule()** — same behavior
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/core/rule-metadata.ts` | New — RuleMetadata interface |
-| `src/core/rule-builder.ts` | Modified — add .rule() method, pass metadata to context |
-| `src/core/condition.ts` | Modified — add ruleId, suggestion, docs to ConditionContext |
-| `src/core/violation.ts` | Modified — add ruleId, docs to ArchViolation, update createViolation |
-| `src/core/format.ts` | Modified — show Why/Fix/Docs in terminal output |
-| `src/core/format-github.ts` | Modified — include suggestion/docs in annotation |
-| `src/core/format-json.ts` | Modified — pass through new fields |
-| `src/builders/slice-rule-builder.ts` | Modified — add .rule() method |
-| `src/index.ts` | Modified — export RuleMetadata |
-| `tests/core/rule-metadata.test.ts` | New — 10 tests |
+| File                                 | Change                                                               |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| `src/core/rule-metadata.ts`          | New — RuleMetadata interface                                         |
+| `src/core/rule-builder.ts`           | Modified — add .rule() method, pass metadata to context              |
+| `src/core/condition.ts`              | Modified — add ruleId, suggestion, docs to ConditionContext          |
+| `src/core/violation.ts`              | Modified — add ruleId, docs to ArchViolation, update createViolation |
+| `src/core/format.ts`                 | Modified — show Why/Fix/Docs in terminal output                      |
+| `src/core/format-github.ts`          | Modified — include suggestion/docs in annotation                     |
+| `src/core/format-json.ts`            | Modified — pass through new fields                                   |
+| `src/builders/slice-rule-builder.ts` | Modified — add .rule() method                                        |
+| `src/index.ts`                       | Modified — export RuleMetadata                                       |
+| `tests/core/rule-metadata.test.ts`   | New — 10 tests                                                       |
 
 ## Out of Scope
 

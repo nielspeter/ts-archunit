@@ -54,11 +54,19 @@ export function formatViolations(
     // Suggestion
     const suggestionLine = v.suggestion ? `\n  ${yellow(`Suggestion: ${v.suggestion}`)}` : ''
 
+    // Why / Fix / Docs metadata lines
+    const whyLine = v.because ? `  ${dim('Why:')} ${v.because}` : ''
+    const fixLine = v.suggestion ? `  ${dim('Fix:')} ${v.suggestion}` : ''
+    const docsLine = v.docs ? `  ${dim('Docs:')} ${v.docs}` : ''
+
     const parts = [counter, '', ruleLine]
     if (reasonLine) parts.push(reasonLine)
     parts.push('', location)
     if (codeLine) parts.push(codeLine)
     if (suggestionLine) parts.push(suggestionLine)
+    if (whyLine) parts.push(whyLine)
+    if (fixLine) parts.push(fixLine)
+    if (docsLine) parts.push(docsLine)
 
     sections.push(parts.join('\n'))
   }

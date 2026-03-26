@@ -9,6 +9,8 @@ import { generateCodeFrame } from './code-frame.js'
 export interface ArchViolation {
   /** Human-readable rule description (from the fluent chain) */
   rule: string
+  /** Unique rule identifier from .rule({ id }) */
+  ruleId?: string
   /** Element identifier, e.g. "OrderService.getTotal()" or "parseConfig" */
   element: string
   /** Absolute file path where the violation occurs */
@@ -23,6 +25,8 @@ export interface ArchViolation {
   codeFrame?: string
   /** Actionable suggestion for fixing the violation (e.g. "Replace parseInt() with this.extractCount()") */
   suggestion?: string
+  /** Link to documentation — ADR, wiki, style guide */
+  docs?: string
 }
 
 /**
@@ -73,18 +77,26 @@ export function getElementLine(node: Node): number {
 export function createViolation(
   node: Node,
   message: string,
-  context: { rule: string; because?: string; suggestion?: string },
+  context: {
+    rule: string
+    because?: string
+    suggestion?: string
+    ruleId?: string
+    docs?: string
+  },
 ): ArchViolation {
   const line = getElementLine(node)
   const sourceText = node.getSourceFile().getFullText()
   return {
     rule: context.rule,
+    ruleId: context.ruleId,
     element: getElementName(node),
     file: getElementFile(node),
     line,
     message,
     because: context.because,
     suggestion: context.suggestion,
+    docs: context.docs,
     codeFrame: generateCodeFrame(sourceText, line),
   }
 }

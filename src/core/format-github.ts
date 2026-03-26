@@ -27,8 +27,12 @@ export function formatViolationsGitHub(
   return violations
     .map((v) => {
       const relativePath = path.relative(cwd, v.file)
-      const title = `Architecture Violation: ${v.rule}`
-      const message = v.because ? `${v.message} (${v.because})` : v.message
+      const title = v.ruleId
+        ? `Architecture Violation: ${v.ruleId}`
+        : `Architecture Violation: ${v.rule}`
+      let message = v.because ? `${v.message} (${v.because})` : v.message
+      if (v.suggestion) message += `. Fix: ${v.suggestion}`
+      if (v.docs) message += `. Docs: ${v.docs}`
 
       // GitHub annotation format: ::level file=path,line=N,title=T::message
       return `::${severity} file=${relativePath},line=${String(v.line)},title=${escapeGitHub(title)}::${escapeGitHub(message)}`

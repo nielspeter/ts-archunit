@@ -16,11 +16,11 @@ We researched how 5 tools handle this: dependency-cruiser (JSON config + extends
 
 ### Three tiers
 
-| Tier | Where | Example |
-|------|-------|---------|
-| Core primitives | `ts-archunit` | `call()`, `newExpr()`, `notImportFrom()` |
-| Standard rules | `ts-archunit/rules/*` sub-paths | `noAnyProperties()`, `noEval()` |
-| Framework rules | Separate npm packages | `@ts-archunit/fastify`, `@ts-archunit/drizzle` |
+| Tier            | Where                           | Example                                        |
+| --------------- | ------------------------------- | ---------------------------------------------- |
+| Core primitives | `ts-archunit`                   | `call()`, `newExpr()`, `notImportFrom()`       |
+| Standard rules  | `ts-archunit/rules/*` sub-paths | `noAnyProperties()`, `noEval()`                |
+| Framework rules | Separate npm packages           | `@ts-archunit/fastify`, `@ts-archunit/drizzle` |
 
 ### Individual rules are configurable factory functions
 
@@ -47,9 +47,12 @@ Sensible defaults, users override via options object. Backward compatible — ze
 ### Presets are functions, not config
 
 ```typescript
-export function recommended(p: ArchProject, options?: {
-  overrides?: Record<string, 'error' | 'warn' | 'off'>
-}): void
+export function recommended(
+  p: ArchProject,
+  options?: {
+    overrides?: Record<string, 'error' | 'warn' | 'off'>
+  },
+): void
 ```
 
 A preset runs a curated set of rules. Users override individual rule severity via options. No JSON config layer — TypeScript imports are the composition mechanism.

@@ -3,6 +3,7 @@ import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
+import type { RuleMetadata } from './rule-metadata.js'
 import { ArchRuleError } from './errors.js'
 import { formatViolations } from './format.js'
 import { formatViolationsJson } from './format-json.js'
@@ -23,6 +24,7 @@ export abstract class RuleBuilder<T> {
   protected _predicates: Predicate<T>[] = []
   protected _conditions: Condition<T>[] = []
   protected _reason?: string
+  protected _metadata?: RuleMetadata
 
   constructor(protected readonly project: ArchProject) {}
 
@@ -83,6 +85,20 @@ export abstract class RuleBuilder<T> {
    */
   because(reason: string): this {
     this._reason = reason
+    return this
+  }
+
+  /**
+   * Attach rich metadata to the rule.
+   * Provides educational context in violation output: why, how to fix, docs link.
+   *
+   * If `metadata.because` is set, it also sets the reason (same as `.because()`).
+   */
+  rule(metadata: RuleMetadata): this {
+    this._metadata = metadata
+    if (metadata.because) {
+      this._reason = metadata.because
+    }
     return this
   }
 
@@ -198,7 +214,8 @@ export abstract class RuleBuilder<T> {
     Object.assign(fork, this)
     fork._predicates = [...this._predicates]
     fork._conditions = []
-    fork._reason = undefined
+    fork._metadata = this._metadata ? { ...this._metadata } : undefined
+    fork._reason = fork._metadata?.because
     return fork
   }
 
@@ -238,6 +255,9 @@ export abstract class RuleBuilder<T> {
     const context: ConditionContext = {
       rule: this.buildRuleDescription(),
       because: this._reason,
+      ruleId: this._metadata?.id,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
     }
 
     // Step 5: Evaluate all conditions (AND — all must pass)

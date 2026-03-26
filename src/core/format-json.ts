@@ -17,12 +17,14 @@ export function formatViolationsJson(violations: ArchViolation[], reason?: strin
     },
     violations: violations.map((v) => ({
       rule: v.rule,
+      ruleId: v.ruleId ?? null,
       element: v.element,
       file: v.file,
       line: v.line,
       message: v.message,
       because: v.because ?? null,
       suggestion: v.suggestion ?? null,
+      docs: v.docs ?? null,
     })),
   }
   return JSON.stringify(output, null, 2)

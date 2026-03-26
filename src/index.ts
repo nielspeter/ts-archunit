@@ -16,9 +16,10 @@ export {
   getElementLine,
 } from './core/violation.js'
 
-// Core — rule builder & error
+// Core — rule builder, error & metadata
 export { RuleBuilder } from './core/rule-builder.js'
 export { ArchRuleError } from './core/errors.js'
+export type { RuleMetadata } from './core/rule-metadata.js'
 
 // Core — code frame & formatting
 export { generateCodeFrame } from './core/code-frame.js'

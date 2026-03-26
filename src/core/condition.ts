@@ -11,6 +11,12 @@ export interface ConditionContext {
   rule: string
   /** Optional rationale provided via .because() */
   because?: string
+  /** Unique rule identifier from .rule({ id }) */
+  ruleId?: string
+  /** Actionable fix suggestion from .rule({ suggestion }) */
+  suggestion?: string
+  /** Link to documentation from .rule({ docs }) */
+  docs?: string
 }
 
 /**

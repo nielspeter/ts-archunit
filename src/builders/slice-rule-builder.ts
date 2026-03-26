@@ -2,6 +2,7 @@ import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { CheckOptions } from '../core/check-options.js'
+import type { RuleMetadata } from '../core/rule-metadata.js'
 import { ArchRuleError } from '../core/errors.js'
 import { formatViolations } from '../core/format.js'
 import { formatViolationsJson } from '../core/format-json.js'
@@ -29,6 +30,7 @@ export class SliceRuleBuilder {
   private _slices: Slice[] = []
   private _conditions: Condition<Slice>[] = []
   private _reason?: string
+  private _metadata?: RuleMetadata
 
   constructor(private readonly project: ArchProject) {}
 
@@ -115,6 +117,20 @@ export class SliceRuleBuilder {
   }
 
   /**
+   * Attach rich metadata to the rule.
+   * Provides educational context in violation output: why, how to fix, docs link.
+   *
+   * If `metadata.because` is set, it also sets the reason (same as `.because()`).
+   */
+  rule(metadata: RuleMetadata): this {
+    this._metadata = metadata
+    if (metadata.because) {
+      this._reason = metadata.because
+    }
+    return this
+  }
+
+  /**
    * Execute the rule and throw `ArchRuleError` if any violations are found.
    *
    * @param options - Optional baseline and diff filtering
@@ -184,6 +200,9 @@ export class SliceRuleBuilder {
     const context: ConditionContext = {
       rule: this.buildRuleDescription(),
       because: this._reason,
+      ruleId: this._metadata?.id,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
     }
 
     const violations: ArchViolation[] = []

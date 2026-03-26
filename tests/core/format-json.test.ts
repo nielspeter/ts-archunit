@@ -23,12 +23,14 @@ describe('formatViolationsJson', () => {
       violations: [
         {
           rule: 'test rule',
+          ruleId: null,
           element: 'MyService.getTotal',
           file: '/project/src/service.ts',
           line: 42,
           message: 'bad call to parseInt',
           because: null,
           suggestion: null,
+          docs: null,
         },
       ],
     })
