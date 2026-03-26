@@ -37,8 +37,14 @@ export function applyFilters(
   if (exclusions.length > 0) {
     const matchedPatterns = new Set<number>()
     result = result.filter((v) => {
+      // Match against element, file, or message — so that custom conditions
+      // using createViolation() can be excluded by file path or message content,
+      // not just by element name (which may be a generic AST node kind).
+      const targets = [v.element, v.file, v.message]
       const matchIndex = exclusions.findIndex((pattern) =>
-        typeof pattern === 'string' ? v.element === pattern : pattern.test(v.element),
+        typeof pattern === 'string'
+          ? targets.some((t) => t === pattern)
+          : targets.some((t) => pattern.test(t)),
       )
       if (matchIndex >= 0) {
         matchedPatterns.add(matchIndex)
