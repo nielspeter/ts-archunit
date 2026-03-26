@@ -12,44 +12,40 @@
 
 ts-archunit can inspect what happens **inside** function bodies (call, newExpr, access), but cannot assert on **function signatures** beyond basic parameter count and return type. This gap was exposed by a real user bug: `.notImportFrom('fastify', 'knex', 'bullmq')` silently ignored arguments 2 and 3 because the predicate accepted `(glob: string)` while the condition variant accepted `(...globs: string[])`.
 
-We want to write a dogfooding rule like:
+We want to write a dogfooding rule that catches this class of bug:
 
 ```typescript
-// Every exported function in predicates/ with a rest parameter
-// must have a matching condition variant that also has a rest parameter
+// Predicate functions in predicates/ must not accept a single 'glob' parameter
+// — they should use ...globs to match their condition counterparts
 functions(p)
   .that()
-  .resideInFolder('**/predicates/**')
+  .resideInFolder('**/src/predicates/**')
   .and()
   .areExported()
   .and()
-  .haveRestParameter()
+  .haveParameterNamed('glob')
+  .and()
+  .haveParameterCount(1)
   .should()
-  .beExported()
+  .notExist()
+  .because('use ...globs variadic to match condition variants')
   .check()
 ```
 
 And more generally, users need signature-level predicates for rules like:
 
 ```typescript
-// Public API functions must not have optional parameters after required ones
-functions(p)
-  .that()
-  .areExported()
-  .and()
-  .haveOptionalParameterBeforeRequired()
-  .should()
-  .notExist()
-  .check()
-
-// Event handlers must accept exactly (event: Event) — no extra params
+// Event handlers must accept exactly one Event parameter — filter to
+// handlers with an Event param AND more than 1 param, assert none exist
 functions(p)
   .that()
   .haveNameMatching(/^handle/)
   .and()
   .haveParameterOfType(0, matching(/Event$/))
+  .and()
+  .haveParameterCountGreaterThan(1)
   .should()
-  .haveParameterCount(1)
+  .notExist()
   .check()
 
 // No rest parameters in route handlers (forces explicit typing)
@@ -85,6 +81,12 @@ These are all **predicates** (filtering in `.that()`), not conditions. "Has a re
 
 For `haveParameterOfType(index, matcher)`, reuse the existing `TypeMatcher` from `src/helpers/type-matchers.ts`. This gives users `isString()`, `isNumber()`, `matching(/Event$/)`, `exactly('string[]')`, etc.
 
+**Type semantics to document:**
+
+- **Rest parameters:** `...args: string[]` has type `string[]`, not `string`. So `haveParameterOfType(0, isString())` returns `false` for a rest parameter — use `haveParameterOfType(0, arrayOf(isString()))` or `exactly('string[]')` instead.
+- **Optional parameters:** `x?: string` has type `string | undefined`, but `TypeMatcher` functions like `isString()` call `getNonNullableType()` internally, stripping the `undefined`. So `haveParameterOfType(0, isString())` returns `true` for `x?: string`. This is intentional — the TypeMatcher contract strips nullability.
+- **Index validation:** Negative or non-integer indices return `false` (array access returns `undefined`). Document this as safe behavior, not an error.
+
 ## Phase 1: New Function Predicates
 
 ### `src/predicates/function.ts` — add to existing file
@@ -113,6 +115,10 @@ export function haveOptionalParameter(): Predicate<ArchFunction> {
 /**
  * Matches functions that have a parameter at the given index
  * whose type matches the given TypeMatcher.
+ *
+ * Note: For rest parameters (...args: string[]), the type is string[] not string.
+ * Use arrayOf(isString()) or exactly('string[]') to match rest param types.
+ * For optional parameters (x?: string), TypeMatcher strips undefined automatically.
  *
  * @example
  * functions(p).that().haveParameterOfType(0, isString()).should()...
@@ -230,8 +236,10 @@ Reuse `tests/fixtures/poc/` — it has functions with various parameter signatur
 6. **haveParameterOfType matches first param type** — positive with isString()
 7. **haveParameterOfType rejects wrong type** — negative
 8. **haveParameterOfType returns false for out-of-bounds index** — edge case
-9. **haveParameterMatching matches param names by regex** — positive
-10. **haveParameterMatching rejects non-matching names** — negative
+9. **haveParameterOfType on rest param returns array type, not element type** — isString() returns false for ...args: string[]
+10. **haveParameterOfType on optional param — isString() matches despite string|undefined** — TypeMatcher strips nullability
+11. **haveParameterMatching matches param names by regex** — positive
+12. **haveParameterMatching rejects non-matching names** — negative
 
 ### Integration test
 
