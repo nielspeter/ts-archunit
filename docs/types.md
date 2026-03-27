@@ -12,7 +12,7 @@ The `types()` entry point operates on interfaces and type aliases. Use it to enf
 ## Basic Usage
 
 ```typescript
-import { project, types, notType, isString } from '@nielspeter/ts-archunit'
+import { project, types, not, isString } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -22,7 +22,7 @@ types(p)
   .and()
   .haveProperty('orderBy')
   .should()
-  .havePropertyType('orderBy', notType(isString()))
+  .havePropertyType('orderBy', not(isString()))
   .check()
 ```
 
@@ -49,17 +49,17 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Available Conditions
 
-| Condition                          | Description                            | Example                                                      |
-| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
-| `havePropertyType(name, matcher)`  | Property must match the type matcher   | `.should().havePropertyType('orderBy', notType(isString()))` |
-| `notExist()`                       | No types should match the predicates   | `.should().notExist()`                                       |
-| `beExported()`                     | Type must be exported                  | `.should().beExported()`                                     |
-| `havePropertyNamed(...names)`      | All named properties must exist        | `.should().havePropertyNamed('version')`                     |
-| `notHavePropertyNamed(...names)`   | None of the named properties may exist | `.should().notHavePropertyNamed('offset')`                   |
-| `havePropertyMatching(pattern)`    | At least one property matches regex    | `.should().havePropertyMatching(/^id$/)`                     |
-| `notHavePropertyMatching(pattern)` | No property matches regex              | `.should().notHavePropertyMatching(/^data$/)`                |
-| `haveOnlyReadonlyProperties()`     | All properties must be readonly        | `.should().haveOnlyReadonlyProperties()`                     |
-| `maxProperties(n)`                 | Property count must not exceed n       | `.should().maxProperties(15)`                                |
+| Condition                          | Description                            | Example                                                  |
+| ---------------------------------- | -------------------------------------- | -------------------------------------------------------- |
+| `havePropertyType(name, matcher)`  | Property must match the type matcher   | `.should().havePropertyType('orderBy', not(isString()))` |
+| `notExist()`                       | No types should match the predicates   | `.should().notExist()`                                   |
+| `beExported()`                     | Type must be exported                  | `.should().beExported()`                                 |
+| `havePropertyNamed(...names)`      | All named properties must exist        | `.should().havePropertyNamed('version')`                 |
+| `notHavePropertyNamed(...names)`   | None of the named properties may exist | `.should().notHavePropertyNamed('offset')`               |
+| `havePropertyMatching(pattern)`    | At least one property matches regex    | `.should().havePropertyMatching(/^id$/)`                 |
+| `notHavePropertyMatching(pattern)` | No property matches regex              | `.should().notHavePropertyMatching(/^data$/)`            |
+| `haveOnlyReadonlyProperties()`     | All properties must be readonly        | `.should().haveOnlyReadonlyProperties()`                 |
+| `maxProperties(n)`                 | Property count must not exceed n       | `.should().maxProperties(15)`                            |
 
 ## Type Matchers
 
@@ -75,7 +75,7 @@ Type matchers are used with `havePropertyType()` to assert on resolved TypeScrip
 | `arrayOf(matcher)`    | Type is an array whose element matches | `arrayOf(isString())` |
 | `matching(re)`        | Type text matches a regex              | `matching(/^Order/)`  |
 | `exactly(text)`       | Type text matches exactly              | `exactly('number')`   |
-| `notType(matcher)`    | Negates a type matcher                 | `notType(isString())` |
+| `not(matcher)`        | Negates a type matcher                 | `not(isString())`     |
 
 ## Real-World Examples
 
@@ -88,7 +88,7 @@ types(p)
   .and()
   .haveProperty('orderBy')
   .should()
-  .havePropertyType('orderBy', notType(isString()))
+  .havePropertyType('orderBy', not(isString()))
   .rule({
     id: 'type/no-bare-string-orderby',
     because: 'Bare string orderBy passed to .orderBy() is a SQL injection surface',
@@ -120,7 +120,7 @@ types(p)
   .and()
   .haveProperty('id')
   .should()
-  .havePropertyType('id', notType(isString()))
+  .havePropertyType('id', not(isString()))
   .because('use branded types or numeric IDs to prevent mixing entity IDs')
   .check()
 ```

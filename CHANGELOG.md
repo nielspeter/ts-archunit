@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-03-27
+
+### Added
+
+- **Unified combinators** — `not()`, `and()`, `or()` now accept both `Predicate<T>` objects and `TypeMatcher` functions, dispatching based on input type
+- **Aliased import condition** (plan 0035) — 1 new condition on `modules()`:
+  - `notHaveAliasedImports()` — detect `import { x as y }` aliased named imports
+- Architecture rule: `core must not import from helpers`
+
+### Removed
+
+- `notType` export — use `not()` directly, which now handles both predicates and type matchers
+
+### Fixed
+
+- BUG-0007: `not(matching(...))` now works with `haveReturnTypeMatching()` and all TypeMatcher-accepting conditions
+
 ## [0.3.0] - 2026-03-27
 
 ### Added
@@ -85,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `modules(p)` — module-level rules with dependency conditions (`onlyImportFrom`, `notImportFrom`, `onlyHaveTypeImportsFrom`)
 - `classes(p)` — class rules with predicates (`extend`, `implement`, `haveDecorator`, `areAbstract`, etc.) and conditions (`shouldExtend`, `shouldHaveMethodNamed`, etc.)
 - `functions(p)` — function rules supporting both `function` declarations and `const` arrow functions, with predicates (`areAsync`, `haveParameterCount`, `haveReturnType`, etc.)
-- `types(p)` — type rules for interfaces and type aliases, with type matchers (`isString`, `isUnionOfLiterals`, `notType`, etc.) and `havePropertyType` condition
+- `types(p)` — type rules for interfaces and type aliases, with type matchers (`isString`, `isUnionOfLiterals`, `not`, etc.) and `havePropertyType` condition
 - `slices(p)` — slice-level rules with `matching()` and `assignedFrom()`, conditions: `beFreeOfCycles`, `respectLayerOrder`, `notDependOn`
 - Body analysis: `call()`, `newExpr()`, `access()`, `expression()` matchers with `contain()`, `notContain()`, `useInsteadOf()` conditions
 - Identity predicates: `haveNameMatching`, `resideInFile`, `resideInFolder`, `areExported`, etc.

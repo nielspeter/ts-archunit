@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-27
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 34 completed, 0 remaining
+**Total Plans:** 35 completed, 0 remaining
 
 ---
 
@@ -45,12 +45,13 @@
 | **P2**   | ~~Member Visibility Predicates (0032)~~                                          | 0.5 day   | COMPLETED 2026-03-27 |
 | **P2**   | ~~Return Type Condition (0033)~~                                                 | 0.25 day  | COMPLETED 2026-03-27 |
 | **P2**   | ~~Call Argument Property Condition (0034)~~                                      | 0.5 day   | COMPLETED 2026-03-27 |
+| **P2**   | ~~Aliased Import Condition (0035)~~                                              | 0.25 day  | COMPLETED 2026-03-27 |
 
 ---
 
 ## What's Shipped
 
-**1265 tests across 102 files. All checks pass.**
+**1358 tests across 107 files. All checks pass.**
 
 ### Core (P0)
 

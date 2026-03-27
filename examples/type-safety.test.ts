@@ -5,15 +5,7 @@
  * ts-archunit/rules/security — no custom conditions needed.
  */
 import { describe, it } from 'vitest'
-import {
-  project,
-  classes,
-  functions,
-  types,
-  notType,
-  isString,
-  access,
-} from '@nielspeter/ts-archunit'
+import { project, classes, functions, types, not, isString, access } from '@nielspeter/ts-archunit'
 import {
   noAnyProperties,
   noTypeAssertions,
@@ -68,7 +60,7 @@ describe('TypeScript Type Safety', () => {
       .and()
       .haveProperty('orderBy')
       .should()
-      .havePropertyType('orderBy', notType(isString()))
+      .havePropertyType('orderBy', not(isString()))
       .because('bare string types defeat the purpose of TypeScript')
       .check()
   })

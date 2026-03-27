@@ -4,7 +4,7 @@ export type { ArchProject } from './core/project.js'
 
 // Core — predicate interface & combinators
 export type { Predicate } from './core/predicate.js'
-export { and, or, not } from './core/predicate.js'
+export { not, and, or } from './core/combinators.js'
 
 // Core — condition interface & violation model
 export type { Condition, ConditionContext } from './core/condition.js'
@@ -64,6 +64,7 @@ export {
   onlyImportFrom,
   notImportFrom as conditionNotImportFrom,
   onlyHaveTypeImportsFrom,
+  notHaveAliasedImports,
 } from './conditions/dependency.js'
 
 // Module entry point
@@ -165,7 +166,6 @@ export type { PropertyBearingNode } from './conditions/members.js'
 // Type matchers
 export type { TypeMatcher } from './helpers/type-matchers.js'
 export {
-  not as notType,
   isString,
   isNumber,
   isBoolean,
@@ -213,12 +213,8 @@ export type { BaselineEntry, BaselineFile } from './helpers/baseline.js'
 export { diffAware, DiffFilter } from './helpers/diff-aware.js'
 
 // Exclusion comments
-export { parseExclusionComments, isExcludedByComment } from './helpers/exclusion-comments.js'
-export type {
-  ExclusionComment,
-  ExclusionWarning,
-  ParseResult,
-} from './helpers/exclusion-comments.js'
+export { parseExclusionComments, isExcludedByComment } from './core/exclusion-comments.js'
+export type { ExclusionComment, ExclusionWarning, ParseResult } from './core/exclusion-comments.js'
 
 // Baseline generation helper
 export { collectViolations } from './helpers/baseline-generator.js'

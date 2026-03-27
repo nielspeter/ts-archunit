@@ -15,6 +15,7 @@ import {
   onlyImportFrom as onlyImportFromCondition,
   notImportFrom as notImportFromCondition,
   onlyHaveTypeImportsFrom as onlyHaveTypeImportsFromCondition,
+  notHaveAliasedImports as notHaveAliasedImportsCondition,
 } from '../conditions/dependency.js'
 import { notExist } from '../conditions/structural.js'
 
@@ -112,6 +113,13 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
    */
   notImportFromCondition(...globs: string[]): this {
     return this.addCondition(notImportFromCondition(...globs))
+  }
+
+  /**
+   * No import may use an aliased specifier (`import { x as y }`).
+   */
+  notHaveAliasedImports(): this {
+    return this.addCondition(notHaveAliasedImportsCondition())
   }
 
   /**

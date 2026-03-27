@@ -6,7 +6,7 @@ import { types } from '../../src/builders/type-rule-builder.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { call, access, newExpr } from '../../src/helpers/matchers.js'
-import { not as notType, isString, isUnionOfLiterals } from '../../src/helpers/type-matchers.js'
+import { not, isString, isUnionOfLiterals } from '../../src/index.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -326,7 +326,7 @@ describe('type rules through fluent chain', () => {
           .that()
           .haveProperty('sortBy')
           .should()
-          .havePropertyType('sortBy', notType(isString()))
+          .havePropertyType('sortBy', not(isString()))
           .because('sortBy must be a union of literals, not bare string')
           .check()
       }).toThrow(ArchRuleError)

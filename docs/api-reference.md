@@ -165,11 +165,12 @@ Available on all entry points via `.that()`.
 
 ## Dependency Conditions
 
-| Export                    | Signature                               | Description                                         |
-| ------------------------- | --------------------------------------- | --------------------------------------------------- |
-| `onlyImportFrom`          | `onlyImportFrom(...globs: string[])`    | Module may only import from listed paths.           |
-| `conditionNotImportFrom`  | `notImportFrom(...globs: string[])`     | Module must not import from listed paths.           |
-| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(glob: string)` | Imports from matching paths must use `import type`. |
+| Export                    | Signature                                     | Description                                             |
+| ------------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| `onlyImportFrom`          | `onlyImportFrom(...globs: string[])`          | Module may only import from listed paths.               |
+| `conditionNotImportFrom`  | `notImportFrom(...globs: string[])`           | Module must not import from listed paths.               |
+| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])` | Imports from matching paths must use `import type`.     |
+| `notHaveAliasedImports`   | `notHaveAliasedImports()`                     | No named import may use an alias (`import { x as y }`). |
 
 ## Body Analysis Matchers
 
@@ -220,7 +221,6 @@ Available on all entry points via `.that()`.
 | `arrayOf`           | `arrayOf(matcher: TypeMatcher): TypeMatcher` | Type is an array whose element matches. |
 | `matching`          | `matching(re: RegExp): TypeMatcher`          | Type text matches regex.                |
 | `exactly`           | `exactly(text: string): TypeMatcher`         | Type text matches exactly.              |
-| `notType`           | `notType(matcher: TypeMatcher): TypeMatcher` | Negates a type matcher.                 |
 
 ## Slice Conditions
 
@@ -284,13 +284,13 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Extension API
 
-| Export            | Signature                                    | Description                  |
-| ----------------- | -------------------------------------------- | ---------------------------- |
-| `definePredicate` | `definePredicate<T>(desc, fn): Predicate<T>` | Create a custom predicate.   |
-| `defineCondition` | `defineCondition<T>(desc, fn): Condition<T>` | Create a custom condition.   |
-| `and`             | `and(...predicates): Predicate`              | Combine predicates with AND. |
-| `or`              | `or(...predicates): Predicate`               | Combine predicates with OR.  |
-| `not`             | `not(predicate): Predicate`                  | Negate a predicate.          |
+| Export            | Signature                                    | Description                                            |
+| ----------------- | -------------------------------------------- | ------------------------------------------------------ |
+| `definePredicate` | `definePredicate<T>(desc, fn): Predicate<T>` | Create a custom predicate.                             |
+| `defineCondition` | `defineCondition<T>(desc, fn): Condition<T>` | Create a custom condition.                             |
+| `and`             | `and(...inputs): Predicate \| TypeMatcher`   | Combine with AND. Accepts predicates or type matchers. |
+| `or`              | `or(...inputs): Predicate \| TypeMatcher`    | Combine with OR. Accepts predicates or type matchers.  |
+| `not`             | `not(input): Predicate \| TypeMatcher`       | Negate. Accepts a predicate or type matcher.           |
 
 ## Utilities
 

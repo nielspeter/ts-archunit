@@ -3,7 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import { matching } from '../../src/helpers/type-matchers.js'
+import { not, and, matching } from '../../src/index.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -147,6 +147,32 @@ describe('classes() entry point integration', () => {
           .notAcceptParameterOfType(matching(/DatabaseClient/))
           .check()
       }).toThrow(ArchRuleError)
+    })
+  })
+
+  describe('type matcher combinators with class conditions', () => {
+    it('not(matching(...)) works with acceptParameterOfType', () => {
+      // CleanService accepts Logger (not DatabaseClient) — not(matching(/DatabaseClient/)) passes
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching('CleanService')
+          .should()
+          .acceptParameterOfType(not(matching(/DatabaseClient/)))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('and(...matchers) works with notAcceptParameterOfType', () => {
+      // CleanService should not accept anything matching both Database AND Client
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching('CleanService')
+          .should()
+          .notAcceptParameterOfType(and(matching(/Database/), matching(/Client/)))
+          .check()
+      }).not.toThrow()
     })
   })
 })

@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  parseExclusionComments,
-  isExcludedByComment,
-} from '../../src/helpers/exclusion-comments.js'
-import type { ExclusionComment } from '../../src/helpers/exclusion-comments.js'
+import { parseExclusionComments, isExcludedByComment } from '../../src/core/exclusion-comments.js'
+import type { ExclusionComment } from '../../src/core/exclusion-comments.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import { TestRuleBuilder, stubProject, alwaysFail } from '../support/test-rule-builder.js'
 import type { TestElement } from '../support/test-rule-builder.js'

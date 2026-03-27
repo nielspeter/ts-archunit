@@ -3,7 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import { isString, matching, not, exactly } from '../../src/helpers/type-matchers.js'
+import { not, and, or, isString, matching, exactly } from '../../src/index.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -532,6 +532,34 @@ describe('functions() entry point integration', () => {
           .should()
           .haveReturnTypeMatching(not(matching(/^any$/)))
           .because('public functions should not return any')
+          .check()
+      }).not.toThrow()
+    })
+
+    it('and() composes type matchers', () => {
+      // listUsers returns Collection<string> — matches both /Collection/ AND not void
+      expect(() => {
+        functions(p)
+          .that()
+          .resideInFile('**/signature-variants.ts')
+          .and()
+          .haveNameMatching(/^list/)
+          .should()
+          .haveReturnTypeMatching(and(matching(/Collection/), not(matching(/void/))))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('or() composes type matchers', () => {
+      // createUser returns string — matches string OR Collection
+      expect(() => {
+        functions(p)
+          .that()
+          .resideInFile('**/signature-variants.ts')
+          .and()
+          .haveNameMatching(/^create/)
+          .should()
+          .haveReturnTypeMatching(or(isString(), matching(/Collection/)))
           .check()
       }).not.toThrow()
     })

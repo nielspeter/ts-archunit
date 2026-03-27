@@ -3,7 +3,8 @@ import path from 'node:path'
 import { project } from '../../src/core/project.js'
 import { types } from '../../src/builders/type-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import { not, isString, isUnionOfLiterals } from '../../src/helpers/type-matchers.js'
+import { isString, isUnionOfLiterals } from '../../src/helpers/type-matchers.js'
+import { not } from '../../src/core/combinators.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 const tsconfigPath = path.join(fixturesDir, 'tsconfig.json')

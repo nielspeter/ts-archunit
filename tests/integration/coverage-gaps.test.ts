@@ -11,7 +11,6 @@ import { smells } from '../../src/smells/index.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { call, access, newExpr, expression } from '../../src/helpers/matchers.js'
 import {
-  not as notType,
   isString,
   isNumber,
   isBoolean,
@@ -20,12 +19,10 @@ import {
   arrayOf,
   matching,
   exactly,
-} from '../../src/helpers/type-matchers.js'
+  not,
+} from '../../src/index.js'
 import { haveConsistentExports } from '../../src/conditions/cross-layer.js'
-import {
-  parseExclusionComments,
-  isExcludedByComment,
-} from '../../src/helpers/exclusion-comments.js'
+import { parseExclusionComments, isExcludedByComment } from '../../src/core/exclusion-comments.js'
 import { extractCallbacks } from '../../src/helpers/callback-extractor.js'
 import { collectCalls } from '../../src/models/arch-call.js'
 import type { ArchProject } from '../../src/core/project.js'
@@ -412,7 +409,7 @@ describe('type matchers — isString, isNumber, isBoolean, isStringLiteral, isUn
           .that()
           .haveNameMatching('UnsafeOptions')
           .should()
-          .havePropertyType('sortBy', notType(isString()))
+          .havePropertyType('sortBy', not(isString()))
           .check()
       }).toThrow(ArchRuleError)
     })
@@ -423,7 +420,7 @@ describe('type matchers — isString, isNumber, isBoolean, isStringLiteral, isUn
           .that()
           .haveNameMatching('SafeOptions')
           .should()
-          .havePropertyType('sortBy', notType(isString()))
+          .havePropertyType('sortBy', not(isString()))
           .check()
       }).not.toThrow()
     })
@@ -434,7 +431,7 @@ describe('type matchers — isString, isNumber, isBoolean, isStringLiteral, isUn
           .that()
           .haveNameMatching('UnsafeOptions')
           .should()
-          .havePropertyType('sortBy', notType(isNumber()))
+          .havePropertyType('sortBy', not(isNumber()))
           .check()
       }).not.toThrow()
     })
@@ -465,7 +462,7 @@ describe('type matchers — isString, isNumber, isBoolean, isStringLiteral, isUn
           .that()
           .havePropertyOfType('sortBy', isString())
           .should()
-          .havePropertyType('sortBy', notType(isUnionOfLiterals()))
+          .havePropertyType('sortBy', not(isUnionOfLiterals()))
           .check()
       }).not.toThrow()
     })

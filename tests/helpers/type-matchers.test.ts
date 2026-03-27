@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import {
-  not,
   isString,
   isNumber,
   isBoolean,
@@ -12,6 +11,7 @@ import {
   matching,
   exactly,
 } from '../../src/helpers/type-matchers.js'
+import { not } from '../../src/core/combinators.js'
 
 /**
  * Tests use the PoC options.ts fixture which has:

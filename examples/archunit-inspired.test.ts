@@ -22,7 +22,7 @@ import {
   slices,
   call,
   newExpr,
-  notType,
+  not,
   isString,
 } from '@nielspeter/ts-archunit'
 
@@ -379,7 +379,7 @@ describe('8. Type Safety (beyond ArchUnit)', () => {
       .and()
       .haveProperty('orderBy')
       .should()
-      .havePropertyType('orderBy', notType(isString()))
+      .havePropertyType('orderBy', not(isString()))
       .rule({
         id: 'type/no-bare-string-orderby',
         because: 'Bare string orderBy passed to SQL query builders is an injection risk',

@@ -195,7 +195,7 @@ functions(p)
 
 ### Return Type Condition
 
-`haveReturnTypeMatching(matcher)` asserts that the return type of matched functions satisfies a `TypeMatcher`. This works with all type matchers: `matching()`, `exactly()`, `isString()`, `notType()`, `arrayOf()`, etc.
+`haveReturnTypeMatching(matcher)` asserts that the return type of matched functions satisfies a `TypeMatcher`. This works with all type matchers: `matching()`, `exactly()`, `isString()`, `not()`, `arrayOf()`, etc.
 
 ```typescript
 import { project, functions, matching } from '@nielspeter/ts-archunit'

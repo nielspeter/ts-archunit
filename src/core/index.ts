@@ -1,5 +1,4 @@
 export type { Predicate } from './predicate.js'
-export { and, or, not } from './predicate.js'
 export type { Condition, ConditionContext } from './condition.js'
 export type { ArchViolation } from './violation.js'
 export { createViolation, getElementName, getElementFile, getElementLine } from './violation.js'

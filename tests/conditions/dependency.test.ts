@@ -5,6 +5,7 @@ import {
   onlyImportFrom,
   notImportFrom,
   onlyHaveTypeImportsFrom,
+  notHaveAliasedImports,
 } from '../../src/conditions/dependency.js'
 import type { ConditionContext } from '../../src/core/condition.js'
 
@@ -70,6 +71,35 @@ describe('dependency conditions', () => {
       const violations = condition.evaluate([sf], ctx)
       expect(violations.length).toBeGreaterThan(0)
       expect(violations.some((v) => v.message.includes('infra'))).toBe(true)
+    })
+  })
+
+  describe('notHaveAliasedImports', () => {
+    it('passes when no imports use aliases', () => {
+      const sf = getSourceFile('src/domain/order.ts')
+      const condition = notHaveAliasedImports()
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(0)
+    })
+
+    it('reports violations for aliased import specifiers', () => {
+      const sf = getSourceFile('src/bad/aliased-import.ts')
+      const condition = notHaveAliasedImports()
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(2)
+      expect(violations.some((v) => v.message.includes('"Entity" as "DomainEntity"'))).toBe(true)
+      expect(violations.some((v) => v.message.includes('"validate" as "check"'))).toBe(true)
+    })
+
+    it('passes for a module with no imports', () => {
+      const sf = getSourceFile('src/domain/entity.ts')
+      const condition = notHaveAliasedImports()
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(0)
+    })
+
+    it('has correct description', () => {
+      expect(notHaveAliasedImports().description).toBe('not have aliased imports')
     })
   })
 

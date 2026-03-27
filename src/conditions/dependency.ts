@@ -103,6 +103,48 @@ export function notImportFrom(...globs: string[]): Condition<SourceFile> {
 }
 
 /**
+ * No import in the module may use an aliased named specifier (`import { x as y }`).
+ * Each aliased specifier produces a violation.
+ * Does not flag namespace imports (`import * as Foo`) — only named specifier aliases.
+ *
+ * To scope the check to specific import sources, filter with
+ * `.that().importFrom(...)` predicates.
+ *
+ * @example
+ * modules(p)
+ *   .that().resideInFolder('** /src/** ')
+ *   .should().notHaveAliasedImports()
+ *   .because('aliases hide API design problems')
+ *   .check()
+ */
+export function notHaveAliasedImports(): Condition<SourceFile> {
+  return {
+    description: 'not have aliased imports',
+    evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const sf of sourceFiles) {
+        for (const decl of sf.getImportDeclarations()) {
+          for (const specifier of decl.getNamedImports()) {
+            const alias = specifier.getAliasNode()
+            if (alias) {
+              violations.push(
+                importViolation(
+                  sf,
+                  decl,
+                  `${sf.getBaseName()} aliases "${specifier.getName()}" as "${alias.getText()}"`,
+                  context,
+                ),
+              )
+            }
+          }
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
  * Imports from paths matching the given globs must use `import type`, not `import`.
  * Non-matching imports are ignored. Matching imports that are not type-only produce violations.
  *

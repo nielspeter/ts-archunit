@@ -1,23 +1,6 @@
-import type { Type } from 'ts-morph'
+import type { TypeMatcher } from '../core/type-matcher.js'
 
-/**
- * A function that tests a ts-morph Type against a condition.
- *
- * All matchers MUST call getNonNullableType() internally to handle
- * optional properties (strip `undefined` from `T | undefined`).
- * This was a critical finding from the PoC (plan 0001).
- */
-export type TypeMatcher = (type: Type) => boolean
-
-/**
- * Negates a matcher. The property type must NOT satisfy the inner matcher.
- *
- * @example
- * not(isString())  // any type except bare string
- */
-export function not(matcher: TypeMatcher): TypeMatcher {
-  return (type) => !matcher(type)
-}
+export type { TypeMatcher }
 
 /**
  * Matches bare `string` type.

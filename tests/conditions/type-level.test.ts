@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import { havePropertyType } from '../../src/conditions/type-level.js'
-import { isString, not, isUnionOfLiterals } from '../../src/helpers/type-matchers.js'
+import { isString, isUnionOfLiterals } from '../../src/helpers/type-matchers.js'
+import { not } from '../../src/core/combinators.js'
 import type { ConditionContext } from '../../src/core/condition.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')

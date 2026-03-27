@@ -271,6 +271,19 @@ describe('Architecture', () => {
       .check()
   })
 
+  it('core must not import from helpers', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/core/**')
+      .should()
+      .notImportFromCondition('**/src/helpers/**')
+      .rule({
+        id: 'arch/core-no-helpers',
+        because: 'Core is the foundation — helpers depend on core, not the reverse',
+      })
+      .check()
+  })
+
   it('standard rules must not import from builders', () => {
     modules(p)
       .that()
@@ -340,7 +353,7 @@ describe('Architecture', () => {
         because: 'Circular dependencies between modules prevent independent testing and reasoning',
         suggestion: 'Extract shared code to a lower-level module (core or helpers)',
       })
-      .warn() // TODO: switch to .check() after fixing type-import edges in slice graph
+      .warn() // type-only imports create false-positive cycles; switch to .check() when beFreeOfCycles ignores import type
   })
 })
 
@@ -375,7 +388,24 @@ describe('No console.log in Source', () => {
   })
 })
 
-// ─── API Consistency (plan 0029 dogfooding) ─────────────────────────
+// ─── API Consistency ─────────────────────────
+
+describe('Import Hygiene', () => {
+  it('test files should not use aliased imports', () => {
+    modules(p)
+      .that()
+      .resideInFile('**/tests/**/*.test.ts')
+      .should()
+      .notHaveAliasedImports()
+      .rule({
+        id: 'quality/no-aliased-imports',
+        because: 'aliases hide API naming problems — use the real export name',
+        suggestion:
+          'Import the symbol by its original name, or fix the export if the name conflicts',
+      })
+      .check()
+  })
+})
 
 describe('API Consistency', () => {
   it('module predicate functions must not accept a single "glob" parameter', () => {

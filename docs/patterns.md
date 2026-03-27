@@ -75,7 +75,7 @@ definePattern('tagged-collection', {
 })
 ```
 
-Available type matchers: `isString()`, `isNumber()`, `isBoolean()`, `isUnionOfLiterals()`, `isStringLiteral()`, `arrayOf(matcher)`, `matching(regex)`, `exactly(text)`, `notType(matcher)`.
+Available type matchers: `isString()`, `isNumber()`, `isBoolean()`, `isUnionOfLiterals()`, `isStringLiteral()`, `arrayOf(matcher)`, `matching(regex)`, `exactly(text)`, `not(matcher)`.
 
 ## `followPattern()`
 

@@ -6,7 +6,7 @@ import { ArchRuleError } from './errors.js'
 import { formatViolations } from './format.js'
 import { formatViolationsJson } from './format-json.js'
 import { formatViolationsGitHub } from './format-github.js'
-import { parseExclusionComments, isExcludedByComment } from '../helpers/exclusion-comments.js'
+import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
 
 /**
  * Context for executing a rule's terminal methods.

@@ -162,7 +162,7 @@ functions(p)
 Check property types using the TypeScript type checker — resolves through aliases, `Partial<>`, `Pick<>`:
 
 ```typescript
-import { types, notType, isString } from '@nielspeter/ts-archunit'
+import { types, not, isString } from '@nielspeter/ts-archunit'
 
 types(p)
   .that()
@@ -170,7 +170,7 @@ types(p)
   .and()
   .haveProperty('orderBy')
   .should()
-  .havePropertyType('orderBy', notType(isString()))
+  .havePropertyType('orderBy', not(isString()))
   .rule({
     id: 'type/no-bare-string-orderby',
     because: 'Bare string orderBy passed to .orderBy() is a SQL injection surface',

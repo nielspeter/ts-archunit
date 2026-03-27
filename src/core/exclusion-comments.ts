@@ -1,4 +1,4 @@
-import type { ArchViolation } from '../core/violation.js'
+import type { ArchViolation } from './violation.js'
 
 /**
  * Exclusion comment parsed from source code.

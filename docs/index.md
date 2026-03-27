@@ -115,7 +115,7 @@ types(p)
   .that()
   .haveProperty('orderBy')
   .should()
-  .havePropertyType('orderBy', notType(isString()))
+  .havePropertyType('orderBy', not(isString()))
   .check()
 ```
 
