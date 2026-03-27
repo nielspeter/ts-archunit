@@ -22,7 +22,7 @@ Four matchers cover the most common expression patterns:
 Matches function/method call expressions.
 
 ```typescript
-import { call } from 'ts-archunit'
+import { call } from '@nielspeter/ts-archunit'
 
 call('parseInt') // matches parseInt(x, 10)
 call('console.log') // matches console.log('hello')
@@ -35,7 +35,7 @@ call(/^parse/) // matches parseInt, parseFloat, parseSomething
 Matches constructor invocations (`new ...`).
 
 ```typescript
-import { newExpr } from 'ts-archunit'
+import { newExpr } from '@nielspeter/ts-archunit'
 
 newExpr('Error') // matches new Error('message')
 newExpr('URLSearchParams') // matches new URLSearchParams(params)
@@ -48,7 +48,7 @@ newExpr(/^(?!Typed)Error$/) // matches new Error but not new TypeError
 Matches property access expressions.
 
 ```typescript
-import { access } from 'ts-archunit'
+import { access } from '@nielspeter/ts-archunit'
 
 access('process.env') // matches process.env.DATABASE_URL
 access('this.config') // matches this.config.timeout
@@ -60,7 +60,7 @@ access(/^document\./) // matches document.querySelector, document.getElementById
 Matches any expression by its text representation. Use this as a fallback when the other matchers don't fit.
 
 ```typescript
-import { expression } from 'ts-archunit'
+import { expression } from '@nielspeter/ts-archunit'
 
 expression('eval') // matches eval('code')
 expression(/JSON\.parse/) // matches JSON.parse(str)
@@ -163,7 +163,7 @@ import {
   functionContain,
   functionNotContain,
   functionUseInsteadOf,
-} from 'ts-archunit'
+} from '@nielspeter/ts-archunit'
 ```
 
 These return `Condition<ClassDeclaration>` or `Condition<ArchFunction>` that can be passed to `.satisfy()` or combined with other conditions.
@@ -220,7 +220,7 @@ functions(p)
 ### Ban `console.log` in Production Code
 
 ```typescript
-import { noConsoleLog } from 'ts-archunit/rules/security'
+import { noConsoleLog } from '@nielspeter/ts-archunit/rules/security'
 
 classes(p)
   .that()
@@ -234,7 +234,7 @@ classes(p)
 ### Ban `eval()`
 
 ```typescript
-import { noEval } from 'ts-archunit/rules/security'
+import { noEval } from '@nielspeter/ts-archunit/rules/security'
 
 classes(p).should().satisfy(noEval()).because('eval is a security risk').check()
 ```
@@ -242,7 +242,7 @@ classes(p).should().satisfy(noEval()).because('eval is a security risk').check()
 ### Ban `process.env` in Domain Layer
 
 ```typescript
-import { noProcessEnv } from 'ts-archunit/rules/security'
+import { noProcessEnv } from '@nielspeter/ts-archunit/rules/security'
 
 classes(p)
   .that()
@@ -256,7 +256,7 @@ classes(p)
 ### Ban `new Function()` Constructor
 
 ```typescript
-import { noFunctionConstructor } from 'ts-archunit/rules/security'
+import { noFunctionConstructor } from '@nielspeter/ts-archunit/rules/security'
 
 classes(p)
   .should()
@@ -270,7 +270,7 @@ classes(p)
 Check what happens inside callback functions of specific call expressions:
 
 ```typescript
-import { calls, call, within } from 'ts-archunit'
+import { calls, call, within } from '@nielspeter/ts-archunit'
 
 const routes = calls(p)
   .that()

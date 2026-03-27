@@ -13,7 +13,7 @@ The `classes()` entry point operates on class declarations. Use it for inheritan
 ## Basic Usage
 
 ```typescript
-import { project, classes } from 'ts-archunit'
+import { project, classes } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -47,12 +47,20 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ### Class-Specific Conditions
 
-| Condition                         | Description                                | Example                                       |
-| --------------------------------- | ------------------------------------------ | --------------------------------------------- |
-| `shouldExtend(name)`              | Class must extend the named base class     | `.should().shouldExtend('BaseRepository')`    |
-| `shouldImplement(name)`           | Class must implement the named interface   | `.should().shouldImplement('Disposable')`     |
-| `shouldHaveMethodNamed(name)`     | Class must have a method with the name     | `.should().shouldHaveMethodNamed('dispose')`  |
-| `shouldNotHaveMethodMatching(re)` | Class must not have methods matching regex | `.should().shouldNotHaveMethodMatching(/^_/)` |
+| Condition                              | Description                                | Example                                                          |
+| -------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
+| `shouldExtend(name)`                   | Class must extend the named base class     | `.should().shouldExtend('BaseRepository')`                       |
+| `shouldImplement(name)`                | Class must implement the named interface   | `.should().shouldImplement('Disposable')`                        |
+| `shouldHaveMethodNamed(name)`          | Class must have a method with the name     | `.should().shouldHaveMethodNamed('dispose')`                     |
+| `shouldNotHaveMethodMatching(re)`      | Class must not have methods matching regex | `.should().shouldNotHaveMethodMatching(/^_/)`                    |
+| `shouldHavePropertyNamed(...names)`    | All named properties must exist            | `.should().shouldHavePropertyNamed('logger')`                    |
+| `shouldNotHavePropertyNamed(...names)` | None of the named properties may exist     | `.should().shouldNotHavePropertyNamed('offset')`                 |
+| `havePropertyMatching(pattern)`        | At least one property matches regex        | `.should().havePropertyMatching(/^id$/)`                         |
+| `notHavePropertyMatching(pattern)`     | No property matches regex                  | `.should().notHavePropertyMatching(/^data$/)`                    |
+| `haveOnlyReadonlyProperties()`         | All properties must be readonly            | `.should().haveOnlyReadonlyProperties()`                         |
+| `maxProperties(n)`                     | Property count must not exceed n           | `.should().maxProperties(10)`                                    |
+| `acceptParameterOfType(matcher)`       | At least one parameter matches TypeMatcher | `.should().acceptParameterOfType(matching(/DatabaseClient/))`    |
+| `notAcceptParameterOfType(matcher)`    | No parameter matches TypeMatcher           | `.should().notAcceptParameterOfType(matching(/DatabaseClient/))` |
 
 ### Body Analysis Conditions
 
@@ -102,7 +110,7 @@ classes(p)
 ### No `any`-Typed Properties
 
 ```typescript
-import { noAnyProperties } from 'ts-archunit/rules/typescript'
+import { noAnyProperties } from '@nielspeter/ts-archunit/rules/typescript'
 
 classes(p)
   .that()
@@ -116,7 +124,7 @@ classes(p)
 ### No Type Assertions in Services
 
 ```typescript
-import { noTypeAssertions } from 'ts-archunit/rules/typescript'
+import { noTypeAssertions } from '@nielspeter/ts-archunit/rules/typescript'
 
 classes(p)
   .that()
@@ -165,6 +173,84 @@ repositories.should().notContain(newExpr('Error')).check()
 repositories.should().beExported().check()
 ```
 
+## Property Conditions
+
+Property conditions assert on the properties of class declarations. The `should` prefix is used on `shouldHavePropertyNamed` and `shouldNotHavePropertyNamed` to avoid collision with the `havePropertyNamed` predicate.
+
+### Forbidden Properties on Classes
+
+```typescript
+import { project, classes } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+
+classes(p)
+  .that()
+  .haveNameEndingWith('Service')
+  .should()
+  .shouldNotHavePropertyNamed('offset', 'pageSize')
+  .because('services should not handle raw pagination parameters')
+  .check()
+```
+
+### Immutable Value Objects
+
+```typescript
+classes(p)
+  .that()
+  .resideInFolder('**/domain/values/**')
+  .should()
+  .haveOnlyReadonlyProperties()
+  .because('value objects must be immutable')
+  .check()
+```
+
+### Property Count Limits
+
+```typescript
+classes(p)
+  .should()
+  .maxProperties(10)
+  .because('classes with many properties indicate a missing abstraction')
+  .check()
+```
+
+## Parameter Type Conditions
+
+Parameter type conditions scan constructor parameters, method parameters, and setter parameters to enforce DI boundaries. They compose with the existing `TypeMatcher` system.
+
+### Services Must Not Accept Database Client
+
+```typescript
+import { project, classes, matching } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+
+classes(p)
+  .that()
+  .haveNameEndingWith('Service')
+  .should()
+  .notAcceptParameterOfType(matching(/Knex/))
+  .rule({
+    id: 'di/no-direct-db-in-services',
+    because: 'Services should depend on repositories, not database clients',
+    suggestion: 'Inject a repository instead of Knex',
+  })
+  .check()
+```
+
+### Repositories Must Accept Database Client
+
+```typescript
+classes(p)
+  .that()
+  .haveNameEndingWith('Repository')
+  .should()
+  .acceptParameterOfType(matching(/DatabaseClient/))
+  .because('repositories are the database access layer')
+  .check()
+```
+
 ## Standard Rules
 
 Pre-built class conditions from sub-path imports:
@@ -174,15 +260,15 @@ import {
   noAnyProperties,
   noTypeAssertions,
   noNonNullAssertions,
-} from 'ts-archunit/rules/typescript'
+} from '@nielspeter/ts-archunit/rules/typescript'
 import {
   noEval,
   noFunctionConstructor,
   noConsoleLog,
   noProcessEnv,
-} from 'ts-archunit/rules/security'
-import { noGenericErrors, noTypeErrors } from 'ts-archunit/rules/errors'
-import { mustMatchName } from 'ts-archunit/rules/naming'
+} from '@nielspeter/ts-archunit/rules/security'
+import { noGenericErrors, noTypeErrors } from '@nielspeter/ts-archunit/rules/errors'
+import { mustMatchName } from '@nielspeter/ts-archunit/rules/naming'
 
 classes(p).should().satisfy(noEval()).check()
 classes(p).should().satisfy(noGenericErrors()).check()

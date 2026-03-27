@@ -12,11 +12,11 @@ import {
   definePredicate,
   defineCondition,
   createViolation,
-} from 'ts-archunit'
+} from '@nielspeter/ts-archunit'
 import type { ClassDeclaration } from 'ts-morph'
 import { SyntaxKind } from 'ts-morph'
-import type { ArchViolation, ConditionContext } from 'ts-archunit'
-import type { ArchFunction } from 'ts-archunit'
+import type { ArchViolation, ConditionContext } from '@nielspeter/ts-archunit'
+import type { ArchFunction } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 

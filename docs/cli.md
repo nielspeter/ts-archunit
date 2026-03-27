@@ -56,7 +56,7 @@ Records all existing violations so that `check --baseline` only fails on new one
 Optional `ts-archunit.config.ts` in your project root:
 
 ```typescript
-import { defineConfig } from 'ts-archunit'
+import { defineConfig } from '@nielspeter/ts-archunit'
 
 export default defineConfig({
   project: 'tsconfig.json',
@@ -75,7 +75,7 @@ A rule file exports an array of rule builders:
 
 ```typescript
 // arch.rules.ts
-import { project, classes, modules, call } from 'ts-archunit'
+import { project, classes, modules, call } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 

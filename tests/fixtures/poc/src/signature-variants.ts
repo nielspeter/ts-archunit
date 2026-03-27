@@ -19,3 +19,34 @@ export function allRequired(a: string, b: number): void {
 export function withBoth(label: string, ...tags: string[]): void {
   void [label, tags]
 }
+
+// --- Return type variants (plan 0033) ---
+
+export function returnsString(): string {
+  return 'hello'
+}
+
+export function returnsPromiseNumber(): Promise<number> {
+  return Promise.resolve(42)
+}
+
+export function returnsVoid(): void {
+  // no return
+}
+
+export interface Collection<T> {
+  items: T[]
+  total: number
+}
+
+export function listUsers(): Collection<string> {
+  return { items: [], total: 0 }
+}
+
+export function listOrders(): Collection<number> {
+  return { items: [], total: 0 }
+}
+
+export function createUser(name: string): string {
+  return name
+}

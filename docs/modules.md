@@ -12,7 +12,7 @@ The `modules()` entry point operates on source files. Use it for import and depe
 ## Basic Usage
 
 ```typescript
-import { project, modules } from 'ts-archunit'
+import { project, modules } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -117,7 +117,11 @@ modules(p)
 Pre-built dependency conditions from `ts-archunit/rules/dependencies`:
 
 ```typescript
-import { onlyDependOn, mustNotDependOn, typeOnlyFrom } from 'ts-archunit/rules/dependencies'
+import {
+  onlyDependOn,
+  mustNotDependOn,
+  typeOnlyFrom,
+} from '@nielspeter/ts-archunit/rules/dependencies'
 
 modules(p)
   .that()

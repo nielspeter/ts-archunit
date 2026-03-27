@@ -98,6 +98,9 @@ Available on all entry points via `.that()`.
 | ------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
 | `areAsync`                      | `areAsync`                                       | Function is async.                                    |
 | `areNotAsync`                   | `areNotAsync`                                    | Function is not async.                                |
+| `arePublic`                     | `arePublic()`                                    | Function/method is public (standalone always match).  |
+| `areProtected`                  | `areProtected()`                                 | Method is protected.                                  |
+| `arePrivate`                    | `arePrivate()`                                   | Method is private.                                    |
 | `haveParameterCount`            | `haveParameterCount(n: number)`                  | Function has exactly n parameters.                    |
 | `haveParameterCountGreaterThan` | `haveParameterCountGreaterThan(n: number)`       | Function has more than n parameters.                  |
 | `haveParameterCountLessThan`    | `haveParameterCountLessThan(n: number)`          | Function has fewer than n parameters.                 |
@@ -139,21 +142,26 @@ Available on all entry points via `.that()`.
 
 ## Class Conditions
 
-| Export                        | Signature                                 | Description                                 |
-| ----------------------------- | ----------------------------------------- | ------------------------------------------- |
-| `shouldExtend`                | `shouldExtend(name: string)`              | Class must extend the named base class.     |
-| `shouldImplement`             | `shouldImplement(name: string)`           | Class must implement the named interface.   |
-| `shouldHaveMethodNamed`       | `shouldHaveMethodNamed(name: string)`     | Class must have a method with the name.     |
-| `shouldNotHaveMethodMatching` | `shouldNotHaveMethodMatching(re: RegExp)` | Class must not have methods matching regex. |
+| Export                          | Signature                                        | Description                                           |
+| ------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
+| `shouldExtend`                  | `shouldExtend(name: string)`                     | Class must extend the named base class.               |
+| `shouldImplement`               | `shouldImplement(name: string)`                  | Class must implement the named interface.             |
+| `shouldHaveMethodNamed`         | `shouldHaveMethodNamed(name: string)`            | Class must have a method with the name.               |
+| `shouldNotHaveMethodMatching`   | `shouldNotHaveMethodMatching(re: RegExp)`        | Class must not have methods matching regex.           |
+| `classAcceptParameterOfType`    | `acceptParameterOfType(matcher: TypeMatcher)`    | At least one param (ctor/method/setter) matches type. |
+| `classNotAcceptParameterOfType` | `notAcceptParameterOfType(matcher: TypeMatcher)` | No param (ctor/method/setter) matches type.           |
 
 ## Function Conditions
 
-| Export                     | Signature                      | Description                     |
-| -------------------------- | ------------------------------ | ------------------------------- |
-| `functionNotExist`         | `notExist()`                   | No functions should match.      |
-| `functionBeExported`       | `beExported()`                 | Function must be exported.      |
-| `functionBeAsync`          | `beAsync()`                    | Function must be async.         |
-| `functionHaveNameMatching` | `haveNameMatching(re: RegExp)` | Function name must match regex. |
+| Export                             | Signature                                        | Description                                 |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------- |
+| `functionNotExist`                 | `notExist()`                                     | No functions should match.                  |
+| `functionBeExported`               | `beExported()`                                   | Function must be exported.                  |
+| `functionBeAsync`                  | `beAsync()`                                      | Function must be async.                     |
+| `functionHaveNameMatching`         | `haveNameMatching(re: RegExp)`                   | Function name must match regex.             |
+| `functionHaveReturnTypeMatching`   | `haveReturnTypeMatching(matcher: TypeMatcher)`   | Return type must satisfy TypeMatcher.       |
+| `functionAcceptParameterOfType`    | `acceptParameterOfType(matcher: TypeMatcher)`    | At least one parameter matches TypeMatcher. |
+| `functionNotAcceptParameterOfType` | `notAcceptParameterOfType(matcher: TypeMatcher)` | No parameter matches TypeMatcher.           |
 
 ## Dependency Conditions
 
@@ -182,6 +190,17 @@ Available on all entry points via `.that()`.
 | `functionContain`      | `functionContain(matcher: ExpressionMatcher)`    | Function body must contain expression.           |
 | `functionNotContain`   | `functionNotContain(matcher: ExpressionMatcher)` | Function body must not contain expression.       |
 | `functionUseInsteadOf` | `functionUseInsteadOf(banned, replacement)`      | Ban expression in function, suggest replacement. |
+
+## Property Conditions
+
+| Export                             | Signature                                  | Description                               |
+| ---------------------------------- | ------------------------------------------ | ----------------------------------------- |
+| `conditionHavePropertyNamed`       | `havePropertyNamed(...names: string[])`    | All named properties must exist.          |
+| `conditionNotHavePropertyNamed`    | `notHavePropertyNamed(...names: string[])` | None of the named properties may exist.   |
+| `conditionHavePropertyMatching`    | `havePropertyMatching(pattern: RegExp)`    | At least one property name matches regex. |
+| `conditionNotHavePropertyMatching` | `notHavePropertyMatching(pattern: RegExp)` | No property name matches regex.           |
+| `haveOnlyReadonlyProperties`       | `haveOnlyReadonlyProperties()`             | All properties must be readonly.          |
+| `maxProperties`                    | `maxProperties(max: number)`               | Property count must not exceed max.       |
 
 ## Type-Level Conditions
 
@@ -218,6 +237,8 @@ Available on all entry points via `.that()`.
 | `callHaveCallbackContaining`    | `haveCallbackContaining(matcher: ExpressionMatcher)`    | At least one callback argument must contain the matched expression. |
 | `callNotHaveCallbackContaining` | `notHaveCallbackContaining(matcher: ExpressionMatcher)` | No callback argument may contain the matched expression.            |
 | `callNotExist`                  | `notExist()`                                            | The filtered call set must be empty.                                |
+| `haveArgumentWithProperty`      | `haveArgumentWithProperty(...names: string[])`          | At least one object literal arg has ALL named properties.           |
+| `notHaveArgumentWithProperty`   | `notHaveArgumentWithProperty(...names: string[])`       | No object literal arg has ANY of the named properties.              |
 
 See [Call Rules](/calls) for usage examples.
 
@@ -342,39 +363,40 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Types (TypeScript)
 
-| Export               | Kind | Description                                            |
-| -------------------- | ---- | ------------------------------------------------------ |
-| `ArchProject`        | type | Loaded TypeScript project.                             |
-| `Predicate`          | type | Predicate interface.                                   |
-| `Condition`          | type | Condition interface.                                   |
-| `ConditionContext`   | type | Context passed to condition evaluators.                |
-| `ArchViolation`      | type | Violation model.                                       |
-| `RuleMetadata`       | type | Rule metadata (`id`, `because`, `suggestion`, `docs`). |
-| `CheckOptions`       | type | Options for `.check()`.                                |
-| `OutputFormat`       | type | Output format (`'terminal' \| 'github' \| 'json'`).    |
-| `FormatOptions`      | type | Options for formatting functions.                      |
-| `CodeFrameOptions`   | type | Options for `generateCodeFrame()`.                     |
-| `ExpressionMatcher`  | type | Matcher returned by `call()`, `newExpr()`, etc.        |
-| `TypeMatcher`        | type | Matcher used with `havePropertyType()`.                |
-| `TypeDeclaration`    | type | Union of interface and type alias declarations.        |
-| `ArchFunction`       | type | Unified function/arrow/method model.                   |
-| `ArchCall`           | type | Model for matched call expressions.                    |
-| `Slice`              | type | A named group of source files.                         |
-| `SliceDefinition`    | type | Input to `assignedFrom()`.                             |
-| `Named`              | type | Element with a name.                                   |
-| `Located`            | type | Element with a file location.                          |
-| `Exportable`         | type | Element that can be exported.                          |
-| `BaselineEntry`      | type | Single entry in a baseline file.                       |
-| `BaselineFile`       | type | Structure of the baseline JSON file.                   |
-| `Layer`              | type | Layer definition for cross-layer validation.           |
-| `LayerPair`          | type | Pair of elements from two layers.                      |
-| `PairCondition`      | type | Condition for cross-layer pairs.                       |
-| `ArchPattern`        | type | Pattern template definition.                           |
-| `PropertyConstraint` | type | Property type constraint in a pattern.                 |
-| `Fingerprint`        | type | AST fingerprint for similarity detection.              |
-| `ScopedContext`      | type | Context returned by `within()`.                        |
-| `ExtractedCallback`  | type | Callback extracted from a call expression.             |
-| `CliConfig`          | type | CLI configuration object.                              |
+| Export                | Kind | Description                                             |
+| --------------------- | ---- | ------------------------------------------------------- |
+| `ArchProject`         | type | Loaded TypeScript project.                              |
+| `Predicate`           | type | Predicate interface.                                    |
+| `Condition`           | type | Condition interface.                                    |
+| `ConditionContext`    | type | Context passed to condition evaluators.                 |
+| `ArchViolation`       | type | Violation model.                                        |
+| `RuleMetadata`        | type | Rule metadata (`id`, `because`, `suggestion`, `docs`).  |
+| `CheckOptions`        | type | Options for `.check()`.                                 |
+| `OutputFormat`        | type | Output format (`'terminal' \| 'github' \| 'json'`).     |
+| `FormatOptions`       | type | Options for formatting functions.                       |
+| `CodeFrameOptions`    | type | Options for `generateCodeFrame()`.                      |
+| `ExpressionMatcher`   | type | Matcher returned by `call()`, `newExpr()`, etc.         |
+| `TypeMatcher`         | type | Matcher used with `havePropertyType()`.                 |
+| `TypeDeclaration`     | type | Union of interface and type alias declarations.         |
+| `ArchFunction`        | type | Unified function/arrow/method model.                    |
+| `ArchCall`            | type | Model for matched call expressions.                     |
+| `Slice`               | type | A named group of source files.                          |
+| `SliceDefinition`     | type | Input to `assignedFrom()`.                              |
+| `Named`               | type | Element with a name.                                    |
+| `Located`             | type | Element with a file location.                           |
+| `Exportable`          | type | Element that can be exported.                           |
+| `BaselineEntry`       | type | Single entry in a baseline file.                        |
+| `BaselineFile`        | type | Structure of the baseline JSON file.                    |
+| `Layer`               | type | Layer definition for cross-layer validation.            |
+| `LayerPair`           | type | Pair of elements from two layers.                       |
+| `PairCondition`       | type | Condition for cross-layer pairs.                        |
+| `ArchPattern`         | type | Pattern template definition.                            |
+| `PropertyConstraint`  | type | Property type constraint in a pattern.                  |
+| `Fingerprint`         | type | AST fingerprint for similarity detection.               |
+| `ScopedContext`       | type | Context returned by `within()`.                         |
+| `ExtractedCallback`   | type | Callback extracted from a call expression.              |
+| `PropertyBearingNode` | type | Union of interface, type alias, and class declarations. |
+| `CliConfig`           | type | CLI configuration object.                               |
 
 ## GraphQL Extension (`ts-archunit/graphql`)
 

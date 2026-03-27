@@ -3,7 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import { isString } from '../../src/helpers/type-matchers.js'
+import { isString, matching, not, exactly } from '../../src/helpers/type-matchers.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -399,6 +399,141 @@ describe('functions() entry point integration', () => {
           .notExist()
           .check()
       }).toThrow(ArchRuleError) // allRequired, withOptional, withBoth match
+    })
+  })
+
+  // --- Plan 0031: Parameter type conditions ---
+
+  describe('notAcceptParameterOfType (plan 0031)', () => {
+    it('factory functions creating services should not accept DatabaseClient', () => {
+      // createServiceWithDb accepts DatabaseClient — should fail
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/create.*Service/)
+          .should()
+          .notAcceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('createCleanService passes the DI boundary rule', () => {
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching('createCleanService')
+          .should()
+          .notAcceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  describe('acceptParameterOfType (plan 0031)', () => {
+    it('createServiceWithDb must accept DatabaseClient', () => {
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching('createServiceWithDb')
+          .should()
+          .acceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  // --- Plan 0032: Visibility predicates ---
+
+  describe('arePublic (full chain)', () => {
+    it('public methods with get prefix should be exported', () => {
+      // MixedVisibility.getPublicData is public and in an exported class
+      expect(() => {
+        functions(p)
+          .that()
+          .arePublic()
+          .and()
+          .haveNameMatching(/^MixedVisibility\.get/)
+          .should()
+          .beExported()
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  describe('arePrivate (full chain)', () => {
+    it('private methods with too many params should not exist', () => {
+      // MixedVisibility.validate is private with 0 params, so > 5 filter yields 0 elements
+      expect(() => {
+        functions(p)
+          .that()
+          .arePrivate()
+          .and()
+          .haveParameterCountGreaterThan(5)
+          .should()
+          .notExist()
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  describe('areProtected (full chain)', () => {
+    it('protected methods exist in the MixedVisibility class', () => {
+      // MixedVisibility.loadInternal is protected, so notExist should throw
+      expect(() => {
+        functions(p)
+          .that()
+          .areProtected()
+          .and()
+          .haveNameMatching(/MixedVisibility/)
+          .should()
+          .notExist()
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+  })
+
+  // --- Plan 0033: Return type condition ---
+
+  describe('haveReturnTypeMatching (plan 0033)', () => {
+    it('list* functions in signature-variants should return Collection', () => {
+      // listUsers and listOrders return Collection<T> — matching(/Collection/) passes
+      expect(() => {
+        functions(p)
+          .that()
+          .resideInFile('**/signature-variants.ts')
+          .and()
+          .haveNameMatching(/^list/)
+          .should()
+          .haveReturnTypeMatching(matching(/Collection/))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('create* functions should not return void', () => {
+      // createUser returns string, not void — not(exactly('void')) passes
+      expect(() => {
+        functions(p)
+          .that()
+          .resideInFile('**/signature-variants.ts')
+          .and()
+          .haveNameMatching(/^create/)
+          .should()
+          .haveReturnTypeMatching(not(exactly('void')))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('public functions should not return any (compose with arePublic)', () => {
+      // No function in the fixture returns `any`, so this should pass
+      expect(() => {
+        functions(p)
+          .that()
+          .arePublic()
+          .should()
+          .haveReturnTypeMatching(not(matching(/^any$/)))
+          .because('public functions should not return any')
+          .check()
+      }).not.toThrow()
     })
   })
 })

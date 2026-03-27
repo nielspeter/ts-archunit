@@ -197,7 +197,7 @@ classes(p).should().notContain(call('eval')).check()
 When running in GitHub Actions, violations appear as inline annotations on PR diffs:
 
 ```typescript
-import { detectFormat } from 'ts-archunit'
+import { detectFormat } from '@nielspeter/ts-archunit'
 
 const format = detectFormat() // 'github' in CI, 'terminal' locally
 
@@ -215,7 +215,7 @@ classes(p).should().notContain(call('eval')).check({ format: 'json' })
 ### Programmatic Format Detection
 
 ```typescript
-import { detectFormat, isCI } from 'ts-archunit'
+import { detectFormat, isCI } from '@nielspeter/ts-archunit'
 
 const format = detectFormat() // auto-detects environment
 const ci = isCI() // true in any CI environment
@@ -226,7 +226,7 @@ const ci = isCI() // true in any CI environment
 When `.check()` throws, it throws an `ArchRuleError`:
 
 ```typescript
-import { ArchRuleError } from 'ts-archunit'
+import { ArchRuleError } from '@nielspeter/ts-archunit'
 
 try {
   classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
@@ -265,7 +265,7 @@ import {
   formatViolations,
   formatViolationsPlain,
   formatViolationsJson,
-} from 'ts-archunit'
+} from '@nielspeter/ts-archunit'
 
 try {
   classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
@@ -289,7 +289,7 @@ try {
 The `generateCodeFrame()` utility can be used directly for custom formatting:
 
 ```typescript
-import { generateCodeFrame } from 'ts-archunit'
+import { generateCodeFrame } from '@nielspeter/ts-archunit'
 
 const frame = generateCodeFrame(sourceText, lineNumber, {
   // options

@@ -41,7 +41,7 @@ function getMemberName(cls: ClassDeclaration, member: ClassMember): string {
  *
  * @example
  * ```ts
- * import { maxCyclomaticComplexity } from 'ts-archunit/rules/metrics'
+ * import { maxCyclomaticComplexity } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
  * ```
@@ -75,7 +75,7 @@ export function maxCyclomaticComplexity(threshold: number): Condition<ClassDecla
  *
  * @example
  * ```ts
- * import { maxClassLines } from 'ts-archunit/rules/metrics'
+ * import { maxClassLines } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * classes(p).should().satisfy(maxClassLines(300)).warn()
  * ```
@@ -107,7 +107,7 @@ export function maxClassLines(threshold: number): Condition<ClassDeclaration> {
  *
  * @example
  * ```ts
- * import { maxMethodLines } from 'ts-archunit/rules/metrics'
+ * import { maxMethodLines } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * classes(p).should().satisfy(maxMethodLines(50)).warn()
  * ```
@@ -143,7 +143,7 @@ export function maxMethodLines(threshold: number): Condition<ClassDeclaration> {
  *
  * @example
  * ```ts
- * import { maxMethods } from 'ts-archunit/rules/metrics'
+ * import { maxMethods } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * classes(p).should().satisfy(maxMethods(15)).warn()
  * ```
@@ -175,7 +175,7 @@ export function maxMethods(threshold: number): Condition<ClassDeclaration> {
  *
  * @example
  * ```ts
- * import { maxParameters } from 'ts-archunit/rules/metrics'
+ * import { maxParameters } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * classes(p).should().satisfy(maxParameters(4))
  *   .because('use an options object for >4 parameters')

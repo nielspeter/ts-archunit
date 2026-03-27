@@ -172,17 +172,18 @@ describe('haveNameStartingWith / haveNameEndingWith', () => {
     expect(haveNameEndingWith('Service').test(named(undefined))).toBe(false)
   })
 
-  it('against ts-morph: haveNameEndingWith("Service") finds all 4 service classes', () => {
+  it('against ts-morph: haveNameEndingWith("Service") finds all service classes', () => {
     const classes = tsMorphProject.getSourceFiles().flatMap((sf) => sf.getClasses())
     const pred = haveNameEndingWith('Service')
     const matched = classes.filter((c) => pred.test(c))
     const names = matched.map((c) => c.getName())
-    // BaseService, OrderService, ProductService, EdgeCaseService
+    // BaseService, OrderService, ProductService, EdgeCaseService, CleanService (plan 0031 fixture)
     expect(names).toContain('BaseService')
     expect(names).toContain('OrderService')
     expect(names).toContain('ProductService')
     expect(names).toContain('EdgeCaseService')
-    expect(matched).toHaveLength(4)
+    expect(names).toContain('CleanService')
+    expect(matched).toHaveLength(5)
   })
 })
 

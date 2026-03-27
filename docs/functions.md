@@ -23,7 +23,7 @@ All three support the same predicates and conditions, so you write one rule and 
 ## Basic Usage
 
 ```typescript
-import { project, functions } from 'ts-archunit'
+import { project, functions } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -38,6 +38,9 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 | ---------------------------------- | ---------------------------------------------------- | -------------------------------------------- |
 | `areAsync`                         | Function is async                                    | `.that().areAsync()`                         |
 | `areNotAsync`                      | Function is not async                                | `.that().areNotAsync()`                      |
+| `arePublic()`                      | Function/method is public (or standalone)            | `.that().arePublic()`                        |
+| `areProtected()`                   | Method is protected                                  | `.that().areProtected()`                     |
+| `arePrivate()`                     | Method is private                                    | `.that().arePrivate()`                       |
 | `haveParameterCount(n)`            | Function has exactly n parameters                    | `.that().haveParameterCount(0)`              |
 | `haveParameterCountGreaterThan(n)` | Function has more than n parameters                  | `.that().haveParameterCountGreaterThan(5)`   |
 | `haveParameterCountLessThan(n)`    | Function has fewer than n parameters                 | `.that().haveParameterCountLessThan(2)`      |
@@ -50,15 +53,18 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Available Conditions
 
-| Condition                       | Description                                   | Example                                          |
-| ------------------------------- | --------------------------------------------- | ------------------------------------------------ |
-| `notExist()`                    | No functions should match the predicates      | `.should().notExist()`                           |
-| `beExported()`                  | Function must be exported                     | `.should().beExported()`                         |
-| `beAsync()`                     | Function must be async                        | `.should().beAsync()`                            |
-| `conditionHaveNameMatching(re)` | Function name must match the regex            | `.should().conditionHaveNameMatching(/^handle/)` |
-| `contain(matcher)`              | Function body must contain the expression     | `.should().contain(call('validate'))`            |
-| `notContain(matcher)`           | Function body must not contain the expression | `.should().notContain(call('eval'))`             |
-| `useInsteadOf(ban, alt)`        | Replace banned expression with an alternative | `.should().useInsteadOf(call('parseInt'), ...)`  |
+| Condition                           | Description                                   | Example                                                          |
+| ----------------------------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| `notExist()`                        | No functions should match the predicates      | `.should().notExist()`                                           |
+| `beExported()`                      | Function must be exported                     | `.should().beExported()`                                         |
+| `beAsync()`                         | Function must be async                        | `.should().beAsync()`                                            |
+| `conditionHaveNameMatching(re)`     | Function name must match the regex            | `.should().conditionHaveNameMatching(/^handle/)`                 |
+| `contain(matcher)`                  | Function body must contain the expression     | `.should().contain(call('validate'))`                            |
+| `notContain(matcher)`               | Function body must not contain the expression | `.should().notContain(call('eval'))`                             |
+| `useInsteadOf(ban, alt)`            | Replace banned expression with an alternative | `.should().useInsteadOf(call('parseInt'), ...)`                  |
+| `haveReturnTypeMatching(matcher)`   | Return type must satisfy TypeMatcher          | `.should().haveReturnTypeMatching(matching(/Collection/))`       |
+| `acceptParameterOfType(matcher)`    | At least one parameter matches TypeMatcher    | `.should().acceptParameterOfType(matching(/Event/))`             |
+| `notAcceptParameterOfType(matcher)` | No parameter matches TypeMatcher              | `.should().notAcceptParameterOfType(matching(/DatabaseClient/))` |
 
 ## Real-World Examples
 
@@ -138,7 +144,7 @@ functions(p)
 ### Event Handlers Must Accept an Event Parameter
 
 ```typescript
-import { matching } from 'ts-archunit'
+import { matching } from '@nielspeter/ts-archunit'
 
 functions(p)
   .that()
@@ -153,12 +159,97 @@ functions(p)
   .check()
 ```
 
+### Visibility Predicates
+
+The `arePublic()`, `areProtected()`, and `arePrivate()` predicates filter functions and methods by their visibility modifier. Standalone functions and arrow functions always match `arePublic()`.
+
+```typescript
+import { project, functions, matching } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+
+// Public methods on repositories must accept TenancyContext
+functions(p)
+  .that()
+  .resideInFolder('**/repositories/**')
+  .and()
+  .arePublic()
+  .should()
+  .acceptParameterOfType(matching(/TenancyContext/))
+  .because('all public repo methods must be tenant-scoped')
+  .check()
+```
+
+```typescript
+// Private methods should not have too many parameters
+functions(p)
+  .that()
+  .arePrivate()
+  .and()
+  .haveParameterCountGreaterThan(5)
+  .should()
+  .notExist()
+  .because('private methods with many params should use an options object')
+  .check()
+```
+
+### Return Type Condition
+
+`haveReturnTypeMatching(matcher)` asserts that the return type of matched functions satisfies a `TypeMatcher`. This works with all type matchers: `matching()`, `exactly()`, `isString()`, `notType()`, `arrayOf()`, etc.
+
+```typescript
+import { project, functions, matching } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+
+// List methods must return a Collection
+functions(p)
+  .that()
+  .haveNameMatching(/^list/)
+  .should()
+  .haveReturnTypeMatching(matching(/Collection/))
+  .because('list methods must return a Collection for consistent pagination')
+  .check()
+```
+
+```typescript
+import { not, exactly } from '@nielspeter/ts-archunit'
+
+// Create methods must not return void
+functions(p)
+  .that()
+  .haveNameMatching(/^create/)
+  .should()
+  .haveReturnTypeMatching(not(exactly('void')))
+  .because('create methods should return the created entity')
+  .check()
+```
+
+### Parameter Type Conditions
+
+`acceptParameterOfType(matcher)` and `notAcceptParameterOfType(matcher)` scan all parameters of matched functions. For class methods accessed via `functions()`, only the method's own parameter list is checked (not the entire class). Use the `classes()` builder if you need to scan constructor + methods + setters together.
+
+```typescript
+import { project, functions, matching } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+
+// Factory functions should not accept database clients
+functions(p)
+  .that()
+  .haveNameMatching(/^create.*Service$/)
+  .should()
+  .notAcceptParameterOfType(matching(/DatabaseClient/))
+  .because('factory functions should not wire database dependencies directly')
+  .check()
+```
+
 ### Pattern Templates
 
 Enforce return type shapes across functions:
 
 ```typescript
-import { definePattern, functions } from 'ts-archunit'
+import { definePattern, functions } from '@nielspeter/ts-archunit'
 
 const paginatedCollection = definePattern('paginated-collection', {
   returnShape: {
@@ -182,7 +273,7 @@ functions(p)
 Use `within()` to restrict rules to callback functions inside matched call expressions:
 
 ```typescript
-import { calls, call, within } from 'ts-archunit'
+import { calls, call, within } from '@nielspeter/ts-archunit'
 
 // Select route registrations
 const routes = calls(p)

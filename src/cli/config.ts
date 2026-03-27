@@ -19,7 +19,7 @@ export interface CliConfig {
  * @example
  * ```ts
  * // ts-archunit.config.ts
- * import { defineConfig } from 'ts-archunit'
+ * import { defineConfig } from '@nielspeter/ts-archunit'
  *
  * export default defineConfig({
  *   project: 'tsconfig.json',

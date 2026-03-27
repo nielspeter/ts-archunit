@@ -1,3 +1,4 @@
+import { Node } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
@@ -112,4 +113,111 @@ function searchCallbacksFor(archCall: ArchCall, matcher: ExpressionMatcher): boo
     if (matches.length > 0) return true
   }
   return false
+}
+
+/**
+ * Collect property names from an ObjectLiteralExpression node.
+ *
+ * Handles both PropertyAssignment (`{ schema: {} }`) and
+ * ShorthandPropertyAssignment (`{ schema }`).
+ */
+function getObjectLiteralPropertyNames(node: Node): Set<string> {
+  const names = new Set<string>()
+  if (!Node.isObjectLiteralExpression(node)) return names
+  for (const prop of node.getProperties()) {
+    if (Node.isPropertyAssignment(prop) || Node.isShorthandPropertyAssignment(prop)) {
+      names.add(prop.getName())
+    }
+  }
+  return names
+}
+
+/**
+ * Assert that at least one object literal argument has ALL named properties.
+ *
+ * Scans all arguments of each call for ObjectLiteralExpression nodes.
+ * Passes if at least one object literal argument contains every
+ * specified property name.
+ *
+ * @throws {Error} if called with zero property names
+ */
+export function haveArgumentWithProperty(...names: string[]): Condition<ArchCall> {
+  if (names.length === 0) {
+    throw new Error('haveArgumentWithProperty requires at least one property name')
+  }
+  const description =
+    names.length === 1
+      ? `have argument with property "${names[0]!}"`
+      : `have argument with properties ${names.map((n) => `"${n}"`).join(', ')}`
+
+  return {
+    description,
+    evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const archCall of elements) {
+        const args = archCall.getArguments()
+        let found = false
+        for (const arg of args) {
+          const propNames = getObjectLiteralPropertyNames(arg)
+          if (propNames.size > 0 && names.every((name) => propNames.has(name))) {
+            found = true
+            break
+          }
+        }
+        if (!found) {
+          violations.push(
+            createCallViolation(
+              archCall,
+              `${archCall.getName() ?? '<call>'} has no argument with properties ${names.map((n) => `"${n}"`).join(', ')}`,
+              context,
+            ),
+          )
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
+ * Assert that NO object literal argument has ANY of the named properties.
+ *
+ * Scans all arguments of each call for ObjectLiteralExpression nodes.
+ * Reports one violation per forbidden property found in any argument.
+ *
+ * @throws {Error} if called with zero property names
+ */
+export function notHaveArgumentWithProperty(...names: string[]): Condition<ArchCall> {
+  if (names.length === 0) {
+    throw new Error('notHaveArgumentWithProperty requires at least one property name')
+  }
+  const description =
+    names.length === 1
+      ? `not have argument with property "${names[0]!}"`
+      : `not have argument with properties ${names.map((n) => `"${n}"`).join(', ')}`
+
+  return {
+    description,
+    evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const archCall of elements) {
+        const args = archCall.getArguments()
+        for (const arg of args) {
+          const propNames = getObjectLiteralPropertyNames(arg)
+          for (const name of names) {
+            if (propNames.has(name)) {
+              violations.push(
+                createCallViolation(
+                  archCall,
+                  `${archCall.getName() ?? '<call>'} argument has forbidden property "${name}"`,
+                  context,
+                ),
+              )
+            }
+          }
+        }
+      }
+      return violations
+    },
+  }
 }

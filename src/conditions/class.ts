@@ -1,7 +1,9 @@
 import type { ClassDeclaration } from 'ts-morph'
-import type { Condition } from '../core/condition.js'
+import type { Condition, ConditionContext } from '../core/condition.js'
+import type { ArchViolation } from '../core/violation.js'
 import { elementCondition } from './helpers.js'
-import { getElementName } from '../core/violation.js'
+import { createViolation, getElementName } from '../core/violation.js'
+import type { TypeMatcher } from '../helpers/type-matchers.js'
 
 /**
  * Assert that classes extend the named base class.
@@ -51,4 +53,119 @@ export function shouldNotHaveMethodMatching(regex: RegExp): Condition<ClassDecla
       return `${getElementName(cls)} has methods matching ${String(regex)}: ${matching.join(', ')}`
     },
   )
+}
+
+/**
+ * Assert that at least one parameter across the class's constructors,
+ * methods, and set accessors has a type matching the given matcher.
+ *
+ * Passes when at least one parameter satisfies `matcher`.
+ * Reports one violation per class that has no matching parameter.
+ *
+ * **Scope note:** This scans constructors, methods, AND set accessors.
+ * The function-level counterpart (`functions(p).should().acceptParameterOfType(...)`)
+ * does NOT scan set accessors because `collectFunctions()` excludes them.
+ */
+export function acceptParameterOfType(matcher: TypeMatcher): Condition<ClassDeclaration> {
+  return {
+    description: 'accept parameter of matching type',
+    evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const cls of elements) {
+        const allParams = [
+          ...cls.getConstructors().flatMap((c) => c.getParameters()),
+          ...cls.getMethods().flatMap((m) => m.getParameters()),
+          ...cls.getSetAccessors().flatMap((s) => s.getParameters()),
+        ]
+        const hasMatch = allParams.some((p) => matcher(p.getType()))
+        if (!hasMatch) {
+          violations.push(
+            createViolation(
+              cls,
+              `${getElementName(cls)} has no parameter with matching type`,
+              context,
+            ),
+          )
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
+ * Assert that NO parameter across the class's constructors, methods,
+ * and set accessors has a type matching the given matcher.
+ *
+ * Reports one violation **per parameter** whose type satisfies `matcher`,
+ * with actionable messages including the member name and parameter name.
+ *
+ * **Scope note:** This scans constructors, methods, AND set accessors.
+ * The function-level counterpart (`functions(p).should().notAcceptParameterOfType(...)`)
+ * does NOT scan set accessors because `collectFunctions()` excludes them.
+ */
+export function notAcceptParameterOfType(matcher: TypeMatcher): Condition<ClassDeclaration> {
+  return {
+    description: 'not accept parameter of matching type',
+    evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const cls of elements) {
+        const className = getElementName(cls)
+
+        // Scan constructors — ConstructorDeclaration has no getName()
+        for (const ctor of cls.getConstructors()) {
+          for (const param of ctor.getParameters()) {
+            if (matcher(param.getType())) {
+              const paramName = param.getName()
+              const typeText = param.getType().getText()
+              violations.push(
+                createViolation(
+                  cls,
+                  `${className}.constructor parameter "${paramName}" has type "${typeText}"`,
+                  context,
+                ),
+              )
+            }
+          }
+        }
+
+        // Scan methods
+        for (const method of cls.getMethods()) {
+          for (const param of method.getParameters()) {
+            if (matcher(param.getType())) {
+              const memberName = method.getName()
+              const paramName = param.getName()
+              const typeText = param.getType().getText()
+              violations.push(
+                createViolation(
+                  cls,
+                  `${className}.${memberName} parameter "${paramName}" has type "${typeText}"`,
+                  context,
+                ),
+              )
+            }
+          }
+        }
+
+        // Scan set accessors
+        for (const setter of cls.getSetAccessors()) {
+          for (const param of setter.getParameters()) {
+            if (matcher(param.getType())) {
+              const memberName = setter.getName()
+              const paramName = param.getName()
+              const typeText = param.getType().getText()
+              violations.push(
+                createViolation(
+                  cls,
+                  `${className}.${memberName} parameter "${paramName}" has type "${typeText}"`,
+                  context,
+                ),
+              )
+            }
+          }
+        }
+      }
+      return violations
+    },
+  }
 }

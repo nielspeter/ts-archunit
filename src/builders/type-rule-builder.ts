@@ -11,6 +11,14 @@ import {
 } from '../predicates/type.js'
 import { havePropertyType } from '../conditions/type-level.js'
 import {
+  havePropertyNamed as memberHavePropertyNamed,
+  notHavePropertyNamed as memberNotHavePropertyNamed,
+  havePropertyMatching as memberHavePropertyMatching,
+  notHavePropertyMatching as memberNotHavePropertyMatching,
+  haveOnlyReadonlyProperties as memberHaveOnlyReadonlyProperties,
+  maxProperties as memberMaxProperties,
+} from '../conditions/members.js'
+import {
   beExported as conditionBeExported,
   notExist as conditionNotExist,
   haveNameMatching as conditionHaveNameMatching,
@@ -92,6 +100,32 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
 
   conditionHaveNameMatching(pattern: RegExp): this {
     return this.addCondition(conditionHaveNameMatching(pattern))
+  }
+
+  // --- Member property conditions (plan 0030) ---
+
+  havePropertyNamed(...names: string[]): this {
+    return this.addCondition(memberHavePropertyNamed(...names))
+  }
+
+  notHavePropertyNamed(...names: string[]): this {
+    return this.addCondition(memberNotHavePropertyNamed(...names))
+  }
+
+  havePropertyMatching(pattern: RegExp): this {
+    return this.addCondition(memberHavePropertyMatching(pattern))
+  }
+
+  notHavePropertyMatching(pattern: RegExp): this {
+    return this.addCondition(memberNotHavePropertyMatching(pattern))
+  }
+
+  haveOnlyReadonlyProperties(): this {
+    return this.addCondition(memberHaveOnlyReadonlyProperties())
+  }
+
+  maxProperties(max: number): this {
+    return this.addCondition(memberMaxProperties(max))
   }
 
   // --- Identity predicates (convenience wrappers) ---

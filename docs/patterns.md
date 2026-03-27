@@ -14,7 +14,7 @@ Pattern templates enforce return type shapes across functions. Use them to ensur
 Create a reusable pattern template with a name and a `returnShape` -- a record of property names to type constraints.
 
 ```typescript
-import { definePattern } from 'ts-archunit'
+import { definePattern } from '@nielspeter/ts-archunit'
 
 const paginatedCollection = definePattern('paginated-collection', {
   returnShape: {
@@ -66,7 +66,7 @@ definePattern('collection', {
 For full control, pass a `TypeMatcher` function. This reuses the same matchers available in type-level rules.
 
 ```typescript
-import { definePattern, arrayOf, isString } from 'ts-archunit'
+import { definePattern, arrayOf, isString } from '@nielspeter/ts-archunit'
 
 definePattern('tagged-collection', {
   returnShape: {
@@ -82,7 +82,7 @@ Available type matchers: `isString()`, `isNumber()`, `isBoolean()`, `isUnionOfLi
 Apply a pattern to functions via the `followPattern()` condition on `FunctionRuleBuilder`.
 
 ```typescript
-import { project, functions, definePattern } from 'ts-archunit'
+import { project, functions, definePattern } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -177,7 +177,7 @@ functions(p)
 ### API Response Envelope
 
 ```typescript
-import { definePattern, arrayOf, matching } from 'ts-archunit'
+import { definePattern, arrayOf, matching } from '@nielspeter/ts-archunit'
 
 const apiEnvelope = definePattern('api-envelope', {
   returnShape: {

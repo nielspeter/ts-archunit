@@ -152,6 +152,74 @@ describe('calls() entry point — end-to-end', () => {
     })
   })
 
+  describe('argument property conditions (plan 0034)', () => {
+    it('Fastify schema enforcement: all route handlers must have schema', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod(/^(get|post)$/)
+          .and()
+          .resideInFile('**/route-options.ts')
+          .should()
+          .haveArgumentWithProperty('schema')
+          .check()
+      }).toThrow(ArchRuleError)
+      // app.get('/health') has an empty object literal --- no schema property
+    })
+
+    it('multiple required properties: schema + preHandler', () => {
+      try {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod(/^(get|post)$/)
+          .and()
+          .resideInFile('**/route-options.ts')
+          .should()
+          .haveArgumentWithProperty('schema', 'preHandler')
+          .check()
+        expect.unreachable('should have thrown')
+      } catch (error) {
+        const archError = error as ArchRuleError
+        // Several calls are missing preHandler or schema
+        expect(archError.violations.length).toBeGreaterThanOrEqual(2)
+      }
+    })
+
+    it('compose with withStringArg: only specific routes need schema', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod(/^(get|post)$/)
+          .and()
+          .withStringArg(0, '/users')
+          .and()
+          .resideInFile('**/route-options.ts')
+          .should()
+          .haveArgumentWithProperty('schema')
+          .check()
+      }).not.toThrow()
+    })
+
+    it('notHaveArgumentWithProperty detects forbidden property', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .resideInFile('**/route-options.ts')
+          .should()
+          .notHaveArgumentWithProperty('deprecated')
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+  })
+
   describe('custom predicates via .satisfy()', () => {
     it('definePredicate<ArchCall> works with CallRuleBuilder', () => {
       const hasGetMethod = definePredicate<ArchCall>(

@@ -31,7 +31,15 @@ Create `arch.test.ts` in your test directory:
 
 ```typescript
 import { describe, it } from 'vitest' // or jest
-import { project, classes, functions, modules, slices, call, newExpr } from 'ts-archunit'
+import {
+  project,
+  classes,
+  functions,
+  modules,
+  slices,
+  call,
+  newExpr,
+} from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -154,7 +162,7 @@ functions(p)
 Check property types using the TypeScript type checker — resolves through aliases, `Partial<>`, `Pick<>`:
 
 ```typescript
-import { types, notType, isString } from 'ts-archunit'
+import { types, notType, isString } from '@nielspeter/ts-archunit'
 
 types(p)
   .that()
@@ -180,11 +188,11 @@ import {
   noAnyProperties,
   noTypeAssertions,
   noNonNullAssertions,
-} from 'ts-archunit/rules/typescript'
-import { noEval, noConsoleLog, noProcessEnv } from 'ts-archunit/rules/security'
-import { noGenericErrors } from 'ts-archunit/rules/errors'
-import { mustMatchName } from 'ts-archunit/rules/naming'
-import { onlyDependOn, mustNotDependOn } from 'ts-archunit/rules/dependencies'
+} from '@nielspeter/ts-archunit/rules/typescript'
+import { noEval, noConsoleLog, noProcessEnv } from '@nielspeter/ts-archunit/rules/security'
+import { noGenericErrors } from '@nielspeter/ts-archunit/rules/errors'
+import { mustMatchName } from '@nielspeter/ts-archunit/rules/naming'
+import { onlyDependOn, mustNotDependOn } from '@nielspeter/ts-archunit/rules/dependencies'
 
 classes(p).should().satisfy(noAnyProperties()).check()
 classes(p).should().satisfy(noTypeAssertions()).check()
@@ -210,7 +218,7 @@ repositories.should().beExported().check()
 Adopt rules in existing codebases without fixing every pre-existing violation first:
 
 ```typescript
-import { withBaseline } from 'ts-archunit'
+import { withBaseline } from '@nielspeter/ts-archunit'
 
 const baseline = withBaseline('arch-baseline.json')
 
@@ -221,7 +229,7 @@ classes(p).that().extend('BaseRepository').should().notContain(call('parseInt'))
 Generate a baseline from current violations:
 
 ```typescript
-import { collectViolations, generateBaseline } from 'ts-archunit'
+import { collectViolations, generateBaseline } from '@nielspeter/ts-archunit'
 
 const violations = collectViolations(rule1, rule2, rule3)
 generateBaseline(violations, 'arch-baseline.json')
@@ -232,7 +240,7 @@ generateBaseline(violations, 'arch-baseline.json')
 Only report violations in files changed in the current PR:
 
 ```typescript
-import { diffAware } from 'ts-archunit'
+import { diffAware } from '@nielspeter/ts-archunit'
 
 classes(p)
   .should()
@@ -245,7 +253,7 @@ classes(p)
 Violations appear inline on PR diffs — automatically detected in GitHub Actions:
 
 ```typescript
-import { detectFormat } from 'ts-archunit'
+import { detectFormat } from '@nielspeter/ts-archunit'
 
 const format = detectFormat() // 'github' in CI, 'terminal' locally
 
@@ -257,7 +265,7 @@ classes(p).should().notContain(call('eval')).check({ format })
 Match call expressions by object and method — works with Express, Fastify, Hono, or any framework:
 
 ```typescript
-import { calls, call, within } from 'ts-archunit'
+import { calls, call, within } from '@nielspeter/ts-archunit'
 
 // Select route registrations
 const routes = calls(p)
@@ -289,7 +297,7 @@ within(routes)
 Enforce return type shapes across functions:
 
 ```typescript
-import { definePattern, functions } from 'ts-archunit'
+import { definePattern, functions } from '@nielspeter/ts-archunit'
 
 const paginatedCollection = definePattern('paginated-collection', {
   returnShape: {
@@ -327,7 +335,7 @@ Optional config file:
 
 ```typescript
 // ts-archunit.config.ts
-import { defineConfig } from 'ts-archunit'
+import { defineConfig } from '@nielspeter/ts-archunit'
 
 export default defineConfig({
   project: 'tsconfig.json',
@@ -342,7 +350,7 @@ export default defineConfig({
 Find code that's drifted — duplicate function bodies and inconsistent patterns:
 
 ```typescript
-import { smells } from 'ts-archunit'
+import { smells } from '@nielspeter/ts-archunit'
 
 // Detect near-identical functions across the codebase
 smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).minLines(10).warn()
@@ -360,8 +368,8 @@ smells
 Enforce schema and resolver conventions via `ts-archunit/graphql` (optional `graphql` peer dep):
 
 ```typescript
-import { schema, resolvers } from 'ts-archunit/graphql'
-import { call } from 'ts-archunit'
+import { schema, resolvers } from '@nielspeter/ts-archunit/graphql'
+import { call } from '@nielspeter/ts-archunit'
 
 // Collection types must have standard pagination fields
 schema(p, 'src/graphql/**/*.graphql')
@@ -386,7 +394,7 @@ resolvers(p, 'src/resolvers/**')
 Verify consistency across architectural boundaries — routes match schemas match SDK types:
 
 ```typescript
-import { crossLayer } from 'ts-archunit'
+import { crossLayer } from '@nielspeter/ts-archunit'
 
 crossLayer(p)
   .layer('routes', 'src/routes/**')
@@ -448,9 +456,9 @@ Architecture Violation [repo/typed-errors]
 Define your own predicates and conditions using the same interface as built-in ones:
 
 ```typescript
-import { definePredicate, defineCondition, createViolation, classes } from 'ts-archunit'
+import { definePredicate, defineCondition, createViolation, classes } from '@nielspeter/ts-archunit'
 import type { ClassDeclaration } from 'ts-morph'
-import type { ArchViolation, ConditionContext } from 'ts-archunit'
+import type { ArchViolation, ConditionContext } from '@nielspeter/ts-archunit'
 
 // Custom predicate
 const hasTooManyMethods = definePredicate<ClassDeclaration>(

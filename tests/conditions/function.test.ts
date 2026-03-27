@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import { notExist, beExported, beAsync, haveNameMatching } from '../../src/conditions/function.js'
+import {
+  notExist,
+  beExported,
+  beAsync,
+  haveNameMatching,
+  haveReturnTypeMatching,
+} from '../../src/conditions/function.js'
+import { isString, matching, not, exactly } from '../../src/helpers/type-matchers.js'
 import { collectFunctions } from '../../src/models/arch-function.js'
 import type { ConditionContext } from '../../src/core/condition.js'
 import type { ArchFunction } from '../../src/models/arch-function.js'
@@ -136,5 +143,51 @@ describe('haveNameMatching()', () => {
     const violations = haveNameMatching(/^parse/).evaluate([fn1, fn2], context)
     expect(violations).toHaveLength(1)
     expect(violations[0]!.element).toBe('listItems')
+  })
+})
+
+describe('haveReturnTypeMatching()', () => {
+  it('passes when return type matches', () => {
+    // returnsPromiseNumber returns Promise<number>
+    const fn = getFunctionByName('returnsPromiseNumber')
+    const violations = haveReturnTypeMatching(matching(/Promise/)).evaluate([fn], context)
+    expect(violations).toHaveLength(0)
+  })
+
+  it('fails when return type does not match', () => {
+    // returnsVoid returns void, not Collection
+    const fn = getFunctionByName('returnsVoid')
+    const violations = haveReturnTypeMatching(matching(/Collection/)).evaluate([fn], context)
+    expect(violations).toHaveLength(1)
+    expect(violations[0]!.message).toContain('does not match the expected type constraint')
+    expect(violations[0]!.message).toContain('void')
+  })
+
+  it('works with isString() matcher', () => {
+    // returnsString returns string
+    const fn = getFunctionByName('returnsString')
+    const violations = haveReturnTypeMatching(isString()).evaluate([fn], context)
+    expect(violations).toHaveLength(0)
+  })
+
+  it('works with not() combinator', () => {
+    // returnsVoid returns void — not(isString()) should pass
+    const fn = getFunctionByName('returnsVoid')
+    const violations = haveReturnTypeMatching(not(isString())).evaluate([fn], context)
+    expect(violations).toHaveLength(0)
+  })
+
+  it('works with exactly() matcher', () => {
+    // returnsString has exact return type text "string"
+    const fn = getFunctionByName('returnsString')
+    const violations = haveReturnTypeMatching(exactly('string')).evaluate([fn], context)
+    expect(violations).toHaveLength(0)
+  })
+
+  it('works on class methods via collectFunctions()', () => {
+    // listUsers returns Collection<string> — matching(/Collection/) should pass
+    const fn = getFunctionByName('listUsers')
+    const violations = haveReturnTypeMatching(matching(/Collection/)).evaluate([fn], context)
+    expect(violations).toHaveLength(0)
   })
 })

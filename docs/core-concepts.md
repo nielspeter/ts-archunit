@@ -37,7 +37,7 @@ The chain handles filtering, AST traversal, violation collection, code frame gen
 Everything starts with loading a TypeScript project:
 
 ```typescript
-import { project } from 'ts-archunit'
+import { project } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 ```
@@ -116,7 +116,7 @@ classes(p).that().extend('BaseRepository').and().resideInFolder('**/repositories
 Use combinators for complex logic:
 
 ```typescript
-import { and, or, not } from 'ts-archunit'
+import { and, or, not } from '@nielspeter/ts-archunit'
 
 const myPredicate = or(extend('BaseService'), extend('BaseRepository'))
 classes(p).that().satisfy(myPredicate).should(). /* ... */
@@ -228,7 +228,7 @@ All fields are optional. When present, they appear in violation output.
 The `and()`, `or()`, and `not()` combinators work on both predicates and conditions:
 
 ```typescript
-import { and, or, not, extend, implement, haveDecorator } from 'ts-archunit'
+import { and, or, not, extend, implement, haveDecorator } from '@nielspeter/ts-archunit'
 
 // Predicate combinators
 const isService = or(extend('BaseService'), implement('IService'))
@@ -242,7 +242,7 @@ classes(p).that().satisfy(and(isService, isNotDeprecated)).should().beExported()
 Adopt rules in existing codebases without fixing every pre-existing violation:
 
 ```typescript
-import { withBaseline } from 'ts-archunit'
+import { withBaseline } from '@nielspeter/ts-archunit'
 
 const baseline = withBaseline('arch-baseline.json')
 
@@ -253,7 +253,7 @@ classes(p).that().extend('BaseRepository').should().notContain(call('parseInt'))
 Generate a baseline from current violations:
 
 ```typescript
-import { collectViolations, generateBaseline } from 'ts-archunit'
+import { collectViolations, generateBaseline } from '@nielspeter/ts-archunit'
 
 const violations = collectViolations(rule1, rule2, rule3)
 generateBaseline(violations, 'arch-baseline.json')
@@ -264,7 +264,7 @@ generateBaseline(violations, 'arch-baseline.json')
 Only report violations in files changed in the current PR:
 
 ```typescript
-import { diffAware } from 'ts-archunit'
+import { diffAware } from '@nielspeter/ts-archunit'
 
 classes(p)
   .should()

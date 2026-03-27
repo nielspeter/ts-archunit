@@ -7,7 +7,7 @@ npm install -D graphql  # required for ts-archunit/graphql
 ```
 
 ```typescript
-import { schema, schemaFromSDL, resolvers } from 'ts-archunit/graphql'
+import { schema, schemaFromSDL, resolvers } from '@nielspeter/ts-archunit/graphql'
 ```
 
 ## Schema Rules
@@ -17,8 +17,8 @@ Load `.graphql` schema files and enforce conventions on types, queries, and muta
 ### Load from files
 
 ```typescript
-import { schema } from 'ts-archunit/graphql'
-import { project } from 'ts-archunit'
+import { schema } from '@nielspeter/ts-archunit/graphql'
+import { project } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 const s = schema(p, 'src/graphql/**/*.graphql')
@@ -27,7 +27,7 @@ const s = schema(p, 'src/graphql/**/*.graphql')
 ### Load from inline SDL
 
 ```typescript
-import { schemaFromSDL } from 'ts-archunit/graphql'
+import { schemaFromSDL } from '@nielspeter/ts-archunit/graphql'
 
 const s = schemaFromSDL(`
   type User {
@@ -105,8 +105,8 @@ s.that()
 Enforce patterns inside resolver functions using the same body analysis engine as `classes()` and `functions()`.
 
 ```typescript
-import { resolvers } from 'ts-archunit/graphql'
-import { call } from 'ts-archunit'
+import { resolvers } from '@nielspeter/ts-archunit/graphql'
+import { call } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 const r = resolvers(p, 'src/resolvers/**')

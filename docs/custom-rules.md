@@ -18,7 +18,7 @@ Custom rules let you encode these using the same interface as built-in rules.
 Create a custom predicate to filter elements with arbitrary logic:
 
 ```typescript
-import { definePredicate, classes } from 'ts-archunit'
+import { definePredicate, classes } from '@nielspeter/ts-archunit'
 import type { ClassDeclaration } from 'ts-morph'
 
 const hasTooManyMethods = definePredicate<ClassDeclaration>(
@@ -56,7 +56,7 @@ classes(p).that().satisfy(hasManyMethods(20)).should().notExist().warn()
 Custom predicates work on any element type, including `ArchFunction`:
 
 ```typescript
-import type { ArchFunction } from 'ts-archunit'
+import type { ArchFunction } from '@nielspeter/ts-archunit'
 
 const isToplevelExport = definePredicate<ArchFunction>('is a top-level export', (fn) =>
   fn.isExported(),
@@ -77,9 +77,9 @@ functions(p)
 Create a custom condition to assert with arbitrary logic. Conditions receive all matched elements and return an array of violations:
 
 ```typescript
-import { defineCondition, createViolation, classes } from 'ts-archunit'
+import { defineCondition, createViolation, classes } from '@nielspeter/ts-archunit'
 import type { ClassDeclaration } from 'ts-morph'
-import type { ArchViolation, ConditionContext } from 'ts-archunit'
+import type { ArchViolation, ConditionContext } from '@nielspeter/ts-archunit'
 
 const haveJsDocOnPublicMethods = defineCondition<ClassDeclaration>(
   'have JSDoc on all public methods',
@@ -141,7 +141,7 @@ classes(p).that().areExported().should().satisfy(haveJsDocOnPublicMethods).check
 Use `and()`, `or()`, and `not()` to compose custom predicates with built-in ones:
 
 ```typescript
-import { and, or, not, extend, implement, haveDecorator } from 'ts-archunit'
+import { and, or, not, extend, implement, haveDecorator } from '@nielspeter/ts-archunit'
 
 const isService = or(extend('BaseService'), implement('IService'))
 const isNotDeprecated = not(haveDecorator('Deprecated'))

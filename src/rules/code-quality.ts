@@ -11,7 +11,7 @@ import { createViolation } from '../core/violation.js'
  * Private and protected methods are skipped.
  *
  * @example
- * import { requireJsDocOnPublicMethods } from 'ts-archunit/rules/code-quality'
+ * import { requireJsDocOnPublicMethods } from '@nielspeter/ts-archunit/rules/code-quality'
  *
  * classes(p).that().areExported()
  *   .should().satisfy(requireJsDocOnPublicMethods())
@@ -51,7 +51,7 @@ export function requireJsDocOnPublicMethods(): Condition<ClassDeclaration> {
  *
  * @example
  * ```typescript
- * import { noPublicFields } from 'ts-archunit/rules/code-quality'
+ * import { noPublicFields } from '@nielspeter/ts-archunit/rules/code-quality'
  *
  * classes(p).that().resideInFolder('src/domain/')
  *   .should().satisfy(noPublicFields())
@@ -92,7 +92,7 @@ export function noPublicFields(): Condition<ClassDeclaration> {
  * Configure with options.allowed to customize.
  *
  * @example
- * import { noMagicNumbers } from 'ts-archunit/rules/code-quality'
+ * import { noMagicNumbers } from '@nielspeter/ts-archunit/rules/code-quality'
  *
  * classes(p).that().haveNameEndingWith('Service')
  *   .should().satisfy(noMagicNumbers())

@@ -218,7 +218,7 @@ TypeScript has multiple levels of architectural structure. Unlike Java where the
 Each architectural unit has a top-level entry function that returns a rule builder:
 
 ```typescript
-import { project, modules, classes, functions, types, calls, slices } from 'ts-archunit'
+import { project, modules, classes, functions, types, calls, slices } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -723,7 +723,7 @@ Users define their own predicates and conditions using the same interface as bui
 ### 7.1 Custom Predicate
 
 ```typescript
-import { definePredicate } from 'ts-archunit'
+import { definePredicate } from '@nielspeter/ts-archunit'
 
 // Example: define what a "route handler" means in YOUR framework
 const isRouteRegistration = definePredicate<CallExpression>('is a route registration', (call) => {
@@ -745,7 +745,7 @@ calls(p)
 ### 7.2 Custom Condition
 
 ```typescript
-import { defineCondition } from 'ts-archunit'
+import { defineCondition } from '@nielspeter/ts-archunit'
 
 const useSharedCountHelper = defineCondition<ClassDeclaration>(
   'use shared count helper instead of inline parsing',
@@ -775,7 +775,7 @@ classes(p).that().extend('BaseRepository').should().satisfy(useSharedCountHelper
 Reusable architectural patterns that encode team conventions:
 
 ```typescript
-import { definePattern } from 'ts-archunit'
+import { definePattern } from '@nielspeter/ts-archunit'
 
 const paginatedCollection = definePattern('paginated-collection', {
   returnShape: {
@@ -807,7 +807,7 @@ Beyond user-defined rules, ts-archunit ships detectors for common architectural 
 Detects functions with near-identical AST structure across the codebase (like the `parseWebhookOrder` / `parseContentTypeOrder` copy-paste from Section 1.1):
 
 ```typescript
-import { smells } from 'ts-archunit'
+import { smells } from '@nielspeter/ts-archunit'
 
 smells
   .duplicateBodies(p)
@@ -859,7 +859,7 @@ GraphQL schemas (`.graphql` files or programmatic SDL) are not TypeScript and ne
 ### 9.1 Entry Points
 
 ```typescript
-import { schema, resolvers } from 'ts-archunit/graphql'
+import { schema, resolvers } from '@nielspeter/ts-archunit/graphql'
 
 const s = schema(p, 'src/**/*.graphql')
 const r = resolvers(p, 'src/resolvers/**')
@@ -908,7 +908,7 @@ Cross-layer validation ensures consistency across architectural boundaries (e.g.
 The first version uses explicit user-provided mappings:
 
 ```typescript
-import { crossLayer } from 'ts-archunit';
+import { crossLayer } from '@nielspeter/ts-archunit';
 
 crossLayer(p)
   .layer('routes', 'src/routes/**')
@@ -932,7 +932,7 @@ Rules are organized using the test runner's native grouping mechanisms. No new c
 ```typescript
 // arch.test.ts
 import { describe, it } from 'vitest'
-import { project, classes, functions, types, modules, slices, calls } from 'ts-archunit'
+import { project, classes, functions, types, modules, slices, calls } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -1019,7 +1019,7 @@ npx ts-archunit check --watch
 
 ```typescript
 // ts-archunit.config.ts
-import { defineConfig, layers } from 'ts-archunit'
+import { defineConfig, layers } from '@nielspeter/ts-archunit'
 
 export default defineConfig({
   project: 'tsconfig.json',
@@ -1068,7 +1068,7 @@ The baseline file records all known violations (file, line, rule). On subsequent
 
 ```typescript
 // Programmatic API
-import { project, classes, withBaseline } from 'ts-archunit'
+import { project, classes, withBaseline } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 

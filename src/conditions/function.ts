@@ -1,6 +1,7 @@
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ArchFunction } from '../models/arch-function.js'
+import type { TypeMatcher } from '../helpers/type-matchers.js'
 
 /**
  * Helper to create a per-element condition for ArchFunction.
@@ -92,5 +93,84 @@ export function haveNameMatching(pattern: RegExp): Condition<ArchFunction> {
       return name !== undefined && pattern.test(name)
     },
     (fn) => `${fn.getName() ?? '<anonymous>'} does not have a name matching ${String(pattern)}`,
+  )
+}
+
+/**
+ * Assert that at least one parameter of the function has a type matching
+ * the given matcher.
+ *
+ * Passes when at least one parameter satisfies `matcher`.
+ * Reports one violation per function that has no matching parameter.
+ *
+ * **Scope note:** This operates on the function's own parameter list only.
+ * Unlike the class-level counterpart, it does NOT scan set accessors
+ * because `collectFunctions()` excludes them.
+ */
+export function acceptParameterOfType(matcher: TypeMatcher): Condition<ArchFunction> {
+  return functionCondition(
+    'accept parameter of matching type',
+    (fn) => fn.getParameters().some((p) => matcher(p.getType())),
+    (fn) => `${fn.getName() ?? '<anonymous>'} has no parameter with matching type`,
+  )
+}
+
+/**
+ * Assert that NO parameter of the function has a type matching the given
+ * matcher.
+ *
+ * Reports one violation **per parameter** whose type satisfies `matcher`,
+ * with actionable messages including the parameter name and type.
+ *
+ * **Scope note:** This operates on the function's own parameter list only.
+ * Unlike the class-level counterpart, it does NOT scan set accessors
+ * because `collectFunctions()` excludes them.
+ */
+export function notAcceptParameterOfType(matcher: TypeMatcher): Condition<ArchFunction> {
+  return {
+    description: 'not accept parameter of matching type',
+    evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const fn of elements) {
+        const fnName = fn.getName() ?? '<anonymous>'
+        for (const param of fn.getParameters()) {
+          if (matcher(param.getType())) {
+            const paramName = param.getName()
+            const typeText = param.getType().getText()
+            violations.push({
+              rule: context.rule,
+              element: fnName,
+              file: fn.getSourceFile().getFilePath(),
+              line: fn.getStartLineNumber(),
+              message: `${fnName} parameter "${paramName}" has type "${typeText}"`,
+              because: context.because,
+            })
+          }
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
+ * Functions must have a return type that satisfies the given TypeMatcher.
+ *
+ * Unlike the `haveReturnType` predicate (which filters with RegExp),
+ * this is a condition (assertion in `.should()`) that uses TypeMatcher
+ * for composability with `isString()`, `matching()`, `not()`, `exactly()`, etc.
+ *
+ * @example
+ * functions(project)
+ *   .that().haveNameMatching(/^list/)
+ *   .should().haveReturnTypeMatching(matching(/Collection/))
+ *   .check()
+ */
+export function haveReturnTypeMatching(matcher: TypeMatcher): Condition<ArchFunction> {
+  return functionCondition(
+    'have return type matching the expected type constraint',
+    (fn) => matcher(fn.getReturnType()),
+    (fn) =>
+      `${fn.getName() ?? '<anonymous>'} has return type '${fn.getReturnType().getText()}' which does not match the expected type constraint`,
   )
 }

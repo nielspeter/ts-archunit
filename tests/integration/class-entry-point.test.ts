@@ -3,6 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
+import { matching } from '../../src/helpers/type-matchers.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
@@ -67,5 +68,85 @@ describe('classes() entry point integration', () => {
     expect(() => {
       builder.that().extend('BaseService')
     }).not.toThrow()
+  })
+
+  // --- Plan 0031: Parameter type conditions ---
+
+  describe('acceptParameterOfType (plan 0031)', () => {
+    it('repos must accept DatabaseClient', () => {
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameEndingWith('Repo')
+          .and()
+          .resideInFile('**/members.ts')
+          .should()
+          .acceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  describe('notAcceptParameterOfType (plan 0031)', () => {
+    it('classes with Service in name should not accept DatabaseClient — DI boundary rule', () => {
+      // Matches: ServiceAcceptingDb, CleanService, ServiceWithDbMethod, ServiceWithDbEverywhere
+      // ServiceAcceptingDb, ServiceWithDbMethod, and ServiceWithDbEverywhere violate this
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching(/Service/)
+          .and()
+          .resideInFile('**/members.ts')
+          .should()
+          .notAcceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('CleanService passes the DI boundary rule', () => {
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching('CleanService')
+          .should()
+          .notAcceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).not.toThrow()
+    })
+  })
+
+  describe('setter parameter scanning (plan 0031 branch coverage)', () => {
+    it('acceptParameterOfType detects matching param in setter', () => {
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching('ServiceWithDbSetter')
+          .should()
+          .acceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('acceptParameterOfType fails when setter has non-matching param', () => {
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching('ServiceWithLoggerSetter')
+          .should()
+          .acceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('notAcceptParameterOfType detects matching param in setter', () => {
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameMatching('ServiceWithDbSetter')
+          .should()
+          .notAcceptParameterOfType(matching(/DatabaseClient/))
+          .check()
+      }).toThrow(ArchRuleError)
+    })
   })
 })

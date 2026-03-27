@@ -150,9 +150,16 @@ describe('class predicates through fluent chain', () => {
 
   describe('haveMethodMatching()', () => {
     it('matches methods by regex pattern', () => {
-      // getTotal, findById match /^(get|find)/
+      // getTotal, findById match /^(get|find)/ — exclude MixedVisibility fixture (plan 0032)
       expect(() => {
-        classes(p).that().haveMethodMatching(/^get/).should().shouldExtend('BaseService').check()
+        classes(p)
+          .that()
+          .haveMethodMatching(/^get/)
+          .and()
+          .haveNameMatching(/Service$/)
+          .should()
+          .shouldExtend('BaseService')
+          .check()
       }).not.toThrow()
     })
 

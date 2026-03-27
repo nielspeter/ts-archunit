@@ -19,7 +19,7 @@ Slices can represent:
 Auto-discover slices from the directory structure:
 
 ```typescript
-import { project, slices } from 'ts-archunit'
+import { project, slices } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 

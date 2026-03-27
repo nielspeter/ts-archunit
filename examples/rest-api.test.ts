@@ -20,7 +20,7 @@ import {
   newExpr,
   notType,
   isString,
-} from 'ts-archunit'
+} from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
