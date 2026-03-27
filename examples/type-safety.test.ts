@@ -5,18 +5,26 @@
  * ts-archunit/rules/security — no custom conditions needed.
  */
 import { describe, it } from 'vitest'
-import { project, classes, functions, types, notType, isString, access } from 'ts-archunit'
+import {
+  project,
+  classes,
+  functions,
+  types,
+  notType,
+  isString,
+  access,
+} from '@nielspeter/ts-archunit'
 import {
   noAnyProperties,
   noTypeAssertions,
   noNonNullAssertions,
-} from 'ts-archunit/rules/typescript'
+} from '@nielspeter/ts-archunit/rules/typescript'
 import {
   noEval,
   noFunctionConstructor,
   noConsoleLog,
   noProcessEnv,
-} from 'ts-archunit/rules/security'
+} from '@nielspeter/ts-archunit/rules/security'
 
 const p = project('tsconfig.json')
 

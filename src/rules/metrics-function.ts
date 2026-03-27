@@ -12,7 +12,7 @@ import { cyclomaticComplexity, linesOfCode } from '../helpers/complexity.js'
  *
  * @example
  * ```ts
- * import { maxFunctionComplexity } from 'ts-archunit/rules/metrics'
+ * import { maxFunctionComplexity } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * functions(p).that().resideInFolder('src/**')
  *   .should().satisfy(maxFunctionComplexity(15))
@@ -46,7 +46,7 @@ export function maxFunctionComplexity(threshold: number): Condition<ArchFunction
  *
  * @example
  * ```ts
- * import { maxFunctionLines } from 'ts-archunit/rules/metrics'
+ * import { maxFunctionLines } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * functions(p).should().satisfy(maxFunctionLines(40)).warn()
  * ```
@@ -80,7 +80,7 @@ export function maxFunctionLines(threshold: number): Condition<ArchFunction> {
  *
  * @example
  * ```ts
- * import { maxFunctionParameters } from 'ts-archunit/rules/metrics'
+ * import { maxFunctionParameters } from '@nielspeter/ts-archunit/rules/metrics'
  *
  * functions(p).that().areExported()
  *   .should().satisfy(maxFunctionParameters(4))

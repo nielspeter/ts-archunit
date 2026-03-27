@@ -16,7 +16,7 @@ Smell detectors do not use the `.that().should()` chain grammar. Instead, they h
 Detects functions with structurally similar bodies using AST fingerprinting. Two functions are flagged when their AST similarity exceeds a threshold (default: 85%).
 
 ```typescript
-import { project, smells } from 'ts-archunit'
+import { project, smells } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -78,7 +78,7 @@ This means:
 Detects files in the same folder where a majority follow a pattern but some don't. This catches files that forgot to adopt a convention that most siblings already follow.
 
 ```typescript
-import { smells, call } from 'ts-archunit'
+import { smells, call } from '@nielspeter/ts-archunit'
 
 smells
   .inconsistentSiblings(p)

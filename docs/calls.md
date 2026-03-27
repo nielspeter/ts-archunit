@@ -27,7 +27,7 @@ For bare calls like `handleError(...)`, `getObjectName()` returns `undefined` an
 ## Basic Usage
 
 ```typescript
-import { project, calls, call } from 'ts-archunit'
+import { project, calls, call } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -92,7 +92,7 @@ calls(p).that().withStringArg(0, '/api/users/**')
 
 ## Call Conditions
 
-Conditions assert what should (or should not) happen inside callback arguments of the matched calls.
+Conditions assert what should (or should not) happen inside the matched calls -- either in callback arguments or in the call's own arguments.
 
 ### `haveCallbackContaining(matcher)`
 
@@ -125,6 +125,52 @@ calls(p)
   .check()
 ```
 
+### `haveArgumentWithProperty(...names)`
+
+At least one object literal argument must have ALL of the named properties. Scans all arguments at every position.
+
+```typescript
+calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+  .should()
+  .haveArgumentWithProperty('schema')
+  .because('all route registrations must declare a validation schema')
+  .check()
+```
+
+Multiple names require all to be present in the same argument:
+
+```typescript
+calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+  .should()
+  .haveArgumentWithProperty('schema', 'preHandler')
+  .because('routes need both schema validation and authentication')
+  .check()
+```
+
+### `notHaveArgumentWithProperty(...names)`
+
+No object literal argument may have ANY of the named properties. Reports a violation per forbidden property found.
+
+```typescript
+calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+  .should()
+  .notHaveArgumentWithProperty('deprecated')
+  .because('do not register deprecated routes')
+  .check()
+```
+
 ### `notExist()`
 
 The filtered call set must be empty -- no calls should match the predicates.
@@ -144,7 +190,7 @@ calls(p)
 Use `within()` to scope function-level rules to callback arguments of matched calls. Instead of scanning all source files, scoped entry points only examine inline callback functions.
 
 ```typescript
-import { calls, call, within } from 'ts-archunit'
+import { calls, call, within } from '@nielspeter/ts-archunit'
 
 // Select route registrations
 const routes = calls(p)
@@ -230,6 +276,26 @@ calls(p)
   .should()
   .haveCallbackContaining(call('next'))
   .because('middleware that never calls next() blocks the request pipeline')
+  .check()
+```
+
+### Fastify Route Schema Enforcement
+
+```typescript
+calls(p)
+  .that()
+  .onObject('fastify')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+  .and()
+  .withStringArg(0, '/api/**')
+  .should()
+  .haveArgumentWithProperty('schema')
+  .rule({
+    id: 'fastify/schema-required',
+    because: 'API routes must declare a validation schema for type-safe request handling',
+    suggestion: 'Add a schema object with response/body/params definitions',
+  })
   .check()
 ```
 

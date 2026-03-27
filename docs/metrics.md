@@ -3,7 +3,11 @@
 Built-in metric rules for complexity, size, and method count thresholds.
 
 ```typescript
-import { maxCyclomaticComplexity, maxClassLines, maxMethods } from 'ts-archunit/rules/metrics'
+import {
+  maxCyclomaticComplexity,
+  maxClassLines,
+  maxMethods,
+} from '@nielspeter/ts-archunit/rules/metrics'
 
 classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
 classes(p).should().satisfy(maxClassLines(300)).warn()
@@ -27,7 +31,7 @@ import {
   maxMethodLines,
   maxMethods,
   maxParameters,
-} from 'ts-archunit/rules/metrics'
+} from '@nielspeter/ts-archunit/rules/metrics'
 
 // Hard rule: no method may exceed complexity 15
 classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()
@@ -65,7 +69,7 @@ import {
   maxFunctionComplexity,
   maxFunctionLines,
   maxFunctionParameters,
-} from 'ts-archunit/rules/metrics'
+} from '@nielspeter/ts-archunit/rules/metrics'
 
 functions(p).that().resideInFolder('src/**').should().satisfy(maxFunctionComplexity(15)).check()
 
@@ -79,7 +83,7 @@ functions(p).that().areExported().should().satisfy(maxFunctionParameters(4)).che
 For composition with other rules, metric predicates filter elements by threshold in `.that().satisfy()`:
 
 ```typescript
-import { haveCyclomaticComplexity, haveMoreMethodsThan } from 'ts-archunit'
+import { haveCyclomaticComplexity, haveMoreMethodsThan } from '@nielspeter/ts-archunit'
 
 // "Complex service classes must be exported"
 classes(p)
@@ -120,7 +124,7 @@ If you need SonarQube-style NCLOC (non-comment lines of code), write a custom co
 The raw `cyclomaticComplexity()` calculator is exported for use in custom rules:
 
 ```typescript
-import { cyclomaticComplexity, defineCondition, createViolation } from 'ts-archunit'
+import { cyclomaticComplexity, defineCondition, createViolation } from '@nielspeter/ts-archunit'
 
 const maxComplexityWithContext = defineCondition('have reasonable complexity', (elements, ctx) => {
   // Custom logic using cyclomaticComplexity()

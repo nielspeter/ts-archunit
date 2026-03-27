@@ -12,7 +12,7 @@ The `types()` entry point operates on interfaces and type aliases. Use it to enf
 ## Basic Usage
 
 ```typescript
-import { project, types, notType, isString } from 'ts-archunit'
+import { project, types, notType, isString } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -49,11 +49,17 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Available Conditions
 
-| Condition                         | Description                          | Example                                                      |
-| --------------------------------- | ------------------------------------ | ------------------------------------------------------------ |
-| `havePropertyType(name, matcher)` | Property must match the type matcher | `.should().havePropertyType('orderBy', notType(isString()))` |
-| `notExist()`                      | No types should match the predicates | `.should().notExist()`                                       |
-| `beExported()`                    | Type must be exported                | `.should().beExported()`                                     |
+| Condition                          | Description                            | Example                                                      |
+| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `havePropertyType(name, matcher)`  | Property must match the type matcher   | `.should().havePropertyType('orderBy', notType(isString()))` |
+| `notExist()`                       | No types should match the predicates   | `.should().notExist()`                                       |
+| `beExported()`                     | Type must be exported                  | `.should().beExported()`                                     |
+| `havePropertyNamed(...names)`      | All named properties must exist        | `.should().havePropertyNamed('version')`                     |
+| `notHavePropertyNamed(...names)`   | None of the named properties may exist | `.should().notHavePropertyNamed('offset')`                   |
+| `havePropertyMatching(pattern)`    | At least one property matches regex    | `.should().havePropertyMatching(/^id$/)`                     |
+| `notHavePropertyMatching(pattern)` | No property matches regex              | `.should().notHavePropertyMatching(/^data$/)`                |
+| `haveOnlyReadonlyProperties()`     | All properties must be readonly        | `.should().haveOnlyReadonlyProperties()`                     |
+| `maxProperties(n)`                 | Property count must not exceed n       | `.should().maxProperties(15)`                                |
 
 ## Type Matchers
 
@@ -142,5 +148,93 @@ types(p)
   .should()
   .notExist()
   .because('domain layer uses interfaces for extensibility')
+  .check()
+```
+
+## Property Conditions
+
+Property conditions let you assert on the properties of interfaces, type aliases, and classes without writing custom `defineCondition` boilerplate.
+
+### `havePropertyNamed(...names)`
+
+Assert that ALL named properties exist. Violation per missing name.
+
+```typescript
+import { project, types } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+
+types(p)
+  .that()
+  .haveNameMatching(/Config$/)
+  .should()
+  .havePropertyNamed('version', 'name')
+  .because('all config types must declare version and name')
+  .check()
+```
+
+### `notHavePropertyNamed(...names)`
+
+Assert that NONE of the named properties exist. Violation per forbidden name found.
+
+```typescript
+types(p)
+  .that()
+  .resideInFolder('**/api/**')
+  .should()
+  .notHavePropertyNamed('offset', 'pageSize', 'page', 'size')
+  .because('use skip/limit for pagination')
+  .check()
+```
+
+### `havePropertyMatching(pattern)`
+
+Assert at least one property name matches the regex.
+
+```typescript
+types(p)
+  .that()
+  .haveNameMatching(/Entity$/)
+  .should()
+  .havePropertyMatching(/^id$/)
+  .because('all entities must have an id field')
+  .check()
+```
+
+### `notHavePropertyMatching(pattern)`
+
+Assert no property name matches the regex.
+
+```typescript
+types(p)
+  .should()
+  .notHavePropertyMatching(/^(data|info|stuff|item)$/)
+  .because('vague property names reduce code clarity')
+  .check()
+```
+
+### `haveOnlyReadonlyProperties()`
+
+Assert all properties are readonly -- enforces immutability.
+
+```typescript
+types(p)
+  .that()
+  .resideInFolder('**/state/**')
+  .should()
+  .haveOnlyReadonlyProperties()
+  .because('state objects must be immutable')
+  .check()
+```
+
+### `maxProperties(n)`
+
+Assert property count does not exceed the maximum -- detects god objects.
+
+```typescript
+types(p)
+  .should()
+  .maxProperties(15)
+  .because('large interfaces indicate a missing abstraction')
   .check()
 ```

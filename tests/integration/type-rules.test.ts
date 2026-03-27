@@ -123,3 +123,97 @@ describe('types() integration', () => {
     }).not.toThrow()
   })
 })
+
+// ============================================================================
+// Member property conditions integration (plan 0030)
+// ============================================================================
+
+describe('types() member property conditions integration', () => {
+  it('enforces no forbidden pagination property names', () => {
+    // The cmless pagination rule from bug 0002
+    expect(() => {
+      types(p)
+        .that()
+        .haveNameMatching(/^Pagination/)
+        .should()
+        .notHavePropertyNamed('offset', 'pageSize', 'page', 'size')
+        .check()
+    }).toThrow(ArchRuleError) // PaginationBad has offset and pageSize
+  })
+
+  it('enforces required property on Config types', () => {
+    expect(() => {
+      types(p)
+        .that()
+        .haveNameMatching(/Config/)
+        .and()
+        .areInterfaces()
+        .should()
+        .havePropertyNamed('version')
+        .check()
+    }).toThrow(ArchRuleError) // ConfigMissingVersion lacks 'version'
+  })
+
+  it('detects god objects via maxProperties', () => {
+    expect(() => {
+      types(p)
+        .that()
+        .haveNameMatching(/^(SmallInterface|LargeInterface)$/)
+        .should()
+        .maxProperties(5)
+        .check()
+    }).toThrow(ArchRuleError) // LargeInterface has 11 properties
+  })
+
+  it('enforces readonly on interfaces', () => {
+    expect(() => {
+      types(p)
+        .that()
+        .areInterfaces()
+        .and()
+        .haveNameMatching(/^(FullyReadonly|PartiallyReadonly|AllMutable)$/)
+        .should()
+        .haveOnlyReadonlyProperties()
+        .check()
+    }).toThrow(ArchRuleError) // PartiallyReadonly and AllMutable have mutable props
+  })
+
+  it('enforces naming convention via notHavePropertyMatching', () => {
+    expect(() => {
+      types(p)
+        .that()
+        .haveNameMatching(/^(BadPropertyNames|PaginationGood)$/)
+        .should()
+        .notHavePropertyMatching(/^(data|info|stuff)$/)
+        .check()
+    }).toThrow(ArchRuleError) // BadPropertyNames has data, info, stuff
+  })
+
+  it('havePropertyMatching passes when property matches pattern', () => {
+    expect(() => {
+      types(p)
+        .that()
+        .haveNameMatching(/^HasIdField$/)
+        .should()
+        .havePropertyMatching(/^id$/)
+        .check()
+    }).not.toThrow()
+  })
+
+  it('havePropertyMatching fails when no property matches pattern', () => {
+    expect(() => {
+      types(p)
+        .that()
+        .haveNameMatching(/^MissingIdField$/)
+        .should()
+        .havePropertyMatching(/^id$/)
+        .check()
+    }).toThrow(ArchRuleError)
+  })
+
+  it('predicate + condition combo: types with skip should also have limit', () => {
+    expect(() => {
+      types(p).that().haveProperty('skip').should().havePropertyNamed('limit').check()
+    }).not.toThrow() // PaginationGood has both skip and limit
+  })
+})

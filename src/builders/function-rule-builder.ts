@@ -16,6 +16,9 @@ import {
   beExported as fnBeExported,
   beAsync as fnBeAsync,
   haveNameMatching as fnConditionHaveNameMatching,
+  acceptParameterOfType as fnAcceptParameterOfType,
+  notAcceptParameterOfType as fnNotAcceptParameterOfType,
+  haveReturnTypeMatching as fnHaveReturnTypeMatching,
 } from '../conditions/function.js'
 import {
   haveNameMatching as identityHaveNameMatching,
@@ -28,6 +31,9 @@ import {
 } from '../predicates/identity.js'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
 import {
+  arePublic as fnArePublic,
+  areProtected as fnAreProtected,
+  arePrivate as fnArePrivate,
   areAsync as fnAreAsync,
   areNotAsync as fnAreNotAsync,
   haveParameterCount as fnHaveParameterCount,
@@ -104,6 +110,20 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
 
   areNotExported(): this {
     return this.addPredicate(identityAreNotExported<ArchFunction>())
+  }
+
+  // --- Visibility predicates (plan 0032) ---
+
+  arePublic(): this {
+    return this.addPredicate(fnArePublic())
+  }
+
+  areProtected(): this {
+    return this.addPredicate(fnAreProtected())
+  }
+
+  arePrivate(): this {
+    return this.addPredicate(fnArePrivate())
   }
 
   // --- Function-specific predicates ---
@@ -190,6 +210,49 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
     return this.addCondition(fnConditionHaveNameMatching(pattern))
   }
 
+  // --- Parameter type condition methods (plan 0031) ---
+
+  /**
+   * Assert that at least one parameter has a type matching the given matcher.
+   *
+   * **Scope note:** Scans only the function's own parameter list.
+   * Unlike the class-level counterpart, does NOT scan set accessors
+   * because `collectFunctions()` excludes them.
+   */
+  acceptParameterOfType(matcher: TypeMatcher): this {
+    return this.addCondition(fnAcceptParameterOfType(matcher))
+  }
+
+  /**
+   * Assert that NO parameter has a type matching the given matcher.
+   * Reports one violation per matching parameter.
+   *
+   * **Scope note:** Scans only the function's own parameter list.
+   * Unlike the class-level counterpart, does NOT scan set accessors
+   * because `collectFunctions()` excludes them.
+   */
+  notAcceptParameterOfType(matcher: TypeMatcher): this {
+    return this.addCondition(fnNotAcceptParameterOfType(matcher))
+  }
+
+  // --- Return type condition (plan 0033) ---
+
+  /**
+   * Assert that the function's return type satisfies the given TypeMatcher.
+   *
+   * Uses TypeMatcher for composability with `isString()`, `matching()`,
+   * `not()`, `exactly()`, etc.
+   *
+   * @example
+   * functions(project)
+   *   .that().haveNameMatching(/^list/)
+   *   .should().haveReturnTypeMatching(matching(/Collection/))
+   *   .check()
+   */
+  haveReturnTypeMatching(matcher: TypeMatcher): this {
+    return this.addCondition(fnHaveReturnTypeMatching(matcher))
+  }
+
   // --- Body analysis condition methods (plan 0011) ---
 
   /**
@@ -234,7 +297,7 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
  *
  * @example
  * ```typescript
- * import { project, functions } from 'ts-archunit'
+ * import { project, functions } from '@nielspeter/ts-archunit'
  *
  * const p = project('tsconfig.json')
  *

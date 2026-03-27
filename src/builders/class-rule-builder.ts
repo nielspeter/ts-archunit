@@ -42,7 +42,21 @@ import {
   shouldImplement as conditionImplement,
   shouldHaveMethodNamed as conditionHaveMethodNamed,
   shouldNotHaveMethodMatching as conditionNotHaveMethodMatching,
+  acceptParameterOfType as conditionAcceptParameterOfType,
+  notAcceptParameterOfType as conditionNotAcceptParameterOfType,
 } from '../conditions/class.js'
+
+import type { TypeMatcher } from '../helpers/type-matchers.js'
+
+// Member property conditions (plan 0030)
+import {
+  havePropertyNamed as memberHavePropertyNamed,
+  notHavePropertyNamed as memberNotHavePropertyNamed,
+  havePropertyMatching as memberHavePropertyMatching,
+  notHavePropertyMatching as memberNotHavePropertyMatching,
+  haveOnlyReadonlyProperties as memberHaveOnlyReadonlyProperties,
+  maxProperties as memberMaxProperties,
+} from '../conditions/members.js'
 
 /**
  * Rule builder for ClassDeclaration elements.
@@ -170,6 +184,44 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
 
   shouldNotHaveMethodMatching(regex: RegExp): this {
     return this.addCondition(conditionNotHaveMethodMatching(regex))
+  }
+
+  // --- Member property condition methods (plan 0030) ---
+
+  // "should" prefix: predicate havePropertyNamed(name) exists on this builder
+  shouldHavePropertyNamed(...names: string[]): this {
+    return this.addCondition(memberHavePropertyNamed(...names))
+  }
+
+  shouldNotHavePropertyNamed(...names: string[]): this {
+    return this.addCondition(memberNotHavePropertyNamed(...names))
+  }
+
+  // No "should" prefix: no predicate collision (matches beExported, notExist, contain pattern)
+  havePropertyMatching(pattern: RegExp): this {
+    return this.addCondition(memberHavePropertyMatching(pattern))
+  }
+
+  notHavePropertyMatching(pattern: RegExp): this {
+    return this.addCondition(memberNotHavePropertyMatching(pattern))
+  }
+
+  haveOnlyReadonlyProperties(): this {
+    return this.addCondition(memberHaveOnlyReadonlyProperties())
+  }
+
+  maxProperties(max: number): this {
+    return this.addCondition(memberMaxProperties(max))
+  }
+
+  // --- Parameter type condition methods (plan 0031) ---
+
+  acceptParameterOfType(matcher: TypeMatcher): this {
+    return this.addCondition(conditionAcceptParameterOfType(matcher))
+  }
+
+  notAcceptParameterOfType(matcher: TypeMatcher): this {
+    return this.addCondition(conditionNotAcceptParameterOfType(matcher))
   }
 
   // --- Body analysis condition methods (plan 0011) ---

@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-03-26
+**Updated:** 2026-03-27
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 29 completed, 0 remaining
+**Total Plans:** 34 completed, 0 remaining
 
 ---
 
@@ -40,6 +40,11 @@
 | **P2**   | ~~CLI Watch Mode (0027)~~                                                        | 0.5 day   | COMPLETED 2026-03-26 |
 | **P3**   | ~~Metric-Based Standard Rules (0028)~~                                           | 1 day     | COMPLETED 2026-03-26 |
 | **P3**   | ~~Function Signature Predicates (0029)~~                                         | 0.5 day   | COMPLETED 2026-03-26 |
+| **P2**   | ~~Member Property Conditions (0030)~~                                            | 1 day     | COMPLETED 2026-03-27 |
+| **P2**   | ~~Parameter Type Conditions (0031)~~                                             | 0.5 day   | COMPLETED 2026-03-27 |
+| **P2**   | ~~Member Visibility Predicates (0032)~~                                          | 0.5 day   | COMPLETED 2026-03-27 |
+| **P2**   | ~~Return Type Condition (0033)~~                                                 | 0.25 day  | COMPLETED 2026-03-27 |
+| **P2**   | ~~Call Argument Property Condition (0034)~~                                      | 0.5 day   | COMPLETED 2026-03-27 |
 
 ---
 
@@ -78,7 +83,7 @@
 - `definePattern()` + `followPattern()` — return shape conventions
 - `defineConfig()` + `npx ts-archunit check` — CLI runner
 - `definePredicate()` + `defineCondition()` + `.satisfy()` — extension API
-- 14 standard rules via `ts-archunit/rules/*` sub-path exports
+- 13 standard rules via `@nielspeter/ts-archunit/rules/*` sub-path exports
 
 ### P3 + P4
 
@@ -99,9 +104,18 @@
 - `docs/cli.md` — full CLI documentation page
 - `docs/metrics.md` — full metrics documentation page
 
+### Member Inspection Layer (P2 — plans 0030–0034)
+
+- Property conditions: `havePropertyNamed`, `notHavePropertyNamed`, `havePropertyMatching`, `notHavePropertyMatching`, `haveOnlyReadonlyProperties`, `maxProperties`
+- Parameter type conditions: `acceptParameterOfType`, `notAcceptParameterOfType` (classes + functions)
+- Visibility predicates: `arePublic`, `areProtected`, `arePrivate`
+- Return type condition: `haveReturnTypeMatching`
+- Call argument conditions: `haveArgumentWithProperty`, `notHaveArgumentWithProperty`
+
 ### Bug Fixes
 
 - BUG-0001: `.excluding()` now matches against `element`, `file`, and `message` (was element-only)
+- BUG-0002 through BUG-0007: See CHANGELOG 0.3.0
 
 ### Documentation
 
@@ -112,4 +126,4 @@
 
 ## All Plans Complete
 
-29 of 29 plans implemented. 1265 tests across 102 files. 90% integration test coverage.
+34 of 34 plans implemented. 1348 tests across 107 files. 91% integration test line coverage.

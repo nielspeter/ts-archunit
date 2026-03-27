@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-03-27
+
+### Added
+
+- **Member property conditions** (plan 0030) — 6 new conditions on `types()` and `classes()`:
+  - `havePropertyNamed(...names)` / `notHavePropertyNamed(...names)` — assert property name existence
+  - `havePropertyMatching(pattern)` / `notHavePropertyMatching(pattern)` — assert property names by regex
+  - `haveOnlyReadonlyProperties()` — assert all properties are readonly (supports `Readonly<T>` mapped types)
+  - `maxProperties(n)` — assert property count limit
+- **Parameter type conditions** (plan 0031) — 2 new conditions on `classes()` and `functions()`:
+  - `acceptParameterOfType(matcher)` / `notAcceptParameterOfType(matcher)` — assert parameter types using TypeMatcher
+  - Class version scans constructor + methods + set accessors
+- **Visibility predicates** (plan 0032) — 3 new predicates on `functions()`:
+  - `arePublic()` / `areProtected()` / `arePrivate()` — filter by member visibility
+  - `getScope()` added to ArchFunction interface
+- **Return type condition** (plan 0033) — 1 new condition on `functions()`:
+  - `haveReturnTypeMatching(matcher)` — assert return type using TypeMatcher (composable with `isString()`, `matching()`, `not()`, etc.)
+- **Call argument conditions** (plan 0034) — 2 new conditions on `calls()`:
+  - `haveArgumentWithProperty(...names)` / `notHaveArgumentWithProperty(...names)` — assert object literal argument properties
+- `PropertyBearingNode` type exported for custom condition authors
+
+### Changed
+
+- Package renamed from `ts-archunit` to `@nielspeter/ts-archunit` — all import paths updated
+
+### Removed
+
+- `ts-archunit/rules/dependencies` sub-path export — `onlyDependOn`, `mustNotDependOn`, `typeOnlyFrom` were pure aliases of `onlyImportFrom`, `notImportFrom`, `onlyHaveTypeImportsFrom`. Use the core primitives directly.
+
+### Fixed
+
+- BUG-0002: Property name checking no longer requires custom `defineCondition`
+- BUG-0003: Constructor/function parameter type checking no longer requires body string matching
+- BUG-0004: Multi-tenant method parameter checking composable via `arePublic()` + `acceptParameterOfType()`
+- BUG-0005: Method return type checking no longer requires 30-line custom conditions
+- BUG-0006: Call argument property checking no longer requires 40-line AST traversal
+
 ## [0.2.0] - 2026-03-26
 
 ### Added

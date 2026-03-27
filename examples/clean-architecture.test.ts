@@ -9,7 +9,7 @@
  *   src/shared/           — cross-cutting utilities
  */
 import { describe, it } from 'vitest'
-import { project, modules, classes, slices } from 'ts-archunit'
+import { project, modules, classes, slices } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 

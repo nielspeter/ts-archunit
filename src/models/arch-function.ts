@@ -7,6 +7,7 @@ import {
   type Type,
   type Node,
   Node as NodeClass,
+  Scope,
   SyntaxKind,
 } from 'ts-morph'
 
@@ -51,6 +52,15 @@ export interface ArchFunction {
    * Used for violation reporting.
    */
   getStartLineNumber(): number
+
+  /**
+   * Visibility scope of this function.
+   *
+   * - Standalone functions and arrow functions are always `'public'` (module-level).
+   * - Class methods return their actual modifier (`public`, `protected`, or `private`).
+   *   Methods with no explicit modifier default to `'public'`.
+   */
+  getScope(): 'public' | 'protected' | 'private'
 }
 
 /**
@@ -67,6 +77,7 @@ export function fromFunctionDeclaration(decl: FunctionDeclaration): ArchFunction
     getBody: () => decl.getBody(),
     getNode: () => decl,
     getStartLineNumber: () => decl.getStartLineNumber(),
+    getScope: () => 'public',
   }
 }
 
@@ -93,6 +104,7 @@ export function fromArrowVariableDeclaration(decl: VariableDeclaration): ArchFun
     getBody: () => arrow.getBody(),
     getNode: () => decl,
     getStartLineNumber: () => decl.getStartLineNumber(),
+    getScope: () => 'public',
   }
 }
 
@@ -127,6 +139,12 @@ export function fromMethodDeclaration(method: MethodDeclaration): ArchFunction {
     getBody: () => method.getBody(),
     getNode: () => method,
     getStartLineNumber: () => method.getStartLineNumber(),
+    getScope: () => {
+      const scope = method.getScope()
+      if (scope === Scope.Protected) return 'protected'
+      if (scope === Scope.Private) return 'private'
+      return 'public'
+    },
   }
 }
 

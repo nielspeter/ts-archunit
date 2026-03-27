@@ -234,11 +234,11 @@ types(p)
   .check()
 
 // No any-typed properties
-import { noAnyProperties } from 'ts-archunit/rules/typescript'
+import { noAnyProperties } from '@nielspeter/ts-archunit/rules/typescript'
 classes(p).that().areExported().should().satisfy(noAnyProperties()).check()
 
 // No type assertions (as casts)
-import { noTypeAssertions } from 'ts-archunit/rules/typescript'
+import { noTypeAssertions } from '@nielspeter/ts-archunit/rules/typescript'
 classes(p).should().satisfy(noTypeAssertions()).check()
 ```
 
@@ -303,20 +303,20 @@ import {
   noAnyProperties,
   noTypeAssertions,
   noNonNullAssertions,
-} from 'ts-archunit/rules/typescript'
+} from '@nielspeter/ts-archunit/rules/typescript'
 
 // Security
-import { noEval, noConsoleLog, noProcessEnv } from 'ts-archunit/rules/security'
+import { noEval, noConsoleLog, noProcessEnv } from '@nielspeter/ts-archunit/rules/security'
 
 // Error handling
-import { noGenericErrors } from 'ts-archunit/rules/errors'
+import { noGenericErrors } from '@nielspeter/ts-archunit/rules/errors'
 
 // Code quality
 import {
   requireJsDocOnPublicMethods,
   noPublicFields,
   noMagicNumbers,
-} from 'ts-archunit/rules/code-quality'
+} from '@nielspeter/ts-archunit/rules/code-quality'
 
 // Apply any of them:
 classes(p).should().satisfy(noAnyProperties()).check()
@@ -345,7 +345,7 @@ smells
 ## GraphQL Rules
 
 ```typescript
-import { schema, resolvers } from 'ts-archunit/graphql'
+import { schema, resolvers } from '@nielspeter/ts-archunit/graphql'
 
 // Collection types must have pagination fields
 schema(p, 'src/graphql/**/*.graphql')
@@ -439,7 +439,7 @@ import {
   maxParameters,
   maxFunctionComplexity,
   maxFunctionParameters,
-} from 'ts-archunit/rules/metrics'
+} from '@nielspeter/ts-archunit/rules/metrics'
 
 // No method may exceed complexity 15
 classes(p).should().satisfy(maxCyclomaticComplexity(15)).check()

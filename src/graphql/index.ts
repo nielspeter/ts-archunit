@@ -1,7 +1,7 @@
 /**
  * GraphQL extension for ts-archunit.
  *
- * Sub-path export: `import { schema, resolvers } from 'ts-archunit/graphql'`
+ * Sub-path export: `import { schema, resolvers } from '@nielspeter/ts-archunit/graphql'`
  *
  * Requires the `graphql` npm package as an optional peer dependency.
  * Schema loading will throw a clear error if graphql is not installed.
@@ -23,8 +23,8 @@ import { ResolverRuleBuilder } from './resolver-rule-builder.js'
  *
  * @example
  * ```typescript
- * import { project } from 'ts-archunit'
- * import { schema } from 'ts-archunit/graphql'
+ * import { project } from '@nielspeter/ts-archunit'
+ * import { schema } from '@nielspeter/ts-archunit/graphql'
  *
  * const p = project('tsconfig.json')
  * schema(p, 'src/schema/*.graphql')
@@ -65,9 +65,9 @@ export function schemaFromSDL(sdl: string, sourcePath?: string): SchemaRuleBuild
  *
  * @example
  * ```typescript
- * import { project } from 'ts-archunit'
- * import { resolvers } from 'ts-archunit/graphql'
- * import { call } from 'ts-archunit'
+ * import { project } from '@nielspeter/ts-archunit'
+ * import { resolvers } from '@nielspeter/ts-archunit/graphql'
+ * import { call } from '@nielspeter/ts-archunit'
  *
  * const p = project('tsconfig.json')
  * resolvers(p, 'src/resolvers/**')

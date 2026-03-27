@@ -9,7 +9,7 @@ import {
   noAnyProperties,
   noTypeAssertions,
   noNonNullAssertions,
-} from 'ts-archunit/rules/typescript'
+} from '@nielspeter/ts-archunit/rules/typescript'
 ```
 
 | Rule                    | What it checks                                                |
@@ -38,7 +38,7 @@ import {
   noFunctionConstructor,
   noProcessEnv,
   noConsoleLog,
-} from 'ts-archunit/rules/security'
+} from '@nielspeter/ts-archunit/rules/security'
 ```
 
 | Rule                      | What it checks                           |
@@ -63,7 +63,7 @@ classes(p)
 ## Error Handling (`ts-archunit/rules/errors`)
 
 ```typescript
-import { noGenericErrors, noTypeErrors } from 'ts-archunit/rules/errors'
+import { noGenericErrors, noTypeErrors } from '@nielspeter/ts-archunit/rules/errors'
 ```
 
 | Rule                | What it checks                                               |
@@ -87,7 +87,7 @@ classes(p)
 ## Naming (`ts-archunit/rules/naming`)
 
 ```typescript
-import { mustMatchName, mustNotEndWith } from 'ts-archunit/rules/naming'
+import { mustMatchName, mustNotEndWith } from '@nielspeter/ts-archunit/rules/naming'
 ```
 
 | Rule                     | What it checks                                 |
@@ -110,7 +110,11 @@ classes(p).that().resideInFolder('**/domain/**').should().satisfy(mustNotEndWith
 ## Dependencies (`ts-archunit/rules/dependencies`)
 
 ```typescript
-import { onlyDependOn, mustNotDependOn, typeOnlyFrom } from 'ts-archunit/rules/dependencies'
+import {
+  onlyDependOn,
+  mustNotDependOn,
+  typeOnlyFrom,
+} from '@nielspeter/ts-archunit/rules/dependencies'
 ```
 
 | Rule                        | What it checks                                 |
@@ -143,7 +147,7 @@ import {
   requireJsDocOnPublicMethods,
   noPublicFields,
   noMagicNumbers,
-} from 'ts-archunit/rules/code-quality'
+} from '@nielspeter/ts-archunit/rules/code-quality'
 ```
 
 | Rule                            | What it checks                                                   |
@@ -183,10 +187,13 @@ classes(p)
 Combine standard rules in a single test file:
 
 ```typescript
-import { noAnyProperties, noTypeAssertions } from 'ts-archunit/rules/typescript'
-import { noEval, noConsoleLog } from 'ts-archunit/rules/security'
-import { noGenericErrors } from 'ts-archunit/rules/errors'
-import { requireJsDocOnPublicMethods, noMagicNumbers } from 'ts-archunit/rules/code-quality'
+import { noAnyProperties, noTypeAssertions } from '@nielspeter/ts-archunit/rules/typescript'
+import { noEval, noConsoleLog } from '@nielspeter/ts-archunit/rules/security'
+import { noGenericErrors } from '@nielspeter/ts-archunit/rules/errors'
+import {
+  requireJsDocOnPublicMethods,
+  noMagicNumbers,
+} from '@nielspeter/ts-archunit/rules/code-quality'
 
 const exported = classes(p).that().areExported()
 
@@ -210,7 +217,7 @@ import {
   maxFunctionComplexity,
   maxFunctionLines,
   maxFunctionParameters,
-} from 'ts-archunit/rules/metrics'
+} from '@nielspeter/ts-archunit/rules/metrics'
 ```
 
 | Rule                         | What it checks                                           |

@@ -2,6 +2,47 @@ import type { Predicate } from '../core/predicate.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
 
+// --- Visibility predicates (plan 0032) ---
+
+/**
+ * Matches functions/methods with public visibility.
+ *
+ * - Class methods: matches explicitly `public` or no access modifier (implicitly public).
+ * - Standalone functions / arrow functions: always match (module-level, no visibility concept).
+ */
+export function arePublic(): Predicate<ArchFunction> {
+  return {
+    description: 'are public',
+    test: (fn) => fn.getScope() === 'public',
+  }
+}
+
+/**
+ * Matches class methods with `protected` visibility.
+ *
+ * Standalone functions and arrow functions never match (they have no visibility modifier).
+ */
+export function areProtected(): Predicate<ArchFunction> {
+  return {
+    description: 'are protected',
+    test: (fn) => fn.getScope() === 'protected',
+  }
+}
+
+/**
+ * Matches class methods with `private` visibility.
+ *
+ * Standalone functions and arrow functions never match (they have no visibility modifier).
+ */
+export function arePrivate(): Predicate<ArchFunction> {
+  return {
+    description: 'are private',
+    test: (fn) => fn.getScope() === 'private',
+  }
+}
+
+// --- Async predicates ---
+
 /**
  * Matches async functions (declared with the `async` keyword).
  */

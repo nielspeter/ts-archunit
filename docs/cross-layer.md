@@ -15,7 +15,7 @@ When someone adds a new route but forgets the schema, the API documentation sile
 ## Basic Usage
 
 ```typescript
-import { project, crossLayer, haveMatchingCounterpart } from 'ts-archunit'
+import { project, crossLayer, haveMatchingCounterpart } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -85,7 +85,7 @@ Attach a `PairCondition` to evaluate against each matched pair. Returns a termin
 Every element in the left layer must have at least one match in the right layer. Produces a violation for each unmatched left-layer file.
 
 ```typescript
-import { haveMatchingCounterpart } from 'ts-archunit'
+import { haveMatchingCounterpart } from '@nielspeter/ts-archunit'
 
 // layers must be the resolved Layer[] — typically from the builder internals
 resolved.forEachPair().should(haveMatchingCounterpart(layers)).check()
@@ -104,7 +104,7 @@ Architecture Violation [cross-layer]
 Every exported symbol name from the left file must appear in the right file. You provide two extractor functions that pull symbol names from each side.
 
 ```typescript
-import { haveConsistentExports } from 'ts-archunit'
+import { haveConsistentExports } from '@nielspeter/ts-archunit'
 
 resolved
   .forEachPair()
@@ -123,7 +123,7 @@ resolved
 Write a fully custom pair condition inline. The function receives a `LayerPair` and returns an `ArchViolation` or `null`.
 
 ```typescript
-import { satisfyPairCondition } from 'ts-archunit'
+import { satisfyPairCondition } from '@nielspeter/ts-archunit'
 
 resolved
   .forEachPair()

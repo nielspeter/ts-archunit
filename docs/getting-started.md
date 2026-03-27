@@ -18,7 +18,7 @@ Create an `arch.test.ts` file in your test directory:
 
 ```typescript
 import { describe, it } from 'vitest'
-import { project, modules } from 'ts-archunit'
+import { project, modules } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -88,7 +88,7 @@ Use `describe` blocks to group rules by concern:
 
 ```typescript
 import { describe, it } from 'vitest'
-import { project, modules, classes, slices, call, newExpr } from 'ts-archunit'
+import { project, modules, classes, slices, call, newExpr } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
@@ -159,7 +159,7 @@ Architecture rules are tests. If your CI already runs tests, it already runs arc
 Violations appear inline on PR diffs automatically when running in GitHub Actions:
 
 ```typescript
-import { detectFormat } from 'ts-archunit'
+import { detectFormat } from '@nielspeter/ts-archunit'
 
 const format = detectFormat() // 'github' in CI, 'terminal' locally
 

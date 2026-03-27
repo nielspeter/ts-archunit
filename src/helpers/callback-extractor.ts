@@ -87,6 +87,7 @@ function fromArrowExpression(node: Node): ArchFunction {
     getBody: () => arrow.getBody(),
     getNode: () => arrow,
     getStartLineNumber: () => arrow.getStartLineNumber(),
+    getScope: () => 'public',
   }
 }
 
@@ -105,5 +106,6 @@ function fromFunctionExpression(node: Node): ArchFunction {
     getBody: () => funcExpr.getBody(),
     getNode: () => funcExpr,
     getStartLineNumber: () => funcExpr.getStartLineNumber(),
+    getScope: () => 'public',
   }
 }

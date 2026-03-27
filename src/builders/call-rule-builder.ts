@@ -20,6 +20,8 @@ import {
   haveCallbackContaining as conditionHaveCallbackContaining,
   notHaveCallbackContaining as conditionNotHaveCallbackContaining,
   notExist as callNotExist,
+  haveArgumentWithProperty as conditionHaveArgumentWithProperty,
+  notHaveArgumentWithProperty as conditionNotHaveArgumentWithProperty,
 } from '../conditions/call.js'
 
 /**
@@ -126,6 +128,20 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
     return this.addCondition(callNotExist())
   }
 
+  /**
+   * Assert that at least one object literal argument has ALL named properties.
+   */
+  haveArgumentWithProperty(...names: string[]): this {
+    return this.addCondition(conditionHaveArgumentWithProperty(...names))
+  }
+
+  /**
+   * Assert that NO object literal argument has ANY of the named properties.
+   */
+  notHaveArgumentWithProperty(...names: string[]): this {
+    return this.addCondition(conditionNotHaveArgumentWithProperty(...names))
+  }
+
   // --- Public accessors (used by plan 0015 within()) ---
 
   /**
@@ -153,7 +169,7 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
  *
  * @example
  * ```typescript
- * import { project, calls, call } from 'ts-archunit'
+ * import { project, calls, call } from '@nielspeter/ts-archunit'
  *
  * const p = project('tsconfig.json')
  *

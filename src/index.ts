@@ -90,6 +90,8 @@ export {
   shouldImplement,
   shouldHaveMethodNamed,
   shouldNotHaveMethodMatching,
+  acceptParameterOfType as classAcceptParameterOfType,
+  notAcceptParameterOfType as classNotAcceptParameterOfType,
 } from './conditions/class.js'
 
 // Function entry point
@@ -104,6 +106,9 @@ export {
 
 // Function predicates
 export {
+  arePublic,
+  areProtected,
+  arePrivate,
   areAsync,
   areNotAsync,
   haveParameterCount,
@@ -123,6 +128,9 @@ export {
   beExported as functionBeExported,
   beAsync as functionBeAsync,
   haveNameMatching as functionHaveNameMatching,
+  acceptParameterOfType as functionAcceptParameterOfType,
+  notAcceptParameterOfType as functionNotAcceptParameterOfType,
+  haveReturnTypeMatching as functionHaveReturnTypeMatching,
 } from './conditions/function.js'
 
 // Type entry point
@@ -140,6 +148,19 @@ export {
 
 // Type-level conditions
 export { havePropertyType } from './conditions/type-level.js'
+
+// Member property conditions (plan 0030)
+export {
+  havePropertyNamed as conditionHavePropertyNamed,
+  notHavePropertyNamed as conditionNotHavePropertyNamed,
+  havePropertyMatching as conditionHavePropertyMatching,
+  notHavePropertyMatching as conditionNotHavePropertyMatching,
+  haveOnlyReadonlyProperties,
+  maxProperties,
+} from './conditions/members.js'
+
+// Re-export the PropertyBearingNode type for custom condition authors
+export type { PropertyBearingNode } from './conditions/members.js'
 
 // Type matchers
 export type { TypeMatcher } from './helpers/type-matchers.js'
@@ -215,6 +236,8 @@ export {
   haveCallbackContaining as callHaveCallbackContaining,
   notHaveCallbackContaining as callNotHaveCallbackContaining,
   notExist as callNotExist,
+  haveArgumentWithProperty,
+  notHaveArgumentWithProperty,
 } from './conditions/call.js'
 
 // Scoped rules --- within() (plan 0015)
