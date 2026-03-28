@@ -72,12 +72,12 @@ Available on all entry points via `.that()`.
 
 ## Module Predicates
 
-| Export                   | Signature                         | Description                                      |
-| ------------------------ | --------------------------------- | ------------------------------------------------ |
-| `importFrom`             | `importFrom(glob: string)`        | Module imports from files matching glob.         |
-| `predicateNotImportFrom` | `notImportFrom(glob: string)`     | Module does not import from files matching glob. |
-| `exportSymbolNamed`      | `exportSymbolNamed(name: string)` | Module exports a symbol with the name.           |
-| `havePathMatching`       | `havePathMatching(re: RegExp)`    | Module file path matches regex.                  |
+| Export                   | Signature                                                      | Description                                                                        |
+| ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `importFrom`             | `importFrom(...globs)` or `importFrom(globs[], options)`       | Module imports from files matching glob. Options: `{ ignoreTypeImports }`.         |
+| `predicateNotImportFrom` | `notImportFrom(...globs)` or `notImportFrom(globs[], options)` | Module does not import from files matching glob. Options: `{ ignoreTypeImports }`. |
+| `exportSymbolNamed`      | `exportSymbolNamed(name: string)`                              | Module exports a symbol with the name.                                             |
+| `havePathMatching`       | `havePathMatching(re: RegExp)`                                 | Module file path matches regex.                                                    |
 
 ## Class Predicates
 
@@ -165,12 +165,12 @@ Available on all entry points via `.that()`.
 
 ## Dependency Conditions
 
-| Export                    | Signature                                     | Description                                             |
-| ------------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| `onlyImportFrom`          | `onlyImportFrom(...globs: string[])`          | Module may only import from listed paths.               |
-| `conditionNotImportFrom`  | `notImportFrom(...globs: string[])`           | Module must not import from listed paths.               |
-| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])` | Imports from matching paths must use `import type`.     |
-| `notHaveAliasedImports`   | `notHaveAliasedImports()`                     | No named import may use an alias (`import { x as y }`). |
+| Export                    | Signature                                          | Description                                                                 |
+| ------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
+| `onlyImportFrom`          | `onlyImportFrom(...globs)` or `(globs[], options)` | Module may only import from listed paths. Options: `{ ignoreTypeImports }`. |
+| `conditionNotImportFrom`  | `notImportFrom(...globs)` or `(globs[], options)`  | Module must not import from listed paths. Options: `{ ignoreTypeImports }`. |
+| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])`      | Imports from matching paths must use `import type`.                         |
+| `notHaveAliasedImports`   | `notHaveAliasedImports()`                          | No named import may use an alias (`import { x as y }`).                     |
 
 ## Body Analysis Matchers
 
@@ -297,20 +297,21 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Utilities
 
-| Export                   | Signature                                        | Description                                      |
-| ------------------------ | ------------------------------------------------ | ------------------------------------------------ |
-| `createViolation`        | `createViolation(node, msg, ctx): ArchViolation` | Create a violation from a ts-morph node.         |
-| `getElementName`         | `getElementName(node): string`                   | Get the name of a ts-morph node.                 |
-| `getElementFile`         | `getElementFile(node): string`                   | Get the file path of a ts-morph node.            |
-| `getElementLine`         | `getElementLine(node): number`                   | Get the line number of a ts-morph node.          |
-| `generateCodeFrame`      | `generateCodeFrame(source, line, opts?): string` | Generate a code frame snippet.                   |
-| `formatViolations`       | `formatViolations(violations, opts?): string`    | Format violations for terminal output.           |
-| `formatViolationsPlain`  | `formatViolationsPlain(violations): string`      | Format violations as plain text.                 |
-| `formatViolationsJson`   | `formatViolationsJson(violations): string`       | Format violations as JSON.                       |
-| `formatViolationsGitHub` | `formatViolationsGitHub(violations): string`     | Format violations as GitHub Actions annotations. |
-| `detectFormat`           | `detectFormat(): OutputFormat`                   | Auto-detect output format from environment.      |
-| `isCI`                   | `isCI(): boolean`                                | True if running in a CI environment.             |
-| `ArchRuleError`          | class                                            | Error thrown by `.check()` on violations.        |
+| Export                   | Signature                                            | Description                                      |
+| ------------------------ | ---------------------------------------------------- | ------------------------------------------------ |
+| `createViolation`        | `createViolation(node, msg, ctx): ArchViolation`     | Create a violation from a ts-morph node.         |
+| `getElementName`         | `getElementName(node): string`                       | Get the name of a ts-morph node.                 |
+| `getElementFile`         | `getElementFile(node): string`                       | Get the file path of a ts-morph node.            |
+| `getElementLine`         | `getElementLine(node): number`                       | Get the line number of a ts-morph node.          |
+| `generateCodeFrame`      | `generateCodeFrame(source, line, opts?): string`     | Generate a code frame snippet.                   |
+| `formatViolations`       | `formatViolations(violations, opts?): string`        | Format violations for terminal output.           |
+| `formatViolationsPlain`  | `formatViolationsPlain(violations): string`          | Format violations as plain text.                 |
+| `formatViolationsJson`   | `formatViolationsJson(violations): string`           | Format violations as JSON.                       |
+| `formatViolationsGitHub` | `formatViolationsGitHub(violations): string`         | Format violations as GitHub Actions annotations. |
+| `detectFormat`           | `detectFormat(): OutputFormat`                       | Auto-detect output format from environment.      |
+| `isCI`                   | `isCI(): boolean`                                    | True if running in a CI environment.             |
+| `ArchRuleError`          | class                                                | Error thrown by `.check()` on violations.        |
+| `isTypeOnlyImport`       | `isTypeOnlyImport(decl: ImportDeclaration): boolean` | Check if an import is purely type-only.          |
 
 ## Check Options
 
@@ -366,40 +367,41 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Types (TypeScript)
 
-| Export                | Kind | Description                                             |
-| --------------------- | ---- | ------------------------------------------------------- |
-| `ArchProject`         | type | Loaded TypeScript project.                              |
-| `Predicate`           | type | Predicate interface.                                    |
-| `Condition`           | type | Condition interface.                                    |
-| `ConditionContext`    | type | Context passed to condition evaluators.                 |
-| `ArchViolation`       | type | Violation model.                                        |
-| `RuleMetadata`        | type | Rule metadata (`id`, `because`, `suggestion`, `docs`).  |
-| `CheckOptions`        | type | Options for `.check()`.                                 |
-| `OutputFormat`        | type | Output format (`'terminal' \| 'github' \| 'json'`).     |
-| `FormatOptions`       | type | Options for formatting functions.                       |
-| `CodeFrameOptions`    | type | Options for `generateCodeFrame()`.                      |
-| `ExpressionMatcher`   | type | Matcher returned by `call()`, `newExpr()`, etc.         |
-| `TypeMatcher`         | type | Matcher used with `havePropertyType()`.                 |
-| `TypeDeclaration`     | type | Union of interface and type alias declarations.         |
-| `ArchFunction`        | type | Unified function/arrow/method model.                    |
-| `ArchCall`            | type | Model for matched call expressions.                     |
-| `Slice`               | type | A named group of source files.                          |
-| `SliceDefinition`     | type | Input to `assignedFrom()`.                              |
-| `Named`               | type | Element with a name.                                    |
-| `Located`             | type | Element with a file location.                           |
-| `Exportable`          | type | Element that can be exported.                           |
-| `BaselineEntry`       | type | Single entry in a baseline file.                        |
-| `BaselineFile`        | type | Structure of the baseline JSON file.                    |
-| `Layer`               | type | Layer definition for cross-layer validation.            |
-| `LayerPair`           | type | Pair of elements from two layers.                       |
-| `PairCondition`       | type | Condition for cross-layer pairs.                        |
-| `ArchPattern`         | type | Pattern template definition.                            |
-| `PropertyConstraint`  | type | Property type constraint in a pattern.                  |
-| `Fingerprint`         | type | AST fingerprint for similarity detection.               |
-| `ScopedContext`       | type | Context returned by `within()`.                         |
-| `ExtractedCallback`   | type | Callback extracted from a call expression.              |
-| `PropertyBearingNode` | type | Union of interface, type alias, and class declarations. |
-| `CliConfig`           | type | CLI configuration object.                               |
+| Export                | Kind | Description                                                         |
+| --------------------- | ---- | ------------------------------------------------------------------- |
+| `ArchProject`         | type | Loaded TypeScript project.                                          |
+| `Predicate`           | type | Predicate interface.                                                |
+| `Condition`           | type | Condition interface.                                                |
+| `ConditionContext`    | type | Context passed to condition evaluators.                             |
+| `ArchViolation`       | type | Violation model.                                                    |
+| `RuleMetadata`        | type | Rule metadata (`id`, `because`, `suggestion`, `docs`).              |
+| `CheckOptions`        | type | Options for `.check()`.                                             |
+| `OutputFormat`        | type | Output format (`'terminal' \| 'github' \| 'json'`).                 |
+| `FormatOptions`       | type | Options for formatting functions.                                   |
+| `CodeFrameOptions`    | type | Options for `generateCodeFrame()`.                                  |
+| `ExpressionMatcher`   | type | Matcher returned by `call()`, `newExpr()`, etc.                     |
+| `TypeMatcher`         | type | Matcher used with `havePropertyType()`.                             |
+| `TypeDeclaration`     | type | Union of interface and type alias declarations.                     |
+| `ArchFunction`        | type | Unified function/arrow/method model.                                |
+| `ArchCall`            | type | Model for matched call expressions.                                 |
+| `Slice`               | type | A named group of source files.                                      |
+| `SliceDefinition`     | type | Input to `assignedFrom()`.                                          |
+| `Named`               | type | Element with a name.                                                |
+| `Located`             | type | Element with a file location.                                       |
+| `Exportable`          | type | Element that can be exported.                                       |
+| `BaselineEntry`       | type | Single entry in a baseline file.                                    |
+| `BaselineFile`        | type | Structure of the baseline JSON file.                                |
+| `Layer`               | type | Layer definition for cross-layer validation.                        |
+| `LayerPair`           | type | Pair of elements from two layers.                                   |
+| `PairCondition`       | type | Condition for cross-layer pairs.                                    |
+| `ArchPattern`         | type | Pattern template definition.                                        |
+| `PropertyConstraint`  | type | Property type constraint in a pattern.                              |
+| `Fingerprint`         | type | AST fingerprint for similarity detection.                           |
+| `ScopedContext`       | type | Context returned by `within()`.                                     |
+| `ExtractedCallback`   | type | Callback extracted from a call expression.                          |
+| `PropertyBearingNode` | type | Union of interface, type alias, and class declarations.             |
+| `ImportOptions`       | type | Options for import conditions/predicates (`{ ignoreTypeImports }`). |
+| `CliConfig`           | type | CLI configuration object.                                           |
 
 ## GraphQL Extension (`ts-archunit/graphql`)
 

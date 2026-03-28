@@ -305,3 +305,4 @@ within(routes).functions().should().contain(call('handleError')).check()
 - **Destructured calls** are not matched. `const { parse } = JSON; parse(str)` won't match `call('JSON.parse')`.
 - **No cross-file tracing.** Body analysis inspects the AST of the current file. If a function delegates to another file, that delegation is not followed.
 - **Dynamic expressions** like `obj[methodName]()` are not matchable by name.
+- **`expression()` deduplicates ancestor matches.** Since `expression()` walks all AST descendants, parent nodes whose `getText()` contains the same pattern are automatically filtered out — only the deepest matching node is reported. This prevents inflated violation counts (e.g., one `reply.code(400)` producing 10+ violations from ancestor nodes).

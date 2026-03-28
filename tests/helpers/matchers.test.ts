@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Project, SyntaxKind } from 'ts-morph'
 import path from 'node:path'
 import { call, access, newExpr, expression } from '../../src/helpers/matchers.js'
+import { findMatchesInNode } from '../../src/helpers/body-traversal.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/poc')
 
@@ -140,6 +141,38 @@ describe('ExpressionMatcher helpers', () => {
 
     it('has meaningful description for regex', () => {
       expect(expression(/eval/).description).toBe('expression matching /eval/')
+    })
+  })
+
+  describe('expression() ancestor deduplication (plan 0037)', () => {
+    it('produces one match for reply.code(400).send({}), not multiple ancestors', () => {
+      const p = new Project({ useInMemoryFileSystem: true })
+      const sf = p.createSourceFile('test.ts', `function handler() { reply.code(400).send({}) }`)
+      const fn = sf.getFunctions()[0]!
+      const body = fn.getBody()!
+      const matches = findMatchesInNode(body, expression(/reply\.code\(400\)/))
+      // Should match the deepest node containing the pattern, not every ancestor
+      expect(matches.length).toBe(1)
+    })
+
+    it('preserves sibling matches on the same line', () => {
+      const p = new Project({ useInMemoryFileSystem: true })
+      const sf = p.createSourceFile('test.ts', `function f() { foo(); bar() }`)
+      const fn = sf.getFunctions()[0]!
+      const body = fn.getBody()!
+      const matches = findMatchesInNode(body, expression(/foo|bar/))
+      // Both foo() and bar() are siblings — both should be reported
+      expect(matches.length).toBe(2)
+    })
+
+    it('does not affect targeted matchers (call uses syntaxKinds path)', () => {
+      const p = new Project({ useInMemoryFileSystem: true })
+      const sf = p.createSourceFile('test.ts', `function f() { parseInt('42', 10) }`)
+      const fn = sf.getFunctions()[0]!
+      const body = fn.getBody()!
+      // call() uses syntaxKinds — goes through targeted path, not broad+dedup
+      const callMatches = findMatchesInNode(body, call('parseInt'))
+      expect(callMatches.length).toBe(1)
     })
   })
 })

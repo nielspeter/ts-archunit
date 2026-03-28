@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-03-28
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 36 completed, 0 remaining
+**Total Plans:** 39 completed, 0 remaining
 
 ---
 
@@ -47,12 +47,15 @@
 | **P2**   | ~~Call Argument Property Condition (0034)~~                                      | 0.5 day   | COMPLETED 2026-03-27 |
 | **P2**   | ~~Aliased Import Condition (0035)~~                                              | 0.25 day  | COMPLETED 2026-03-27 |
 | **P1**   | ~~Property Matcher & Argument Containing Condition (0036)~~                      | 0.5 day   | COMPLETED 2026-03-28 |
+| **P0**   | ~~expression() Ancestor Deduplication (0037)~~                                   | 0.25 day  | COMPLETED 2026-03-28 |
+| **P1**   | ~~notImportFrom Type-Import Awareness (0038)~~                                   | 0.5 day   | COMPLETED 2026-03-28 |
+| **P2**   | ~~within() Object Literal Callback Extraction (0039)~~                           | 0.5 day   | COMPLETED 2026-03-28 |
 
 ---
 
 ## What's Shipped
 
-**1399 tests across 108 files. All checks pass.**
+**1414 tests across 108 files. All checks pass.**
 
 ### Core (P0)
 
@@ -128,4 +131,4 @@
 
 ## All Plans Complete
 
-36 of 36 plans implemented. 1399 tests across 108 files. 91% integration test line coverage.
+39 of 39 plans implemented. 1414 tests across 108 files. 91% integration test line coverage.

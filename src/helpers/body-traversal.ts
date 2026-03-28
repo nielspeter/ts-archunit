@@ -38,6 +38,17 @@ export function findMatchesInNode(node: Node, matcher: ExpressionMatcher): Node[
         matches.push(descendant)
       }
     }
+    // Deduplicate: remove ancestors of other matches.
+    // Parent nodes' getText() includes children's text, so regex-based
+    // matchers (expression()) match at multiple ancestor levels.
+    // Keep only the deepest (most specific) matching nodes.
+    return matches.filter(
+      (m) =>
+        !matches.some(
+          (other) =>
+            other !== m && other.getStart() >= m.getStart() && other.getEnd() <= m.getEnd(),
+        ),
+    )
   }
 
   return matches

@@ -74,6 +74,8 @@ describe('ModuleRuleBuilder fluent chain', () => {
         modules(p)
           .that()
           .resideInFolder('**/domain/**')
+          .and()
+          .haveNameMatching(/^(?!typed-service)/)
           .should()
           .onlyImportFrom('**/domain/**', '**/shared/**')
           .check()
@@ -96,6 +98,8 @@ describe('ModuleRuleBuilder fluent chain', () => {
         modules(p)
           .that()
           .resideInFolder('**/domain/**')
+          .and()
+          .haveNameMatching(/^(?!typed-service)/)
           .should()
           .notImportFromCondition('**/infra/**')
           .check()
@@ -165,7 +169,11 @@ describe('ModuleRuleBuilder fluent chain', () => {
 
   describe('named selections', () => {
     it('supports reusing a predicate chain across multiple rules', () => {
-      const domainModules = modules(p).that().resideInFolder('**/domain/**')
+      const domainModules = modules(p)
+        .that()
+        .resideInFolder('**/domain/**')
+        .and()
+        .haveNameMatching(/^(?!typed-service)/)
 
       expect(() => {
         domainModules.should().onlyImportFrom('**/domain/**', '**/shared/**').check()

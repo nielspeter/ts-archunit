@@ -1,16 +1,24 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
+import type { ImportOptions } from '../core/import-options.js'
+import { isTypeOnlyImport } from '../core/import-options.js'
 
 /**
- * Resolve the import paths for a source file.
+ * Resolve the import paths for a source file, optionally filtering out type-only imports.
  * Returns absolute paths for resolvable imports, raw specifiers for external packages.
  */
-function getImportPaths(sourceFile: SourceFile): string[] {
-  return sourceFile.getImportDeclarations().map((decl) => {
-    const resolved = decl.getModuleSpecifierSourceFile()
-    return resolved ? resolved.getFilePath() : decl.getModuleSpecifierValue()
-  })
+function getImportPaths(sourceFile: SourceFile, ignoreTypeImports = false): string[] {
+  return sourceFile
+    .getImportDeclarations()
+    .filter((decl) => {
+      if (!ignoreTypeImports) return true
+      return !isTypeOnlyImport(decl)
+    })
+    .map((decl) => {
+      const resolved = decl.getModuleSpecifierSourceFile()
+      return resolved ? resolved.getFilePath() : decl.getModuleSpecifierValue()
+    })
 }
 
 /**
@@ -23,11 +31,18 @@ function getImportPaths(sourceFile: SourceFile): string[] {
  * modules(p).that().importFrom('** /infrastructure/**')
  * modules(p).that().importFrom('fastify', 'knex', 'bullmq')
  */
-export function importFrom(...globs: string[]): Predicate<SourceFile> {
+export function importFrom(globs: string[], options: ImportOptions): Predicate<SourceFile>
+export function importFrom(...globs: string[]): Predicate<SourceFile>
+export function importFrom(...args: [string[], ImportOptions] | string[]): Predicate<SourceFile> {
+  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
+  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
+  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
     description: `import from ${globs.map((g) => `"${g}"`).join(', ')}`,
-    test: (sourceFile) => getImportPaths(sourceFile).some((p) => matchers.some((m) => m(p))),
+    test: (sourceFile) =>
+      getImportPaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
   }
 }
 
@@ -38,11 +53,20 @@ export function importFrom(...globs: string[]): Predicate<SourceFile> {
  * modules(p).that().notImportFrom('** /legacy/**')
  * modules(p).that().notImportFrom('fastify', 'knex', 'bullmq')
  */
-export function notImportFrom(...globs: string[]): Predicate<SourceFile> {
+export function notImportFrom(globs: string[], options: ImportOptions): Predicate<SourceFile>
+export function notImportFrom(...globs: string[]): Predicate<SourceFile>
+export function notImportFrom(
+  ...args: [string[], ImportOptions] | string[]
+): Predicate<SourceFile> {
+  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
+  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
+  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
     description: `not import from ${globs.map((g) => `"${g}"`).join(', ')}`,
-    test: (sourceFile) => !getImportPaths(sourceFile).some((p) => matchers.some((m) => m(p))),
+    test: (sourceFile) =>
+      !getImportPaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
   }
 }
 

@@ -244,6 +244,21 @@ within(routes)
   .check()
 ```
 
+`within()` also extracts callbacks from **object literal arguments** — arrow functions, function expressions, and method shorthands inside properties like `{ handler: (req) => { ... } }`. Nested objects are searched up to 3 levels deep.
+
+```typescript
+// Fastify-style: callback inside options object
+app.post('/users', {
+  schema: { body: { type: 'object' } },
+  handler: async (req) => {
+    validateInput(req)
+  },
+})
+
+// within() extracts the handler callback for body analysis
+within(routes).functions().should().contain(call('validateInput')).check()
+```
+
 See [Function Rules](/functions#scoped-rules-with-within) for more on `within()`.
 
 ## Real-World Examples

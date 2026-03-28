@@ -2,6 +2,10 @@ import picomatch from 'picomatch'
 import type { SourceFile, ImportDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
+import { isTypeOnlyImport } from '../core/import-options.js'
+
+export type { ImportOptions } from '../core/import-options.js'
+import type { ImportOptions } from '../core/import-options.js'
 
 /**
  * Resolve an import declaration to an absolute path or raw specifier.
@@ -40,7 +44,15 @@ function importViolation(
  *   .should().onlyImportFrom('** /domain/** ', '** /shared/** ')
  *   .check()
  */
-export function onlyImportFrom(...globs: string[]): Condition<SourceFile> {
+export function onlyImportFrom(globs: string[], options: ImportOptions): Condition<SourceFile>
+export function onlyImportFrom(...globs: string[]): Condition<SourceFile>
+export function onlyImportFrom(
+  ...args: [string[], ImportOptions] | string[]
+): Condition<SourceFile> {
+  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
+  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
+  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
     description: `only import from ${globs.map((g) => `"${g}"`).join(', ')}`,
@@ -48,6 +60,7 @@ export function onlyImportFrom(...globs: string[]): Condition<SourceFile> {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
         for (const decl of sf.getImportDeclarations()) {
+          if (ignoreType && isTypeOnlyImport(decl)) continue
           const importPath = resolveImportPath(decl)
           if (!matchers.some((m) => m(importPath))) {
             violations.push(
@@ -76,7 +89,15 @@ export function onlyImportFrom(...globs: string[]): Condition<SourceFile> {
  *   .should().notImportFrom('** /legacy/** ')
  *   .check()
  */
-export function notImportFrom(...globs: string[]): Condition<SourceFile> {
+export function notImportFrom(globs: string[], options: ImportOptions): Condition<SourceFile>
+export function notImportFrom(...globs: string[]): Condition<SourceFile>
+export function notImportFrom(
+  ...args: [string[], ImportOptions] | string[]
+): Condition<SourceFile> {
+  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
+  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
+  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
     description: `not import from ${globs.map((g) => `"${g}"`).join(', ')}`,
@@ -84,6 +105,7 @@ export function notImportFrom(...globs: string[]): Condition<SourceFile> {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
         for (const decl of sf.getImportDeclarations()) {
+          if (ignoreType && isTypeOnlyImport(decl)) continue
           const importPath = resolveImportPath(decl)
           if (matchers.some((m) => m(importPath))) {
             violations.push(
@@ -163,7 +185,7 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
       for (const sf of sourceFiles) {
         for (const decl of sf.getImportDeclarations()) {
           const importPath = resolveImportPath(decl)
-          if (matchers.some((m) => m(importPath)) && !decl.isTypeOnly()) {
+          if (matchers.some((m) => m(importPath)) && !isTypeOnlyImport(decl)) {
             violations.push(
               importViolation(
                 sf,

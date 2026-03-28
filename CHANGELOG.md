@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-03-28
+
+### Added
+
+- **Type-import awareness** (plan 0038) — `notImportFrom`, `onlyImportFrom`, `importFrom`, and `notImportFrom` predicates now accept `{ ignoreTypeImports: true }` via `ImportOptions`. Type-only imports (`import type { X }` and `import { type X, type Y }`) are excluded from violation checks. Builder methods: `notImportFromConditionWithOptions`, `onlyImportFromWithOptions`, `importFromWithOptions`, `notImportFromWithOptions`.
+- **`within()` object literal callback extraction** (plan 0039) — `extractCallbacks()` now searches object literal arguments for function-valued properties (arrow functions, function expressions, method shorthands). Depth-limited to 3 levels. Enables `within(routes).functions()` for Fastify-style `{ handler: (req) => { ... } }` patterns.
+- **`isTypeOnlyImport(decl)`** utility — shared helper for checking if an import is purely type-only. Exported for custom condition authors.
+- **`ImportOptions`** type — exported for custom condition/predicate authors.
+
+### Fixed
+
+- **`expression()` ancestor deduplication** (plan 0037) — `expression()` matcher no longer reports violations for every ancestor node whose `getText()` contains the pattern. Only the deepest matching node is reported. **Note:** existing rules using `expression()` will see lower violation counts (e.g., 189 → 13 for a real-world case). Update baseline files or count assertions accordingly.
+- **`onlyHaveTypeImportsFrom` now handles `import { type X, type Y }`** — previously only checked declaration-level `import type`, now uses the shared `isTypeOnlyImport` helper for consistent behavior.
+
 ## [0.5.0] - 2026-03-28
 
 ### Added

@@ -1,4 +1,4 @@
-import { type CallExpression, type Node, SyntaxKind } from 'ts-morph'
+import { type CallExpression, type Node, Node as NodeUtils, SyntaxKind } from 'ts-morph'
 import type { ArchFunction } from '../models/arch-function.js'
 
 /**
@@ -35,10 +35,64 @@ export function extractCallbacks(callExpr: CallExpression): ExtractedCallback[] 
     const fn = extractInlineFunction(arg, callExpr, i)
     if (fn) {
       callbacks.push(fn)
+    } else {
+      // Search object literal arguments for function-valued properties
+      callbacks.push(...extractFromObjectLiteral(arg, callExpr, i, 0))
     }
   }
 
   return callbacks
+}
+
+/**
+ * Maximum depth to recurse into nested object literals.
+ * Prevents extracting unintended callbacks from deep config/schema structures.
+ */
+const MAX_OBJECT_DEPTH = 3
+
+/**
+ * Recursively search an ObjectLiteralExpression for function-like property values.
+ *
+ * Handles:
+ * - Arrow function properties: `{ handler: (req) => { ... } }`
+ * - Function expression properties: `{ handler: function(req) { ... } }`
+ * - Method shorthand: `{ handler(req) { ... } }`
+ * - Nested object literals: `{ hooks: { onRequest: (req) => { ... } } }`
+ *
+ * Stops at MAX_OBJECT_DEPTH to avoid false positives from schema defaults.
+ */
+function extractFromObjectLiteral(
+  arg: Node,
+  callSite: CallExpression,
+  argIndex: number,
+  depth: number,
+): ExtractedCallback[] {
+  if (!NodeUtils.isObjectLiteralExpression(arg)) return []
+  if (depth >= MAX_OBJECT_DEPTH) return []
+  const results: ExtractedCallback[] = []
+  for (const prop of arg.getProperties()) {
+    // Method shorthand: { handler(req, res) { ... } }
+    if (NodeUtils.isMethodDeclaration(prop)) {
+      results.push({
+        fn: fromMethodDeclaration(prop),
+        callSite,
+        argIndex,
+      })
+      continue
+    }
+    if (!NodeUtils.isPropertyAssignment(prop)) continue
+    const init = prop.getInitializer()
+    if (!init) continue
+    // Direct function property
+    const direct = extractInlineFunction(init, callSite, argIndex)
+    if (direct) {
+      results.push(direct)
+      continue
+    }
+    // Recurse into nested object literals (depth-limited)
+    results.push(...extractFromObjectLiteral(init, callSite, argIndex, depth + 1))
+  }
+  return results
 }
 
 /**
@@ -106,6 +160,26 @@ function fromFunctionExpression(node: Node): ArchFunction {
     getBody: () => funcExpr.getBody(),
     getNode: () => funcExpr,
     getStartLineNumber: () => funcExpr.getStartLineNumber(),
+    getScope: () => 'public',
+  }
+}
+
+/**
+ * Wrap an object literal method declaration as an ArchFunction.
+ * Handles: `{ handler(req, res) { ... } }`
+ */
+function fromMethodDeclaration(node: Node): ArchFunction {
+  const method = node.asKindOrThrow(SyntaxKind.MethodDeclaration)
+  return {
+    getName: () => method.getName(),
+    getSourceFile: () => method.getSourceFile(),
+    isExported: () => false,
+    isAsync: () => method.isAsync(),
+    getParameters: () => method.getParameters(),
+    getReturnType: () => method.getReturnType(),
+    getBody: () => method.getBody(),
+    getNode: () => method,
+    getStartLineNumber: () => method.getStartLineNumber(),
     getScope: () => 'public',
   }
 }

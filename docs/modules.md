@@ -73,6 +73,26 @@ modules(p)
   .check()
 ```
 
+### Allow Type Imports Across Layers
+
+Type-only imports (`import type { X }`) are erased at compile time and create no runtime dependency. Use `ignoreTypeImports` to allow type-sharing while forbidding runtime imports:
+
+```typescript
+// No runtime imports from infra, but type imports are OK
+modules(p)
+  .that()
+  .resideInFolder('**/domain/**')
+  .should()
+  .notImportFromConditionWithOptions(['**/infra/**'], { ignoreTypeImports: true })
+  .because('domain may reference infra types for DI, but not runtime code')
+  .check()
+```
+
+**Relationship with `onlyHaveTypeImportsFrom`:**
+
+- `onlyHaveTypeImportsFrom('**/infra/**')` — imports from infra MUST use `import type`
+- `notImportFromConditionWithOptions(['**/infra/**'], { ignoreTypeImports: true })` — no runtime imports from infra (type imports allowed)
+
 ### Application Layer Depends Only on Domain
 
 ```typescript

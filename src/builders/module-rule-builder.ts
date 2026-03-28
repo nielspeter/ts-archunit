@@ -17,6 +17,7 @@ import {
   onlyHaveTypeImportsFrom as onlyHaveTypeImportsFromCondition,
   notHaveAliasedImports as notHaveAliasedImportsCondition,
 } from '../conditions/dependency.js'
+import type { ImportOptions } from '../core/import-options.js'
 import { notExist } from '../conditions/structural.js'
 
 /**
@@ -71,9 +72,18 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
 
   /**
    * Filter modules that import from a path matching any of the given globs.
+   * Pass `{ ignoreTypeImports: true }` to exclude type-only imports.
    */
   importFrom(...globs: string[]): this {
     return this.addPredicate(importFromPredicate(...globs))
+  }
+
+  /**
+   * Filter modules that import from a path matching any of the given globs,
+   * with options to control type-import handling.
+   */
+  importFromWithOptions(globs: string[], options: ImportOptions): this {
+    return this.addPredicate(importFromPredicate(globs, options))
   }
 
   /**
@@ -81,6 +91,14 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
    */
   notImportFrom(...globs: string[]): this {
     return this.addPredicate(notImportFromPredicate(...globs))
+  }
+
+  /**
+   * Filter modules that do NOT import from any path matching the given globs,
+   * with options to control type-import handling.
+   */
+  notImportFromWithOptions(globs: string[], options: ImportOptions): this {
+    return this.addPredicate(notImportFromPredicate(globs, options))
   }
 
   /**
@@ -101,9 +119,18 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
 
   /**
    * Every import must resolve to a path matching at least one of the globs.
+   * Pass `{ ignoreTypeImports: true }` to exclude type-only imports.
    */
   onlyImportFrom(...globs: string[]): this {
     return this.addCondition(onlyImportFromCondition(...globs))
+  }
+
+  /**
+   * Every import must resolve to a path matching at least one of the globs,
+   * with options to control type-import handling.
+   */
+  onlyImportFromWithOptions(globs: string[], options: ImportOptions): this {
+    return this.addCondition(onlyImportFromCondition(globs, options))
   }
 
   /**
@@ -113,6 +140,18 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
    */
   notImportFromCondition(...globs: string[]): this {
     return this.addCondition(notImportFromCondition(...globs))
+  }
+
+  /**
+   * No import may resolve to a path matching any of the globs,
+   * with options to control type-import handling.
+   *
+   * Relationship with `onlyHaveTypeImportsFrom`:
+   * `onlyHaveTypeImportsFrom` enforces that imports MUST use `import type`.
+   * `notImportFromConditionWithOptions` with `ignoreTypeImports` allows type imports but forbids runtime imports.
+   */
+  notImportFromConditionWithOptions(globs: string[], options: ImportOptions): this {
+    return this.addCondition(notImportFromCondition(globs, options))
   }
 
   /**

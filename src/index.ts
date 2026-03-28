@@ -60,6 +60,8 @@ export {
 } from './predicates/module.js'
 
 // Dependency conditions
+export type { ImportOptions } from './core/import-options.js'
+export { isTypeOnlyImport } from './core/import-options.js'
 export {
   onlyImportFrom,
   notImportFrom as conditionNotImportFrom,

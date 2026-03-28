@@ -103,6 +103,46 @@ describe('dependency conditions', () => {
     })
   })
 
+  describe('notImportFrom with ignoreTypeImports (plan 0038)', () => {
+    it('default: flags type-only imports (backward compatible)', () => {
+      const sf = getSourceFile('src/domain/typed-service.ts')
+      const condition = notImportFrom('**/infra/**')
+      const violations = condition.evaluate([sf], ctx)
+      // type-only import from infra is still flagged by default
+      expect(violations.length).toBeGreaterThan(0)
+    })
+
+    it('ignoreTypeImports: skips type-only imports', () => {
+      const sf = getSourceFile('src/domain/typed-service.ts')
+      const condition = notImportFrom(['**/infra/**'], { ignoreTypeImports: true })
+      const violations = condition.evaluate([sf], ctx)
+      // type-only import from infra is now allowed
+      expect(violations).toHaveLength(0)
+    })
+
+    it('mixed import (import { type X, Y }) is NOT skipped', () => {
+      const sf = getSourceFile('src/bad/mixed-import.ts')
+      const condition = notImportFrom(['**/shared/utils**'], { ignoreTypeImports: true })
+      const violations = condition.evaluate([sf], ctx)
+      // import { type format, parse } has runtime import parse — still flagged
+      expect(violations.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('onlyImportFrom with ignoreTypeImports (plan 0038)', () => {
+    it('ignoreTypeImports: type-only imports from forbidden paths are allowed', () => {
+      const sf = getSourceFile('src/domain/typed-service.ts')
+      // typed-service.ts has type imports from infra and shared
+      // With ignoreTypeImports, only non-type imports need to match
+      const condition = onlyImportFrom(['**/domain/**', '**/shared/**'], {
+        ignoreTypeImports: true,
+      })
+      const violations = condition.evaluate([sf], ctx)
+      // The type-only import from infra is ignored, no violations
+      expect(violations).toHaveLength(0)
+    })
+  })
+
   describe('onlyHaveTypeImportsFrom', () => {
     it('passes when imports from matching paths are type-only', () => {
       const sf = getSourceFile('src/domain/order.ts')
