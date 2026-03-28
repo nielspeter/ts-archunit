@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { Project, SyntaxKind } from 'ts-morph'
 import { fromCallExpression } from '../../src/models/arch-call.js'
 import type { ArchCall } from '../../src/models/arch-call.js'
-import { haveArgumentWithProperty, notHaveArgumentWithProperty } from '../../src/conditions/call.js'
+import {
+  haveArgumentWithProperty,
+  notHaveArgumentWithProperty,
+  haveArgumentContaining,
+  notHaveArgumentContaining,
+} from '../../src/conditions/call.js'
+import { property, call } from '../../src/helpers/matchers.js'
 import type { ConditionContext } from '../../src/core/condition.js'
 
 function makeTopLevelArchCall(code: string): ArchCall {
@@ -130,6 +136,152 @@ describe('call argument property conditions', () => {
       expect(() => notHaveArgumentWithProperty()).toThrow(
         'notHaveArgumentWithProperty requires at least one property name',
       )
+    })
+  })
+
+  describe('haveArgumentContaining', () => {
+    it('passes when argument contains matching property at top level', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/items', {
+          additionalProperties: true,
+        })
+      `)
+      const violations = haveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(0)
+    })
+
+    it('passes when nested argument contains matching property', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/users', {
+          schema: {
+            body: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        })
+      `)
+      const violations = haveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(0)
+    })
+
+    it('fails when no argument contains match', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.get('/health', {
+          schema: { response: {} },
+        })
+      `)
+      const violations = haveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(1)
+      expect(violations[0]!.message).toContain("property 'additionalProperties' = true")
+    })
+
+    it('fails when value does not match', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/orders', {
+          additionalProperties: false,
+        })
+      `)
+      const violations = haveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(1)
+    })
+
+    it('works with any ExpressionMatcher, not just property()', () => {
+      const archCall = makeTopLevelArchCall(`
+        fn({ handler: validate() })
+      `)
+      const violations = haveArgumentContaining(call('validate')).evaluate([archCall], ctx)
+      expect(violations).toHaveLength(0)
+    })
+  })
+
+  describe('notHaveArgumentContaining', () => {
+    it('passes when no argument contains match', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/orders', {
+          additionalProperties: false,
+        })
+      `)
+      const violations = notHaveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(0)
+    })
+
+    it('reports violation per match found', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/users', {
+          schema: {
+            body: {
+              additionalProperties: true,
+              properties: {
+                metadata: {
+                  additionalProperties: true,
+                },
+              },
+            },
+          },
+        })
+      `)
+      const violations = notHaveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(2)
+    })
+
+    it('reports correct line number in violation', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/items', {
+          additionalProperties: true,
+        })
+      `)
+      const violations = notHaveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(1)
+      expect(violations[0]!.message).toContain('at line')
+    })
+
+    it('finds deeply nested properties (3 levels)', () => {
+      const archCall = makeTopLevelArchCall(`
+        app.post('/deep', {
+          level1: {
+            level2: {
+              level3: {
+                additionalProperties: true,
+              },
+            },
+          },
+        })
+      `)
+      const violations = notHaveArgumentContaining(property('additionalProperties', true)).evaluate(
+        [archCall],
+        ctx,
+      )
+      expect(violations).toHaveLength(1)
+    })
+
+    it('works with call() matcher in arguments', () => {
+      const archCall = makeTopLevelArchCall(`
+        fn({ handler: validate() })
+      `)
+      const violations = notHaveArgumentContaining(call('validate')).evaluate([archCall], ctx)
+      expect(violations).toHaveLength(1)
     })
   })
 })

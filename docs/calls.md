@@ -171,6 +171,42 @@ calls(p)
   .check()
 ```
 
+### `haveArgumentContaining(matcher)`
+
+At least one argument subtree must contain the matched expression. Searches all arguments recursively at any depth -- object literals, nested objects, callbacks, and any other expression.
+
+This is a superset of `haveCallbackContaining`. Use `haveCallbackContaining` when you only want to search callback (function-like) arguments.
+
+```typescript
+calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+  .should()
+  .haveArgumentContaining(property('type', 'object'))
+  .because('all route schemas must declare their type')
+  .check()
+```
+
+### `notHaveArgumentContaining(matcher)`
+
+No argument subtree may contain the matched expression. Reports one violation per match found at any depth.
+
+```typescript
+import { calls, property } from '@nielspeter/ts-archunit'
+
+calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete|patch)$/)
+  .should()
+  .notHaveArgumentContaining(property('additionalProperties', true))
+  .because('additionalProperties: true defeats schema validation')
+  .check()
+```
+
 ### `notExist()`
 
 The filtered call set must be empty -- no calls should match the predicates.

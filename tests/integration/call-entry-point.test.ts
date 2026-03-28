@@ -3,7 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { calls } from '../../src/builders/call-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
-import { call } from '../../src/helpers/matchers.js'
+import { call, property } from '../../src/helpers/matchers.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { definePredicate } from '../../src/core/define.js'
 import type { ArchCall } from '../../src/models/arch-call.js'
@@ -217,6 +217,95 @@ describe('calls() entry point — end-to-end', () => {
           .notHaveArgumentWithProperty('deprecated')
           .check()
       }).toThrow(ArchRuleError)
+    })
+  })
+
+  describe('argument containing conditions (plan 0036)', () => {
+    it('notHaveArgumentContaining detects nested additionalProperties: true', () => {
+      try {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod(/^(get|post)$/)
+          .and()
+          .resideInFile('**/nested-properties.ts')
+          .should()
+          .notHaveArgumentContaining(property('additionalProperties', true))
+          .check()
+        expect.unreachable('should have thrown')
+      } catch (error) {
+        const archError = error as ArchRuleError
+        // /users has nested additionalProperties: true, /items has top-level
+        expect(archError.violations.length).toBe(2)
+      }
+    })
+
+    it('compose with withMethod: only POST routes checked', () => {
+      try {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod('post')
+          .and()
+          .resideInFile('**/nested-properties.ts')
+          .should()
+          .notHaveArgumentContaining(property('additionalProperties', true))
+          .check()
+        expect.unreachable('should have thrown')
+      } catch (error) {
+        const archError = error as ArchRuleError
+        // /users and /items are both POST
+        expect(archError.violations.length).toBe(2)
+      }
+    })
+
+    it('haveArgumentContaining passes when property exists', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod('post')
+          .and()
+          .resideInFile('**/nested-properties.ts')
+          .should()
+          .haveArgumentContaining(property('type', 'object'))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('property() with numeric value matches in nested schema', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withMethod('get')
+          .and()
+          .withStringArg(0, '/list')
+          .and()
+          .resideInFile('**/nested-properties.ts')
+          .should()
+          .haveArgumentContaining(property('maximum', 100))
+          .check()
+      }).not.toThrow()
+    })
+
+    it('clean routes pass notHaveArgumentContaining', () => {
+      expect(() => {
+        calls(p)
+          .that()
+          .onObject('app')
+          .and()
+          .withStringArg(0, '/health')
+          .and()
+          .resideInFile('**/nested-properties.ts')
+          .should()
+          .notHaveArgumentContaining(property('additionalProperties', true))
+          .check()
+      }).not.toThrow()
     })
   })
 

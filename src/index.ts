@@ -177,7 +177,7 @@ export {
 } from './helpers/type-matchers.js'
 
 // Body analysis helpers (plan 0011)
-export { call, access, newExpr, expression } from './helpers/matchers.js'
+export { call, access, newExpr, expression, property } from './helpers/matchers.js'
 export type { ExpressionMatcher } from './helpers/matchers.js'
 
 // Body analysis conditions (for advanced composition)
@@ -234,6 +234,8 @@ export {
   notExist as callNotExist,
   haveArgumentWithProperty,
   notHaveArgumentWithProperty,
+  haveArgumentContaining as callHaveArgumentContaining,
+  notHaveArgumentContaining as callNotHaveArgumentContaining,
 } from './conditions/call.js'
 
 // Scoped rules --- within() (plan 0015)

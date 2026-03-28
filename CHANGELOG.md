@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-03-28
+
+### Added
+
+- **`property()` ExpressionMatcher** (plan 0036) — match `PropertyAssignment` nodes by name (`string | RegExp`) and optional value (`boolean | number | string | RegExp`). Semantic comparison for primitives via `getLiteralValue()`, `RegExp` escape hatch for raw text. Handles quoted property keys, guards against computed property names.
+- **`haveArgumentContaining(matcher)` / `notHaveArgumentContaining(matcher)`** (plan 0036) — 2 new conditions on `calls()` that recursively search all argument subtrees with any `ExpressionMatcher`. Superset of `haveCallbackContaining` — searches object literals, callbacks, and nested expressions at any depth.
+- Builder methods `haveArgumentContaining()` / `notHaveArgumentContaining()` on `CallRuleBuilder`
+- Standalone exports `callHaveArgumentContaining` / `callNotHaveArgumentContaining` for advanced composition
+
 ## [0.4.0] - 2026-03-27
 
 ### Added

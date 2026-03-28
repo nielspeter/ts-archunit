@@ -264,6 +264,16 @@ calls(p)
   .should()
   .haveCallbackContaining(call('authenticate'))
   .check()
+
+// No additionalProperties: true in route schemas (defeats validation)
+calls(p)
+  .that()
+  .onObject('app')
+  .and()
+  .withMethod(/^(get|post|put|delete)$/)
+  .should()
+  .notHaveArgumentContaining(property('additionalProperties', true))
+  .check()
 ```
 
 ## Scoped Rules (within)

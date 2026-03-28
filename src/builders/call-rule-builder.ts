@@ -22,6 +22,8 @@ import {
   notExist as callNotExist,
   haveArgumentWithProperty as conditionHaveArgumentWithProperty,
   notHaveArgumentWithProperty as conditionNotHaveArgumentWithProperty,
+  haveArgumentContaining as conditionHaveArgumentContaining,
+  notHaveArgumentContaining as conditionNotHaveArgumentContaining,
 } from '../conditions/call.js'
 
 /**
@@ -140,6 +142,26 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
    */
   notHaveArgumentWithProperty(...names: string[]): this {
     return this.addCondition(conditionNotHaveArgumentWithProperty(...names))
+  }
+
+  /**
+   * Assert that at least one argument subtree contains a match.
+   *
+   * Searches ALL arguments recursively — a superset of `haveCallbackContaining`.
+   * Use `haveCallbackContaining` when you only want to search callback bodies.
+   */
+  haveArgumentContaining(matcher: ExpressionMatcher): this {
+    return this.addCondition(conditionHaveArgumentContaining(matcher))
+  }
+
+  /**
+   * Assert that NO argument subtree contains a match.
+   *
+   * Searches ALL arguments recursively — a superset of `notHaveCallbackContaining`.
+   * Use `notHaveCallbackContaining` when you only want to search callback bodies.
+   */
+  notHaveArgumentContaining(matcher: ExpressionMatcher): this {
+    return this.addCondition(conditionNotHaveArgumentContaining(matcher))
   }
 
   // --- Public accessors (used by plan 0015 within()) ---

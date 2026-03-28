@@ -15,7 +15,7 @@ Body analysis fills this gap. It traverses the AST inside every method body (for
 
 ## Matchers
 
-Four matchers cover the most common expression patterns:
+Five matchers cover the most common expression patterns:
 
 ### `call(target)`
 
@@ -54,6 +54,24 @@ access('process.env') // matches process.env.DATABASE_URL
 access('this.config') // matches this.config.timeout
 access(/^document\./) // matches document.querySelector, document.getElementById
 ```
+
+### `property(name, value?)`
+
+Matches property assignments in object literals by name and optional value. Useful for inspecting configuration objects, JSON schema definitions, and options passed to framework calls.
+
+```typescript
+import { property } from '@nielspeter/ts-archunit'
+
+property('additionalProperties', true) // matches additionalProperties: true
+property('type', 'object') // matches type: 'object' (no quotes needed)
+property('maximum', 100) // matches maximum: 100
+property(/^additional/) // matches any property starting with 'additional'
+property('mode', /^'(strict|loose)'$/) // matches mode: 'strict' or 'loose' (RegExp uses raw getText())
+```
+
+Value matching uses semantic comparison for primitives (`boolean`, `number`, `string` via `getLiteralValue()`). `RegExp` values match against the raw source text including quotes. Omit the value parameter for name-only matching.
+
+> **Note:** `property()` targets `PropertyAssignment` nodes. It does not match shorthand properties (`{ schema }`) or computed property names (`{ [key]: value }`).
 
 ### `expression(target)`
 

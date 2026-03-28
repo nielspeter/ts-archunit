@@ -221,3 +221,78 @@ export function notHaveArgumentWithProperty(...names: string[]): Condition<ArchC
     },
   }
 }
+
+/**
+ * Assert that at least one argument subtree contains a match.
+ *
+ * Searches ALL arguments of each call recursively using `findMatchesInNode`.
+ * This is a superset of `haveCallbackContaining` — it searches the entire
+ * subtree of every argument (object literals, callbacks, nested expressions),
+ * not just function-like arguments. Use `haveCallbackContaining` when you
+ * only want to search callback bodies.
+ */
+export function haveArgumentContaining(matcher: ExpressionMatcher): Condition<ArchCall> {
+  return {
+    description: `have argument containing ${matcher.description}`,
+    evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const archCall of elements) {
+        const args = archCall.getArguments()
+        let found = false
+        for (const arg of args) {
+          const matches = findMatchesInNode(arg, matcher)
+          if (matches.length > 0) {
+            found = true
+            break
+          }
+        }
+        if (!found) {
+          violations.push(
+            createCallViolation(
+              archCall,
+              `${archCall.getName() ?? '<call>'} has no argument containing ${matcher.description}`,
+              context,
+            ),
+          )
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
+ * Assert that NO argument subtree contains a match.
+ *
+ * Searches ALL arguments of each call recursively using `findMatchesInNode`.
+ * Produces one violation per matching node found in any argument.
+ *
+ * This is a superset of `notHaveCallbackContaining` — it searches the entire
+ * subtree of every argument (object literals, callbacks, nested expressions),
+ * not just function-like arguments. Use `notHaveCallbackContaining` when you
+ * only want to search callback bodies.
+ */
+export function notHaveArgumentContaining(matcher: ExpressionMatcher): Condition<ArchCall> {
+  return {
+    description: `not have argument containing ${matcher.description}`,
+    evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const archCall of elements) {
+        const args = archCall.getArguments()
+        for (const arg of args) {
+          const matches = findMatchesInNode(arg, matcher)
+          for (const match of matches) {
+            violations.push(
+              createCallViolation(
+                archCall,
+                `${archCall.getName() ?? '<call>'} argument contains ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+                context,
+              ),
+            )
+          }
+        }
+      }
+      return violations
+    },
+  }
+}

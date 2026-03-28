@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-03-27
+**Updated:** 2026-03-28
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 35 completed, 0 remaining
+**Total Plans:** 36 completed, 0 remaining
 
 ---
 
@@ -46,12 +46,13 @@
 | **P2**   | ~~Return Type Condition (0033)~~                                                 | 0.25 day  | COMPLETED 2026-03-27 |
 | **P2**   | ~~Call Argument Property Condition (0034)~~                                      | 0.5 day   | COMPLETED 2026-03-27 |
 | **P2**   | ~~Aliased Import Condition (0035)~~                                              | 0.25 day  | COMPLETED 2026-03-27 |
+| **P1**   | ~~Property Matcher & Argument Containing Condition (0036)~~                      | 0.5 day   | COMPLETED 2026-03-28 |
 
 ---
 
 ## What's Shipped
 
-**1358 tests across 107 files. All checks pass.**
+**1399 tests across 108 files. All checks pass.**
 
 ### Core (P0)
 
@@ -71,7 +72,7 @@
 
 ### Body Analysis (P1) — the differentiator
 
-- `call()`, `newExpr()`, `access()`, `expression()` matchers
+- `call()`, `newExpr()`, `access()`, `property()`, `expression()` matchers
 - `contain()`, `notContain()`, `useInsteadOf()` conditions
 - Optional chaining normalization, nested call detection
 
@@ -111,7 +112,7 @@
 - Parameter type conditions: `acceptParameterOfType`, `notAcceptParameterOfType` (classes + functions)
 - Visibility predicates: `arePublic`, `areProtected`, `arePrivate`
 - Return type condition: `haveReturnTypeMatching`
-- Call argument conditions: `haveArgumentWithProperty`, `notHaveArgumentWithProperty`
+- Call argument conditions: `haveArgumentWithProperty`, `notHaveArgumentWithProperty`, `haveArgumentContaining`, `notHaveArgumentContaining`
 
 ### Bug Fixes
 
@@ -127,4 +128,4 @@
 
 ## All Plans Complete
 
-34 of 34 plans implemented. 1348 tests across 107 files. 91% integration test line coverage.
+36 of 36 plans implemented. 1399 tests across 108 files. 91% integration test line coverage.

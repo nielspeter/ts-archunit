@@ -174,12 +174,13 @@ Available on all entry points via `.that()`.
 
 ## Body Analysis Matchers
 
-| Export       | Signature                              | Description                                |
-| ------------ | -------------------------------------- | ------------------------------------------ |
-| `call`       | `call(target: string \| RegExp)`       | Match function/method call expressions.    |
-| `newExpr`    | `newExpr(target: string \| RegExp)`    | Match constructor invocations (`new ...`). |
-| `access`     | `access(target: string \| RegExp)`     | Match property access expressions.         |
-| `expression` | `expression(target: string \| RegExp)` | Match any expression by text.              |
+| Export       | Signature                                                                         | Description                                            |
+| ------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `call`       | `call(target: string \| RegExp)`                                                  | Match function/method call expressions.                |
+| `newExpr`    | `newExpr(target: string \| RegExp)`                                               | Match constructor invocations (`new ...`).             |
+| `access`     | `access(target: string \| RegExp)`                                                | Match property access expressions.                     |
+| `property`   | `property(name: string \| RegExp, value?: boolean \| number \| string \| RegExp)` | Match property assignments by name and optional value. |
+| `expression` | `expression(target: string \| RegExp)`                                            | Match any expression by text.                          |
 
 ## Body Analysis Conditions
 
@@ -239,6 +240,8 @@ Available on all entry points via `.that()`.
 | `callNotExist`                  | `notExist()`                                            | The filtered call set must be empty.                                |
 | `haveArgumentWithProperty`      | `haveArgumentWithProperty(...names: string[])`          | At least one object literal arg has ALL named properties.           |
 | `notHaveArgumentWithProperty`   | `notHaveArgumentWithProperty(...names: string[])`       | No object literal arg has ANY of the named properties.              |
+| `callHaveArgumentContaining`    | `haveArgumentContaining(matcher: ExpressionMatcher)`    | At least one argument subtree must contain the matched expression.  |
+| `callNotHaveArgumentContaining` | `notHaveArgumentContaining(matcher: ExpressionMatcher)` | No argument subtree may contain the matched expression.             |
 
 See [Call Rules](/calls) for usage examples.
 
