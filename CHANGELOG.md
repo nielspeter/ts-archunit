@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-03-30
+
+### Added
+
+- **Architecture rule primitives** (plan 0041) — phase-aware builders with dual-use predicate/condition dispatch based on `.that()` / `.should()` context. Methods `notImportFrom`, `resideInFile`, `resideInFolder`, `haveNameMatching`, `extend`, `implement`, `haveMethodNamed` now work in both phases across 4 builders.
+- **Module body analysis** — `modules().should().notContain()` / `contain()` / `useInsteadOf()` with `{ scopeToModule: true }` option for top-level-only scanning.
+- **Export conditions** — `notHaveDefaultExport()`, `haveDefaultExport()`, `haveMaxExports(n)` on module builder.
+- **Reverse dependency conditions** — `onlyBeImportedVia(...globs)`, `beImported()`, `haveNoUnusedExports()` with cached reverse import graph.
+- **Stub detection** — `comment()` matcher, `STUB_PATTERNS` constant, `notHaveEmptyBody()` on functions and classes.
+- **19 standard rule variants** (plan 0042):
+  - Function variants: `functionNoEval`, `functionNoFunctionConstructor`, `functionNoProcessEnv`, `functionNoConsoleLog`, `functionNoConsole`, `functionNoJsonParse`, `functionNoGenericErrors`, `functionNoTypeErrors`
+  - Module variants: `moduleNoEval`, `moduleNoProcessEnv`, `moduleNoConsoleLog`
+  - New class rules: `noConsole` (all console methods), `noJsonParse`
+  - Architecture primitives: `mustCall(pattern)`, `classMustCall(pattern)` — positive body assertion
+  - Hygiene rules: `noDeadModules()`, `noUnusedExports()`, `noStubComments(pattern?)`, `noEmptyBodies()`
+  - Sub-path exports: `./rules/architecture`, `./rules/hygiene`
+- **3 architecture presets** (plan 0040):
+  - `layeredArchitecture(p, options)` — layer ordering, cycle detection, innermost isolation, type-import enforcement, restricted packages
+  - `dataLayerIsolation(p, options)` — base class extension, typed error enforcement
+  - `strictBoundaries(p, options)` — no cycles, no cross-boundary imports, shared isolation, test isolation, copy-paste detection
+  - Override system: per-rule severity (`'error'`, `'warn'`, `'off'`)
+  - Sub-path export: `./presets`
+- **`.violations()` terminal** on `RuleBuilder` and `TerminalBuilder` — returns violations without throwing for programmatic access and preset aggregation.
+- **`dispatchRule()` + `throwIfViolations()`** — aggregated error reporting across multiple preset rules.
+- **`ts-archunit explain` CLI subcommand** (plan 0043) — dumps active rules as JSON or markdown table via `.describeRule()` without executing them. Supports `--markdown` flag.
+- **`.describeRule()` method** on `RuleBuilder` and `TerminalBuilder` — metadata extraction without rule execution.
+- **3 new VitePress doc pages** — presets guide, architecture recipes, explain command reference.
+- **Comprehensive documentation overhaul** — added explanatory descriptions to 45+ sections across 18 doc files. Every section now explains what the feature does and why before showing code.
+- **36 dogfooding rules** — ts-archunit enforces its own architecture with function/module security rules, hygiene checks, preset isolation, and export hygiene.
+- 7 deprecated aliases for backwards compatibility: `notImportFromCondition`, `shouldResideInFile`, `shouldResideInFolder`, `conditionHaveNameMatching`, `shouldExtend`, `shouldImplement`, `shouldHaveMethodNamed`.
+
 ## [0.6.0] - 2026-03-28
 
 ### Added
