@@ -4,14 +4,14 @@ ts-archunit provides `definePredicate()` and `defineCondition()` for encoding te
 
 ## Why Custom Rules
 
-Built-in predicates and conditions cover common patterns. But every team has conventions unique to their codebase:
+Built-in predicates and conditions cover common patterns -- naming, imports, body analysis, metrics. But every team has domain-specific conventions that no library can anticipate out of the box:
 
 - "Services must have a logger field"
 - "Controllers must not return entity types directly"
 - "All exported functions must have JSDoc"
 - "No magic numbers in service methods"
 
-Custom rules let you encode these using the same interface as built-in rules.
+Rather than requesting upstream features for each of these, `definePredicate()` and `defineCondition()` let you encode them yourself using the same fluent interface and violation reporting as built-in rules.
 
 ## `definePredicate()`
 

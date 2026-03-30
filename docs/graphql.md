@@ -12,9 +12,11 @@ import { schema, schemaFromSDL, resolvers } from '@nielspeter/ts-archunit/graphq
 
 ## Schema Rules
 
-Load `.graphql` schema files and enforce conventions on types, queries, and mutations.
+Schema rules let you enforce structural conventions on your GraphQL types, queries, and mutations -- for example, requiring that all collection types carry pagination fields, or that every query field has a matching resolver. You start by loading your schema from `.graphql` files or inline SDL, then chain predicates and conditions just like any other ts-archunit rule.
 
 ### Load from files
+
+Use `schema()` to load `.graphql` files from disk via a glob pattern. This is the typical approach when your schema is split across multiple files in the repository.
 
 ```typescript
 import { schema } from '@nielspeter/ts-archunit/graphql'
@@ -25,6 +27,8 @@ const s = schema(p, 'src/graphql/**/*.graphql')
 ```
 
 ### Load from inline SDL
+
+Use `schemaFromSDL()` when you want to test against a schema defined directly in your test file. This is useful for unit-testing pattern templates or for projects that build their schema programmatically rather than from `.graphql` files.
 
 ```typescript
 import { schemaFromSDL } from '@nielspeter/ts-archunit/graphql'
@@ -52,7 +56,7 @@ const s = schemaFromSDL(`
 
 ### Schema predicates
 
-Filter which schema elements to check:
+Predicates narrow the schema elements your rule targets. Use them to select specific categories -- all Query fields, all Mutation fields, types matching a name pattern, or fields that return lists. Without predicates, the rule applies to every element in the schema.
 
 ```typescript
 // Select all Query fields
@@ -70,7 +74,7 @@ s.that().returnListOf()
 
 ### Schema conditions
 
-Assert what must be true about matched schema elements:
+Conditions define the assertions enforced on schema elements that pass the predicate filter. They let you require specific fields on types, mandate pagination arguments on list queries, or verify that every query field has a corresponding resolver implementation.
 
 ```typescript
 // Collection types must have pagination fields
@@ -102,7 +106,7 @@ s.that()
 
 ## Resolver Rules
 
-Enforce patterns inside resolver functions using the same body analysis engine as `classes()` and `functions()`.
+Resolver rules let you enforce patterns inside your GraphQL resolver functions -- for example, requiring DataLoader usage for relation fields or banning direct database calls. They use the same body analysis engine as `classes()` and `functions()`, so you get access to `call()`, `access()`, `newExpr()`, and all other expression matchers.
 
 ```typescript
 import { resolvers } from '@nielspeter/ts-archunit/graphql'

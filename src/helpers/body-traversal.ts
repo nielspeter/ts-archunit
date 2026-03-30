@@ -1,6 +1,18 @@
-import { type Node, type ClassDeclaration, Node as NodeUtils } from 'ts-morph'
+import { type Node, type ClassDeclaration, type SourceFile, Node as NodeUtils } from 'ts-morph'
 import type { ExpressionMatcher } from './matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
+
+/**
+ * Options for module body analysis.
+ */
+export interface ModuleBodyOptions {
+  /**
+   * When true, only traverse top-level (module-scope) statements.
+   * Skips class bodies, function bodies, and arrow function bodies.
+   * Default: false (full file traversal).
+   */
+  scopeToModule?: boolean
+}
 
 /**
  * Result of searching a body for matcher hits.
@@ -136,4 +148,58 @@ export function getFunctionBody(node: Node): Node | undefined {
     return node.getBody()
   }
   return undefined
+}
+
+/**
+ * Search a module (SourceFile) for matches.
+ *
+ * Default: walks the entire file (all descendants), including inside
+ * class methods and function bodies. This makes `modules().notContain()`
+ * a file-level policy check.
+ *
+ * With `scopeToModule: true`: walks only top-level statements,
+ * skipping class bodies, function declaration bodies, and arrow/function
+ * expression bodies. Use when you already have class/function rules and
+ * want to avoid duplicate violations.
+ */
+export function searchModuleBody(
+  sourceFile: SourceFile,
+  matcher: ExpressionMatcher,
+  options?: ModuleBodyOptions,
+): MatchResult {
+  if (!options?.scopeToModule) {
+    // Full file traversal — walk all descendants
+    const matchingNodes = findMatchesInNode(sourceFile, matcher)
+    return { found: matchingNodes.length > 0, matchingNodes }
+  }
+
+  // Module-scope only — walk each top-level statement but skip class/function internals
+  const matchingNodes: Node[] = []
+  for (const statement of sourceFile.getStatements()) {
+    // Skip class declarations entirely (their bodies are covered by class rules)
+    if (NodeUtils.isClassDeclaration(statement)) continue
+
+    // Skip function declarations entirely (their bodies are covered by function rules)
+    if (NodeUtils.isFunctionDeclaration(statement)) continue
+
+    // For variable statements (const/let/var), check the initializer but skip
+    // arrow function and function expression bodies within it
+    if (NodeUtils.isVariableStatement(statement)) {
+      for (const decl of statement.getDeclarationList().getDeclarations()) {
+        const initializer = decl.getInitializer()
+        if (!initializer) continue
+        // Skip arrow/function expressions entirely — function rules cover them
+        if (NodeUtils.isArrowFunction(initializer) || NodeUtils.isFunctionExpression(initializer)) {
+          continue
+        }
+        matchingNodes.push(...findMatchesInNode(initializer, matcher))
+      }
+      continue
+    }
+
+    // All other statements: walk their descendants
+    matchingNodes.push(...findMatchesInNode(statement, matcher))
+  }
+
+  return { found: matchingNodes.length > 0, matchingNodes }
 }

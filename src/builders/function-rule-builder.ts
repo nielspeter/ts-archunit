@@ -6,6 +6,7 @@ import {
   functionContain,
   functionNotContain,
   functionUseInsteadOf,
+  functionNotHaveEmptyBody,
 } from '../conditions/body-analysis-function.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import { collectFunctions } from '../models/arch-function.js'
@@ -29,6 +30,10 @@ import {
   areExported as identityAreExported,
   areNotExported as identityAreNotExported,
 } from '../predicates/identity.js'
+import {
+  resideInFile as fnConditionResideInFile,
+  resideInFolder as fnConditionResideInFolder,
+} from '../conditions/function.js'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
 import {
   arePublic as fnArePublic,
@@ -84,7 +89,15 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
 
   // --- Identity predicates (delegated to plan 0003 generics) ---
 
+  /**
+   * After `.that()`: filter functions whose name matches the pattern.
+   * After `.should()`: assert matched functions have names matching the pattern.
+   */
   haveNameMatching(pattern: RegExp | string): this {
+    if (this._phase === 'condition') {
+      const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern
+      return this.addCondition(fnConditionHaveNameMatching(regex))
+    }
     return this.addPredicate(identityHaveNameMatching<ArchFunction>(pattern))
   }
 
@@ -96,11 +109,25 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
     return this.addPredicate(identityHaveNameEndingWith<ArchFunction>(suffix))
   }
 
+  /**
+   * After `.that()`: filter functions in a file matching the glob.
+   * After `.should()`: assert functions reside in a file matching the glob.
+   */
   resideInFile(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(fnConditionResideInFile(glob))
+    }
     return this.addPredicate(identityResideInFile<ArchFunction>(glob))
   }
 
+  /**
+   * After `.that()`: filter functions in a folder matching the glob.
+   * After `.should()`: assert functions reside in a folder matching the glob.
+   */
   resideInFolder(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(fnConditionResideInFolder(glob))
+    }
     return this.addPredicate(identityResideInFolder<ArchFunction>(glob))
   }
 
@@ -203,9 +230,7 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
     return this.addCondition(fnBeAsync())
   }
 
-  /**
-   * Functions must have a name matching the given pattern.
-   */
+  /** @deprecated Use `haveNameMatching()` after `.should()` instead. */
   conditionHaveNameMatching(pattern: RegExp): this {
     return this.addCondition(fnConditionHaveNameMatching(pattern))
   }
@@ -276,6 +301,14 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
    */
   useInsteadOf(bad: ExpressionMatcher, good: ExpressionMatcher): this {
     return this.addCondition(functionUseInsteadOf(bad, good))
+  }
+
+  /**
+   * Assert that matched functions do not have empty bodies.
+   * Expression-bodied arrows always pass (no block body).
+   */
+  notHaveEmptyBody(): this {
+    return this.addCondition(functionNotHaveEmptyBody())
   }
 
   /**

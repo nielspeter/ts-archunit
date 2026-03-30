@@ -57,7 +57,6 @@ function isPropertyReadonly(prop: TsSymbol): boolean {
   //   Readonly<{a: string}>.a → decl.isReadonly() = false, but
   //   compilerSymbol.links.checkFlags & 8 = 8 (readonly)
   //
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- JS interop boundary: accessing TS compiler internal checkFlags for Readonly<T> detection
   const links = (prop.compilerSymbol as unknown as Record<string, unknown>).links
   if (typeof links === 'object' && links !== null) {
     const flags = (links as Record<string, unknown>)['checkFlags']

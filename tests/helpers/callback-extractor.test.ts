@@ -222,4 +222,254 @@ describe('extractCallbacks', () => {
       expect(callbacks).toHaveLength(1)
     })
   })
+
+  describe('ArchFunction wrapper methods — arrow functions', () => {
+    it('getSourceFile returns the source file containing the arrow', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', (req, res) => { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const sf = callbacks[0]!.fn.getSourceFile()
+      expect(sf.getFilePath()).toContain('test.ts')
+    })
+
+    it('getReturnType returns the return type of the arrow', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', (x: number) => x + 1)
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const returnType = callbacks[0]!.fn.getReturnType()
+      expect(returnType).toBeDefined()
+    })
+
+    it('getStartLineNumber returns a positive line number', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', (req, res) => { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getStartLineNumber()).toBeGreaterThan(0)
+    })
+
+    it('getScope always returns public for callbacks', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', (req, res) => { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getScope()).toBe('public')
+    })
+
+    it('getNode returns the arrow function node', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', (req, res) => { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const node = callbacks[0]!.fn.getNode()
+      expect(node.getKind()).toBe(SyntaxKind.ArrowFunction)
+    })
+  })
+
+  describe('ArchFunction wrapper methods — function expressions', () => {
+    it('getSourceFile returns the source file', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function handler(req, res) { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const sf = callbacks[0]!.fn.getSourceFile()
+      expect(sf.getFilePath()).toContain('test.ts')
+    })
+
+    it('getReturnType returns the return type', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function(x: number) { return x + 1 })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const returnType = callbacks[0]!.fn.getReturnType()
+      expect(returnType).toBeDefined()
+    })
+
+    it('getStartLineNumber returns a positive line number', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function(req, res) { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getStartLineNumber()).toBeGreaterThan(0)
+    })
+
+    it('getScope always returns public', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function(req, res) { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getScope()).toBe('public')
+    })
+
+    it('getNode returns the function expression node', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function handler(req, res) { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const node = callbacks[0]!.fn.getNode()
+      expect(node.getKind()).toBe(SyntaxKind.FunctionExpression)
+    })
+
+    it('getName returns undefined for anonymous function expressions', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function(req, res) { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getName()).toBeUndefined()
+    })
+
+    it('isAsync detects async function expressions', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', async function(req, res) { await fetch('/api') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.isAsync()).toBe(true)
+    })
+
+    it('isExported returns false for function expression callbacks', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function handler(req, res) { res.send('ok') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.isExported()).toBe(false)
+    })
+
+    it('getBody returns the function body', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function(req, res) { res.send('hello') })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const body = callbacks[0]!.fn.getBody()
+      expect(body).toBeDefined()
+      expect(body!.getText()).toContain('hello')
+    })
+
+    it('getParameters returns parameters list', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', function(a, b, c) { return a })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getParameters()).toHaveLength(3)
+    })
+  })
+
+  describe('ArchFunction wrapper methods — method declarations', () => {
+    it('getSourceFile returns the source file', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(req, res) { res.send('ok') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const sf = callbacks[0]!.fn.getSourceFile()
+      expect(sf.getFilePath()).toContain('test.ts')
+    })
+
+    it('getReturnType returns the return type', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { compute(x: number) { return x * 2 } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const returnType = callbacks[0]!.fn.getReturnType()
+      expect(returnType).toBeDefined()
+    })
+
+    it('getStartLineNumber returns a positive line number', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(req, res) { res.send('ok') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getStartLineNumber()).toBeGreaterThan(0)
+    })
+
+    it('getScope always returns public', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(req, res) { res.send('ok') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getScope()).toBe('public')
+    })
+
+    it('getNode returns the method declaration node', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(req, res) { res.send('ok') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const node = callbacks[0]!.fn.getNode()
+      expect(node.getKind()).toBe(SyntaxKind.MethodDeclaration)
+    })
+
+    it('getName returns the method name', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { myHandler(req, res) { res.send('ok') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getName()).toBe('myHandler')
+    })
+
+    it('isAsync detects async methods', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { async handler(req, res) { await fetch('/api') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.isAsync()).toBe(true)
+    })
+
+    it('isExported returns false for method declaration callbacks', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(req, res) { res.send('ok') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.isExported()).toBe(false)
+    })
+
+    it('getBody returns the method body', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(req, res) { res.send('world') } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      const body = callbacks[0]!.fn.getBody()
+      expect(body).toBeDefined()
+      expect(body!.getText()).toContain('world')
+    })
+
+    it('getParameters returns parameters list', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', { handler(a, b) { return a } })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks[0]!.fn.getParameters()).toHaveLength(2)
+    })
+  })
+
+  describe('edge cases — object literal extraction', () => {
+    it('skips property assignments with no initializer', () => {
+      // TypeScript shorthand property: { x } — PropertyAssignment with no initializer
+      // Actually in ts-morph this would be a ShorthandPropertyAssignment, not PropertyAssignment
+      // So this should just not crash
+      const callExpr = getFirstCallExpression(`
+        const x = 1
+        app.get('/test', { x })
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      // Shorthand properties are not PropertyAssignment, so they're skipped
+      expect(callbacks).toHaveLength(0)
+    })
+
+    it('handles empty object literal argument', () => {
+      const callExpr = getFirstCallExpression(`
+        app.get('/test', {})
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks).toHaveLength(0)
+    })
+
+    it('handles call with no arguments', () => {
+      const callExpr = getFirstCallExpression(`
+        doSomething()
+      `)
+      const callbacks = extractCallbacks(callExpr)
+      expect(callbacks).toHaveLength(0)
+    })
+  })
 })

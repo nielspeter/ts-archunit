@@ -11,6 +11,8 @@ The `types()` entry point operates on interfaces and type aliases. Use it to enf
 
 ## Basic Usage
 
+A type rule selects interfaces or type aliases with predicates, then asserts a condition. This example enforces that any `Options` type with an `orderBy` property uses a typed union instead of a bare `string`, preventing SQL injection and typo bugs.
+
 ```typescript
 import { project, types, not, isString } from '@nielspeter/ts-archunit'
 
@@ -37,7 +39,7 @@ ts-archunit uses the TypeScript type checker to resolve types. This means:
 
 ## Available Predicates
 
-All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on types. In addition:
+Predicates narrow which interfaces and type aliases a rule applies to. Use `areInterfaces` or `areTypeAliases` to distinguish between the two, and property predicates to filter by shape. All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on types. In addition:
 
 | Predicate                   | Description                              | Example                                      |
 | --------------------------- | ---------------------------------------- | -------------------------------------------- |
@@ -48,6 +50,8 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 | `extendType(name)`          | Interface extends the named type         | `.that().extendType('BaseEntity')`           |
 
 ## Available Conditions
+
+Conditions define what matched types must satisfy. They cover property existence, naming patterns, immutability, and type-level assertions via `havePropertyType()` combined with type matchers.
 
 | Condition                          | Description                            | Example                                                  |
 | ---------------------------------- | -------------------------------------- | -------------------------------------------------------- |
@@ -63,7 +67,7 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Type Matchers
 
-Type matchers are used with `havePropertyType()` to assert on resolved TypeScript types:
+Type matchers are composable predicates that assert on resolved TypeScript types. Pass them to `havePropertyType()` to check what a property's type resolves to after alias expansion and generic instantiation. Combine matchers with `not()` and `arrayOf()` to express complex constraints without custom code.
 
 | Matcher               | Description                            | Example               |
 | --------------------- | -------------------------------------- | --------------------- |

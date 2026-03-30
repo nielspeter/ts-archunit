@@ -12,9 +12,37 @@
 npm install -D @nielspeter/ts-archunit
 ```
 
-## Your First Rule
+## Quick Start with Presets
 
-Create an `arch.test.ts` file in your test directory:
+The fastest way to add architecture rules. One function call enforces an entire architecture pattern:
+
+```typescript
+import { describe, it } from 'vitest'
+import { project } from '@nielspeter/ts-archunit'
+import { layeredArchitecture } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+describe('Architecture', () => {
+  it('enforces layered architecture', () => {
+    layeredArchitecture(p, {
+      layers: {
+        routes: 'src/routes/**',
+        services: 'src/services/**',
+        repositories: 'src/repositories/**',
+      },
+      shared: ['src/shared/**'],
+      strict: true,
+    })
+  })
+})
+```
+
+This generates 5 coordinated rules: layer ordering, cycle detection, innermost isolation, type-import enforcement, and package restrictions. See [Architecture Presets](/presets) for the full API.
+
+## Your First Custom Rule
+
+For project-specific constraints, use the fluent API directly:
 
 ```typescript
 import { describe, it } from 'vitest'

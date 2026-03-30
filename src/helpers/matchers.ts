@@ -1,4 +1,4 @@
-import { Node, SyntaxKind } from 'ts-morph'
+import { Node, SyntaxKind, type CommentRange } from 'ts-morph'
 
 /**
  * A matcher that tests whether a ts-morph AST node matches a specific pattern.
@@ -265,6 +265,73 @@ export function property(
       }
       // RegExp — test against raw getText()
       return value.test(initializer.getText())
+    },
+  }
+}
+
+/**
+ * Default stub/deferred-work patterns found in comments.
+ * Matches: TODO, FIXME, HACK, XXX, STUB, DEFERRED, PLACEHOLDER,
+ * "not implemented", "coming soon".
+ *
+ * Exported as a constant for use with `comment()`. Users can pass
+ * their own RegExp to `comment()` for narrower matching.
+ */
+export const STUB_PATTERNS =
+  /\b(TODO|FIXME|HACK|XXX|STUB|DEFERRED|PLACEHOLDER)\b|\bnot\s+implemented\b|\bcoming\s+soon\b/i
+
+/**
+ * Match comments attached to AST nodes.
+ *
+ * Unlike other matchers that test AST nodes, this matcher tests the
+ * leading and trailing comment ranges of each node. It uses
+ * `syntaxKinds: undefined` so the broad traversal path visits every node,
+ * and `matches(node)` checks that node's comment ranges.
+ *
+ * A Set tracks matched comment positions to avoid duplicates (the same
+ * comment may be visited as leading trivia of multiple nested nodes).
+ *
+ * @param pattern - String substring or RegExp to test against comment text.
+ *
+ * @example
+ * comment(/TODO/)                     // matches // TODO: implement this
+ * comment(STUB_PATTERNS)              // matches TODO, FIXME, HACK, STUB, etc.
+ * comment('FIXME')                    // matches // FIXME: broken
+ */
+export function comment(pattern: string | RegExp): ExpressionMatcher {
+  // Dedup by (filePath, pos) — prevents the same comment from matching
+  // multiple times when visited as leading trivia of nested nodes.
+  // Using a composite string key avoids cross-file collisions.
+  const matchedComments = new Set<string>()
+
+  function testComment(range: CommentRange): boolean {
+    const text = range.getText()
+    if (typeof pattern === 'string') {
+      return text.includes(pattern)
+    }
+    // Reset lastIndex for stateful (g-flag) regexes
+    pattern.lastIndex = 0
+    return pattern.test(text)
+  }
+
+  return {
+    description:
+      typeof pattern === 'string'
+        ? `comment containing '${pattern}'`
+        : `comment matching ${String(pattern)}`,
+    // No syntaxKinds — broad traversal to visit all nodes and their comments
+    matches(node: Node): boolean {
+      const filePath = node.getSourceFile().getFilePath()
+      const ranges = [...node.getLeadingCommentRanges(), ...node.getTrailingCommentRanges()]
+      for (const range of ranges) {
+        const key = `${filePath}:${String(range.getPos())}`
+        if (matchedComments.has(key)) continue
+        if (testComment(range)) {
+          matchedComments.add(key)
+          return true
+        }
+      }
+      return false
     },
   }
 }

@@ -2,6 +2,8 @@
 
 ## Before and After
 
+This comparison shows what ts-archunit replaces. Manual AST traversal is verbose, error-prone, and produces poor error messages. The fluent DSL compresses the same logic into a single readable chain while adding code frames, violation context, and CI-friendly output for free.
+
 Without ts-archunit, enforcing architecture means manual AST traversal with ts-morph:
 
 ```typescript

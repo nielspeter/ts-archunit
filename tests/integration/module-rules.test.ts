@@ -3,6 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import { modules } from '../../src/builders/module-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
+import { onlyDependOn, mustNotDependOn, typeOnlyFrom } from '../../src/rules/dependencies.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/modules')
@@ -115,6 +116,87 @@ describe('modules() — full fluent chain', () => {
           .notImportFromCondition('**/infra/**')
           .warn()
       }).not.toThrow()
+    })
+  })
+
+  // ----------------------------------------------------------------
+  // Dependency rules via .satisfy() (src/rules/dependencies.ts)
+  // ----------------------------------------------------------------
+  describe('dependency rules via .satisfy()', () => {
+    describe('onlyDependOn', () => {
+      it('domain modules only depend on domain and shared', () => {
+        expect(() => {
+          modules(p)
+            .that()
+            .resideInFolder('**/domain/**')
+            .and()
+            .haveNameMatching(/^(?!typed-service)/)
+            .should()
+            .satisfy(onlyDependOn('**/domain/**', '**/shared/**'))
+            .check()
+        }).not.toThrow()
+      })
+
+      it('bad modules violate onlyDependOn domain', () => {
+        expect(() => {
+          modules(p)
+            .that()
+            .resideInFolder('**/bad/**')
+            .should()
+            .satisfy(onlyDependOn('**/bad/**', '**/shared/**'))
+            .check()
+        }).toThrow(ArchRuleError)
+      })
+    })
+
+    describe('mustNotDependOn', () => {
+      it('domain modules must not depend on infra', () => {
+        expect(() => {
+          modules(p)
+            .that()
+            .resideInFolder('**/domain/**')
+            .and()
+            .haveNameMatching(/^(?!typed-service)/)
+            .should()
+            .satisfy(mustNotDependOn('**/infra/**'))
+            .check()
+        }).not.toThrow()
+      })
+
+      it('bad modules violate mustNotDependOn infra', () => {
+        expect(() => {
+          modules(p)
+            .that()
+            .resideInFolder('**/bad/**')
+            .should()
+            .satisfy(mustNotDependOn('**/infra/**'))
+            .check()
+        }).toThrow(ArchRuleError)
+      })
+    })
+
+    describe('typeOnlyFrom', () => {
+      it('domain modules only type-import from domain', () => {
+        expect(() => {
+          modules(p)
+            .that()
+            .resideInFolder('**/domain/**')
+            .should()
+            .satisfy(typeOnlyFrom('**/domain/**'))
+            .check()
+        }).not.toThrow()
+      })
+
+      it('bad modules with value imports from domain violate typeOnlyFrom', () => {
+        expect(() => {
+          modules(p)
+            .that()
+            .haveNameMatching(/^non-type-import/)
+            .should()
+            .satisfy(typeOnlyFrom('**/domain/**'))
+            .check()
+        }).toThrow(ArchRuleError)
+      })
     })
   })
 })

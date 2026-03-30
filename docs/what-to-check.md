@@ -6,6 +6,8 @@ Every example is a real rule you can paste into `arch.test.ts` and run with `npx
 
 ## Import Dependencies
 
+Control which modules can import from which, preventing forbidden cross-boundary dependencies.
+
 ```typescript
 // Domain must not import from infrastructure
 modules(p)
@@ -42,6 +44,8 @@ modules(p)
 
 ## Layer Ordering
 
+Enforce that dependencies between architectural layers only flow in one direction.
+
 ```typescript
 // Dependencies flow inward
 slices(p)
@@ -58,6 +62,8 @@ slices(p)
 
 ## Cycle Detection
 
+Detect circular dependencies between modules or feature slices that make code hard to refactor.
+
 ```typescript
 // No circular dependencies between feature modules
 slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
@@ -67,6 +73,8 @@ slices(p).matching('src/features/*/').should().notDependOn('legacy', 'deprecated
 ```
 
 ## Naming Conventions
+
+Enforce consistent naming patterns so classes, services, and functions are discoverable by convention.
 
 ```typescript
 // Controllers end with Controller
@@ -93,6 +101,8 @@ functions(p)
 
 ## Function Signatures
 
+Constrain function parameter counts, types, and shapes to keep APIs explicit and consistent.
+
 ```typescript
 // No rest parameters in route handlers (forces explicit typing)
 functions(p)
@@ -117,11 +127,12 @@ functions(p)
   .because('event handlers should accept exactly one Event parameter')
   .check()
 
-// Exported functions with optional params must document defaults
-functions(p).that().areExported().and().haveOptionalParameter().should().beExported().check()
+// TODO: placeholder — replace with a real optional-parameter rule for your project
 ```
 
 ## Class Structure
+
+Require classes to extend specific base classes or implement required methods.
 
 ```typescript
 // Repositories must extend BaseRepository
@@ -139,6 +150,8 @@ classes(p).that().extend('BaseService').should().shouldHaveMethodNamed('findById
 ```
 
 ## Containment
+
+Ensure classes live in the correct folders based on their name or role.
 
 ```typescript
 // Controllers must live in the controllers folder
@@ -160,6 +173,8 @@ classes(p)
 
 ## Inheritance
 
+Enforce that classes extending a base or implementing an interface follow naming and structural conventions.
+
 ```typescript
 // Classes extending BaseRepository must end with Repository
 classes(p)
@@ -180,6 +195,8 @@ classes(p)
 
 ## Decorators
 
+Constrain where decorated classes may live and which combinations of decorators are allowed.
+
 ```typescript
 // @Controller classes must be in controllers folder
 classes(p)
@@ -194,6 +211,8 @@ classes(p).that().areAbstract().and().haveDecorator('Controller').should().notEx
 ```
 
 ## Body Analysis
+
+Ban specific function calls, constructors, or property accesses inside method and function bodies.
 
 ```typescript
 // No raw parseInt — use shared helper
@@ -224,6 +243,8 @@ functions(p)
 
 ## Type Safety
 
+Catch weak or unsafe types like `any`, bare `string`, and type assertions at the architectural level.
+
 ```typescript
 // orderBy must be typed union, not bare string
 types(p)
@@ -243,6 +264,8 @@ classes(p).should().satisfy(noTypeAssertions()).check()
 ```
 
 ## Call Matching (Framework-Agnostic)
+
+Inspect method calls on specific objects to enforce patterns like authentication or error handling in route registrations.
 
 ```typescript
 // All route handlers must have error handling
@@ -278,6 +301,8 @@ calls(p)
 
 ## Scoped Rules (within)
 
+Narrow the scope of a rule to code inside matched call sites, such as route handler callbacks.
+
 ```typescript
 // Within route handlers, enforce normalizePagination
 const routes = calls(p)
@@ -290,6 +315,8 @@ within(routes).functions().should().contain(call('normalizePagination')).check()
 ```
 
 ## Pattern Templates
+
+Define reusable structural shapes (like paginated responses) that functions or types must conform to.
 
 ```typescript
 // List endpoints must return paginated collection shape
@@ -306,6 +333,8 @@ functions(p)
 ```
 
 ## Standard Rules (ready-to-use)
+
+Import pre-built rules for common concerns like type safety, security, and code quality without writing custom conditions.
 
 ```typescript
 // TypeScript strictness
@@ -340,6 +369,8 @@ classes(p)
 
 ## Smell Detection
 
+Find copy-pasted logic and inconsistent patterns across sibling files automatically.
+
 ```typescript
 // Detect near-identical function bodies
 smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).minLines(10).warn()
@@ -353,6 +384,8 @@ smells
 ```
 
 ## GraphQL Rules
+
+Validate GraphQL schema types and resolver implementations against architectural conventions.
 
 ```typescript
 import { schema, resolvers } from '@nielspeter/ts-archunit/graphql'
@@ -376,6 +409,8 @@ resolvers(p, 'src/resolvers/**')
 
 ## Cross-Layer Consistency
 
+Verify that matching counterparts exist across layers, such as a schema for every route.
+
 ```typescript
 // Every route must have a matching schema
 crossLayer(p)
@@ -392,6 +427,8 @@ crossLayer(p)
 ```
 
 ## Gradual Adoption
+
+Introduce rules into existing codebases without failing on legacy violations by using baselines and diff-awareness.
 
 ```typescript
 // Baseline — only NEW violations fail
@@ -410,6 +447,8 @@ classes(p).should().notContain(call('eval')).check({ format: detectFormat() })
 
 ## Exclusions (Permanent Exceptions)
 
+Exempt specific elements from a rule when a permanent exception is justified.
+
 ```typescript
 // Chain-level — exclude specific elements
 functions(p).should().notContain(newExpr('URLSearchParams'))
@@ -421,6 +460,8 @@ async getImageUrl() { ... }
 ```
 
 ## Rich Violation Messages
+
+Attach human-readable explanations, fix suggestions, and documentation links to rule violations.
 
 ```typescript
 // Every rule can explain WHY, HOW to fix, and WHERE to learn more
@@ -439,6 +480,8 @@ classes(p)
 ```
 
 ## Complexity & Size
+
+Set upper bounds on cyclomatic complexity, line counts, method counts, and parameter lists to prevent god classes and unreadable functions.
 
 ```typescript
 import {
@@ -472,6 +515,8 @@ functions(p).that().areExported().should().satisfy(maxFunctionParameters(4)).che
 ```
 
 ## Custom Rules
+
+Write your own predicates and conditions with full AST access when built-in rules don't cover your case.
 
 ```typescript
 // Custom predicate — filter by any logic

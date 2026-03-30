@@ -1,6 +1,6 @@
 # Pattern Templates
 
-Pattern templates enforce return type shapes across functions. Use them to ensure that all functions in a folder return objects with the expected structure -- for example, every list endpoint must return `{ total, skip, limit, items }`.
+Pattern templates enforce return type shapes across functions. Use them to ensure that all functions in a folder return objects with the expected structure -- for example, every list endpoint must return `{ total, skip, limit, items }`. This catches missing or mistyped fields at CI time, before inconsistent response shapes reach production and break clients.
 
 ## When to Use
 
@@ -11,7 +11,7 @@ Pattern templates enforce return type shapes across functions. Use them to ensur
 
 ## `definePattern()`
 
-Create a reusable pattern template with a name and a `returnShape` -- a record of property names to type constraints.
+`definePattern()` creates a reusable, named template describing the return type shape you expect. Define it once with a `returnShape` -- a record mapping property names to type constraints -- and then apply it to any set of functions via `followPattern()`. The name appears in violation messages so you can immediately tell which contract a function broke.
 
 ```typescript
 import { definePattern } from '@nielspeter/ts-archunit'
@@ -79,7 +79,7 @@ Available type matchers: `isString()`, `isNumber()`, `isBoolean()`, `isUnionOfLi
 
 ## `followPattern()`
 
-Apply a pattern to functions via the `followPattern()` condition on `FunctionRuleBuilder`.
+`followPattern()` is the condition that wires a pattern template into a function rule. It inspects every matched function's return type and reports a violation whenever a required property is missing or has the wrong type. Use it in combination with predicates like `resideInFolder()` or `haveNameMatching()` to target exactly the functions that should conform.
 
 ```typescript
 import { project, functions, definePattern } from '@nielspeter/ts-archunit'

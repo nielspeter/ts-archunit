@@ -110,3 +110,29 @@ export function classUseInsteadOf(
     },
   }
 }
+
+/**
+ * Class must not have an empty body (zero members).
+ *
+ * A class with only comments is still considered empty.
+ */
+export function classNotHaveEmptyBody(): Condition<ClassDeclaration> {
+  return {
+    description: 'not have an empty body',
+    evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const cls of elements) {
+        if (cls.getMembers().length === 0) {
+          violations.push(
+            createViolation(
+              cls,
+              `${getElementName(cls)} has an empty body (zero members)`,
+              context,
+            ),
+          )
+        }
+      }
+      return violations
+    },
+  }
+}

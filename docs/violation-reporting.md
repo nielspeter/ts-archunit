@@ -60,6 +60,8 @@ classes(p).that().haveDecorator('Deprecated').should().notExist().warn()
 
 ## Rule Metadata with `.rule()`
 
+When a rule fails, developers need to know not just what broke but why it exists and how to fix it. The `.rule()` method attaches structured metadata -- ID, rationale, fix suggestion, and docs link -- that appears directly in violation output. This turns cryptic failures into actionable guidance.
+
 Attach context to any rule:
 
 ```typescript
@@ -102,6 +104,8 @@ classes(p)
 
 ## Excluding Intentional Violations
 
+Not every rule violation is a bug. Some code legitimately needs to break a general rule -- a wrapper that constructs `URLSearchParams`, a legacy adapter that calls `parseInt`. Exclusions let you suppress these known-good violations permanently while keeping the rule enforced everywhere else. Unlike baseline mode (which tracks temporary debt), exclusions are for code that is correct as-is.
+
 Some violations are intentional -- they'll never be "fixed" because the code is correct. Use exclusions to suppress them while keeping the rule enforced for everything else.
 
 ### Chain-level exclusion
@@ -142,6 +146,8 @@ Supports exact strings and regex patterns. Patterns are tested against `violatio
 If an exclusion pattern matches zero violations, a warning is emitted to help detect stale exclusions after renames.
 
 ### Inline exclusion comments
+
+Inline comments let you suppress a violation directly in the source file, right next to the code. This is better than chain-level exclusions when the exception is tightly coupled to a specific line -- it survives renames and moves with the code during refactors.
 
 Exclude at the code level -- the exclusion moves with the code:
 

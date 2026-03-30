@@ -2,7 +2,12 @@ import type { ClassDeclaration } from 'ts-morph'
 import { RuleBuilder } from '../core/rule-builder.js'
 import type { ArchProject } from '../core/project.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
-import { classContain, classNotContain, classUseInsteadOf } from '../conditions/body-analysis.js'
+import {
+  classContain,
+  classNotContain,
+  classUseInsteadOf,
+  classNotHaveEmptyBody,
+} from '../conditions/body-analysis.js'
 
 // Identity predicates (plan 0003)
 import {
@@ -80,7 +85,15 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
 
   // --- Identity predicate methods (plan 0003) ---
 
+  /**
+   * After `.that()`: filter classes whose name matches the pattern.
+   * After `.should()`: assert matched classes have names matching the pattern.
+   */
   haveNameMatching(pattern: RegExp | string): this {
+    if (this._phase === 'condition') {
+      const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern
+      return this.addCondition(conditionHaveNameMatching(regex))
+    }
     return this.addPredicate(identityHaveNameMatching(pattern))
   }
 
@@ -92,11 +105,25 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
     return this.addPredicate(identityHaveNameEndingWith(suffix))
   }
 
+  /**
+   * After `.that()`: filter classes that reside in a file matching the glob.
+   * After `.should()`: assert matched classes reside in a file matching the glob.
+   */
   resideInFile(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionResideInFile(glob))
+    }
     return this.addPredicate(predicateResideInFile(glob))
   }
 
+  /**
+   * After `.that()`: filter classes that reside in a folder matching the glob.
+   * After `.should()`: assert matched classes reside in a folder matching the glob.
+   */
   resideInFolder(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionResideInFolder(glob))
+    }
     return this.addPredicate(predicateResideInFolder(glob))
   }
 
@@ -110,11 +137,25 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
 
   // --- Class-specific predicate methods ---
 
+  /**
+   * After `.that()`: filter classes that extend the given class.
+   * After `.should()`: assert matched classes extend the given class.
+   */
   extend(className: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionExtend(className))
+    }
     return this.addPredicate(predicateExtend(className))
   }
 
+  /**
+   * After `.that()`: filter classes that implement the given interface.
+   * After `.should()`: assert matched classes implement the given interface.
+   */
   implement(interfaceName: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionImplement(interfaceName))
+    }
     return this.addPredicate(predicateImplement(interfaceName))
   }
 
@@ -130,7 +171,14 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
     return this.addPredicate(predicateAreAbstract())
   }
 
+  /**
+   * After `.that()`: filter classes that have a method with the given name.
+   * After `.should()`: assert matched classes have a method with the given name.
+   */
   haveMethodNamed(name: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionHaveMethodNamed(name))
+    }
     return this.addPredicate(predicateHaveMethodNamed(name))
   }
 
@@ -144,10 +192,12 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
 
   // --- Structural condition methods (plan 0004) ---
 
+  /** @deprecated Use `resideInFile()` after `.should()` instead. */
   shouldResideInFile(glob: string): this {
     return this.addCondition(conditionResideInFile(glob))
   }
 
+  /** @deprecated Use `resideInFolder()` after `.should()` instead. */
   shouldResideInFolder(glob: string): this {
     return this.addCondition(conditionResideInFolder(glob))
   }
@@ -160,24 +210,24 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
     return this.addCondition(conditionNotExist())
   }
 
-  /**
-   * Assert that matched classes have names matching the regex.
-   * Note: The predicate variant (used after .that()) is haveNameMatching().
-   */
+  /** @deprecated Use `haveNameMatching()` after `.should()` instead. */
   conditionHaveNameMatching(pattern: RegExp): this {
     return this.addCondition(conditionHaveNameMatching(pattern))
   }
 
   // --- Class-specific condition methods ---
 
+  /** @deprecated Use `extend()` after `.should()` instead. */
   shouldExtend(className: string): this {
     return this.addCondition(conditionExtend(className))
   }
 
+  /** @deprecated Use `implement()` after `.should()` instead. */
   shouldImplement(interfaceName: string): this {
     return this.addCondition(conditionImplement(interfaceName))
   }
 
+  /** @deprecated Use `haveMethodNamed()` after `.should()` instead. */
   shouldHaveMethodNamed(name: string): this {
     return this.addCondition(conditionHaveMethodNamed(name))
   }
@@ -248,6 +298,13 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
    */
   useInsteadOf(bad: ExpressionMatcher, good: ExpressionMatcher): this {
     return this.addCondition(classUseInsteadOf(bad, good))
+  }
+
+  /**
+   * Assert that matched classes do not have empty bodies (zero members).
+   */
+  notHaveEmptyBody(): this {
+    return this.addCondition(classNotHaveEmptyBody())
   }
 }
 

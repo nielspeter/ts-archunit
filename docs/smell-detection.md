@@ -31,6 +31,8 @@ smells
 
 ### Configuration
 
+Each detection run can be scoped, tuned, and filtered using these chainable methods. Start broad and tighten thresholds as you reduce duplicates.
+
 | Method                  | Default   | Description                                                               |
 | ----------------------- | --------- | ------------------------------------------------------------------------- |
 | `inFolder(glob)`        | all files | Scope detection to files matching the glob. Can be called multiple times. |
@@ -43,6 +45,8 @@ smells
 
 ### Terminal Methods
 
+Terminal methods end the builder chain and execute the smell detection. Choose `.warn()` for advisory feedback during adoption or `.check()` when you want CI to block on smell violations.
+
 | Method     | Description                                         |
 | ---------- | --------------------------------------------------- |
 | `.warn()`  | Log violations to stderr without throwing. Default. |
@@ -51,6 +55,8 @@ smells
 Both accept an optional `{ format: 'terminal' | 'json' | 'github' }` parameter.
 
 ## AST Fingerprinting
+
+Understanding how fingerprinting works helps you tune similarity thresholds and predict what will (and won't) be caught. This section explains the internals so you can set expectations correctly.
 
 Duplicate detection works by comparing structural fingerprints, not raw text. Two functions with different variable names, string literals, and formatting can still be flagged as duplicates if their AST shapes are similar.
 
@@ -74,6 +80,8 @@ This means:
 - Reordering statements reduces similarity
 
 ## `smells.inconsistentSiblings()`
+
+Use this detector when your codebase has folder-level conventions (e.g., all repositories call `this.validate()`, all handlers call `handleError()`) and you want to catch files that missed the memo. It works by majority rule: if most files in a folder follow a pattern, the outliers are flagged.
 
 Detects files in the same folder where a majority follow a pattern but some don't. This catches files that forgot to adopt a convention that most siblings already follow.
 

@@ -1,7 +1,8 @@
 import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
-import { executeCheck, executeWarn } from './execute-rule.js'
+import type { RuleDescription } from './rule-description.js'
+import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 
 /**
  * Abstract base class for builders that share the terminal method pattern
@@ -57,6 +58,33 @@ export abstract class TerminalBuilder {
   excluding(...patterns: (string | RegExp)[]): this {
     this._exclusions.push(...patterns)
     return this
+  }
+
+  /**
+   * Return a structured description of this rule without executing it.
+   * Used by the `explain` CLI subcommand.
+   */
+  describeRule(): RuleDescription {
+    return {
+      rule: this._metadata?.id ?? 'unnamed',
+      id: this._metadata?.id,
+      because: this._reason,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+    }
+  }
+
+  /**
+   * Execute the rule and return violations after exclusion filtering.
+   * Does not throw — use for programmatic access (presets, aggregation).
+   */
+  violations(): ArchViolation[] {
+    const raw = this.collectViolations()
+    return applyFilters(raw, {
+      reason: this._reason,
+      metadata: this._metadata,
+      exclusions: this._exclusions,
+    })
   }
 
   /**

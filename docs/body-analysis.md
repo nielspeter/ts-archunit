@@ -15,11 +15,13 @@ Body analysis fills this gap. It traverses the AST inside every method body (for
 
 ## Matchers
 
+Matchers are the building blocks of body analysis rules. Each matcher targets a specific kind of AST node -- function calls, constructor invocations, property access, object properties, or arbitrary expressions. You pass a matcher to a condition like `notContain()` to define what should (or should not) appear inside method and function bodies.
+
 Five matchers cover the most common expression patterns:
 
 ### `call(target)`
 
-Matches function/method call expressions.
+Matches function and method call expressions. Use this to ban specific function calls (like `parseInt` or `console.log`) or require that certain methods are invoked (like `this.validate`). This is the most frequently used matcher.
 
 ```typescript
 import { call } from '@nielspeter/ts-archunit'
@@ -32,7 +34,7 @@ call(/^parse/) // matches parseInt, parseFloat, parseSomething
 
 ### `newExpr(target)`
 
-Matches constructor invocations (`new ...`).
+Matches constructor invocations (`new ...`). Use this to forbid direct instantiation of certain classes -- for example, banning `new Error()` in favor of typed domain errors, or banning `new URLSearchParams()` in favor of a shared utility.
 
 ```typescript
 import { newExpr } from '@nielspeter/ts-archunit'
@@ -45,7 +47,7 @@ newExpr(/^(?!Typed)Error$/) // matches new Error but not new TypeError
 
 ### `access(target)`
 
-Matches property access expressions.
+Matches property access expressions. Use this to detect direct access to globals like `process.env` or `document`, which should typically go through an abstraction layer for testability and portability.
 
 ```typescript
 import { access } from '@nielspeter/ts-archunit'
@@ -57,7 +59,7 @@ access(/^document\./) // matches document.querySelector, document.getElementById
 
 ### `property(name, value?)`
 
-Matches property assignments in object literals by name and optional value. Useful for inspecting configuration objects, JSON schema definitions, and options passed to framework calls.
+Matches property assignments in object literals by name and optional value. Use this when your architectural rules target configuration or schema definitions rather than executable code -- for example, ensuring JSON schemas always set `additionalProperties: false`, or that config objects use specific modes. Reach for `property()` instead of `expression()` when you need to match a specific key-value pair in an object literal.
 
 ```typescript
 import { property } from '@nielspeter/ts-archunit'
@@ -75,7 +77,7 @@ Value matching uses semantic comparison for primitives (`boolean`, `number`, `st
 
 ### `expression(target)`
 
-Matches any expression by its text representation. Use this as a fallback when the other matchers don't fit.
+Matches any expression by its raw source text. This is the catch-all matcher -- use it as a fallback when `call()`, `newExpr()`, `access()`, and `property()` do not cover your case. Because it matches against `getText()` output, it is less precise than the specialized matchers but more flexible.
 
 ```typescript
 import { expression } from '@nielspeter/ts-archunit'
@@ -115,9 +117,11 @@ call('this.extractCount')
 
 ## Conditions
 
+Conditions combine with matchers to form the `.should()` clause of a body analysis rule. They determine whether a matched expression must be present, must be absent, or should be replaced by an alternative.
+
 ### `contain(matcher)`
 
-Asserts that the body _must contain_ the matched expression:
+Asserts that every matched class or function must include at least one occurrence of the matched expression in its body. Use this to enforce that certain methods are always called -- for example, requiring that all repositories call `this.validate`.
 
 ```typescript
 classes(p).that().extend('BaseRepository').should().contain(call('this.validate')).check()
@@ -125,7 +129,7 @@ classes(p).that().extend('BaseRepository').should().contain(call('this.validate'
 
 ### `notContain(matcher)`
 
-Asserts that the body _must not contain_ the matched expression:
+Asserts that the matched expression must not appear anywhere in the body. This is the most common body analysis condition -- use it to ban unsafe functions, raw constructors, or direct access to globals that should go through an abstraction.
 
 ```typescript
 classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
@@ -133,7 +137,7 @@ classes(p).that().extend('BaseRepository').should().notContain(call('parseInt'))
 
 ### `useInsteadOf(banned, replacement)`
 
-A combination condition: asserts the banned expression is absent, and the replacement is present in the violation message as a suggestion.
+Combines a ban with a suggested alternative. It asserts the banned expression is absent and includes the replacement in the violation message as guidance. Use this instead of a bare `notContain()` when there is a clear migration path -- it produces more actionable violation messages.
 
 ```typescript
 classes(p)

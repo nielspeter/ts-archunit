@@ -18,7 +18,28 @@ import {
   notHaveAliasedImports as notHaveAliasedImportsCondition,
 } from '../conditions/dependency.js'
 import type { ImportOptions } from '../core/import-options.js'
-import { notExist } from '../conditions/structural.js'
+import {
+  notExist,
+  resideInFile as resideInFileCondition,
+  resideInFolder as resideInFolderCondition,
+} from '../conditions/structural.js'
+import type { ExpressionMatcher } from '../helpers/matchers.js'
+import type { ModuleBodyOptions } from '../helpers/body-traversal.js'
+import {
+  moduleContain,
+  moduleNotContain,
+  moduleUseInsteadOf,
+} from '../conditions/body-analysis-module.js'
+import {
+  notHaveDefaultExport as notHaveDefaultExportCondition,
+  haveDefaultExport as haveDefaultExportCondition,
+  haveMaxExports as haveMaxExportsCondition,
+} from '../conditions/exports.js'
+import {
+  onlyBeImportedVia as onlyBeImportedViaCondition,
+  beImported as beImportedCondition,
+  haveNoUnusedExports as haveNoUnusedExportsCondition,
+} from '../conditions/reverse-dependency.js'
 
 /**
  * Rule builder for module-level (SourceFile) architecture rules.
@@ -53,18 +74,26 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
   }
 
   /**
-   * Filter modules that reside in a file matching the given glob.
+   * After `.that()`: filter modules that reside in a file matching the given glob.
+   * After `.should()`: assert modules reside in a file matching the given glob.
    * Matched against the absolute file path.
    */
   resideInFile(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(resideInFileCondition<SourceFile>(glob))
+    }
     return this.addPredicate(resideInFilePredicate<SourceFile>(glob))
   }
 
   /**
-   * Filter modules that reside in a folder matching the given glob.
+   * After `.that()`: filter modules that reside in a folder matching the given glob.
+   * After `.should()`: assert modules reside in a folder matching the given glob.
    * Matched against the directory portion of the absolute file path.
    */
   resideInFolder(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(resideInFolderCondition<SourceFile>(glob))
+    }
     return this.addPredicate(resideInFolderPredicate<SourceFile>(glob))
   }
 
@@ -87,17 +116,25 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
   }
 
   /**
-   * Filter modules that do NOT import from any path matching the given globs.
+   * After `.that()`: filter modules that do NOT import from matching globs.
+   * After `.should()`: assert that no import resolves to a matching glob.
    */
   notImportFrom(...globs: string[]): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(notImportFromCondition(...globs))
+    }
     return this.addPredicate(notImportFromPredicate(...globs))
   }
 
   /**
-   * Filter modules that do NOT import from any path matching the given globs,
-   * with options to control type-import handling.
+   * After `.that()`: filter modules that do NOT import from matching globs.
+   * After `.should()`: assert that no import resolves to a matching glob.
+   * With options to control type-import handling.
    */
   notImportFromWithOptions(globs: string[], options: ImportOptions): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(notImportFromCondition(globs, options))
+    }
     return this.addPredicate(notImportFromPredicate(globs, options))
   }
 
@@ -134,21 +171,16 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
   }
 
   /**
-   * No import may resolve to a path matching any of the globs.
-   * Note: This is the condition variant (used after .should()).
-   * The predicate variant (used after .that()) is notImportFrom().
+   * @deprecated Use `notImportFrom()` after `.should()` instead — it now dispatches
+   * as a condition automatically in the condition phase.
    */
   notImportFromCondition(...globs: string[]): this {
     return this.addCondition(notImportFromCondition(...globs))
   }
 
   /**
-   * No import may resolve to a path matching any of the globs,
-   * with options to control type-import handling.
-   *
-   * Relationship with `onlyHaveTypeImportsFrom`:
-   * `onlyHaveTypeImportsFrom` enforces that imports MUST use `import type`.
-   * `notImportFromConditionWithOptions` with `ignoreTypeImports` allows type imports but forbids runtime imports.
+   * @deprecated Use `notImportFromWithOptions()` after `.should()` instead — it now
+   * dispatches as a condition automatically in the condition phase.
    */
   notImportFromConditionWithOptions(globs: string[], options: ImportOptions): this {
     return this.addCondition(notImportFromCondition(globs, options))
@@ -173,6 +205,84 @@ export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
    */
   notExist(): this {
     return this.addCondition(notExist<SourceFile>())
+  }
+
+  // --- Body analysis conditions (plan 0041 phase 2) ---
+
+  /**
+   * Assert that the module contains at least one match for the matcher.
+   * Default: searches the entire file including class/function bodies.
+   * With `{ scopeToModule: true }`: only searches top-level module-scope code.
+   */
+  contain(matcher: ExpressionMatcher, options?: ModuleBodyOptions): this {
+    return this.addCondition(moduleContain(matcher, options))
+  }
+
+  /**
+   * Assert that the module does NOT contain any match for the matcher.
+   * Default: searches the entire file including class/function bodies.
+   * With `{ scopeToModule: true }`: only searches top-level module-scope code.
+   */
+  notContain(matcher: ExpressionMatcher, options?: ModuleBodyOptions): this {
+    return this.addCondition(moduleNotContain(matcher, options))
+  }
+
+  /**
+   * Assert: module must NOT contain 'bad' AND must contain 'good'.
+   */
+  useInsteadOf(bad: ExpressionMatcher, good: ExpressionMatcher, options?: ModuleBodyOptions): this {
+    return this.addCondition(moduleUseInsteadOf(bad, good, options))
+  }
+
+  // --- Export conditions (plan 0041 phase 3) ---
+
+  /**
+   * Assert that matched modules do NOT have a default export.
+   */
+  notHaveDefaultExport(): this {
+    return this.addCondition(notHaveDefaultExportCondition())
+  }
+
+  /**
+   * Assert that matched modules have a default export.
+   */
+  haveDefaultExport(): this {
+    return this.addCondition(haveDefaultExportCondition())
+  }
+
+  /**
+   * Assert that matched modules have at most `max` named exports.
+   * Default exports are not counted.
+   */
+  haveMaxExports(max: number): this {
+    return this.addCondition(haveMaxExportsCondition(max))
+  }
+
+  // --- Reverse dependency conditions (plan 0041 phase 4) ---
+
+  /**
+   * Assert that every file importing this module matches at least one glob.
+   * Enforces barrel/facade patterns. Modules with zero importers pass vacuously.
+   */
+  onlyBeImportedVia(...globs: string[]): this {
+    return this.addCondition(onlyBeImportedViaCondition(...globs))
+  }
+
+  /**
+   * Assert that at least one other module in the project imports this module.
+   * Detects dead/orphaned files. Use `.excluding()` to skip entry points.
+   */
+  beImported(): this {
+    return this.addCondition(beImportedCondition())
+  }
+
+  /**
+   * Assert that every named export is referenced by at least one other file.
+   * Detects unused exports. More expensive than file-level checks — scope
+   * with `.that().resideInFolder()` to limit the search space.
+   */
+  haveNoUnusedExports(): this {
+    return this.addCondition(haveNoUnusedExportsCondition())
   }
 }
 
