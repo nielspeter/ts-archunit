@@ -1,6 +1,6 @@
 # Metrics
 
-Built-in metric rules for complexity, size, and method count thresholds.
+Built-in metric rules for complexity, size, and method count thresholds. These rules catch the slow creep of large classes, long functions, and tangled control flow before they become entrenched. Use them as guardrails in CI -- they are cheaper than code review for objective limits.
 
 ```typescript
 import {
@@ -15,6 +15,8 @@ classes(p).should().satisfy(maxMethods(15)).warn()
 ```
 
 ## Class-Level Rules
+
+Class-level metric rules enforce upper bounds on complexity, size, and member counts for class declarations. They prevent individual classes from growing into "god objects" that are hard to test and reason about.
 
 | Rule                         | What it checks                                           |
 | ---------------------------- | -------------------------------------------------------- |
@@ -58,6 +60,8 @@ classes(p)
 
 ## Function-Level Rules
 
+Function-level rules apply the same kind of guardrails to standalone functions and arrow functions. Use these in codebases that are primarily functional or when you want to enforce limits on functions outside of classes.
+
 | Rule                       | What it checks                         |
 | -------------------------- | -------------------------------------- |
 | `maxFunctionComplexity(n)` | Function complexity does not exceed N  |
@@ -79,6 +83,8 @@ functions(p).that().areExported().should().satisfy(maxFunctionParameters(4)).che
 ```
 
 ## Metric Predicates
+
+Metric predicates let you use thresholds as filters in the `.that()` phase rather than as conditions. This is useful when you want to combine a metric filter with a structural assertion -- for example, "complex classes must be exported" or "classes with many methods should not exist."
 
 For composition with other rules, metric predicates filter elements by threshold in `.that().satisfy()`:
 

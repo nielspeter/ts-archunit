@@ -11,7 +11,7 @@ The `calls()` entry point operates on call expressions across all source files. 
 
 ## ArchCall
 
-ts-archunit scans every `CallExpression` in the project and wraps it in an `ArchCall` model with precomputed fields:
+ts-archunit scans every `CallExpression` in the project and wraps it in an `ArchCall` model with precomputed fields. This model gives you uniform access to the call's target object, method name, and arguments regardless of whether the call is a method invocation like `app.get(...)` or a bare function call like `handleError(...)`.
 
 | Method            | Returns               | Example for `app.get('/users', handler)` |
 | ----------------- | --------------------- | ---------------------------------------- |
@@ -45,7 +45,7 @@ calls(p)
 
 ## Call Predicates
 
-Predicates filter which call expressions the rule applies to. Chain them with `.and()`.
+Predicates narrow down the set of call expressions your rule targets. Without predicates, a rule applies to every call in the project; with them, you select only the calls that matter -- for example, only HTTP route registrations on a specific object. Chain multiple predicates with `.and()`.
 
 ### `onObject(name)`
 
@@ -92,7 +92,7 @@ calls(p).that().withStringArg(0, '/api/users/**')
 
 ## Call Conditions
 
-Conditions assert what should (or should not) happen inside the matched calls -- either in callback arguments or in the call's own arguments.
+Conditions define the assertions enforced on calls that pass the predicate filter. They let you verify what happens inside callback arguments (e.g., every route handler must call `authenticate()`) or inspect the structure of non-callback arguments (e.g., every route must pass a schema object). If any matched call violates the condition, the rule reports it.
 
 ### `haveCallbackContaining(matcher)`
 

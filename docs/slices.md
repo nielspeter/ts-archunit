@@ -4,6 +4,8 @@ The `slices()` entry point groups source files into logical slices and checks re
 
 ## What Slices Are
 
+Slices let you reason about architecture at a higher level than individual files. Instead of writing per-module import rules, you group files into named units and enforce constraints between them -- cycle freedom, layer ordering, or isolation. Use slices when your architectural rules are about relationships between groups (features, layers, packages) rather than between individual files.
+
 A slice is a named group of source files. Two files in the same slice are considered "together." Two files in different slices have a dependency if one imports the other.
 
 Slices can represent:
@@ -14,7 +16,11 @@ Slices can represent:
 
 ## Defining Slices
 
+There are two ways to assign files to slices: automatic discovery from directory structure, or explicit assignment via a map. Use `matching()` when your folder layout already reflects the architecture; use `assignedFrom()` when slices do not map one-to-one to directories or when you want explicit control.
+
 ### `matching(pattern)`
+
+Derives slice names automatically from directory paths using a glob capture. This is the simplest approach when each subdirectory under a common parent represents one architectural slice (e.g., one feature folder per slice).
 
 Auto-discover slices from the directory structure:
 
@@ -30,6 +36,8 @@ slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 The `*/` captures one directory level. `src/features/billing/order.ts` and `src/features/billing/invoice.ts` both land in the `billing` slice.
 
 ### `assignedFrom(map)`
+
+Defines slices by providing a name-to-glob mapping. Use this when your architectural layers do not correspond to a single directory level, or when you need to name slices independently of folder structure. This is the typical choice for layer-based rules like Clean Architecture or Hexagonal Architecture.
 
 Explicitly assign slices from a map of glob patterns:
 

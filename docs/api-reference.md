@@ -17,29 +17,32 @@ All public exports from `ts-archunit`, organized by category.
 
 ## Rule Builders
 
-| Export                      | Description                                 |
-| --------------------------- | ------------------------------------------- |
-| `RuleBuilder`               | Base rule builder class.                    |
-| `ModuleRuleBuilder`         | Builder returned by `modules()`.            |
-| `ClassRuleBuilder`          | Builder returned by `classes()`.            |
-| `FunctionRuleBuilder`       | Builder returned by `functions()`.          |
-| `TypeRuleBuilder`           | Builder returned by `types()`.              |
-| `SliceRuleBuilder`          | Builder returned by `slices()`.             |
-| `CallRuleBuilder`           | Builder returned by `calls()`.              |
-| `ScopedFunctionRuleBuilder` | Builder returned by `within().functions()`. |
+| Export                      | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `RuleBuilder`               | Base rule builder class.                                   |
+| `TerminalBuilder`           | Base terminal builder class (slices, smells, cross-layer). |
+| `ModuleRuleBuilder`         | Builder returned by `modules()`.                           |
+| `ClassRuleBuilder`          | Builder returned by `classes()`.                           |
+| `FunctionRuleBuilder`       | Builder returned by `functions()`.                         |
+| `TypeRuleBuilder`           | Builder returned by `types()`.                             |
+| `SliceRuleBuilder`          | Builder returned by `slices()`.                            |
+| `CallRuleBuilder`           | Builder returned by `calls()`.                             |
+| `ScopedFunctionRuleBuilder` | Builder returned by `within().functions()`.                |
 
 ## Rule Builder Methods
 
 Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`).
 
-| Method         | Signature                                       | Description                                                                                             |
-| -------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `.excluding()` | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name, file path, or message. Warns on unused patterns. |
-| `.because()`   | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                          |
-| `.rule()`      | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                   |
-| `.check()`     | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                      |
-| `.warn()`      | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                                          |
-| `.severity()`  | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                                        |
+| Method            | Signature                                       | Description                                                                                             |
+| ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `.excluding()`    | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name, file path, or message. Warns on unused patterns. |
+| `.because()`      | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                          |
+| `.rule()`         | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                   |
+| `.check()`        | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                      |
+| `.warn()`         | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                                          |
+| `.severity()`     | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                                        |
+| `.violations()`   | `.violations(): ArchViolation[]`                | Execute rule, return violations without throwing. For programmatic access and presets.                  |
+| `.describeRule()` | `.describeRule(): RuleDescription`              | Return rule metadata without executing. Used by `explain` command.                                      |
 
 ## Exclusion Comments
 
@@ -184,14 +187,35 @@ Available on all entry points via `.that()`.
 
 ## Body Analysis Conditions
 
-| Export                 | Signature                                        | Description                                      |
-| ---------------------- | ------------------------------------------------ | ------------------------------------------------ |
-| `classContain`         | `classContain(matcher: ExpressionMatcher)`       | Class methods must contain expression.           |
-| `classNotContain`      | `classNotContain(matcher: ExpressionMatcher)`    | Class methods must not contain expression.       |
-| `classUseInsteadOf`    | `classUseInsteadOf(banned, replacement)`         | Ban expression in class, suggest replacement.    |
-| `functionContain`      | `functionContain(matcher: ExpressionMatcher)`    | Function body must contain expression.           |
-| `functionNotContain`   | `functionNotContain(matcher: ExpressionMatcher)` | Function body must not contain expression.       |
-| `functionUseInsteadOf` | `functionUseInsteadOf(banned, replacement)`      | Ban expression in function, suggest replacement. |
+| Export                     | Signature                                        | Description                                      |
+| -------------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| `classContain`             | `classContain(matcher: ExpressionMatcher)`       | Class methods must contain expression.           |
+| `classNotContain`          | `classNotContain(matcher: ExpressionMatcher)`    | Class methods must not contain expression.       |
+| `classUseInsteadOf`        | `classUseInsteadOf(banned, replacement)`         | Ban expression in class, suggest replacement.    |
+| `functionContain`          | `functionContain(matcher: ExpressionMatcher)`    | Function body must contain expression.           |
+| `functionNotContain`       | `functionNotContain(matcher: ExpressionMatcher)` | Function body must not contain expression.       |
+| `functionUseInsteadOf`     | `functionUseInsteadOf(banned, replacement)`      | Ban expression in function, suggest replacement. |
+| `functionNotHaveEmptyBody` | `functionNotHaveEmptyBody()`                     | Function must have at least one statement.       |
+| `classNotHaveEmptyBody`    | `classNotHaveEmptyBody()`                        | Class must have at least one member.             |
+| `moduleContain`            | `moduleContain(matcher, options?)`               | Module must contain expression.                  |
+| `moduleNotContain`         | `moduleNotContain(matcher, options?)`            | Module must not contain expression.              |
+| `moduleUseInsteadOf`       | `moduleUseInsteadOf(banned, replacement, opts?)` | Ban expression in module, suggest replacement.   |
+
+## Export Conditions
+
+| Export                 | Signature                     | Description                                   |
+| ---------------------- | ----------------------------- | --------------------------------------------- |
+| `notHaveDefaultExport` | `notHaveDefaultExport()`      | Module must not have a default export.        |
+| `haveDefaultExport`    | `haveDefaultExport()`         | Module must have a default export.            |
+| `haveMaxExports`       | `haveMaxExports(max: number)` | Module must have at most `max` named exports. |
+
+## Reverse Dependency Conditions
+
+| Export                | Signature                     | Description                                            |
+| --------------------- | ----------------------------- | ------------------------------------------------------ |
+| `onlyBeImportedVia`   | `onlyBeImportedVia(...globs)` | All importers must match at least one glob.            |
+| `beImported`          | `beImported()`                | Module must be imported by at least one other file.    |
+| `haveNoUnusedExports` | `haveNoUnusedExports()`       | Every named export must be referenced by another file. |
 
 ## Property Conditions
 
@@ -375,6 +399,7 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 | `ConditionContext`    | type | Context passed to condition evaluators.                             |
 | `ArchViolation`       | type | Violation model.                                                    |
 | `RuleMetadata`        | type | Rule metadata (`id`, `because`, `suggestion`, `docs`).              |
+| `RuleDescription`     | type | Structured rule description returned by `.describeRule()`.          |
 | `CheckOptions`        | type | Options for `.check()`.                                             |
 | `OutputFormat`        | type | Output format (`'terminal' \| 'github' \| 'json'`).                 |
 | `FormatOptions`       | type | Options for formatting functions.                                   |
@@ -465,6 +490,21 @@ Requires the optional `graphql` peer dependency.
 | `GraphQLArgumentLike`   | type | Argument interface.               |
 | `GraphQLTypeLike`       | type | Type interface.                   |
 
+## Presets (`ts-archunit/presets`)
+
+Parameterized architecture rule bundles that generate multiple coordinated rules from a single function call.
+
+| Export                | Signature                                                 | Description                                              |
+| --------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| `layeredArchitecture` | `layeredArchitecture(p, options): void`                   | Layer ordering, cycles, isolation, restricted packages.  |
+| `dataLayerIsolation`  | `dataLayerIsolation(p, options): void`                    | Base class extension and typed error enforcement.        |
+| `strictBoundaries`    | `strictBoundaries(p, options): void`                      | No cycles, no cross-boundary imports, shared isolation.  |
+| `dispatchRule`        | `dispatchRule(builder, ruleId, severity, overrides): V[]` | Run a single rule within a preset with severity control. |
+| `throwIfViolations`   | `throwIfViolations(violations): void`                     | Throw aggregated ArchRuleError if violations exist.      |
+| `validateOverrides`   | `validateOverrides(overrides, knownIds): void`            | Warn on unrecognized override keys.                      |
+
+See [Architecture Presets](/presets) for full configuration options.
+
 ## Standard Rules (Sub-Path Imports)
 
 ### `ts-archunit/rules/typescript`
@@ -477,19 +517,32 @@ Requires the optional `graphql` peer dependency.
 
 ### `ts-archunit/rules/security`
 
-| Export                    | Description                         |
-| ------------------------- | ----------------------------------- |
-| `noEval()`                | No `eval()` calls in class methods. |
-| `noFunctionConstructor()` | No `new Function()` constructor.    |
-| `noConsoleLog()`          | No `console.log` calls.             |
-| `noProcessEnv()`          | No direct `process.env` access.     |
+| Export                            | Target    | Description                                       |
+| --------------------------------- | --------- | ------------------------------------------------- |
+| `noEval()`                        | classes   | No `eval()` calls in class methods.               |
+| `noFunctionConstructor()`         | classes   | No `new Function()` constructor.                  |
+| `noConsoleLog()`                  | classes   | No `console.log` calls.                           |
+| `noProcessEnv()`                  | classes   | No direct `process.env` access.                   |
+| `noConsole()`                     | classes   | No console access at all (log, warn, error, etc). |
+| `noJsonParse()`                   | classes   | No `JSON.parse` calls.                            |
+| `functionNoEval()`                | functions | No `eval()` calls in functions.                   |
+| `functionNoFunctionConstructor()` | functions | No `new Function()` in functions.                 |
+| `functionNoProcessEnv()`          | functions | No `process.env` access in functions.             |
+| `functionNoConsoleLog()`          | functions | No `console.log` in functions.                    |
+| `functionNoConsole()`             | functions | No console access in functions.                   |
+| `functionNoJsonParse()`           | functions | No `JSON.parse` in functions.                     |
+| `moduleNoEval()`                  | modules   | No `eval()` anywhere in module.                   |
+| `moduleNoProcessEnv()`            | modules   | No `process.env` anywhere in module.              |
+| `moduleNoConsoleLog()`            | modules   | No `console.log` anywhere in module.              |
 
 ### `ts-archunit/rules/errors`
 
-| Export              | Description                                  |
-| ------------------- | -------------------------------------------- |
-| `noGenericErrors()` | No `new Error()` -- use typed domain errors. |
-| `noTypeErrors()`    | No `new TypeError()`.                        |
+| Export                      | Target    | Description                                  |
+| --------------------------- | --------- | -------------------------------------------- |
+| `noGenericErrors()`         | classes   | No `new Error()` -- use typed domain errors. |
+| `noTypeErrors()`            | classes   | No `new TypeError()`.                        |
+| `functionNoGenericErrors()` | functions | No `new Error()` in functions.               |
+| `functionNoTypeErrors()`    | functions | No `new TypeError()` in functions.           |
 
 ### `ts-archunit/rules/naming`
 
@@ -505,6 +558,22 @@ Requires the optional `graphql` peer dependency.
 | `onlyDependOn(...globs)`    | Module may only import from listed paths.         |
 | `mustNotDependOn(...globs)` | Module must not import from listed paths.         |
 | `typeOnlyFrom(...globs)`    | Imports from listed paths must use `import type`. |
+
+### `ts-archunit/rules/architecture`
+
+| Export                   | Target    | Description                                             |
+| ------------------------ | --------- | ------------------------------------------------------- |
+| `mustCall(pattern)`      | functions | Function body must contain a call matching the regex.   |
+| `classMustCall(pattern)` | classes   | At least one class method must contain a matching call. |
+
+### `ts-archunit/rules/hygiene`
+
+| Export                     | Target    | Description                                            |
+| -------------------------- | --------- | ------------------------------------------------------ |
+| `noDeadModules()`          | modules   | Module must be imported by at least one other file.    |
+| `noUnusedExports()`        | modules   | Every named export must be referenced by another file. |
+| `noStubComments(pattern?)` | functions | No TODO/FIXME/HACK/STUB comments in function body.     |
+| `noEmptyBodies()`          | functions | Functions must have at least one statement.            |
 
 ### `ts-archunit/rules/metrics`
 

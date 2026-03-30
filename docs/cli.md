@@ -37,6 +37,18 @@ npx ts-archunit baseline arch.rules.ts --output arch-baseline.json
 
 Records all existing violations so that `check --baseline` only fails on new ones. See [Gradual Adoption](/core-concepts#baseline-mode) for details.
 
+### `explain` — Dump Rule Metadata
+
+```bash
+# JSON output (default)
+npx ts-archunit explain arch.rules.ts
+
+# Markdown table
+npx ts-archunit explain arch.rules.ts --markdown
+```
+
+Outputs a structured description of every rule — id, description, because, suggestion — without executing them. See [Explain Command](/explain) for use cases.
+
 ## Options
 
 | Flag                | Short | Description                                                           |

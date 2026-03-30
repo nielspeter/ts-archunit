@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-03-28
+**Updated:** 2026-03-30
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 39 completed, 0 remaining
+**Total Plans:** 43 completed, 0 remaining
 
 ---
 
@@ -53,9 +53,20 @@
 
 ---
 
+## Final batch (completed 2026-03-30)
+
+| Priority | Plan                                              | Effort   | Status               | Depends on       |
+| -------- | ------------------------------------------------- | -------- | -------------------- | ---------------- |
+| **P1**   | ~~Architecture Rule Framework Primitives (0041)~~ | 2.5 days | COMPLETED 2026-03-30 | 0011, 0007       |
+| **P1**   | ~~Standard Architecture Rule Conditions (0042)~~  | 0.5 day  | COMPLETED 2026-03-30 | 0041             |
+| **P1**   | ~~Architecture Presets (0040)~~                   | 1.5 days | COMPLETED 2026-03-30 | 0041, 0042       |
+| **P1**   | ~~Docs, Explain Command, and Recipes (0043)~~     | 1 day    | COMPLETED 2026-03-30 | 0041, 0042, 0040 |
+
+---
+
 ## What's Shipped
 
-**1414 tests across 108 files. All checks pass.**
+**1518 tests across 118 files. All checks pass.**
 
 ### Core (P0)
 
@@ -127,8 +138,46 @@
 - VitePress user guide with 16 pages (plans 0023, 0027, 0028)
 - GitHub Pages deployment workflow
 
+### Standard Architecture Rule Conditions (P1 — plan 0042)
+
+- Security function variants: `functionNoEval`, `functionNoFunctionConstructor`, `functionNoProcessEnv`, `functionNoConsoleLog`, `functionNoConsole`, `functionNoJsonParse`
+- Security module variants: `moduleNoEval`, `moduleNoProcessEnv`, `moduleNoConsoleLog`
+- New class security rules: `noConsole` (all console methods), `noJsonParse`
+- Error function variants: `functionNoGenericErrors`, `functionNoTypeErrors`
+- Architecture primitives: `mustCall(pattern)`, `classMustCall(pattern)` — positive body assertion
+- Hygiene rules: `noDeadModules`, `noUnusedExports`, `noStubComments`, `noEmptyBodies`
+- Sub-path exports: `./rules/architecture`, `./rules/hygiene`
+
+### Architecture Rule Primitives (P1 — plan 0041)
+
+- Builder phase tracking: `_phase` field, dual-use methods dispatch as predicate or condition based on `.that()` / `.should()` context
+- Phase-aware methods: `notImportFrom`, `resideInFile`, `resideInFolder`, `haveNameMatching`, `extend`, `implement`, `haveMethodNamed` across 4 builders
+- Module body analysis: `modules().should().notContain()` / `contain()` / `useInsteadOf()` with `{ scopeToModule: true }` option
+- Export conditions: `notHaveDefaultExport()`, `haveDefaultExport()`, `haveMaxExports(n)`
+- Reverse dependency: `onlyBeImportedVia()`, `beImported()`, `haveNoUnusedExports()` with cached reverse import graph
+- Stub detection: `comment()` matcher, `STUB_PATTERNS` constant, `notHaveEmptyBody()` on functions + classes
+- 7 deprecated aliases: `notImportFromCondition`, `shouldResideInFile`, `shouldResideInFolder`, `conditionHaveNameMatching`, `shouldExtend`, `shouldImplement`, `shouldHaveMethodNamed`
+
+### Architecture Presets (P1 — plan 0040)
+
+- `layeredArchitecture(p, options)` — layer ordering, cycle detection, innermost isolation, type-import enforcement, restricted packages
+- `dataLayerIsolation(p, options)` — base class extension, typed error enforcement for repositories
+- `strictBoundaries(p, options)` — no cycles, no cross-boundary imports, shared isolation, test isolation, copy-paste detection
+- `.violations()` terminal on `RuleBuilder` and `TerminalBuilder` — returns violations without throwing
+- `dispatchRule()` + `throwIfViolations()` — aggregated error reporting across multiple rules
+- Sub-path export: `./presets`
+- Override system: per-rule severity (`'error'`, `'warn'`, `'off'`)
+
+### Docs, Explain Command, and Recipes (P1 — plan 0043)
+
+- `npx ts-archunit explain` CLI subcommand — dumps active rules as JSON or markdown
+- `.describeRule()` on `RuleBuilder` and `TerminalBuilder` — metadata extraction without rule execution
+- VitePress: `docs/presets.md`, `docs/recipes.md`, `docs/explain.md` — 3 new pages
+- Updated: `docs/standard-rules.md`, `docs/getting-started.md`, `docs/cli.md`
+- Explanatory descriptions added to all 45+ sections across 18 documentation files
+
 ---
 
 ## All Plans Complete
 
-39 of 39 plans implemented. 1414 tests across 108 files. 91% integration test line coverage.
+43 of 43 plans implemented. 1538 tests across 123 files.

@@ -12,7 +12,7 @@ The `functions()` entry point operates on functions, arrow functions, and class 
 
 ## ArchFunction
 
-ts-archunit collects three kinds of declarations into a single `ArchFunction` type:
+Unlike most linters that treat function declarations, arrow functions, and class methods as separate constructs, ts-archunit collects all three into a single `ArchFunction` type. This lets you write one rule that covers every function shape in your codebase.
 
 1. **Function declarations** -- `function handleRequest() { ... }`
 2. **Arrow function variables** -- `const handleRequest = () => { ... }`
@@ -32,7 +32,7 @@ functions(p).that().resideInFolder('**/handlers/**').should().beAsync().check()
 
 ## Available Predicates
 
-All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on functions. In addition:
+Predicates filter which functions a rule targets. Combine them with `.and()` to build precise selections. All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on functions. The function-specific predicates below let you filter by async status, visibility, parameter shape, and return type:
 
 | Predicate                          | Description                                          | Example                                      |
 | ---------------------------------- | ---------------------------------------------------- | -------------------------------------------- |
@@ -52,6 +52,8 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 | `haveParameterNameMatching(regex)` | Function has a parameter name matching regex         | `.that().haveParameterNameMatching(/^ctx/)`  |
 
 ## Available Conditions
+
+Conditions define what matched functions must satisfy. They go after `.should()` and cover export visibility, async requirements, naming, body analysis, return types, and parameter types.
 
 | Condition                           | Description                                   | Example                                                          |
 | ----------------------------------- | --------------------------------------------- | ---------------------------------------------------------------- |

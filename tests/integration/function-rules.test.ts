@@ -564,4 +564,79 @@ describe('functions() entry point integration', () => {
       }).not.toThrow()
     })
   })
+
+  // ----------------------------------------------------------------
+  // resideInFile as condition (after .should())
+  // ----------------------------------------------------------------
+  describe('resideInFile as condition', () => {
+    it('passes when matched functions reside in the expected file', () => {
+      // parseFooOrder, parseBarOrder, parseBazOrder all reside in routes.ts
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parse\w+Order$/)
+          .should()
+          .resideInFile('**/routes.ts')
+          .check()
+      }).not.toThrow()
+    })
+
+    it('fails when functions do not reside in the expected file', () => {
+      // parse*Order functions are in routes.ts, not in good-service.ts
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parse\w+Order$/)
+          .should()
+          .resideInFile('**/good-service.ts')
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+  })
+
+  // ----------------------------------------------------------------
+  // resideInFolder as condition (after .should())
+  // ----------------------------------------------------------------
+  describe('resideInFolder as condition', () => {
+    it('passes when matched functions reside in the expected folder', () => {
+      // All functions in the POC fixture reside under poc/src
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parse\w+Order$/)
+          .should()
+          .resideInFolder('**/poc/src')
+          .check()
+      }).not.toThrow()
+    })
+
+    it('fails when functions do not reside in the expected folder', () => {
+      // parse*Order functions are not in a folder matching **/nonexistent
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/^parse\w+Order$/)
+          .should()
+          .resideInFolder('**/nonexistent')
+          .check()
+      }).toThrow(ArchRuleError)
+    })
+  })
+
+  // ----------------------------------------------------------------
+  // beAsync as condition — positive path (passes for async functions)
+  // ----------------------------------------------------------------
+  describe('beAsync condition — positive path', () => {
+    it('passes when all matched functions are async', () => {
+      // getTotal methods are async in both OrderService and ProductService
+      expect(() => {
+        functions(p)
+          .that()
+          .haveNameMatching(/\.getTotal$/)
+          .should()
+          .beAsync()
+          .check()
+      }).not.toThrow()
+    })
+  })
 })

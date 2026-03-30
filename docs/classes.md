@@ -4,6 +4,8 @@ The `classes()` entry point operates on class declarations. Use it for inheritan
 
 ## When to Use
 
+Use `classes()` when your architectural rules target object-oriented constructs -- inheritance hierarchies, decorators, method signatures, or property shapes. If your rule is about standalone functions or type aliases, reach for `functions()` or `types()` instead.
+
 - Enforce inheritance patterns (repositories extend BaseRepository)
 - Check decorators on classes and methods
 - Verify naming conventions for classes
@@ -22,7 +24,7 @@ classes(p).that().extend('BaseRepository').should().beExported().check()
 
 ## Available Predicates
 
-All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on classes. In addition:
+Predicates narrow down which classes a rule applies to. Chain them with `.and()` to combine multiple filters. All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on classes. In addition, class-specific predicates let you filter by inheritance, decorators, and members:
 
 | Predicate                   | Description                           | Example                                 |
 | --------------------------- | ------------------------------------- | --------------------------------------- |
@@ -37,7 +39,11 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Available Conditions
 
+Conditions define what the matched classes must satisfy. They go after `.should()` in the rule chain. Conditions are grouped into structural checks, class-specific assertions, and body analysis.
+
 ### Structural Conditions
+
+Structural conditions apply to any declaration type and cover basic concerns like export visibility and naming.
 
 | Condition                       | Description                            |
 | ------------------------------- | -------------------------------------- |
@@ -46,6 +52,8 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 | `conditionHaveNameMatching(re)` | Class name must match the regex        |
 
 ### Class-Specific Conditions
+
+These conditions assert on class structure -- inheritance, methods, properties, and parameter types. Use them to enforce patterns like "all repositories must extend BaseRepository" or "services must not accept a raw database client."
 
 | Condition                              | Description                                | Example                                                          |
 | -------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
@@ -63,6 +71,8 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 | `notAcceptParameterOfType(matcher)`    | No parameter matches TypeMatcher           | `.should().notAcceptParameterOfType(matching(/DatabaseClient/))` |
 
 ### Body Analysis Conditions
+
+Body analysis conditions inspect the AST inside class method bodies for specific call expressions, constructor invocations, or other patterns. Use these to ban unsafe APIs or require specific helper calls.
 
 | Condition                           | Description                                   |
 | ----------------------------------- | --------------------------------------------- |

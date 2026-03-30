@@ -7,8 +7,15 @@
 import { describe, it } from 'vitest'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
 import { noAnyProperties, noTypeAssertions } from '../../src/rules/typescript.js'
-import { noEval, noConsoleLog } from '../../src/rules/security.js'
-import { noGenericErrors } from '../../src/rules/errors.js'
+import {
+  noEval,
+  noConsoleLog,
+  functionNoEval,
+  functionNoJsonParse,
+  moduleNoEval,
+} from '../../src/rules/security.js'
+import { noGenericErrors, functionNoGenericErrors } from '../../src/rules/errors.js'
+import { noEmptyBodies, noStubComments } from '../../src/rules/hygiene.js'
 
 const p = project('tsconfig.json')
 
@@ -354,6 +361,140 @@ describe('Architecture', () => {
         suggestion: 'Extract shared code to a lower-level module (core or helpers)',
       })
       .warn() // type-only imports create false-positive cycles; switch to .check() when beFreeOfCycles ignores import type
+  })
+})
+
+// ─── Hygiene: function variants (plan 0042) ────────────────────────
+
+describe('Hygiene', () => {
+  it('source functions must not have empty bodies', () => {
+    functions(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .should()
+      .satisfy(noEmptyBodies())
+      .rule({
+        id: 'hygiene/no-empty-bodies',
+        because: 'An empty function compiles but does nothing — dead code or unfinished work',
+      })
+      .check()
+  })
+
+  it('source functions must not have stub comments', () => {
+    functions(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .should()
+      .satisfy(noStubComments())
+      .rule({
+        id: 'hygiene/no-stubs',
+        because: 'TODO/FIXME/HACK comments indicate unfinished work — resolve before merging',
+      })
+      .check()
+  })
+
+  it('source functions must not use eval', () => {
+    functions(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .should()
+      .satisfy(functionNoEval())
+      .rule({ id: 'security/no-eval-fn' })
+      .check()
+  })
+
+  it('source functions must not throw generic Error (excluding argument validation)', () => {
+    functions(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .should()
+      .satisfy(functionNoGenericErrors())
+      .excluding(
+        // Argument validation in condition factories — thrown at construction time, not evaluation
+        /haveMaxExports/,
+        /havePropertyNamed/,
+        /notHavePropertyNamed/,
+        /haveArgumentWithProperty/,
+        /notHaveArgumentWithProperty/,
+        // Project loader — single point of failure with descriptive message
+        'project',
+        // GraphQL schema loader — requires graphql peer dep
+        'requireGraphQL',
+        'loadSchemaFromGlob',
+      )
+      .rule({
+        id: 'quality/typed-errors-fn',
+        because: 'Use ArchRuleError or a specific Error subclass',
+      })
+      .check()
+  })
+
+  it('source modules must not contain eval', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .should()
+      .satisfy(moduleNoEval())
+      .rule({ id: 'security/no-eval-module' })
+      .check()
+  })
+
+  it('source functions must not use JSON.parse (excluding CLI and baseline)', () => {
+    functions(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .should()
+      .satisfy(functionNoJsonParse())
+      .excluding(
+        'getVersion', // CLI: reads package.json version
+        'withBaseline', // baseline: parses baseline JSON file
+      )
+      .rule({
+        id: 'security/no-json-parse',
+        because: 'ts-archunit analyzes AST, not JSON — JSON.parse should not appear in source',
+      })
+      .check()
+  })
+
+  it('presets must not import from graphql', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/presets/**')
+      .should()
+      .notImportFrom('**/src/graphql/**')
+      .rule({
+        id: 'arch/presets-no-graphql',
+        because: 'Presets are core — they must not depend on the optional graphql extension',
+      })
+      .check()
+  })
+
+  it('presets must not import from cli', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/src/presets/**')
+      .should()
+      .notImportFrom('**/src/cli/**')
+      .rule({
+        id: 'arch/presets-no-cli',
+        because: 'Presets are used programmatically — they must not depend on CLI infrastructure',
+      })
+      .check()
+  })
+
+  it('modules must not have default exports (except index)', () => {
+    modules(p)
+      .that()
+      .resideInFolder('**/ts-archunit/src/**')
+      .and()
+      .haveNameMatching(/^(?!index\.ts$)/)
+      .should()
+      .notHaveDefaultExport()
+      .rule({
+        id: 'quality/no-default-exports',
+        because: 'Named exports are easier to refactor and tree-shake',
+      })
+      .check()
   })
 })
 

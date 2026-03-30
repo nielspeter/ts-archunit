@@ -36,6 +36,18 @@
       "types": "./dist/rules/metrics.d.ts",
       "import": "./dist/rules/metrics.js"
     },
+    "./rules/architecture": {
+      "types": "./dist/rules/architecture.d.ts",
+      "import": "./dist/rules/architecture.js"
+    },
+    "./rules/hygiene": {
+      "types": "./dist/rules/hygiene.d.ts",
+      "import": "./dist/rules/hygiene.js"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "import": "./dist/presets/index.js"
+    },
     "./graphql": {
       "types": "./dist/graphql/index.d.ts",
       "import": "./dist/graphql/index.js"

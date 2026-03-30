@@ -1,3 +1,4 @@
+import picomatch from 'picomatch'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ArchFunction } from '../models/arch-function.js'
@@ -172,5 +173,42 @@ export function haveReturnTypeMatching(matcher: TypeMatcher): Condition<ArchFunc
     (fn) => matcher(fn.getReturnType()),
     (fn) =>
       `${fn.getName() ?? '<anonymous>'} has return type '${fn.getReturnType().getText()}' which does not match the expected type constraint`,
+  )
+}
+
+/**
+ * Functions must reside in a file matching the glob.
+ * ArchFunction is not a ts-morph Node, so the generic structural condition
+ * cannot be used — this is the ArchFunction-specific equivalent.
+ */
+export function resideInFile(glob: string): Condition<ArchFunction> {
+  const isMatch = picomatch(glob)
+  return functionCondition(
+    `reside in file matching '${glob}'`,
+    (fn) => isMatch(fn.getSourceFile().getFilePath()),
+    (fn) =>
+      `${fn.getName() ?? '<anonymous>'} resides in '${fn.getSourceFile().getFilePath()}' which does not match '${glob}'`,
+  )
+}
+
+/**
+ * Functions must reside in a folder matching the glob.
+ * ArchFunction is not a ts-morph Node, so the generic structural condition
+ * cannot be used — this is the ArchFunction-specific equivalent.
+ */
+export function resideInFolder(glob: string): Condition<ArchFunction> {
+  const isMatch = picomatch(glob)
+  return functionCondition(
+    `reside in folder matching '${glob}'`,
+    (fn) => {
+      const filePath = fn.getSourceFile().getFilePath()
+      const folder = filePath.substring(0, filePath.lastIndexOf('/'))
+      return isMatch(folder)
+    },
+    (fn) => {
+      const filePath = fn.getSourceFile().getFilePath()
+      const folder = filePath.substring(0, filePath.lastIndexOf('/'))
+      return `${fn.getName() ?? '<anonymous>'} resides in folder '${folder}' which does not match '${glob}'`
+    },
   )
 }

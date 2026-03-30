@@ -18,8 +18,10 @@ export {
 
 // Core — rule builder, error & metadata
 export { RuleBuilder } from './core/rule-builder.js'
+export { TerminalBuilder } from './core/terminal-builder.js'
 export { ArchRuleError } from './core/errors.js'
 export type { RuleMetadata } from './core/rule-metadata.js'
+export type { RuleDescription } from './core/rule-description.js'
 
 // Core — code frame & formatting
 export { generateCodeFrame } from './core/code-frame.js'
@@ -179,16 +181,46 @@ export {
 } from './helpers/type-matchers.js'
 
 // Body analysis helpers (plan 0011)
-export { call, access, newExpr, expression, property } from './helpers/matchers.js'
+export {
+  call,
+  access,
+  newExpr,
+  expression,
+  property,
+  comment,
+  STUB_PATTERNS,
+} from './helpers/matchers.js'
 export type { ExpressionMatcher } from './helpers/matchers.js'
 
 // Body analysis conditions (for advanced composition)
-export { classContain, classNotContain, classUseInsteadOf } from './conditions/body-analysis.js'
+export {
+  classContain,
+  classNotContain,
+  classUseInsteadOf,
+  classNotHaveEmptyBody,
+} from './conditions/body-analysis.js'
 export {
   functionContain,
   functionNotContain,
   functionUseInsteadOf,
+  functionNotHaveEmptyBody,
 } from './conditions/body-analysis-function.js'
+export {
+  moduleContain,
+  moduleNotContain,
+  moduleUseInsteadOf,
+} from './conditions/body-analysis-module.js'
+export type { ModuleBodyOptions } from './helpers/body-traversal.js'
+
+// Export conditions (plan 0041 phase 3)
+export { notHaveDefaultExport, haveDefaultExport, haveMaxExports } from './conditions/exports.js'
+
+// Reverse dependency conditions (plan 0041 phase 4)
+export {
+  onlyBeImportedVia,
+  beImported,
+  haveNoUnusedExports,
+} from './conditions/reverse-dependency.js'
 
 // Slice model (plan 0012)
 export type { Slice, SliceDefinition } from './models/slice.js'
@@ -283,6 +315,39 @@ export {
 
 // Complexity calculator (for custom rules)
 export { cyclomaticComplexity, linesOfCode } from './helpers/complexity.js'
+
+// Standard rules — security function/module variants (plan 0042)
+export {
+  noEval,
+  noFunctionConstructor,
+  noProcessEnv,
+  noConsoleLog,
+  noConsole,
+  noJsonParse,
+  functionNoEval,
+  functionNoFunctionConstructor,
+  functionNoProcessEnv,
+  functionNoConsoleLog,
+  functionNoConsole,
+  functionNoJsonParse,
+  moduleNoEval,
+  moduleNoProcessEnv,
+  moduleNoConsoleLog,
+} from './rules/security.js'
+
+// Standard rules — error function variants (plan 0042)
+export {
+  noGenericErrors,
+  noTypeErrors,
+  functionNoGenericErrors,
+  functionNoTypeErrors,
+} from './rules/errors.js'
+
+// Standard rules — architecture (plan 0042)
+export { mustCall, classMustCall } from './rules/architecture.js'
+
+// Standard rules — hygiene (plan 0042)
+export { noDeadModules, noUnusedExports, noStubComments, noEmptyBodies } from './rules/hygiene.js'
 
 // CLI config (plan 0020)
 export { defineConfig } from './cli/config.js'

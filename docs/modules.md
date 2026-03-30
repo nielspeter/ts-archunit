@@ -26,7 +26,7 @@ modules(p)
 
 ## Available Predicates
 
-All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on modules. In addition:
+All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on modules. In addition, module-specific predicates let you filter by import relationships and exported symbols. Use these in the `.that()` clause to narrow down which modules the rule applies to.
 
 | Predicate                 | Description                                         | Example                                   |
 | ------------------------- | --------------------------------------------------- | ----------------------------------------- |
@@ -37,11 +37,22 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 ## Available Conditions
 
-| Condition                          | Description                                        | Example                                                 |
-| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| `onlyImportFrom(...globs)`         | Module may only import from the listed paths       | `.should().onlyImportFrom('**/domain/**')`              |
-| `notImportFromCondition(...globs)` | Module must not import from the listed paths       | `.should().notImportFromCondition('**/controllers/**')` |
-| `onlyHaveTypeImportsFrom(glob)`    | Imports from matching paths must use `import type` | `.should().onlyHaveTypeImportsFrom('**/models/**')`     |
+Conditions define what the matched modules must (or must not) do. These go in the `.should()` clause and are checked against every module that passed the predicate filter. Use them to enforce import boundaries, restrict allowed dependencies, and require type-only imports where runtime coupling is undesirable.
+
+| Condition                          | Description                                                       | Example                                                 |
+| ---------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| `onlyImportFrom(...globs)`         | Module may only import from the listed paths                      | `.should().onlyImportFrom('**/domain/**')`              |
+| `notImportFromCondition(...globs)` | Module must not import from the listed paths                      | `.should().notImportFromCondition('**/controllers/**')` |
+| `onlyHaveTypeImportsFrom(glob)`    | Imports from matching paths must use `import type`                | `.should().onlyHaveTypeImportsFrom('**/models/**')`     |
+| `notHaveAliasedImports()`          | No named import may use an alias (`import { x as y }`)            | `.should().notHaveAliasedImports()`                     |
+| `notHaveDefaultExport()`           | Module must not have a default export                             | `.should().notHaveDefaultExport()`                      |
+| `haveDefaultExport()`              | Module must have a default export                                 | `.should().haveDefaultExport()`                         |
+| `haveMaxExports(n)`                | Module must have at most n named exports                          | `.should().haveMaxExports(10)`                          |
+| `onlyBeImportedVia(...globs)`      | All importers must match at least one glob (barrel enforcement)   | `.should().onlyBeImportedVia('**/index.ts')`            |
+| `beImported()`                     | Module must be imported by at least one other file                | `.should().beImported()`                                |
+| `haveNoUnusedExports()`            | Every named export must be referenced elsewhere                   | `.should().haveNoUnusedExports()`                       |
+| `contain(matcher, options?)`       | Module must contain at least one match for the expression matcher | `.should().contain(call('validate'))`                   |
+| `notContain(matcher, options?)`    | Module must not contain any match for the expression matcher      | `.should().notContain(call('eval'))`                    |
 
 ## Real-World Examples
 
@@ -134,7 +145,7 @@ modules(p)
 
 ## Standard Rules
 
-Pre-built dependency conditions from `ts-archunit/rules/dependencies`:
+Standard rules are pre-packaged conditions for common dependency patterns, so you do not have to write them from scratch. They are composable with `.satisfy()` and cover the most frequent layer-boundary constraints. Reach for these when your rule maps cleanly to "only depend on X" or "must not depend on Y."
 
 ```typescript
 import {

@@ -4,7 +4,8 @@ import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
-import { executeCheck, executeWarn } from './execute-rule.js'
+import type { RuleDescription } from './rule-description.js'
+import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 
 /**
  * Abstract base class for all rule builders.
@@ -23,6 +24,7 @@ export abstract class RuleBuilder<T> {
   protected _reason?: string
   protected _metadata?: RuleMetadata
   protected _exclusions: (string | RegExp)[] = []
+  protected _phase: 'predicate' | 'condition' = 'predicate'
 
   constructor(protected readonly project: ArchProject) {}
 
@@ -31,8 +33,10 @@ export abstract class RuleBuilder<T> {
   /**
    * Begin the predicate phase. Returns `this` for chaining.
    * Purely a readability marker — `.that().haveNameMatching(...)` reads like English.
+   * Explicitly resets phase to 'predicate' — defensive against `.should().that()` misuse.
    */
   that(): this {
+    this._phase = 'predicate'
     return this
   }
 
@@ -47,9 +51,11 @@ export abstract class RuleBuilder<T> {
   /**
    * Begin the condition phase. Returns a forked builder for named selection safety.
    * Creates a fresh builder with the same predicates but empty conditions.
+   * Sets phase to 'condition' so dual-use methods dispatch correctly.
    */
   should(): this {
     const fork = this.fork()
+    fork._phase = 'condition'
     return fork
   }
 
@@ -117,6 +123,33 @@ export abstract class RuleBuilder<T> {
   }
 
   // --- Terminal methods ---
+
+  /**
+   * Return a structured description of this rule without executing it.
+   * Used by the `explain` CLI subcommand.
+   */
+  describeRule(): RuleDescription {
+    return {
+      rule: this.buildRuleDescription(),
+      id: this._metadata?.id,
+      because: this._reason,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+    }
+  }
+
+  /**
+   * Execute the rule and return violations after exclusion filtering.
+   * Does not throw — use for programmatic access (presets, aggregation).
+   */
+  violations(): ArchViolation[] {
+    const raw = this.evaluate()
+    return applyFilters(raw, {
+      reason: this._reason,
+      metadata: this._metadata,
+      exclusions: this._exclusions,
+    })
+  }
 
   /**
    * Execute the rule and throw `ArchRuleError` if any violations are found.
@@ -248,14 +281,16 @@ export abstract class RuleBuilder<T> {
       return []
     }
 
-    // Step 3b: Warn if no conditions were added — likely a predicate/condition mixup
-    if (this._conditions.length === 0) {
+    // Step 3b: Warn if no conditions were added and phase is still 'predicate'
+    // — likely a predicate-only method was called after .should().
+    // Phase-aware methods dispatch correctly, so this only fires for predicate-only methods.
+    if (this._conditions.length === 0 && this._phase === 'predicate') {
       const ruleId = this._metadata?.id ?? (this.buildRuleDescription() || 'unnamed')
       console.warn(
         `[ts-archunit] Rule '${ruleId}' has predicates but no conditions. ` +
-          `Did you use a predicate method after .should()? ` +
-          `Predicate methods (e.g. notImportFrom) filter elements; ` +
-          `use the condition variant (e.g. notImportFromCondition) after .should().`,
+          `Did you use a predicate-only method after .should()? ` +
+          `Predicate-only methods (e.g. areExported, areAsync) filter elements; ` +
+          `use a condition method or .satisfy() after .should().`,
       )
       return []
     }

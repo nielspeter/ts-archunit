@@ -1,3 +1,4 @@
+import { Node } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
@@ -105,6 +106,39 @@ export function functionUseInsteadOf(
             createFunctionViolation(
               fn,
               `${fn.getName() ?? '<anonymous>'} does not contain ${good.description}`,
+              context,
+            ),
+          )
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
+ * Function must not have an empty body (zero statements).
+ *
+ * Expression-bodied arrows (`() => expr`) always pass — they have no block body.
+ * A function with only comments is still considered empty (comments are not statements).
+ */
+export function functionNotHaveEmptyBody(): Condition<ArchFunction> {
+  return {
+    description: 'not have an empty body',
+    evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const fn of elements) {
+        const body = fn.getBody()
+        if (!body) continue // no body = declaration only, skip
+
+        // Expression-bodied arrows return the expression, not a Block
+        if (!Node.isBlock(body)) continue // expression body — always has content
+
+        if (body.getStatements().length === 0) {
+          violations.push(
+            createFunctionViolation(
+              fn,
+              `${fn.getName() ?? '<anonymous>'} has an empty body`,
               context,
             ),
           )

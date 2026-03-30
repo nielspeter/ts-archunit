@@ -7,6 +7,7 @@ import { resetProjectCache } from '../core/project.js'
 import { resolveConfig } from './resolve-config.js'
 import { runCheck } from './commands/check.js'
 import { runBaseline } from './commands/baseline.js'
+import { runExplain } from './commands/explain.js'
 import { watchAndRerun } from './watch.js'
 
 function getVersion(): string {
@@ -21,6 +22,7 @@ ts-archunit — Architecture testing for TypeScript
 Usage:
   ts-archunit check [files...]          Run architecture rules
   ts-archunit baseline [files...]       Generate baseline file
+  ts-archunit explain [files...]        Dump all active rules as JSON
 
 Options:
   --baseline <path>     Baseline file for filtering known violations
@@ -28,6 +30,7 @@ Options:
   --changed             Only report violations in changed files (git diff)
   --base <branch>       Base branch for diff (default: main)
   --format <format>     Output format: terminal, json, github, auto (default: auto)
+  --markdown            Output explain results as markdown table
   -w, --watch           Watch for changes and re-run (check command only)
   --config <path>       Path to config file
   -v, --version         Show version number
@@ -45,6 +48,7 @@ interface ParsedArgs {
     help?: boolean
     version?: boolean
     watch?: boolean
+    markdown?: boolean
   }
   positionals: string[]
 }
@@ -56,6 +60,7 @@ export function parseCliArgs(args: string[]): ParsedArgs {
       baseline: { type: 'string' },
       output: { type: 'string' },
       changed: { type: 'boolean', default: false },
+      markdown: { type: 'boolean', default: false },
       base: { type: 'string', default: 'main' },
       format: { type: 'string' },
       config: { type: 'string' },
@@ -161,6 +166,16 @@ export async function run(args: string[]): Promise<void> {
 
     const output = values.output ?? 'arch-baseline.json'
     await runBaseline({ ruleFiles, output })
+  } else if (command === 'explain') {
+    if (ruleFiles.length === 0) {
+      console.error(
+        'Error: No rule files specified. Pass rule files as arguments or set them in config.',
+      )
+      process.exitCode = 1
+      return
+    }
+
+    await runExplain({ ruleFiles, markdown: values.markdown })
   } else {
     console.error(`Error: Unknown command "${command}". Use --help for usage.`)
     process.exitCode = 1

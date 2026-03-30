@@ -37,6 +37,8 @@ export default defineConfig({
           { text: 'Smell Detection', link: '/smell-detection' },
           { text: 'GraphQL Rules', link: '/graphql' },
           { text: 'Standard Rules', link: '/standard-rules' },
+          { text: 'Architecture Presets', link: '/presets' },
+          { text: 'Recipes', link: '/recipes' },
           { text: 'Metrics', link: '/metrics' },
           { text: 'Custom Rules', link: '/custom-rules' },
           { text: 'Violation Reporting', link: '/violation-reporting' },
@@ -46,6 +48,7 @@ export default defineConfig({
         text: 'Reference',
         items: [
           { text: 'CLI', link: '/cli' },
+          { text: 'Explain Command', link: '/explain' },
           { text: 'API Reference', link: '/api-reference' },
         ],
       },

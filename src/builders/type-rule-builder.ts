@@ -22,6 +22,8 @@ import {
   beExported as conditionBeExported,
   notExist as conditionNotExist,
   haveNameMatching as conditionHaveNameMatching,
+  resideInFile as conditionResideInFile,
+  resideInFolder as conditionResideInFolder,
 } from '../conditions/structural.js'
 import {
   haveNameMatching as identityHaveNameMatching,
@@ -98,6 +100,7 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
     return this.addCondition(conditionNotExist())
   }
 
+  /** @deprecated Use `haveNameMatching()` after `.should()` instead. */
   conditionHaveNameMatching(pattern: RegExp): this {
     return this.addCondition(conditionHaveNameMatching(pattern))
   }
@@ -130,7 +133,15 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
 
   // --- Identity predicates (convenience wrappers) ---
 
+  /**
+   * After `.that()`: filter types whose name matches the pattern.
+   * After `.should()`: assert matched types have names matching the pattern.
+   */
   haveNameMatching(pattern: RegExp | string): this {
+    if (this._phase === 'condition') {
+      const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern
+      return this.addCondition(conditionHaveNameMatching(regex))
+    }
     return this.addPredicate(identityHaveNameMatching(pattern))
   }
 
@@ -142,11 +153,25 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
     return this.addPredicate(identityAreNotExported())
   }
 
+  /**
+   * After `.that()`: filter types in a file matching the glob.
+   * After `.should()`: assert types reside in a file matching the glob.
+   */
   resideInFile(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionResideInFile(glob))
+    }
     return this.addPredicate(identityResideInFile(glob))
   }
 
+  /**
+   * After `.that()`: filter types in a folder matching the glob.
+   * After `.should()`: assert types reside in a folder matching the glob.
+   */
   resideInFolder(glob: string): this {
+    if (this._phase === 'condition') {
+      return this.addCondition(conditionResideInFolder(glob))
+    }
     return this.addPredicate(identityResideInFolder(glob))
   }
 }
