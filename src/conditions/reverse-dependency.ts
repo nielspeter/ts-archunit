@@ -17,6 +17,27 @@ const graphCache = new WeakMap<Project, ReverseImportGraph>()
  * test suite share the same graph. Cache is cleared automatically
  * when resetProjectCache() creates new ArchProject instances (WeakMap GC).
  */
+/**
+ * Add an edge to the reverse import graph: targetPath is imported by sf.
+ * Deduplicates entries when `deduplicate` is true (used for re-exports
+ * where the same file may appear via both import and export declarations).
+ */
+function addToGraph(
+  graph: ReverseImportGraph,
+  targetPath: string,
+  sf: SourceFile,
+  deduplicate: boolean,
+): void {
+  const existing = graph.get(targetPath)
+  if (existing) {
+    if (!deduplicate || !existing.includes(sf)) {
+      existing.push(sf)
+    }
+  } else {
+    graph.set(targetPath, [sf])
+  }
+}
+
 function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
   if (sourceFiles.length === 0) return new Map()
 
@@ -31,13 +52,7 @@ function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
     for (const decl of sf.getImportDeclarations()) {
       const resolved = decl.getModuleSpecifierSourceFile()
       if (!resolved) continue
-      const targetPath = resolved.getFilePath()
-      const existing = graph.get(targetPath)
-      if (existing) {
-        existing.push(sf)
-      } else {
-        graph.set(targetPath, [sf])
-      }
+      addToGraph(graph, resolved.getFilePath(), sf, false)
     }
 
     // Re-export declarations (export { x } from './y') — these reference
@@ -45,13 +60,7 @@ function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
     for (const decl of sf.getExportDeclarations()) {
       const resolved = decl.getModuleSpecifierSourceFile()
       if (!resolved) continue
-      const targetPath = resolved.getFilePath()
-      const existing = graph.get(targetPath)
-      if (existing) {
-        if (!existing.includes(sf)) existing.push(sf)
-      } else {
-        graph.set(targetPath, [sf])
-      }
+      addToGraph(graph, resolved.getFilePath(), sf, true)
     }
   }
 
@@ -75,8 +84,9 @@ function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
  */
 export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
   const matchers = globs.map((g) => picomatch(g))
+  const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
-    description: `only be imported via ${globs.map((g) => `"${g}"`).join(', ')}`,
+    description: `only be imported via ${quotedGlobs}`,
     evaluate(elements: SourceFile[], context: ConditionContext): ArchViolation[] {
       // Build graph from ALL project files, not just the filtered elements
       const allFiles = elements.length > 0 ? elements[0]!.getProject().getSourceFiles() : []
@@ -153,36 +163,42 @@ export function beImported(): Condition<SourceFile> {
  * **Note:** Default exports are excluded from this check. Use `beImported()` for
  * file-level dead code detection. Only named exports are analyzed.
  */
+/**
+ * Scan a single source file for unused named exports, returning violations.
+ */
+function findUnusedExportsInFile(sf: SourceFile, context: ConditionContext): ArchViolation[] {
+  const violations: ArchViolation[] = []
+  const exportMap = sf.getExportedDeclarations()
+
+  for (const [name, declarations] of exportMap) {
+    if (name === 'default') continue
+    if (declarations.length === 0) continue
+
+    const firstDecl = declarations[0]!
+    if (!hasExternalReference(firstDecl, sf)) {
+      const line = Node.isNode(firstDecl) ? firstDecl.getStartLineNumber() : 1
+      violations.push({
+        rule: context.rule,
+        element: sf.getBaseName(),
+        file: sf.getFilePath(),
+        line,
+        message: `${sf.getBaseName()} exports "${name}" which is not referenced by any other file`,
+        because: context.because,
+      })
+    }
+  }
+
+  return violations
+}
+
 export function haveNoUnusedExports(): Condition<SourceFile> {
   return {
     description: 'have no unused exports',
     evaluate(elements: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
-
       for (const sf of elements) {
-        const exportMap = sf.getExportedDeclarations()
-
-        for (const [name, declarations] of exportMap) {
-          if (name === 'default') continue
-          if (declarations.length === 0) continue
-
-          const firstDecl = declarations[0]!
-          const hasExternalRef = hasExternalReference(firstDecl, sf)
-
-          if (!hasExternalRef) {
-            const line = Node.isNode(firstDecl) ? firstDecl.getStartLineNumber() : 1
-            violations.push({
-              rule: context.rule,
-              element: sf.getBaseName(),
-              file: sf.getFilePath(),
-              line,
-              message: `${sf.getBaseName()} exports "${name}" which is not referenced by any other file`,
-              because: context.because,
-            })
-          }
-        }
+        violations.push(...findUnusedExportsInFile(sf, context))
       }
-
       return violations
     },
   }

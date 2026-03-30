@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-03-30
+
+### Changed
+
+- Reduced cognitive complexity in 8 functions by extracting helpers: `applyTypeImportRules`, `applyRestrictedPackages`, `applySharedIsolation`, `applyTestIsolation`, `addToGraph`, `findUnusedExportsInFile`, `matchPropertyValue`, `matchPropertyName`, `collectEdgesFromFile`, `scanParametersForType`, `collectByKind`, `collectBroad`, `collectModuleScopeMatches`
+- Eliminated nested template literals in `call.ts`, `dependency.ts`, `members.ts`, `reverse-dependency.ts` by extracting to variables
+- Merged duplicate imports in `cross-layer.ts`, `function-rule-builder.ts`
+- Added `readonly` to `_exclusions` in `TerminalBuilder` and `_conditions` in `SliceRuleBuilder`
+- Used `this` return type in `CrossLayerBuilder.layer()`
+- Reworded JSDoc in `matchers.ts` and `hygiene.ts` to avoid false-positive SonarLint stub-comment warnings
+
 ## [0.7.0] - 2026-03-30
 
 ### Added

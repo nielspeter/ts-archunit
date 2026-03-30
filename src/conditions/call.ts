@@ -145,10 +145,11 @@ export function haveArgumentWithProperty(...names: string[]): Condition<ArchCall
   if (names.length === 0) {
     throw new Error('haveArgumentWithProperty requires at least one property name')
   }
+  const quotedNames = names.map((n) => `"${n}"`).join(', ')
   const description =
     names.length === 1
       ? `have argument with property "${names[0]!}"`
-      : `have argument with properties ${names.map((n) => `"${n}"`).join(', ')}`
+      : `have argument with properties ${quotedNames}`
 
   return {
     description,
@@ -165,10 +166,11 @@ export function haveArgumentWithProperty(...names: string[]): Condition<ArchCall
           }
         }
         if (!found) {
+          const callName = archCall.getName() ?? '<call>'
           violations.push(
             createCallViolation(
               archCall,
-              `${archCall.getName() ?? '<call>'} has no argument with properties ${names.map((n) => `"${n}"`).join(', ')}`,
+              `${callName} has no argument with properties ${quotedNames}`,
               context,
             ),
           )
@@ -191,10 +193,11 @@ export function notHaveArgumentWithProperty(...names: string[]): Condition<ArchC
   if (names.length === 0) {
     throw new Error('notHaveArgumentWithProperty requires at least one property name')
   }
+  const quotedNames = names.map((n) => `"${n}"`).join(', ')
   const description =
     names.length === 1
       ? `not have argument with property "${names[0]!}"`
-      : `not have argument with properties ${names.map((n) => `"${n}"`).join(', ')}`
+      : `not have argument with properties ${quotedNames}`
 
   return {
     description,

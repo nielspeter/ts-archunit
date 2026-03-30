@@ -35,6 +35,31 @@ export function buildFileToSliceMap(slices: Slice[]): Map<string, string> {
  * @param fileToSlice - Pre-built file-to-slice map (optional, built internally if not provided)
  * @returns Unique directed edges between slices
  */
+/**
+ * Collect unique slice edges from a single file's imports.
+ */
+function collectEdgesFromFile(
+  file: SourceFile,
+  sliceName: string,
+  fileToSlice: Map<string, string>,
+  edgeSet: Set<string>,
+  edges: SliceEdge[],
+): void {
+  for (const importDecl of file.getImportDeclarations()) {
+    const resolved = importDecl.getModuleSpecifierSourceFile()
+    if (!resolved) continue
+
+    const targetSlice = fileToSlice.get(resolved.getFilePath())
+    if (targetSlice && targetSlice !== sliceName) {
+      const edgeKey = `${sliceName}->${targetSlice}`
+      if (!edgeSet.has(edgeKey)) {
+        edgeSet.add(edgeKey)
+        edges.push({ from: sliceName, to: targetSlice })
+      }
+    }
+  }
+}
+
 export function buildSliceDependencyGraph(
   slices: Slice[],
   fileToSlice?: Map<string, string>,
@@ -47,19 +72,7 @@ export function buildSliceDependencyGraph(
 
   for (const slice of slices) {
     for (const file of slice.files) {
-      for (const importDecl of file.getImportDeclarations()) {
-        const resolved = importDecl.getModuleSpecifierSourceFile()
-        if (!resolved) continue
-
-        const targetSlice = map.get(resolved.getFilePath())
-        if (targetSlice && targetSlice !== slice.name) {
-          const edgeKey = `${slice.name}->${targetSlice}`
-          if (!edgeSet.has(edgeKey)) {
-            edgeSet.add(edgeKey)
-            edges.push({ from: slice.name, to: targetSlice })
-          }
-        }
-      }
+      collectEdgesFromFile(file, slice.name, map, edgeSet, edges)
     }
   }
 

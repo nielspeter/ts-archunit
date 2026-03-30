@@ -29,8 +29,8 @@ function getClassMembers(cls: ClassDeclaration): ClassMember[] {
 function getMemberName(cls: ClassDeclaration, member: ClassMember): string {
   const clsName = cls.getName() ?? '<anonymous>'
   if ('getName' in member && typeof member.getName === 'function') {
-    const name: unknown = member.getName()
-    return `${clsName}.${String(name)}`
+    const memberName = String(member.getName())
+    return `${clsName}.${memberName}`
   }
   return `${clsName}.constructor`
 }

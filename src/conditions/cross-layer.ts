@@ -2,8 +2,7 @@ import type { SourceFile } from 'ts-morph'
 import type { PairCondition } from '../core/pair-condition.js'
 import type { ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
-import type { LayerPair } from '../models/cross-layer.js'
-import type { Layer } from '../models/cross-layer.js'
+import type { LayerPair, Layer } from '../models/cross-layer.js'
 
 /**
  * Every element in the left layer must have at least one match in the right layer.

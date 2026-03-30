@@ -69,7 +69,7 @@ export class CrossLayerBuilder {
    * Define a layer by name and glob pattern.
    * At least two layers must be defined before calling `.mapping()`.
    */
-  layer(name: string, pattern: string): CrossLayerBuilder {
+  layer(name: string, pattern: string): this {
     this._layerDefs.push({ name, pattern })
     return this
   }

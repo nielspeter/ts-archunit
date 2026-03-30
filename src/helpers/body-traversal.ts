@@ -25,6 +25,43 @@ export interface MatchResult {
 }
 
 /**
+ * Targeted traversal: only check nodes of the specified syntax kinds.
+ */
+function findMatchesByKind(node: Node, matcher: ExpressionMatcher): Node[] {
+  const matches: Node[] = []
+  for (const kind of matcher.syntaxKinds!) {
+    for (const descendant of node.getDescendantsOfKind(kind)) {
+      if (matcher.matches(descendant)) {
+        matches.push(descendant)
+      }
+    }
+  }
+  return matches
+}
+
+/**
+ * Broad traversal: check every descendant, then deduplicate.
+ *
+ * Parent nodes' getText() includes children's text, so regex-based
+ * matchers (expression()) match at multiple ancestor levels.
+ * Keep only the deepest (most specific) matching nodes.
+ */
+function findMatchesBroad(node: Node, matcher: ExpressionMatcher): Node[] {
+  const matches: Node[] = []
+  for (const descendant of node.getDescendants()) {
+    if (matcher.matches(descendant)) {
+      matches.push(descendant)
+    }
+  }
+  return matches.filter(
+    (m) =>
+      !matches.some(
+        (other) => other !== m && other.getStart() >= m.getStart() && other.getEnd() <= m.getEnd(),
+      ),
+  )
+}
+
+/**
  * Find all nodes in a subtree that match the given matcher.
  *
  * Uses getDescendantsOfKind when the matcher specifies syntaxKinds
@@ -32,38 +69,10 @@ export interface MatchResult {
  * getDescendants() for matchers without syntaxKinds (expression()).
  */
 export function findMatchesInNode(node: Node, matcher: ExpressionMatcher): Node[] {
-  const matches: Node[] = []
-
   if (matcher.syntaxKinds && matcher.syntaxKinds.length > 0) {
-    // Targeted traversal: only check nodes of the specified kinds
-    for (const kind of matcher.syntaxKinds) {
-      for (const descendant of node.getDescendantsOfKind(kind)) {
-        if (matcher.matches(descendant)) {
-          matches.push(descendant)
-        }
-      }
-    }
-  } else {
-    // Broad traversal: check every descendant node
-    for (const descendant of node.getDescendants()) {
-      if (matcher.matches(descendant)) {
-        matches.push(descendant)
-      }
-    }
-    // Deduplicate: remove ancestors of other matches.
-    // Parent nodes' getText() includes children's text, so regex-based
-    // matchers (expression()) match at multiple ancestor levels.
-    // Keep only the deepest (most specific) matching nodes.
-    return matches.filter(
-      (m) =>
-        !matches.some(
-          (other) =>
-            other !== m && other.getStart() >= m.getStart() && other.getEnd() <= m.getEnd(),
-        ),
-    )
+    return findMatchesByKind(node, matcher)
   }
-
-  return matches
+  return findMatchesBroad(node, matcher)
 }
 
 /**
@@ -162,6 +171,25 @@ export function getFunctionBody(node: Node): Node | undefined {
  * expression bodies. Use when you already have class/function rules and
  * want to avoid duplicate violations.
  */
+/**
+ * Collect matches from top-level variable statement initializers,
+ * skipping arrow/function expressions (covered by function rules).
+ */
+function collectVariableStatementMatches(statement: Node, matcher: ExpressionMatcher): Node[] {
+  if (!NodeUtils.isVariableStatement(statement)) return []
+  const matches: Node[] = []
+  for (const decl of statement.getDeclarationList().getDeclarations()) {
+    const initializer = decl.getInitializer()
+    if (!initializer) continue
+    // Skip arrow/function expressions entirely — function rules cover them
+    if (NodeUtils.isArrowFunction(initializer) || NodeUtils.isFunctionExpression(initializer)) {
+      continue
+    }
+    matches.push(...findMatchesInNode(initializer, matcher))
+  }
+  return matches
+}
+
 export function searchModuleBody(
   sourceFile: SourceFile,
   matcher: ExpressionMatcher,
@@ -185,15 +213,7 @@ export function searchModuleBody(
     // For variable statements (const/let/var), check the initializer but skip
     // arrow function and function expression bodies within it
     if (NodeUtils.isVariableStatement(statement)) {
-      for (const decl of statement.getDeclarationList().getDeclarations()) {
-        const initializer = decl.getInitializer()
-        if (!initializer) continue
-        // Skip arrow/function expressions entirely — function rules cover them
-        if (NodeUtils.isArrowFunction(initializer) || NodeUtils.isFunctionExpression(initializer)) {
-          continue
-        }
-        matchingNodes.push(...findMatchesInNode(initializer, matcher))
-      }
+      matchingNodes.push(...collectVariableStatementMatches(statement, matcher))
       continue
     }
 

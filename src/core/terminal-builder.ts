@@ -19,7 +19,7 @@ import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
-  private _exclusions: (string | RegExp)[] = []
+  private readonly _exclusions: (string | RegExp)[] = []
 
   /**
    * Attach a human-readable rationale to the rule.

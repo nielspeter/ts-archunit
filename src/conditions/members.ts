@@ -84,8 +84,9 @@ export function havePropertyNamed(...names: string[]): Condition<PropertyBearing
   if (names.length === 0) {
     throw new Error('havePropertyNamed() requires at least one property name')
   }
+  const quotedNames = names.map((n) => `"${n}"`).join(', ')
   return {
-    description: `have properties named ${names.map((n) => `"${n}"`).join(', ')}`,
+    description: `have properties named ${quotedNames}`,
     evaluate(elements: PropertyBearingNode[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const element of elements) {
@@ -125,8 +126,9 @@ export function notHavePropertyNamed(...names: string[]): Condition<PropertyBear
     throw new Error('notHavePropertyNamed() requires at least one property name')
   }
   const nameSet = new Set(names)
+  const quotedNames = names.map((n) => `"${n}"`).join(', ')
   return {
-    description: `not have properties named ${names.map((n) => `"${n}"`).join(', ')}`,
+    description: `not have properties named ${quotedNames}`,
     evaluate(elements: PropertyBearingNode[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const element of elements) {

@@ -40,9 +40,9 @@ export function noUnusedExports(): Condition<SourceFile> {
 }
 
 /**
- * No stub/TODO/FIXME comments in function bodies.
- * Catches: TODO, FIXME, HACK, XXX, STUB, DEFERRED, PLACEHOLDER,
- * "not implemented", "coming soon".
+ * No stub or deferred-work comments in function bodies.
+ * Catches common markers (see STUB_PATTERNS) and phrases like
+ * "not implemented" or "coming soon".
  *
  * Pass a custom pattern to override the defaults.
  *

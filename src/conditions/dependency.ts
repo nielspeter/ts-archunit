@@ -54,8 +54,9 @@ export function onlyImportFrom(
   const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
+  const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
-    description: `only import from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    description: `only import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
@@ -99,8 +100,9 @@ export function notImportFrom(
   const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
+  const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
-    description: `not import from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    description: `not import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
@@ -178,8 +180,9 @@ export function notHaveAliasedImports(): Condition<SourceFile> {
  */
 export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFile> {
   const matchers = globs.map((g) => picomatch(g))
+  const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
-    description: `only have type imports from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    description: `only have type imports from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {

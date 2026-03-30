@@ -27,6 +27,60 @@ const RULE_IDS = [
 ] as const
 
 /**
+ * Collect violations for shared-folder isolation rules.
+ */
+function applySharedIsolation(
+  p: ArchProject,
+  sharedGlobs: string[],
+  boundaryFolders: string[],
+  overrides: StrictBoundariesOptions['overrides'],
+): ArchViolation[] {
+  const violations: ArchViolation[] = []
+  for (const sharedGlob of sharedGlobs) {
+    for (const dir of boundaryFolders) {
+      violations.push(
+        ...dispatchRule(
+          modules(p).that().resideInFolder(sharedGlob).should().notImportFrom(`${dir}/**`),
+          'preset/boundaries/shared-isolation',
+          'error',
+          overrides,
+        ),
+      )
+    }
+  }
+  return violations
+}
+
+/**
+ * Collect violations for test-isolation rules across boundaries.
+ */
+function applyTestIsolation(
+  p: ArchProject,
+  boundaryFolders: string[],
+  overrides: StrictBoundariesOptions['overrides'],
+): ArchViolation[] {
+  const violations: ArchViolation[] = []
+  for (const dir of boundaryFolders) {
+    const testPattern = `${dir}/**/*.test.*`
+    const otherBoundaryTests = boundaryFolders
+      .filter((d) => d !== dir)
+      .map((d) => `${d}/**/*.test.*`)
+
+    for (const otherTestGlob of otherBoundaryTests) {
+      violations.push(
+        ...dispatchRule(
+          modules(p).that().resideInFile(testPattern).should().notImportFrom(otherTestGlob),
+          'preset/boundaries/test-isolation',
+          'error',
+          overrides,
+        ),
+      )
+    }
+  }
+  return violations
+}
+
+/**
  * Enforce strict module boundaries: no cycles, no cross-boundary imports,
  * shared isolation, and optional copy-paste detection.
  */
@@ -88,38 +142,11 @@ export function strictBoundaries(p: ArchProject, options: StrictBoundariesOption
   }
 
   // --- Shared isolation: shared folders don't import from boundaries ---
-  for (const sharedGlob of sharedGlobs) {
-    for (const dir of boundaryFolders) {
-      violations.push(
-        ...dispatchRule(
-          modules(p).that().resideInFolder(sharedGlob).should().notImportFrom(`${dir}/**`),
-          'preset/boundaries/shared-isolation',
-          'error',
-          overrides,
-        ),
-      )
-    }
-  }
+  violations.push(...applySharedIsolation(p, sharedGlobs, boundaryFolders, overrides))
 
   // --- Test isolation ---
   if (options.isolateTests) {
-    for (const dir of boundaryFolders) {
-      const testPattern = `${dir}/**/*.test.*`
-      const otherBoundaryTests = boundaryFolders
-        .filter((d) => d !== dir)
-        .map((d) => `${d}/**/*.test.*`)
-
-      for (const otherTestGlob of otherBoundaryTests) {
-        violations.push(
-          ...dispatchRule(
-            modules(p).that().resideInFile(testPattern).should().notImportFrom(otherTestGlob),
-            'preset/boundaries/test-isolation',
-            'error',
-            overrides,
-          ),
-        )
-      }
-    }
+    violations.push(...applyTestIsolation(p, boundaryFolders, overrides))
   }
 
   // --- No copy-paste across boundaries ---

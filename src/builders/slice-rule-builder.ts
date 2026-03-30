@@ -23,7 +23,7 @@ import {
  */
 export class SliceRuleBuilder extends TerminalBuilder {
   private _slices: Slice[] = []
-  private _conditions: Condition<Slice>[] = []
+  private readonly _conditions: Condition<Slice>[] = []
 
   constructor(private readonly project: ArchProject) {
     super()

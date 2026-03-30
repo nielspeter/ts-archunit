@@ -1,4 +1,4 @@
-import type { ClassDeclaration } from 'ts-morph'
+import type { ClassDeclaration, ParameterDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { elementCondition } from './helpers.js'
@@ -104,66 +104,50 @@ export function acceptParameterOfType(matcher: TypeMatcher): Condition<ClassDecl
  * The function-level counterpart (`functions(p).should().notAcceptParameterOfType(...)`)
  * does NOT scan set accessors because `collectFunctions()` excludes them.
  */
+/**
+ * Scan parameters of class members (constructors, methods, set accessors) for
+ * types matching the given matcher. Returns a violation for each matching parameter.
+ */
+function scanParametersForType(
+  cls: ClassDeclaration,
+  typeMatcher: TypeMatcher,
+  context: ConditionContext,
+): ArchViolation[] {
+  const violations: ArchViolation[] = []
+  const className = getElementName(cls)
+
+  const members: Array<{ memberName: string; params: ParameterDeclaration[] }> = [
+    ...cls.getConstructors().map((c) => ({ memberName: 'constructor', params: c.getParameters() })),
+    ...cls.getMethods().map((m) => ({ memberName: m.getName(), params: m.getParameters() })),
+    ...cls.getSetAccessors().map((s) => ({ memberName: s.getName(), params: s.getParameters() })),
+  ]
+
+  for (const { memberName, params } of members) {
+    for (const param of params) {
+      if (typeMatcher(param.getType())) {
+        const paramName = param.getName()
+        const typeText = param.getType().getText()
+        violations.push(
+          createViolation(
+            cls,
+            `${className}.${memberName} parameter "${paramName}" has type "${typeText}"`,
+            context,
+          ),
+        )
+      }
+    }
+  }
+
+  return violations
+}
+
 export function notAcceptParameterOfType(matcher: TypeMatcher): Condition<ClassDeclaration> {
   return {
     description: 'not accept parameter of matching type',
     evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const cls of elements) {
-        const className = getElementName(cls)
-
-        // Scan constructors — ConstructorDeclaration has no getName()
-        for (const ctor of cls.getConstructors()) {
-          for (const param of ctor.getParameters()) {
-            if (matcher(param.getType())) {
-              const paramName = param.getName()
-              const typeText = param.getType().getText()
-              violations.push(
-                createViolation(
-                  cls,
-                  `${className}.constructor parameter "${paramName}" has type "${typeText}"`,
-                  context,
-                ),
-              )
-            }
-          }
-        }
-
-        // Scan methods
-        for (const method of cls.getMethods()) {
-          for (const param of method.getParameters()) {
-            if (matcher(param.getType())) {
-              const memberName = method.getName()
-              const paramName = param.getName()
-              const typeText = param.getType().getText()
-              violations.push(
-                createViolation(
-                  cls,
-                  `${className}.${memberName} parameter "${paramName}" has type "${typeText}"`,
-                  context,
-                ),
-              )
-            }
-          }
-        }
-
-        // Scan set accessors
-        for (const setter of cls.getSetAccessors()) {
-          for (const param of setter.getParameters()) {
-            if (matcher(param.getType())) {
-              const memberName = setter.getName()
-              const paramName = param.getName()
-              const typeText = param.getType().getText()
-              violations.push(
-                createViolation(
-                  cls,
-                  `${className}.${memberName} parameter "${paramName}" has type "${typeText}"`,
-                  context,
-                ),
-              )
-            }
-          }
-        }
+        violations.push(...scanParametersForType(cls, matcher, context))
       }
       return violations
     },

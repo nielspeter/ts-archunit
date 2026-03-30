@@ -20,6 +20,8 @@ import {
   acceptParameterOfType as fnAcceptParameterOfType,
   notAcceptParameterOfType as fnNotAcceptParameterOfType,
   haveReturnTypeMatching as fnHaveReturnTypeMatching,
+  resideInFile as fnConditionResideInFile,
+  resideInFolder as fnConditionResideInFolder,
 } from '../conditions/function.js'
 import {
   haveNameMatching as identityHaveNameMatching,
@@ -30,10 +32,6 @@ import {
   areExported as identityAreExported,
   areNotExported as identityAreNotExported,
 } from '../predicates/identity.js'
-import {
-  resideInFile as fnConditionResideInFile,
-  resideInFolder as fnConditionResideInFolder,
-} from '../conditions/function.js'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
 import {
   arePublic as fnArePublic,

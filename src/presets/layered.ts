@@ -30,6 +30,77 @@ const RULE_IDS = [
 ] as const
 
 /**
+ * Collect violations for type-import-only rules on specified layers.
+ */
+function applyTypeImportRules(
+  p: ArchProject,
+  typeImportsAllowed: string[],
+  layerGlobs: string[],
+  overrides: LayeredArchitectureOptions['overrides'],
+): ArchViolation[] {
+  const violations: ArchViolation[] = []
+  for (const layerGlob of typeImportsAllowed) {
+    const otherLayerGlobs = layerGlobs.filter((g) => g !== layerGlob)
+    if (otherLayerGlobs.length > 0) {
+      violations.push(
+        ...dispatchRule(
+          modules(p)
+            .that()
+            .resideInFolder(layerGlob)
+            .should()
+            .onlyHaveTypeImportsFrom(...otherLayerGlobs),
+          'preset/layered/type-imports-only',
+          'warn',
+          overrides,
+        ),
+      )
+    }
+  }
+  return violations
+}
+
+/**
+ * Collect violations for restricted-package rules.
+ */
+function applyRestrictedPackages(
+  p: ArchProject,
+  restrictedPackages: Record<string, string[]>,
+  overrides: LayeredArchitectureOptions['overrides'],
+): ArchViolation[] {
+  // Invert: for each package, find which layers are allowed
+  const packageToAllowed = new Map<string, string[]>()
+  for (const [layerGlob, packages] of Object.entries(restrictedPackages)) {
+    for (const pkg of packages) {
+      const existing = packageToAllowed.get(pkg)
+      if (existing) {
+        existing.push(layerGlob)
+      } else {
+        packageToAllowed.set(pkg, [layerGlob])
+      }
+    }
+  }
+
+  const violations: ArchViolation[] = []
+  for (const [pkg, allowedLayers] of packageToAllowed) {
+    // Modules NOT in any allowed layer must not import this package
+    const builder = modules(p).that()
+    for (const allowedGlob of allowedLayers) {
+      builder.satisfy(not(resideInFolderPredicate<SourceFile>(allowedGlob)))
+    }
+
+    violations.push(
+      ...dispatchRule(
+        builder.should().notImportFrom(pkg),
+        'preset/layered/restricted-packages',
+        'error',
+        overrides,
+      ),
+    )
+  }
+  return violations
+}
+
+/**
  * Enforce a layered architecture: dependency direction, cycle freedom,
  * and optional package restrictions.
  */
@@ -92,56 +163,12 @@ export function layeredArchitecture(p: ArchProject, options: LayeredArchitecture
 
   // --- Type imports only for specified layers ---
   if (options.typeImportsAllowed && options.typeImportsAllowed.length > 0) {
-    for (const layerGlob of options.typeImportsAllowed) {
-      const otherLayerGlobs = layerGlobs.filter((g) => g !== layerGlob)
-      if (otherLayerGlobs.length > 0) {
-        violations.push(
-          ...dispatchRule(
-            modules(p)
-              .that()
-              .resideInFolder(layerGlob)
-              .should()
-              .onlyHaveTypeImportsFrom(...otherLayerGlobs),
-            'preset/layered/type-imports-only',
-            'warn',
-            overrides,
-          ),
-        )
-      }
-    }
+    violations.push(...applyTypeImportRules(p, options.typeImportsAllowed, layerGlobs, overrides))
   }
 
   // --- Restricted packages ---
   if (options.restrictedPackages) {
-    // Invert: for each package, find which layers are allowed
-    const packageToAllowed = new Map<string, string[]>()
-    for (const [layerGlob, packages] of Object.entries(options.restrictedPackages)) {
-      for (const pkg of packages) {
-        const existing = packageToAllowed.get(pkg)
-        if (existing) {
-          existing.push(layerGlob)
-        } else {
-          packageToAllowed.set(pkg, [layerGlob])
-        }
-      }
-    }
-
-    for (const [pkg, allowedLayers] of packageToAllowed) {
-      // Modules NOT in any allowed layer must not import this package
-      const builder = modules(p).that()
-      for (const allowedGlob of allowedLayers) {
-        builder.satisfy(not(resideInFolderPredicate<SourceFile>(allowedGlob)))
-      }
-
-      violations.push(
-        ...dispatchRule(
-          builder.should().notImportFrom(pkg),
-          'preset/layered/restricted-packages',
-          'error',
-          overrides,
-        ),
-      )
-    }
+    violations.push(...applyRestrictedPackages(p, options.restrictedPackages, overrides))
   }
 
   throwIfViolations(violations)

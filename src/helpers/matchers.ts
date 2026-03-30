@@ -217,6 +217,35 @@ export function expression(textOrRegex: string | RegExp): ExpressionMatcher {
  * property(/^additional/)                  // matches any property starting with 'additional'
  * property('mode', /^'(strict|loose)'$/)   // matches mode: 'strict' or 'loose' (getText() includes quotes)
  */
+/**
+ * Test whether an initializer matches the expected value.
+ */
+function matchPropertyValue(initializer: Node, value: boolean | number | string | RegExp): boolean {
+  if (typeof value === 'boolean') {
+    const kind = initializer.getKind()
+    return value ? kind === SyntaxKind.TrueKeyword : kind === SyntaxKind.FalseKeyword
+  }
+  if (typeof value === 'number') {
+    return Node.isNumericLiteral(initializer) && initializer.getLiteralValue() === value
+  }
+  if (typeof value === 'string') {
+    return Node.isStringLiteral(initializer) && initializer.getLiteralValue() === value
+  }
+  return value.test(initializer.getText())
+}
+
+/**
+ * Test whether a property assignment's name matches the expected pattern.
+ */
+function matchPropertyName(node: Node, name: string | RegExp): boolean {
+  if (!Node.isPropertyAssignment(node)) return false
+  if (node.getNameNode().getKind() === SyntaxKind.ComputedPropertyName) return false
+  const nameNode = node.getNameNode()
+  const propName = Node.isStringLiteral(nameNode) ? nameNode.getLiteralValue() : node.getName()
+  if (typeof name === 'string') return propName === name
+  return name.test(propName)
+}
+
 export function property(
   name: string | RegExp,
   value?: boolean | number | string | RegExp,
@@ -229,50 +258,19 @@ export function property(
     description,
     syntaxKinds: [SyntaxKind.PropertyAssignment],
     matches(node: Node): boolean {
-      if (!Node.isPropertyAssignment(node)) return false
-
-      // Skip computed property names — getName() would throw
-      if (node.getNameNode().getKind() === SyntaxKind.ComputedPropertyName) return false
-
-      // Match name — strip quotes for string-literal property keys
-      // getName() returns '"content-type"' for { "content-type": ... }
-      const nameNode = node.getNameNode()
-      const propName = Node.isStringLiteral(nameNode) ? nameNode.getLiteralValue() : node.getName()
-      if (typeof name === 'string') {
-        if (propName !== name) return false
-      } else {
-        if (!name.test(propName)) return false
-      }
-
-      // If no value constraint, name match is sufficient
+      if (!matchPropertyName(node, name)) return false
       if (value === undefined) return true
-
-      // Match value against initializer
-      const initializer = node.getInitializer()
+      const initializer = Node.isPropertyAssignment(node) ? node.getInitializer() : undefined
       if (!initializer) return false
-
-      if (typeof value === 'boolean') {
-        const kind = initializer.getKind()
-        return value ? kind === SyntaxKind.TrueKeyword : kind === SyntaxKind.FalseKeyword
-      }
-      if (typeof value === 'number') {
-        if (!Node.isNumericLiteral(initializer)) return false
-        return initializer.getLiteralValue() === value
-      }
-      if (typeof value === 'string') {
-        if (!Node.isStringLiteral(initializer)) return false
-        return initializer.getLiteralValue() === value
-      }
-      // RegExp — test against raw getText()
-      return value.test(initializer.getText())
+      return matchPropertyValue(initializer, value)
     },
   }
 }
 
 /**
  * Default stub/deferred-work patterns found in comments.
- * Matches: TODO, FIXME, HACK, XXX, STUB, DEFERRED, PLACEHOLDER,
- * "not implemented", "coming soon".
+ * Matches common markers (see regex) and phrases like
+ * "not implemented" or "coming soon".
  *
  * Exported as a constant for use with `comment()`. Users can pass
  * their own RegExp to `comment()` for narrower matching.
@@ -294,9 +292,9 @@ export const STUB_PATTERNS =
  * @param pattern - String substring or RegExp to test against comment text.
  *
  * @example
- * comment(/TODO/)                     // matches // TODO: implement this
- * comment(STUB_PATTERNS)              // matches TODO, FIXME, HACK, STUB, etc.
- * comment('FIXME')                    // matches // FIXME: broken
+ * comment(/HACK/)                     // matches hack marker comments
+ * comment(STUB_PATTERNS)              // matches all common stub markers
+ * comment('HACK')                     // matches hack comments
  */
 export function comment(pattern: string | RegExp): ExpressionMatcher {
   // Dedup by (filePath, pos) — prevents the same comment from matching
