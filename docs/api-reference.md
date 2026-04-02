@@ -33,16 +33,16 @@ All public exports from `ts-archunit`, organized by category.
 
 Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`).
 
-| Method            | Signature                                       | Description                                                                                             |
-| ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Method            | Signature                                       | Description                                                                                                                                                                         |
+| ----------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `.excluding()`    | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name (e.g., `'MyService.doWork'`), file path, or message. Strings use exact match; regex uses `.test()`. Warns on unused patterns. |
-| `.because()`      | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                          |
-| `.rule()`         | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                   |
-| `.check()`        | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                      |
-| `.warn()`         | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                                          |
-| `.severity()`     | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                                        |
-| `.violations()`   | `.violations(): ArchViolation[]`                | Execute rule, return violations without throwing. For programmatic access and presets.                  |
-| `.describeRule()` | `.describeRule(): RuleDescription`              | Return rule metadata without executing. Used by `explain` command.                                      |
+| `.because()`      | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                                                                                                      |
+| `.rule()`         | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                                                                                               |
+| `.check()`        | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                                                                                                  |
+| `.warn()`         | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                                                                                                                      |
+| `.severity()`     | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                                                                                                                    |
+| `.violations()`   | `.violations(): ArchViolation[]`                | Execute rule, return violations without throwing. For programmatic access and presets.                                                                                              |
+| `.describeRule()` | `.describeRule(): RuleDescription`              | Return rule metadata without executing. Used by `explain` command.                                                                                                                  |
 
 ## Exclusion Comments
 

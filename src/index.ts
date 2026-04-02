@@ -341,6 +341,9 @@ export {
   noTypeErrors,
   functionNoGenericErrors,
   functionNoTypeErrors,
+  noSilentCatch,
+  functionNoSilentCatch,
+  moduleNoSilentCatch,
 } from './rules/errors.js'
 
 // Standard rules — architecture (plan 0042)
