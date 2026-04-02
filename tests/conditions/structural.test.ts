@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
-import { Project } from 'ts-morph'
+import { Project, SyntaxKind } from 'ts-morph'
 import {
   createViolation,
   getElementName,
@@ -75,15 +75,124 @@ describe('element metadata helpers', () => {
     expect(getElementName(varDecl)).toBe('myVar')
   })
 
-  it('getElementName falls back to kind name', () => {
+  it('getElementName falls back to kind name for top-level nodes', () => {
     const proj = createInMemoryProject()
     const sf = proj.createSourceFile('t.ts', '1 + 2')
-    // Get an expression statement — it has no getName()
     const stmt = sf.getStatements()[0]!
-    const name = getElementName(stmt)
-    // Should be some kind name, not undefined
-    expect(typeof name).toBe('string')
-    expect(name.length).toBeGreaterThan(0)
+    expect(getElementName(stmt)).toBe('ExpressionStatement')
+  })
+
+  // --- BUG-0008: ancestor walking for inner nodes ---
+
+  it('getElementName walks up to ClassName.methodName for inner nodes', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile(
+      't.ts',
+      'class MyService { doWork() { const x = 1 as number; } }',
+    )
+    const cls = sf.getClasses()[0]!
+    const method = cls.getMethods()[0]!
+    const body = method.getBody()!
+    const asExpr = body.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('MyService.doWork')
+  })
+
+  it('getElementName returns function name for inner nodes in standalone functions', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile('t.ts', 'function handler() { const x = 1 as number; }')
+    const fn = sf.getFunctions()[0]!
+    const body = fn.getBody()!
+    const asExpr = body.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('handler')
+  })
+
+  it('getElementName handles constructors: ClassName.constructor', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile(
+      't.ts',
+      'class Config { constructor() { const x = 1 as number; } }',
+    )
+    const cls = sf.getClasses()[0]!
+    const ctor = cls.getConstructors()[0]!
+    // Constructor node itself
+    expect(getElementName(ctor)).toBe('constructor')
+    // Inner node inside constructor
+    const body = ctor.getBody()!
+    const asExpr = body.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('Config.constructor')
+  })
+
+  it('getElementName handles getters: ClassName.getterName', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile('t.ts', 'class Svc { get value() { return 1 as number; } }')
+    const cls = sf.getClasses()[0]!
+    const getter = cls.getGetAccessors()[0]!
+    expect(getElementName(getter)).toBe('value')
+    // Inner node inside getter
+    const body = getter.getBody()!
+    const asExpr = body.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('Svc.value')
+  })
+
+  it('getElementName handles setters: ClassName.setterName', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile(
+      't.ts',
+      'class Svc { set value(v: unknown) { const x = v as string; } }',
+    )
+    const cls = sf.getClasses()[0]!
+    const setter = cls.getSetAccessors()[0]!
+    expect(getElementName(setter)).toBe('value')
+    const body = setter.getBody()!
+    const asExpr = body.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('Svc.value')
+  })
+
+  it('getElementName handles arrow functions assigned to variables', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile('t.ts', 'const handler = () => { const x = 1 as number; }')
+    const arrow = sf.getDescendantsOfKind(SyntaxKind.ArrowFunction)[0]!
+    const body = arrow.getBody()
+    const asExpr = body.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('handler')
+  })
+
+  it('getElementName handles arrow functions inside class methods', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile(
+      't.ts',
+      'class Svc { run() { const cb = () => { const x = 1 as number; }; } }',
+    )
+    const asExpr = sf.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('Svc.run.cb')
+  })
+
+  it('getElementName handles function expressions assigned to variables', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile(
+      't.ts',
+      'const handler = function() { const x = 1 as number; }',
+    )
+    const asExpr = sf.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('handler')
+  })
+
+  it('getElementName handles property initializers: ClassName.propName', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile('t.ts', 'class Foo { bar = 1 as number; }')
+    const asExpr = sf.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    expect(getElementName(asExpr)).toBe('Foo.bar')
+  })
+
+  it('getElementName handles anonymous classes: returns method name only', () => {
+    const proj = createInMemoryProject()
+    const sf = proj.createSourceFile(
+      't.ts',
+      'export default class { doWork() { const x = 1 as number; } }',
+    )
+    const asExpr = sf.getDescendantsOfKind(SyntaxKind.AsExpression)[0]!
+    // Anonymous class has no name — only the method name is collected
+    expect(getElementName(asExpr)).toBe('doWork')
   })
 
   it('getElementFile returns absolute path', () => {

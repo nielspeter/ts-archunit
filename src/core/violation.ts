@@ -30,13 +30,11 @@ export interface ArchViolation {
 }
 
 /**
- * Extract a human-readable name from a ts-morph Node.
- *
- * Handles classes, functions, interfaces, type aliases, variable declarations,
- * and methods. Falls back to the node's kind name for unknown node types.
+ * Check if a node is a named declaration and return its name, or undefined.
+ * Constructors return "constructor" since they have no getName().
  */
-export function getElementName(node: Node): string {
-  // ts-morph type guards for nodes with getName()
+function getNodeName(node: Node): string | undefined {
+  if (Node.isConstructorDeclaration(node)) return 'constructor'
   if (
     Node.isClassDeclaration(node) ||
     Node.isFunctionDeclaration(node) ||
@@ -44,14 +42,92 @@ export function getElementName(node: Node): string {
     Node.isTypeAliasDeclaration(node) ||
     Node.isEnumDeclaration(node) ||
     Node.isMethodDeclaration(node) ||
+    Node.isGetAccessorDeclaration(node) ||
+    Node.isSetAccessorDeclaration(node) ||
     Node.isPropertyDeclaration(node) ||
     Node.isVariableDeclaration(node)
   ) {
-    const name = node.getName()
-    if (name !== undefined) return name
+    return node.getName()
   }
-  // Fallback: use the node's kind name (e.g. "VariableDeclaration")
-  return node.getKindName()
+  return undefined
+}
+
+/**
+ * Check if a node is a structural member that should appear in
+ * qualified element names (e.g., "ClassName.methodName").
+ * Returns the member name, or undefined to skip.
+ */
+function getStructuralName(node: Node): string | undefined {
+  if (Node.isConstructorDeclaration(node)) return 'constructor'
+  if (
+    Node.isMethodDeclaration(node) ||
+    Node.isGetAccessorDeclaration(node) ||
+    Node.isSetAccessorDeclaration(node) ||
+    Node.isPropertyDeclaration(node)
+  ) {
+    return node.getName()
+  }
+  // Arrow/function expressions: check if assigned to a named variable
+  if (Node.isArrowFunction(node) || Node.isFunctionExpression(node)) {
+    const parent = node.getParent()
+    if (parent && Node.isVariableDeclaration(parent)) {
+      return parent.getName()
+    }
+  }
+  return undefined
+}
+
+/**
+ * Check if a node is a top-level architectural boundary where
+ * the ancestor walk should stop.
+ */
+function isTopLevelDeclaration(node: Node): boolean {
+  return (
+    Node.isClassDeclaration(node) ||
+    Node.isInterfaceDeclaration(node) ||
+    Node.isTypeAliasDeclaration(node) ||
+    Node.isEnumDeclaration(node) ||
+    Node.isFunctionDeclaration(node)
+  )
+}
+
+/**
+ * Extract a human-readable name from a ts-morph Node.
+ *
+ * If the node itself is a named declaration (class, function, method, etc.),
+ * returns its name directly. Otherwise, walks up the AST ancestors to find
+ * the nearest named declaration and builds a qualified name like
+ * "ClassName.methodName". This ensures that inner nodes (e.g., AsExpression,
+ * CallExpression) produce meaningful element names for `.excluding()` matching.
+ *
+ * Falls back to the node's kind name only if no named ancestor is found
+ * (e.g., top-level expressions in a module).
+ */
+export function getElementName(node: Node): string {
+  const directName = getNodeName(node)
+  if (directName !== undefined) return directName
+
+  // Walk up ancestors collecting structural names: method/constructor/accessor
+  // at the member level, class/function at the top level. Skips variables,
+  // properties, and expressions — those are implementation detail.
+  const parts: string[] = []
+  let current: Node | undefined = node.getParent()
+  while (current) {
+    // Top-level declarations: collect name and stop
+    if (isTopLevelDeclaration(current)) {
+      const name = getNodeName(current)
+      if (name !== undefined) parts.unshift(name)
+      break
+    }
+    // Structural members: collect name and keep walking to find the parent class
+    const memberName = getStructuralName(current)
+    if (memberName !== undefined) {
+      parts.unshift(memberName)
+    }
+    current = current.getParent()
+  }
+
+  return parts.length > 0 ? parts.join('.') : node.getKindName()
 }
 
 /**

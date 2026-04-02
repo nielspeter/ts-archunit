@@ -35,7 +35,7 @@ Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`)
 
 | Method            | Signature                                       | Description                                                                                             |
 | ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `.excluding()`    | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name, file path, or message. Warns on unused patterns. |
+| `.excluding()`    | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name (e.g., `'MyService.doWork'`), file path, or message. Strings use exact match; regex uses `.test()`. Warns on unused patterns. |
 | `.because()`      | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                          |
 | `.rule()`         | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                   |
 | `.check()`        | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                      |

@@ -5,419 +5,29 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org/)
 
-Architecture testing for TypeScript. Enforce structural rules across your codebase as executable tests.
+**Architecture guardrails for AI coding agents.** Executable rules that catch structural violations in CI — before they reach your codebase.
 
 Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](https://ts-morph.com/).
 
 [Documentation](https://nielspeter.github.io/ts-archunit/) · [Getting Started](https://nielspeter.github.io/ts-archunit/getting-started) · [What Can It Check?](https://nielspeter.github.io/ts-archunit/what-to-check)
 
-## Why
+## The Problem
 
-Architecture decisions rot. Teams agree on patterns, document them in wikis, enforce them in code review — and discover months later that half the codebase diverged. AI agents generating code don't know about team conventions. Each PR looks correct in isolation.
+AI coding agents don't know your architecture. They generate code that compiles, passes type checks, and looks correct in isolation — but violates the structural decisions your team spent months establishing.
 
-ts-archunit turns architectural rules into tests. They run in your CI pipeline. Violations are caught on the PR that introduces them — with clear messages explaining what's wrong, why it matters, and how to fix it.
+An agent will:
 
-## Install
+- Call `parseInt` instead of the shared `extractCount()` helper
+- Throw `new Error()` instead of your typed `NotFoundError`
+- Import the database driver directly from a service instead of going through the repository
+- Copy-paste a parser function instead of using the shared utility
+- Skip validation in a route handler
 
-```bash
-npm install -D @nielspeter/ts-archunit
-```
+Code review catches some of this. But at scale — with multiple agents generating PRs across a large codebase — review becomes the bottleneck. You need automated enforcement.
 
-Requires Node.js >= 24 and a `tsconfig.json`.
+## The Solution
 
-## Quick Start
-
-Create `arch.test.ts` in your test directory:
-
-```typescript
-import { describe, it } from 'vitest' // or jest
-import {
-  project,
-  classes,
-  functions,
-  modules,
-  slices,
-  call,
-  newExpr,
-} from '@nielspeter/ts-archunit'
-
-const p = project('tsconfig.json')
-
-describe('Architecture Rules', () => {
-  it('domain must not import from infrastructure', () => {
-    modules(p)
-      .that()
-      .resideInFolder('**/domain/**')
-      .should()
-      .onlyImportFrom('**/domain/**', '**/shared/**')
-      .rule({
-        id: 'layer/domain-isolation',
-        because: 'Domain must be independent of infrastructure for testability',
-        suggestion: 'Move the import to a service that bridges domain and infrastructure',
-        docs: 'https://example.com/adr/clean-architecture',
-      })
-      .check()
-  })
-
-  it('services must use shared error classes', () => {
-    classes(p)
-      .that()
-      .extend('BaseService')
-      .should()
-      .notContain(newExpr('Error'))
-      .rule({
-        id: 'error/typed-errors',
-        because: 'Generic Error loses context and prevents consistent API error responses',
-        suggestion: 'Use NotFoundError, ValidationError, or DomainError instead',
-      })
-      .check()
-  })
-
-  it('no copy-pasted order parsers', () => {
-    functions(p)
-      .that()
-      .haveNameMatching(/^parse\w+Order$/)
-      .and()
-      .resideInFolder('**/routes/**')
-      .should()
-      .notExist()
-      .rule({
-        id: 'route/no-copy-paste',
-        because: 'Copy-pasted parsers diverge over time',
-        suggestion: 'Use the shared parseOrder() utility with a column map',
-      })
-      .check()
-  })
-})
-```
-
-Run with your test runner:
-
-```bash
-npx vitest run arch.test.ts
-```
-
-## What It Can Do
-
-### Layer Enforcement
-
-```typescript
-slices(p)
-  .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
-    domain: 'src/domain/**',
-  })
-  .should()
-  .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
-  .rule({
-    id: 'layer/direction',
-    because: 'Dependencies flow inward: controllers → services → repositories → domain',
-  })
-  .check()
-```
-
-### Cycle Detection
-
-```typescript
-slices(p)
-  .matching('src/features/*/')
-  .should()
-  .beFreeOfCycles()
-  .rule({ id: 'arch/no-feature-cycles', because: 'Circular deps prevent independent deployment' })
-  .check()
-```
-
-### Body Analysis
-
-This is where ts-archunit goes beyond import-path checking. It inspects what happens _inside_ functions and class methods:
-
-```typescript
-// Ban inline parseInt — use the shared helper
-classes(p)
-  .that()
-  .extend('BaseRepository')
-  .should()
-  .useInsteadOf(call('parseInt'), call('this.extractCount'))
-  .rule({
-    id: 'repo/no-parseint',
-    because: 'BaseRepository provides extractCount() which handles type coercion safely',
-    suggestion: 'Replace parseInt(x, 10) with this.extractCount(result)',
-  })
-  .check()
-
-// Ban new URLSearchParams in wrappers (catches class methods too)
-functions(p)
-  .that()
-  .resideInFolder('**/wrappers/**')
-  .should()
-  .notContain(newExpr('URLSearchParams'))
-  .rule({ id: 'sdk/no-raw-urlsearchparams', suggestion: 'Use buildQueryString() utility' })
-  .check()
-```
-
-### Type-Level Rules
-
-Check property types using the TypeScript type checker — resolves through aliases, `Partial<>`, `Pick<>`:
-
-```typescript
-import { types, not, isString } from '@nielspeter/ts-archunit'
-
-types(p)
-  .that()
-  .haveNameMatching(/Options$/)
-  .and()
-  .haveProperty('orderBy')
-  .should()
-  .havePropertyType('orderBy', not(isString()))
-  .rule({
-    id: 'type/no-bare-string-orderby',
-    because: 'Bare string orderBy passed to .orderBy() is a SQL injection surface',
-    suggestion: "Use a union type: orderBy?: 'created_at' | 'updated_at' | 'name'",
-  })
-  .check()
-```
-
-### Standard Rules
-
-Ready-to-use rules via categorized sub-path imports — no custom conditions needed:
-
-```typescript
-import {
-  noAnyProperties,
-  noTypeAssertions,
-  noNonNullAssertions,
-} from '@nielspeter/ts-archunit/rules/typescript'
-import { noEval, noConsoleLog, noProcessEnv } from '@nielspeter/ts-archunit/rules/security'
-import { noGenericErrors } from '@nielspeter/ts-archunit/rules/errors'
-import { mustMatchName } from '@nielspeter/ts-archunit/rules/naming'
-import { onlyDependOn, mustNotDependOn } from '@nielspeter/ts-archunit/rules/dependencies'
-
-classes(p).should().satisfy(noAnyProperties()).check()
-classes(p).should().satisfy(noTypeAssertions()).check()
-classes(p).should().satisfy(noEval()).check()
-```
-
-Available categories: `rules/typescript`, `rules/security`, `rules/errors`, `rules/naming`, `rules/dependencies`.
-
-### Named Selections
-
-Save predicate chains for reuse across multiple rules:
-
-```typescript
-const repositories = classes(p).that().extend('BaseRepository')
-
-repositories.should().notContain(call('parseInt')).check()
-repositories.should().notContain(newExpr('Error')).check()
-repositories.should().beExported().check()
-```
-
-### Baseline Mode (Gradual Adoption)
-
-Adopt rules in existing codebases without fixing every pre-existing violation first:
-
-```typescript
-import { withBaseline } from '@nielspeter/ts-archunit'
-
-const baseline = withBaseline('arch-baseline.json')
-
-// Only NEW violations fail — existing ones are recorded in the baseline
-classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check({ baseline })
-```
-
-Generate a baseline from current violations:
-
-```typescript
-import { collectViolations, generateBaseline } from '@nielspeter/ts-archunit'
-
-const violations = collectViolations(rule1, rule2, rule3)
-generateBaseline(violations, 'arch-baseline.json')
-```
-
-### Diff-Aware Mode
-
-Only report violations in files changed in the current PR:
-
-```typescript
-import { diffAware } from '@nielspeter/ts-archunit'
-
-classes(p)
-  .should()
-  .notContain(call('eval'))
-  .check({ diff: diffAware('main') })
-```
-
-### GitHub Actions Annotations
-
-Violations appear inline on PR diffs — automatically detected in GitHub Actions:
-
-```typescript
-import { detectFormat } from '@nielspeter/ts-archunit'
-
-const format = detectFormat() // 'github' in CI, 'terminal' locally
-
-classes(p).should().notContain(call('eval')).check({ format })
-```
-
-### Framework-Agnostic Route Matching
-
-Match call expressions by object and method — works with Express, Fastify, Hono, or any framework:
-
-```typescript
-import { calls, call, within } from '@nielspeter/ts-archunit'
-
-// Select route registrations
-const routes = calls(p)
-  .that()
-  .onObject('app')
-  .and()
-  .withMethod(/^(get|post|put|delete|patch)$/)
-
-// Assert all routes have error handling
-routes.should().haveCallbackContaining(call('handleError')).check()
-```
-
-### Scoped Rules with `within()`
-
-Restrict rules to callback functions inside matched call expressions:
-
-```typescript
-// "Within route handlers, enforce normalizePagination"
-within(routes)
-  .functions()
-  .should()
-  .contain(call('normalizePagination'))
-  .rule({ id: 'route/pagination', because: 'All list endpoints must use shared pagination' })
-  .check()
-```
-
-### Pattern Templates
-
-Enforce return type shapes across functions:
-
-```typescript
-import { definePattern, functions } from '@nielspeter/ts-archunit'
-
-const paginatedCollection = definePattern('paginated-collection', {
-  returnShape: {
-    total: 'number',
-    skip: 'number',
-    limit: 'number',
-    items: 'T[]',
-  },
-})
-
-functions(p)
-  .that()
-  .resideInFolder('**/routes/**')
-  .should()
-  .followPattern(paginatedCollection)
-  .check()
-```
-
-### CLI
-
-Run rules without a test runner:
-
-```bash
-# Check rules
-npx ts-archunit check arch.rules.ts
-
-# Generate baseline for existing violations
-npx ts-archunit baseline --output arch-baseline.json
-
-# Check with baseline and diff-aware mode
-npx ts-archunit check arch.rules.ts --baseline arch-baseline.json --changed --base main
-```
-
-Optional config file:
-
-```typescript
-// ts-archunit.config.ts
-import { defineConfig } from '@nielspeter/ts-archunit'
-
-export default defineConfig({
-  project: 'tsconfig.json',
-  rules: ['arch.rules.ts'],
-  baseline: 'arch-baseline.json',
-  format: 'auto',
-})
-```
-
-### Smell Detection
-
-Find code that's drifted — duplicate function bodies and inconsistent patterns:
-
-```typescript
-import { smells } from '@nielspeter/ts-archunit'
-
-// Detect near-identical functions across the codebase
-smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).minLines(10).warn()
-
-// Flag the odd one out — most repositories use extractCount(), one doesn't
-smells
-  .inconsistentSiblings(p)
-  .inFolder('src/repositories/**')
-  .forPattern(call('this.extractCount'))
-  .warn()
-```
-
-### GraphQL Rules
-
-Enforce schema and resolver conventions via `ts-archunit/graphql` (optional `graphql` peer dep):
-
-```typescript
-import { schema, resolvers } from '@nielspeter/ts-archunit/graphql'
-import { call } from '@nielspeter/ts-archunit'
-
-// Collection types must have standard pagination fields
-schema(p, 'src/graphql/**/*.graphql')
-  .that()
-  .typesNamed(/Collection$/)
-  .should()
-  .haveFields('items', 'total', 'skip', 'limit')
-  .check()
-
-// Relation resolvers must use DataLoader
-resolvers(p, 'src/resolvers/**')
-  .that()
-  .resolveFieldReturning(/^[A-Z]/)
-  .should()
-  .contain(call('loader.load'))
-  .because('prevent N+1 queries')
-  .check()
-```
-
-### Cross-Layer Validation
-
-Verify consistency across architectural boundaries — routes match schemas match SDK types:
-
-```typescript
-import { crossLayer } from '@nielspeter/ts-archunit'
-
-crossLayer(p)
-  .layer('routes', 'src/routes/**')
-  .layer('schemas', 'src/schemas/**')
-  .mapping(
-    (route, schema) =>
-      route.getBaseName().replace('-route', '') === schema.getBaseName().replace('-schema', ''),
-  )
-  .forEachPair()
-  .should()
-  .haveMatchingCounterpart()
-  .check()
-```
-
-### Warnings (Non-Blocking Rules)
-
-```typescript
-classes(p).that().haveDecorator('Deprecated').should().notExist().warn()
-```
-
-## Rich Violation Messages
-
-Every rule can include why it exists, how to fix it, and where to learn more:
+ts-archunit turns your architecture decisions into executable tests. They run in CI. Violations show up inline on the PR with clear messages explaining **what's wrong, why it matters, and how to fix it** — exactly the context an agent needs to self-correct.
 
 ```typescript
 classes(p)
@@ -428,13 +38,12 @@ classes(p)
   .rule({
     id: 'repo/typed-errors',
     because: 'Generic Error loses context and prevents consistent error handling',
-    suggestion: 'Replace new Error(msg) with new NotFoundError(entity, id)',
-    docs: 'https://example.com/adr/011#error-handling',
+    suggestion: 'Use NotFoundError, ValidationError, or DomainError instead',
   })
   .check()
 ```
 
-Output:
+When an agent violates this rule, it sees:
 
 ```
 Architecture Violation [repo/typed-errors]
@@ -442,50 +51,242 @@ Architecture Violation [repo/typed-errors]
   WebhookRepository.findById contains new 'Error' at line 42
   at src/repositories/webhook.repository.ts:42
 
-    41 |     if (!result) {
-  > 42 |       throw new Error(`Webhook '${id}' not found`)
-    43 |     }
+      41 |     if (!result) {
+    > 42 |       throw new Error(`Webhook '${id}' not found`)
+      43 |     }
 
   Why: Generic Error loses context and prevents consistent error handling
-  Fix: Replace new Error(msg) with new NotFoundError(entity, id)
-  Docs: https://example.com/adr/011#error-handling
+  Fix: Use NotFoundError, ValidationError, or DomainError instead
 ```
+
+The `because` and `suggestion` fields give the agent everything it needs to fix the violation without human intervention.
+
+## Why Not Just Import Rules?
+
+Every other tool (dependency-cruiser, eslint-plugin-boundaries, ts-arch) only checks which files import which. That's necessary but insufficient.
+
+AI agents don't violate architecture by importing wrong files. They violate it by **writing the wrong code in the right place** — inlining logic instead of delegating, using raw APIs instead of abstractions, skipping validation, throwing generic errors.
+
+ts-archunit checks what happens **inside** your functions:
+
+```typescript
+// "Services must delegate to repositories, not hardcode data"
+functions(p)
+  .that()
+  .resideInFolder('**/services/**')
+  .should()
+  .satisfy(mustCall(/Repository/))
+  .check()
+
+// "No eval anywhere in production code"
+modules(p).that().resideInFolder('src/**').should().satisfy(moduleNoEval()).check()
+
+// "Route handlers must validate input"
+functions(p)
+  .that()
+  .resideInFolder('**/handlers/**')
+  .should()
+  .satisfy(mustCall(/validate|parse/))
+  .check()
+```
+
+| Capability                                         | ts-archunit | dependency-cruiser | eslint-plugin-boundaries |
+| -------------------------------------------------- | ----------- | ------------------ | ------------------------ |
+| Import path rules                                  | Yes         | Yes                | Yes                      |
+| **Body analysis** (what's called inside functions) | Yes         | No                 | No                       |
+| **Type checking** (string vs typed union)          | Yes         | No                 | No                       |
+| Cycle detection                                    | Yes         | Yes                | No                       |
+| Baseline (gradual adoption)                        | Yes         | No                 | No                       |
+| GitHub PR annotations                              | Yes         | No                 | No                       |
+
+## Quick Start with Presets
+
+One function call enforces an entire architecture pattern — layer ordering, cycles, import direction, package restrictions:
+
+```typescript
+import { project } from '@nielspeter/ts-archunit'
+import { layeredArchitecture } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+layeredArchitecture(p, {
+  layers: {
+    routes: 'src/routes/**',
+    services: 'src/services/**',
+    repositories: 'src/repositories/**',
+  },
+  shared: ['src/shared/**'],
+  strict: true,
+})
+```
+
+This generates 5 coordinated rules. Override individual rules without disabling the preset:
+
+```typescript
+layeredArchitecture(p, {
+  layers: { ... },
+  overrides: {
+    'preset/layered/type-imports-only': 'off',
+  },
+})
+```
+
+Three presets available: [`layeredArchitecture`](https://nielspeter.github.io/ts-archunit/presets), [`dataLayerIsolation`](https://nielspeter.github.io/ts-archunit/presets#datalayerisolation), [`strictBoundaries`](https://nielspeter.github.io/ts-archunit/presets#strictboundaries).
+
+## Feed Your Architecture to the Agent
+
+The `explain` command dumps all active rules as structured JSON — pipe it into your agent's system prompt so it knows the constraints before writing code:
+
+```bash
+npx ts-archunit explain arch.rules.ts
+```
+
+```json
+{
+  "rules": [
+    {
+      "id": "repo/typed-errors",
+      "rule": "that extend 'BaseRepository' should not contain new 'Error'",
+      "because": "Generic Error loses context and prevents consistent error handling",
+      "suggestion": "Use NotFoundError, ValidationError, or DomainError instead"
+    }
+  ]
+}
+```
+
+The agent reads the rules, understands the constraints, and generates compliant code from the start. When it doesn't, CI catches it with actionable violation messages.
 
 ## Custom Rules
 
-Define your own predicates and conditions using the same interface as built-in ones:
+The fluent API reads like English:
 
 ```typescript
-import { definePredicate, defineCondition, createViolation, classes } from '@nielspeter/ts-archunit'
-import type { ClassDeclaration } from 'ts-morph'
-import type { ArchViolation, ConditionContext } from '@nielspeter/ts-archunit'
-
-// Custom predicate
-const hasTooManyMethods = definePredicate<ClassDeclaration>(
-  'has more than 10 methods',
-  (cls) => cls.getMethods().length > 10,
-)
-
-classes(p).that().satisfy(hasTooManyMethods).should().notExist().check()
-
-// Custom condition
-const haveJsDocOnPublicMethods = defineCondition<ClassDeclaration>(
-  'have JSDoc on all public methods',
-  (elements, context) => {
-    const violations: ArchViolation[] = []
-    for (const cls of elements) {
-      for (const method of cls.getMethods()) {
-        if (method.getScope() === 'public' && method.getJsDocs().length === 0) {
-          violations.push(createViolation(method, `${method.getName()} has no JSDoc`, context))
-        }
-      }
-    }
-    return violations
-  },
-)
-
-classes(p).that().areExported().should().satisfy(haveJsDocOnPublicMethods).check()
+// Select → Filter → Assert → Execute
+classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')).check()
 ```
+
+### Body Analysis
+
+Inspect what happens inside functions — the differentiator:
+
+```typescript
+// Ban inline parseInt — use the shared helper
+classes(p)
+  .that()
+  .extend('BaseRepository')
+  .should()
+  .useInsteadOf(call('parseInt'), call('this.extractCount'))
+  .check()
+
+// Services must delegate to repositories
+functions(p)
+  .that()
+  .resideInFolder('**/services/**')
+  .should()
+  .satisfy(mustCall(/Repository/))
+  .check()
+
+// No process.env in domain — use dependency injection
+functions(p).that().resideInFolder('**/domain/**').should().satisfy(functionNoProcessEnv()).check()
+```
+
+### Layer Enforcement
+
+```typescript
+slices(p)
+  .assignedFrom({
+    controllers: 'src/controllers/**',
+    services: 'src/services/**',
+    repositories: 'src/repositories/**',
+  })
+  .should()
+  .respectLayerOrder('controllers', 'services', 'repositories')
+  .check()
+
+slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
+```
+
+### Type-Level Rules
+
+Check property types using the TypeScript type checker:
+
+```typescript
+types(p)
+  .that()
+  .haveProperty('orderBy')
+  .should()
+  .havePropertyType('orderBy', not(isString()))
+  .rule({
+    because: 'Bare string orderBy is a SQL injection surface',
+    suggestion: "Use a union type: orderBy?: 'created_at' | 'updated_at'",
+  })
+  .check()
+```
+
+### Standard Rules Library
+
+25+ ready-to-use rules across 8 categories:
+
+```typescript
+import {
+  functionNoEval,
+  functionNoConsole,
+  functionNoJsonParse,
+} from '@nielspeter/ts-archunit/rules/security'
+import { functionNoGenericErrors } from '@nielspeter/ts-archunit/rules/errors'
+import { mustCall } from '@nielspeter/ts-archunit/rules/architecture'
+import { noDeadModules, noStubComments, noEmptyBodies } from '@nielspeter/ts-archunit/rules/hygiene'
+
+functions(p).that().resideInFolder('src/**').should().satisfy(functionNoEval()).check()
+functions(p).that().resideInFolder('src/**').should().satisfy(noEmptyBodies()).check()
+functions(p).that().resideInFolder('src/**').should().satisfy(noStubComments()).check()
+```
+
+Categories: `rules/typescript`, `rules/security`, `rules/errors`, `rules/naming`, `rules/dependencies`, `rules/code-quality`, `rules/metrics`, `rules/architecture`, `rules/hygiene`.
+
+### Baseline Mode
+
+Adopt rules in existing codebases without fixing every pre-existing violation:
+
+```typescript
+const baseline = withBaseline('arch-baseline.json')
+
+// Only NEW violations fail — existing ones are recorded
+classes(p).should().notContain(call('parseInt')).check({ baseline })
+```
+
+### GitHub Actions Annotations
+
+Violations appear inline on PR diffs — automatically detected in GitHub Actions:
+
+```typescript
+classes(p).should().notContain(call('eval')).check({ format: detectFormat() })
+```
+
+### Smell Detection
+
+Find code drift — duplicate function bodies and inconsistent patterns:
+
+```typescript
+smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).warn()
+
+smells
+  .inconsistentSiblings(p)
+  .inFolder('src/repositories/**')
+  .forPattern(call('this.extractCount'))
+  .warn()
+```
+
+### More Features
+
+- **[Call matching](https://nielspeter.github.io/ts-archunit/calls)** — framework-agnostic route/handler inspection (Express, Fastify, Hono)
+- **[Scoped rules](https://nielspeter.github.io/ts-archunit/body-analysis)** — `within(routes).functions()` for callback-level rules
+- **[Pattern templates](https://nielspeter.github.io/ts-archunit/patterns)** — enforce return type shapes (`{ items, total, skip, limit }`)
+- **[GraphQL rules](https://nielspeter.github.io/ts-archunit/graphql)** — schema and resolver conventions
+- **[Cross-layer validation](https://nielspeter.github.io/ts-archunit/cross-layer)** — route/schema/SDK consistency
+- **[Custom predicates and conditions](https://nielspeter.github.io/ts-archunit/custom-rules)** — `definePredicate()`, `defineCondition()`, `and`/`or`/`not` combinators
+- **[Metrics](https://nielspeter.github.io/ts-archunit/metrics)** — cyclomatic complexity, lines of code, method count limits
+- **[CLI](https://nielspeter.github.io/ts-archunit/cli)** — `check`, `baseline`, `explain`, `--watch` mode
 
 ## Entry Points
 
@@ -499,30 +300,42 @@ classes(p).that().areExported().should().satisfy(haveJsDocOnPublicMethods).check
 | `calls(p)`     | Call expressions                          | Framework-agnostic route/handler matching       |
 | `within(sel)`  | Scoped callbacks                          | Rules inside matched call callbacks             |
 
-## How It Works
+## Compared to Other Tools
 
-ts-archunit loads your TypeScript project using [ts-morph](https://ts-morph.com/) (a wrapper around the TypeScript compiler API). It has full access to:
+| Capability                                        | ts-archunit | [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) | [ArchUnitTS](https://github.com/LukasNiessen/ArchUnitTS) |
+| ------------------------------------------------- | ----------- | -------------------------------------------------------------------- | -------------------------------------------------------- |
+| Import path rules                                 | Yes         | Yes                                                                  | Yes                                                      |
+| **Body analysis** (calls, access, constructors)   | Yes         | No                                                                   | No                                                       |
+| **Type checking** (resolved types via ts-morph)   | Yes         | No                                                                   | No                                                       |
+| Class rules (inheritance, decorators, members)    | Yes         | No                                                                   | No                                                       |
+| Function rules (params, return types, async)      | Yes         | No                                                                   | No                                                       |
+| Cycle detection                                   | Yes         | Yes                                                                  | Yes                                                      |
+| Parameterized presets                             | Yes         | Flat config                                                          | No                                                       |
+| Baseline / gradual adoption                       | Yes         | No                                                                   | No                                                       |
+| GitHub PR annotations                             | Yes         | No                                                                   | No                                                       |
+| Violation messages with fix suggestions           | Yes         | No                                                                   | No                                                       |
+| `explain` command (dump rules as JSON for agents) | Yes         | No                                                                   | No                                                       |
+| OO metrics (LCOM, coupling, instability)          | No          | No                                                                   | Yes                                                      |
+| PlantUML diagram compliance                       | No          | No                                                                   | Yes                                                      |
+| Dependency graph visualization                    | No          | Yes (dot, HTML)                                                      | No                                                       |
+| License checking                                  | No          | Yes                                                                  | No                                                       |
+| Nx monorepo support                               | No          | No                                                                   | Yes                                                      |
 
-- **AST** — syntax tree for every file (classes, functions, imports, call expressions)
-- **Type checker** — resolve types through aliases, generics, `Partial<>`, `Pick<>`
+**Use ts-archunit** when you need to enforce what happens _inside_ functions — call patterns, error types, missing delegation, stub comments — and when AI agents are generating code that needs architectural guardrails. This is the only tool that catches "service calls parseInt instead of extractCount()".
 
-Rules run in your test suite. `.check()` throws on violations (test fails). `.warn()` logs to stderr (test passes). The project is loaded once and cached — subsequent rules in the same test run share the same instance.
+**Use dependency-cruiser** when you only need import direction rules and want fast graph visualization, license compliance checking, or stability metrics. It's faster (no ts-morph project load) and has mature HTML/dot reporting.
 
-## Comparison
+**Use ArchUnitTS** when you need OO metrics (LCOM cohesion, coupling factor, distance from main sequence), PlantUML diagram validation, or Nx monorepo project-graph awareness.
 
-| Tool                     | Import paths | Body analysis | Type checking | Cycles | Baseline | GraphQL | Smells |
-| ------------------------ | ------------ | ------------- | ------------- | ------ | -------- | ------- | ------ |
-| **ts-archunit**          | Yes          | Yes           | Yes           | Yes    | Yes      | Yes     | Yes    |
-| dependency-cruiser       | Yes          | No            | No            | Yes    | No       | No      | No     |
-| eslint-plugin-boundaries | Yes          | No            | No            | No     | No       | No      | No     |
-| ts-arch (npm)            | Yes          | No            | No            | No     | No       | No      | No     |
-| ESLint rules             | Per-file     | No            | No            | No     | No       | No      | No     |
+**Use ts-archunit + dependency-cruiser together** if you want both body-level enforcement and dependency graph visualization.
 
-## Requirements
+## Install
 
-- Node.js >= 24
-- TypeScript project with `tsconfig.json`
-- Test runner: vitest (recommended) or jest
+```bash
+npm install -D @nielspeter/ts-archunit
+```
+
+Requires Node.js >= 24 and a `tsconfig.json`. Works with vitest (recommended) or jest.
 
 ## License
 

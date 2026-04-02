@@ -113,6 +113,47 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
     })
   })
 
+  describe('BUG-0008: element names from getElementName() enable excluding', () => {
+    it('class name as element is excludable by exact string', () => {
+      // After BUG-0008 fix: createViolation() produces meaningful element names
+      // (e.g., "AssetService.getAssetDisplayName") instead of AST kind names.
+      // This test verifies that excluding works when element has the class name.
+      const violations = [
+        makeViolation({
+          element: 'AssetService.getAssetDisplayName',
+          message: 'AssetService.getAssetDisplayName uses type assertion',
+        }),
+      ]
+      const result = applyFilters(violations, {
+        exclusions: ['AssetService.getAssetDisplayName'],
+      })
+      expect(result).toHaveLength(0)
+    })
+
+    it('regex excludes by class name pattern in element', () => {
+      const violations = [
+        makeViolation({
+          element: 'AssetService.getAssetDisplayName',
+          message: 'uses type assertion',
+        }),
+      ]
+      const result = applyFilters(violations, { exclusions: [/AssetService/] })
+      expect(result).toHaveLength(0)
+    })
+
+    it('string exclusion uses exact match — no accidental over-matching', () => {
+      const violations = [
+        makeViolation({
+          element: 'AssetService.getAssetDisplayName',
+          message: 'uses type assertion',
+        }),
+      ]
+      // 'Service' does NOT match — it's a substring, not the full element name
+      const result = applyFilters(violations, { exclusions: ['Service'] })
+      expect(result).toHaveLength(1)
+    })
+  })
+
   describe('real-world scenario from BUG-0001', () => {
     it('can exclude specific file while keeping other violations', () => {
       const violations = [

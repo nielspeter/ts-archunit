@@ -178,6 +178,21 @@
 
 ---
 
-## All Plans Complete
+## Next
 
-43 of 43 plans implemented. 1538 tests across 123 files.
+| Priority | Plan                        | Effort | Status | Depends on |
+| -------- | --------------------------- | ------ | ------ | ---------- |
+| **P0**   | AI Agent Integration (0044) | 3 days | Ready  | 0040, 0043 |
+
+### Plan 0044 phases
+
+1. **MCP Server** (1.5 days) — `check_architecture` + `explain_rules` tools for real-time agent feedback
+2. **System Prompt Generator** (0.5 day) — `ts-archunit context` outputs agent-optimized markdown
+3. **Agent Guardrails Preset** (0.5 day) — one-liner preset for common AI agent mistakes
+4. **Documentation** (0.5 day) — AI agent setup guide, MCP reference
+
+---
+
+## Completed
+
+43 of 43 original plans implemented. 1658 tests across 128 files.

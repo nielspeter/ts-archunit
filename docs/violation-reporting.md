@@ -141,7 +141,13 @@ classes(p)
   .check()
 ```
 
-Supports exact strings and regex patterns. Patterns are tested against `violation.element`, `violation.file`, and `violation.message` — the first match wins.
+Supports exact strings and regex patterns. String matching is exact (`===`). Use regex for partial matching.
+
+Patterns are tested against three fields — the first match wins:
+
+- `violation.element` — qualified name like `MyService.doWork`, `Config.constructor`, or `handler` (for standalone functions). Inner AST nodes (e.g., `AsExpression`) are resolved to their nearest enclosing class/method/function.
+- `violation.file` — absolute file path
+- `violation.message` — full violation description
 
 If an exclusion pattern matches zero violations, a warning is emitted to help detect stale exclusions after renames.
 

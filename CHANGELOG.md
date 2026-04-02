@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] - 2026-04-02
+
+### Fixed
+
+- **BUG-0008: `.excluding()` now works with `satisfy()` conditions.** `getElementName()` resolves inner AST nodes (e.g., `AsExpression`, `CallExpression`) to their nearest enclosing class/method/function, producing qualified names like `MyService.doWork` instead of raw AST kind names. This makes `.excluding('MyService')` and `.excluding('MyService.doWork')` work as expected for all conditions, including `noTypeAssertions()`, `noNonNullAssertions()`, and custom `createViolation()` calls.
+- **Element names now include constructors, getters, setters, and property initializers.** `getElementName()` handles `ConstructorDeclaration` (→ `ClassName.constructor`), `GetAccessorDeclaration`, `SetAccessorDeclaration`, and `PropertyDeclaration` (→ `ClassName.propName`). Arrow functions and function expressions assigned to variables are also resolved (→ `handlerName`).
+
+### Changed
+
+- Refactored `getElementName()` into three focused helpers: `getNodeName()` (direct name extraction), `getStructuralName()` (member-level identity for ancestor walking), `isTopLevelDeclaration()` (walk boundary detection). No public API changes.
+
 ## [0.7.1] - 2026-03-30
 
 ### Changed
