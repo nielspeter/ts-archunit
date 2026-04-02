@@ -384,7 +384,7 @@ tests/fixtures/rules/src/silent-catch.ts
 
 ### Configurable logger patterns
 
-Deferred. The shipped rule checks "must reference error variable" — universal, pattern-free, zero false positives. A stricter follow-up could enforce that the reference actually goes to a *logging* call:
+Deferred. The shipped rule checks "must reference error variable" — universal, pattern-free, zero false positives. A stricter follow-up could enforce that the reference actually goes to a _logging_ call:
 
 ```typescript
 noSilentCatch({ logPatterns: [/logger\./, /Sentry\.capture/, /console\.(error|warn)/] })

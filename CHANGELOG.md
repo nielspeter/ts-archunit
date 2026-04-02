@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.7.2] - 2026-04-02
 
+### Added
+
+- **`noSilentCatch()`, `functionNoSilentCatch()`, `moduleNoSilentCatch()`** (plan 0045) — detect catch blocks that don't reference the caught error variable. Catches silent error swallowing: `catch { return fallback }`, `catch (err) { throw new AppError('failed') }`. Handles simple bindings, object/array destructured bindings. Class variant scans methods, constructors, getters, and setters. New `src/conditions/catch-analysis.ts` with `findSilentCatches()` core detection.
+
 ### Fixed
 
 - **BUG-0008: `.excluding()` now works with `satisfy()` conditions.** `getElementName()` resolves inner AST nodes (e.g., `AsExpression`, `CallExpression`) to their nearest enclosing class/method/function, producing qualified names like `MyService.doWork` instead of raw AST kind names. This makes `.excluding('MyService')` and `.excluding('MyService.doWork')` work as expected for all conditions, including `noTypeAssertions()`, `noNonNullAssertions()`, and custom `createViolation()` calls.
