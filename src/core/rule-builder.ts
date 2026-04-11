@@ -107,15 +107,35 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
-   * Exclude specific elements from violation reporting.
+   * Exclude specific violations from reporting by matching against
+   * the violation's `element`, `file`, or `message` fields.
    *
    * Matched violations are silently suppressed. Use for permanent,
    * intentional exceptions — not for temporary violations (use baseline for those).
    *
-   * Matches against the violation's `element` field (e.g., 'Asset.getImageUrl').
-   * Supports exact strings and regex patterns.
+   * Patterns are matched against all three fields. Prefer anchored regexes
+   * or full string matches over short substrings, especially for `message`
+   * matching, to avoid accidentally suppressing unrelated violations whose
+   * messages happen to contain the same text.
    *
-   * Emits a warning if an exclusion matches zero violations (stale exclusion).
+   * Emits a warning if an exclusion matches zero violations — so renamed
+   * or deleted exceptions don't silently stay in the rule.
+   *
+   * For narrowing a rule's scope at the predicate phase (so the rule never
+   * evaluates the excluded element), use `satisfy(not(<predicate>))` instead.
+   * See the "Excluding a file from a rule's scope" recipe in docs/recipes.md.
+   *
+   * @example
+   * // Exclude by element name (fully qualified)
+   * .excluding('Asset.getImageUrl')
+   *
+   * @example
+   * // Exclude by file path (regex anchored to suffix)
+   * .excluding(/repositories\/index\.ts$/)
+   *
+   * @example
+   * // Multiple exclusions, mixed forms
+   * .excluding('Asset.getImageUrl', /\/legacy\//, /generated/)
    */
   excluding(...patterns: (string | RegExp)[]): this {
     this._exclusions.push(...patterns)

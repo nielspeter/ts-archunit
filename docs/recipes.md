@@ -100,6 +100,54 @@ modules(p)
 slices(p).matching('packages/*/').should().beFreeOfCycles().check()
 ```
 
+## Scope Exclusions
+
+Some rules should apply to most files in a folder but skip specific ones — aggregator `index.ts` files that re-export or install hooks, generated code, or test fixtures. ts-archunit offers three exclusion mechanisms, each answering a different question:
+
+| When you want to say… | Use | Why |
+| --- | --- | --- |
+| *"This specific line is a known exception, annotated at the call site"* | Inline `// ts-archunit-exclude` comment | The code author owns the justification; the comment stays next to the code it excuses. |
+| *"These violations are expected — drop them, and warn me if they disappear"* | `.excluding(pattern)` after `.should()` | Stale-detection keeps the exclusion honest: if the excluded code is renamed or deleted, the next run emits a warning. |
+| *"This file is not part of what I'm testing at all — don't even evaluate against it"* | `.and().satisfy(not(<predicate>))` in the `.that()` chain | The rule never walks the file. Use when the exclusion is a structural property, not a suppressed violation. |
+
+### Excluding a file from a rule's scope (predicate-phase)
+
+The rule never evaluates against the excluded file. Composes the existing `not()` combinator with any positive predicate.
+
+```typescript
+import { functions, not, resideInFile, type ArchFunction } from '@nielspeter/ts-archunit'
+
+functions(p)
+  .that()
+  .resideInFolder('src/repositories/**')
+  .and().satisfy(not(resideInFile<ArchFunction>('src/repositories/index.ts')))
+  .should()
+  .beExported()
+  .because('repository modules must export their members — except the barrel file')
+  .check()
+```
+
+The `not()` / `and()` / `or()` combinators are exported from the top-level package and work with any `Predicate<T>`. See `src/presets/layered.ts` for a live example inside the layered-architecture preset.
+
+### Excluding violations with stale-detection (post-filter)
+
+Same shape, different intent: evaluate the rule normally, then drop violations matching the pattern. If the excluded file is ever removed or renamed, the next run warns that the exclusion is stale.
+
+```typescript
+functions(p)
+  .that()
+  .resideInFolder('src/repositories/**')
+  .should()
+  .beExported()
+  .excluding(/repositories\/index\.ts$/)
+  .because('repository modules must export their members')
+  .check()
+```
+
+`.excluding()` patterns match against the violation's `element`, `file`, or `message` fields. Prefer anchored regexes over short substrings — a pattern like `/index/` would match any violation whose element name, file path, or message contains the word "index".
+
+**When to pick which:** if the excluded file is a structural fact about your architecture (a barrel file that will always exist), `satisfy(not(...))` reads closer to intent. If the exclusion is a known, deliberate exception you want cleanup warnings for, `.excluding()` gives you stale-detection for free.
+
 ## Safety
 
 Safety rules ban dangerous API calls from production code. `eval`, `new Function`, and direct `JSON.parse` are attack vectors; `console.*` and `process.env` bypass logging and configuration abstractions. These are straightforward bans — scope them to `src/**` and exclude test files.
