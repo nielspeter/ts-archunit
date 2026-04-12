@@ -25,6 +25,14 @@ Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](
 - SDK wrappers must use `buildQueryString()`, not raw `URLSearchParams`
 - No `eval()`, no `console.log` in production code
 
+**JSX & design system compliance**
+
+- No raw `<button>` — use `<Button>` from the design system
+- Every `<img>` must have `alt` text
+- No inline `style={}` — use utility classes
+- No `dangerouslySetInnerHTML`
+- Interactive elements must have `data-testid` for E2E
+
 **Naming & structure**
 
 - Controllers end with `Controller`, services end with `Service`
@@ -51,6 +59,7 @@ Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](
 - Layer ordering: controllers → services → repositories → domain
 - Feature modules are cycle-free
 - Routes ↔ schemas ↔ SDK types stay in sync
+- Monorepo-aware: `workspace()` unifies imports across packages
 
 [See all rule examples →](/what-to-check)
 
@@ -94,6 +103,20 @@ The auth module imports from billing, billing imports from notifications, notifi
 slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 ```
 
+**"Someone used raw `<button>` instead of the design system component."**
+
+You have a component library. But developers keep reaching for raw HTML. Import rules can't catch it — there's no forbidden import involved.
+
+```typescript
+jsxElements(p)
+  .that()
+  .areHtmlElements('button', 'input', 'select')
+  .should()
+  .notExist()
+  .because('use design system components')
+  .check()
+```
+
 **ts-archunit turns these rules into tests.** They run in CI. Violations are caught on the PR that introduces them — not 18 months later during a manual audit.
 
 ---
@@ -128,6 +151,7 @@ slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 | -------------------------------------------------- | ----------- | ------------------ | ------------------------ |
 | Import path rules                                  | ✅          | ✅                 | ✅                       |
 | **Body analysis** (what's called inside functions) | ✅          | ❌                 | ❌                       |
+| **JSX element rules** (design system, a11y)        | ✅          | ❌                 | ❌                       |
 | **Type checking** (string vs typed union)          | ✅          | ❌                 | ❌                       |
 | Cycle detection                                    | ✅          | ✅                 | ❌                       |
 | Baseline (gradual adoption)                        | ✅          | ❌                 | ❌                       |

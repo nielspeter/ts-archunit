@@ -194,6 +194,28 @@ modules(p)
   .check()
 ```
 
+## Monorepo Setup
+
+In a monorepo, use `workspace()` instead of `project()` to unify the import graph across packages. This makes cross-workspace imports visible to all module conditions:
+
+```typescript
+import { workspace, modules, noUnusedExports } from '@nielspeter/ts-archunit'
+
+const p = workspace([
+  'apps/web/tsconfig.json',
+  'apps/api/tsconfig.json',
+  'packages/shared/tsconfig.json',
+])
+
+// Shared package has no unused exports (cross-workspace aware)
+modules(p)
+  .that()
+  .resideInFolder('**/packages/shared/src/**')
+  .should()
+  .satisfy(noUnusedExports())
+  .check()
+```
+
 ## Combining with Other Entry Points
 
 Use `modules()` for import rules and `classes()` for body analysis on the same codebase:

@@ -17,7 +17,7 @@ Body analysis fills this gap. It traverses the AST inside every method body (for
 
 Matchers are the building blocks of body analysis rules. Each matcher targets a specific kind of AST node -- function calls, constructor invocations, property access, object properties, or arbitrary expressions. You pass a matcher to a condition like `notContain()` to define what should (or should not) appear inside method and function bodies.
 
-Five matchers cover the most common expression patterns:
+Six matchers cover the most common expression patterns:
 
 ### `call(target)`
 
@@ -84,6 +84,23 @@ import { expression } from '@nielspeter/ts-archunit'
 
 expression('eval') // matches eval('code')
 expression(/JSON\.parse/) // matches JSON.parse(str)
+```
+
+### `jsxElement(tag)`
+
+Matches JSX elements by tag name. Use this to detect raw HTML elements or specific components inside function/module bodies. This is a **tag-only** matcher — for attribute-level rules, use the [`jsxElements()` entry point](/jsx).
+
+```typescript
+import { jsxElement } from '@nielspeter/ts-archunit'
+
+jsxElement('div') // matches <div>...</div> and <div />
+jsxElement('Button') // matches <Button>...</Button>
+jsxElement(/^motion\./) // matches <motion.div>, <motion.span>, etc.
+```
+
+```typescript
+// Functions in pages/ must not render raw <div>
+functions(p).that().resideInFile('**/pages/**/*.tsx').should().notContain(jsxElement('div')).check()
 ```
 
 ## String vs Regex

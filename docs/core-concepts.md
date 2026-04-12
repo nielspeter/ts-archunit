@@ -46,19 +46,36 @@ const p = project('tsconfig.json')
 
 The project is loaded once using [ts-morph](https://ts-morph.com/) and cached per path. Subsequent calls to `project('tsconfig.json')` return the same instance. This means multiple rules in the same test file share the same loaded project -- no duplicate parsing.
 
+### Monorepo: `workspace()`
+
+For monorepos with multiple tsconfigs, use `workspace()` to unify the import graph across packages:
+
+```typescript
+import { workspace } from '@nielspeter/ts-archunit'
+
+const p = workspace([
+  'apps/web/tsconfig.json',
+  'apps/api/tsconfig.json',
+  'packages/shared/tsconfig.json',
+])
+```
+
+`workspace()` returns a standard `ArchProject` — all entry points and conditions work unchanged. This makes cross-workspace imports visible to `noDeadModules()`, `noUnusedExports()`, and all dependency conditions.
+
 ## Entry Points
 
 Each entry point creates a rule builder for a specific kind of element:
 
-| Entry Point    | Operates On                         | Use Case                                        |
-| -------------- | ----------------------------------- | ----------------------------------------------- |
-| `modules(p)`   | Source files                        | Import/dependency rules                         |
-| `classes(p)`   | Class declarations                  | Inheritance, decorators, methods, body analysis |
-| `functions(p)` | Functions, arrow functions, methods | Naming, parameters, body analysis               |
-| `types(p)`     | Interfaces + type aliases           | Property types, type safety                     |
-| `slices(p)`    | Groups of files                     | Cycles, layer ordering                          |
-| `calls(p)`     | Call expressions                    | Framework-agnostic route/handler matching       |
-| `within(sel)`  | Scoped callbacks                    | Rules inside matched call callbacks             |
+| Entry Point      | Operates On                         | Use Case                                                            |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `modules(p)`     | Source files                        | Import/dependency rules                                             |
+| `classes(p)`     | Class declarations                  | Inheritance, decorators, methods, body analysis                     |
+| `functions(p)`   | Functions, arrow functions, methods | Naming, parameters, body analysis                                   |
+| `types(p)`       | Interfaces + type aliases           | Property types, type safety                                         |
+| `slices(p)`      | Groups of files                     | Cycles, layer ordering                                              |
+| `calls(p)`       | Call expressions                    | Framework-agnostic route/handler matching                           |
+| `jsxElements(p)` | JSX elements in .tsx/.jsx files     | Design system compliance, accessibility, structural JSX conventions |
+| `within(sel)`    | Scoped callbacks                    | Rules inside matched call callbacks                                 |
 
 ## The Chain
 
@@ -104,7 +121,7 @@ Available on all entry points:
 
 ### Type-Specific Predicates
 
-Each entry point adds its own predicates. See the dedicated pages: [Classes](/classes), [Functions](/functions), [Types](/types), [Modules](/modules).
+Each entry point adds its own predicates. See the dedicated pages: [Classes](/classes), [Functions](/functions), [Types](/types), [Modules](/modules), [Calls](/calls), [JSX Elements](/jsx).
 
 ### Combining Predicates
 
