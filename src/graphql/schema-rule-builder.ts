@@ -2,8 +2,7 @@ import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { Predicate } from '../core/predicate.js'
-import type { LoadedSchema } from './schema-loader.js'
-import type { GraphQLObjectTypeLike, GraphQLTypeLike } from './schema-loader.js'
+import type { LoadedSchema, GraphQLObjectTypeLike, GraphQLTypeLike } from './schema-loader.js'
 import type { SchemaElement } from './schema-predicates.js'
 import {
   queries as queriesPredicate,
@@ -46,8 +45,8 @@ function isObjectType(type: GraphQLTypeLike): type is GraphQLObjectTypeLike {
  * ```
  */
 export class SchemaRuleBuilder extends TerminalBuilder {
-  private _predicates: Predicate<SchemaElement>[] = []
-  private _conditions: Condition<SchemaElement>[] = []
+  private readonly _predicates: Predicate<SchemaElement>[] = []
+  private readonly _conditions: Condition<SchemaElement>[] = []
 
   constructor(private readonly loaded: LoadedSchema) {
     super()

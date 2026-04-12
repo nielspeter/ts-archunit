@@ -116,15 +116,21 @@ functions(p)
 import {
   noGenericErrors,
   noTypeErrors,
+  noSilentCatch,
   functionNoGenericErrors,
   functionNoTypeErrors,
+  functionNoSilentCatch,
+  moduleNoSilentCatch,
 } from '@nielspeter/ts-archunit/rules/errors'
 ```
 
-| Rule              | Variants        | What it checks                                     |
-| ----------------- | --------------- | -------------------------------------------------- |
-| `noGenericErrors` | class, function | No `new Error()` — use typed domain errors         |
-| `noTypeErrors`    | class, function | No `new TypeError()` — usually a programming error |
+| Rule              | Variants                | What it checks                                     |
+| ----------------- | ----------------------- | -------------------------------------------------- |
+| `noGenericErrors` | class, function         | No `new Error()` — use typed domain errors         |
+| `noTypeErrors`    | class, function         | No `new TypeError()` — usually a programming error |
+| `noSilentCatch`   | class, function, module | Catch blocks must reference the caught error       |
+
+### Typed errors
 
 The rule matches exact constructor names. `new Error()` is caught, but `new NotFoundError()` or `new ValidationError()` pass. This is by design — the goal is to force developers to use typed errors that can be caught and handled specifically:
 
@@ -137,6 +143,24 @@ functions(p)
   .rule({
     id: 'error/typed-errors',
     suggestion: 'throw new NotFoundError(...) or new ValidationError(...)',
+  })
+  .check()
+```
+
+### Silent catch detection
+
+`noSilentCatch()` flags catch blocks where the caught error is never referenced — no logging, no rethrowing, no passing to another function. Silent catches are a common source of hidden production bugs:
+
+```typescript
+functions(p)
+  .that()
+  .resideInFolder('**/services/**')
+  .should()
+  .satisfy(functionNoSilentCatch())
+  .rule({
+    id: 'error/no-silent-catch',
+    because: 'Swallowed errors hide production failures',
+    suggestion: 'Log the error, rethrow it, or pass it to an error handler',
   })
   .check()
 ```
@@ -211,7 +235,9 @@ modules(p)
   .check()
 ```
 
-**Limitation:** Only static `import` declarations are analyzed. Files loaded via dynamic `import()` or `require()` will be falsely reported.
+**Note:** Both static `import` declarations and dynamic `import()` expressions with string-literal specifiers are resolved. Only `require()` calls and dynamic imports with computed specifiers (variables, template literals with substitutions) are not resolved.
+
+**Monorepo note:** In a multi-workspace project, exports consumed by sibling workspaces are invisible to a single `project()` call. Use `workspace()` to unify the import graph across workspaces. See [Getting Started — Monorepo Setup](/getting-started#monorepo-setup).
 
 ### Unused export detection
 

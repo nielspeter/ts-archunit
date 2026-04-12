@@ -148,7 +148,7 @@ export function haveArgumentWithProperty(...names: string[]): Condition<ArchCall
   const quotedNames = names.map((n) => `"${n}"`).join(', ')
   const description =
     names.length === 1
-      ? `have argument with property "${names[0]!}"`
+      ? `have argument with property "${names[0] ?? ''}"`
       : `have argument with properties ${quotedNames}`
 
   return {
@@ -196,7 +196,7 @@ export function notHaveArgumentWithProperty(...names: string[]): Condition<ArchC
   const quotedNames = names.map((n) => `"${n}"`).join(', ')
   const description =
     names.length === 1
-      ? `not have argument with property "${names[0]!}"`
+      ? `not have argument with property "${names[0] ?? ''}"`
       : `not have argument with properties ${quotedNames}`
 
   return {

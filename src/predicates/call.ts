@@ -75,7 +75,9 @@ export function withArgMatching(index: number, pattern: string | RegExp): Predic
     test: (call) => {
       const args = call.getArguments()
       if (index >= args.length) return false
-      const argText = args[index]!.getText()
+      const argNode = args[index]
+      if (!argNode) return false
+      const argText = argNode.getText()
       return regex.test(argText)
     },
   }
@@ -104,7 +106,8 @@ export function withStringArg(index: number, glob: string): Predicate<ArchCall> 
     test: (call) => {
       const args = call.getArguments()
       if (index >= args.length) return false
-      const arg = args[index]!
+      const arg = args[index]
+      if (!arg) return false
       // Use ts-morph type guard (ADR-005: no duck typing or as casts)
       if (!Node.isStringLiteral(arg)) return false
       return isMatch(arg.getLiteralValue())

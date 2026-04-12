@@ -22,8 +22,9 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
 
       // Check consecutive layer pairs
       for (let i = 0; i < layers.length - 1; i++) {
-        const leftLayer = layers[i]!
-        const rightLayer = layers[i + 1]!
+        const leftLayer = layers[i]
+        const rightLayer = layers[i + 1]
+        if (!leftLayer || !rightLayer) continue
 
         // Collect all left files that appear in at least one pair
         const matchedLeftFiles = new Set<string>()

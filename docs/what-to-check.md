@@ -33,6 +33,9 @@ modules(p)
   .notImportFromCondition('**/controllers/**', '**/services/**')
   .check()
 
+// Server must depend on security middleware (import { dependOn } from '@nielspeter/ts-archunit')
+modules(p).that().resideInFile('**/server.ts').should().satisfy(dependOn('**/security/**')).check()
+
 // Imports from repositories must be type-only
 modules(p)
   .that()

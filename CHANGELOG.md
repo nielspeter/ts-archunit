@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-04-12
+
+### Added
+
+- **`workspace(tsConfigPaths)`** — load multiple tsconfigs into a unified project for monorepo-aware dead-code and unused-export detection. Returns a standard `ArchProject` so all existing entry points and conditions work unchanged. Paths are sorted for deterministic compiler-option selection. Cached per unique set of tsconfigs; `resetProjectCache()` clears both caches.
+- **`dependOn(...globs)`** — new condition asserting a module imports from at least one path matching the given globs. Completes the import-condition family alongside `onlyImportFrom` (all) and `notImportFrom` (none). Supports `{ ignoreTypeImports }` for consistency with the family.
+- **`silent(pattern)`** — wrapper for `.excluding()` patterns that suppresses the "unused exclusion" warning. Designed for intentionally broad patterns shared across monorepo workspaces where not every workspace triggers every pattern.
+- **Dynamic `import()` detection** — `beImported()` and `noDeadModules()` now resolve dynamic `import()` expressions with string-literal and no-substitution template-literal specifiers. Handles `.js→.ts`, `.jsx→.tsx`, `.mjs→.mts` ESM extension mapping and `/index.ts` directory imports.
+
+### Fixed
+
+- ESLint config now ignores `dist/`, `coverage/`, and `docs/.vitepress/` build artifacts, preventing `npx eslint .` failures on generated files.
+
+### Changed
+
+- Reduced cognitive complexity in 7 functions by extracting helpers: `indexStaticImports`, `indexReExports`, `indexDynamicImports` (reverse-dependency), `formatSingleViolation` (format), `handleBlockEnd`, `handleBlockStart`, `handleSingleLine` (exclusion-comments), `passesFileFilters`, `meetsMinLines` (duplicate-bodies), `partitionByPattern`, `buildFolderViolations` (inconsistent-siblings), `handleCheck`, `handleBaseline`, `handleExplain` (CLI).
+- Removed 23 unnecessary non-null assertions (`!`) across the codebase, replaced with proper narrowing guards and `?? default` patterns (ADR-005 compliance).
+- Merged duplicate imports in `fingerprint.ts`, `schema-rule-builder.ts`.
+- Added `readonly` to `_predicates`/`_conditions` in GraphQL rule builders.
+- Replaced `localeCompare` sort with locale-independent codepoint ordering where determinism across OS locales matters.
+- Added `noSilentCatch` documentation to `standard-rules.md` and `api-reference.md` (was missing since v0.7.2).
+
 ## [0.7.2] - 2026-04-02
 
 ### Added

@@ -17,6 +17,7 @@ export interface ExecuteRuleContext {
   reason?: string
   metadata?: RuleMetadata
   exclusions?: (string | RegExp)[]
+  silentIndices?: Set<number>
 }
 
 /**
@@ -54,8 +55,9 @@ export function applyFilters(
     })
 
     const ruleId = ctx.metadata?.id ?? 'unnamed'
+    const silentIndices = ctx.silentIndices ?? new Set()
     exclusions.forEach((pattern, index) => {
-      if (!matchedPatterns.has(index)) {
+      if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
         console.warn(
           `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
             `It matched zero violations — it may be stale after a rename.`,

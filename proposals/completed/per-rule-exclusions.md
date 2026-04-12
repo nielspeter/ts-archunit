@@ -200,7 +200,7 @@ Architecture Warning: unused exclusion 'Asset.getImageUrl' in rule sdk/no-manual
 **Ship Phase 1 first** (`.excluding()` chain method). It covers the three cases from the feature request immediately:
 
 ```typescript
-// cmless: SDK wrappers
+// SDK wrappers — exclude known thin wrappers
 functions(p)
   .that()
   .resideInFolder('**/wrappers/**')
@@ -209,7 +209,7 @@ functions(p)
   .excluding('Asset.getImageUrl', 'Environment.sync')
   .check() // ← now enforced
 
-// cmless: route imports
+// Route imports — only type imports from repositories
 modules(p)
   .that()
   .resideInFolder('**/routes/**')
@@ -218,7 +218,7 @@ modules(p)
   .excluding('internal-routes')
   .check() // ← now enforced
 
-// cmless: repository base class
+// Repository base class — all repos must extend BaseRepository
 classes(p)
   .that()
   .haveNameEndingWith('Repository')

@@ -1,5 +1,6 @@
 import picomatch from 'picomatch'
-import { type SourceFile, type Project, Node } from 'ts-morph'
+import nodePath from 'node:path'
+import { type SourceFile, type Project, Node, SyntaxKind } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 
@@ -38,30 +39,96 @@ function addToGraph(
   }
 }
 
+/**
+ * Resolve a dynamic import specifier to a project source file.
+ *
+ * Handles relative specifiers with ESM extension mappings (.js→.ts, .jsx→.tsx,
+ * .mjs→.mts) and directory index imports. Non-relative specifiers (bare packages)
+ * are skipped — they resolve to node_modules, which are outside the project.
+ */
+function resolveDynamicImport(fromFile: SourceFile, specifier: string): SourceFile | undefined {
+  if (!specifier.startsWith('.')) return undefined
+
+  const dirPath = fromFile.getDirectory().getPath()
+  const project = fromFile.getProject()
+
+  // Try the specifier as-is, with ESM extension mappings, and as a directory index
+  const candidates = [
+    specifier,
+    specifier.replace(/\.js$/, '.ts'),
+    specifier.replace(/\.jsx$/, '.tsx'),
+    specifier.replace(/\.mjs$/, '.mts'),
+    specifier + '.ts',
+    specifier + '.tsx',
+    specifier + '/index.ts',
+    specifier + '/index.tsx',
+  ]
+
+  for (const candidate of candidates) {
+    const absolutePath = nodePath.resolve(dirPath, candidate)
+    const resolved = project.getSourceFile(absolutePath)
+    if (resolved) return resolved
+  }
+
+  return undefined
+}
+
+/** Index static import declarations from a source file into the reverse graph. */
+function indexStaticImports(graph: ReverseImportGraph, sf: SourceFile): void {
+  for (const decl of sf.getImportDeclarations()) {
+    const resolved = decl.getModuleSpecifierSourceFile()
+    if (!resolved) continue
+    addToGraph(graph, resolved.getFilePath(), sf, false)
+  }
+}
+
+/** Index re-export declarations from a source file into the reverse graph. */
+function indexReExports(graph: ReverseImportGraph, sf: SourceFile): void {
+  for (const decl of sf.getExportDeclarations()) {
+    const resolved = decl.getModuleSpecifierSourceFile()
+    if (!resolved) continue
+    addToGraph(graph, resolved.getFilePath(), sf, true)
+  }
+}
+
+/** Index dynamic import() expressions from a source file into the reverse graph. */
+function indexDynamicImports(graph: ReverseImportGraph, sf: SourceFile): void {
+  for (const callExpr of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    if (callExpr.getExpression().getKind() !== SyntaxKind.ImportKeyword) continue
+    const args = callExpr.getArguments()
+    if (args.length === 0) continue
+
+    const arg = args[0]
+    if (!arg) continue
+    let specifier: string | undefined
+    if (Node.isStringLiteral(arg) || Node.isNoSubstitutionTemplateLiteral(arg)) {
+      specifier = arg.getLiteralValue()
+    }
+
+    if (specifier === undefined) continue
+
+    const resolved = resolveDynamicImport(sf, specifier)
+    if (resolved) {
+      addToGraph(graph, resolved.getFilePath(), sf, true)
+    }
+  }
+}
+
 function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
   if (sourceFiles.length === 0) return new Map()
 
-  const project = sourceFiles[0]!.getProject()
+  const firstFile = sourceFiles[0]
+  if (!firstFile) return new Map()
+  const project = firstFile.getProject()
   const cached = graphCache.get(project)
   if (cached) return cached
 
   const graph: ReverseImportGraph = new Map()
 
   for (const sf of sourceFiles) {
-    // Static import declarations
-    for (const decl of sf.getImportDeclarations()) {
-      const resolved = decl.getModuleSpecifierSourceFile()
-      if (!resolved) continue
-      addToGraph(graph, resolved.getFilePath(), sf, false)
-    }
-
-    // Re-export declarations (export { x } from './y') — these reference
-    // another module but appear as ExportDeclaration, not ImportDeclaration
-    for (const decl of sf.getExportDeclarations()) {
-      const resolved = decl.getModuleSpecifierSourceFile()
-      if (!resolved) continue
-      addToGraph(graph, resolved.getFilePath(), sf, true)
-    }
+    indexStaticImports(graph, sf)
+    indexReExports(graph, sf)
+    indexDynamicImports(graph, sf)
   }
 
   graphCache.set(project, graph)
@@ -79,8 +146,8 @@ function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
  * Modules with zero importers pass vacuously. Chain `.andShould().beImported()`
  * if you also want to catch orphaned files.
  *
- * **Limitation:** Only considers static `import` declarations. Dynamic `import()`
- * expressions and `require()` calls are not resolved.
+ * Both static `import` declarations and dynamic `import()` expressions with
+ * string-literal specifiers are resolved. `require()` calls are not resolved.
  */
 export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
   const matchers = globs.map((g) => picomatch(g))
@@ -89,7 +156,8 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
     description: `only be imported via ${quotedGlobs}`,
     evaluate(elements: SourceFile[], context: ConditionContext): ArchViolation[] {
       // Build graph from ALL project files, not just the filtered elements
-      const allFiles = elements.length > 0 ? elements[0]!.getProject().getSourceFiles() : []
+      const first = elements[0]
+      const allFiles = first ? first.getProject().getSourceFiles() : []
       const graph = getReverseImportGraph(allFiles)
       const violations: ArchViolation[] = []
 
@@ -121,14 +189,16 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
  * Detects dead/orphaned modules that nobody references.
  * Use `.excluding('index.ts', 'main.ts')` to skip entry points.
  *
- * **Limitation:** Only considers static `import` declarations. Modules loaded
- * via dynamic `import()` or `require()` will be falsely reported as dead.
+ * Both static `import` declarations and dynamic `import()` expressions with
+ * string-literal specifiers are resolved. Modules loaded via `require()` or
+ * dynamic imports with computed specifiers will still be falsely reported.
  */
 export function beImported(): Condition<SourceFile> {
   return {
     description: 'be imported by at least one other module',
     evaluate(elements: SourceFile[], context: ConditionContext): ArchViolation[] {
-      const allFiles = elements.length > 0 ? elements[0]!.getProject().getSourceFiles() : []
+      const first = elements[0]
+      const allFiles = first ? first.getProject().getSourceFiles() : []
       const graph = getReverseImportGraph(allFiles)
       const violations: ArchViolation[] = []
 

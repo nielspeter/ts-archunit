@@ -43,6 +43,7 @@ Conditions define what the matched modules must (or must not) do. These go in th
 | ---------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
 | `onlyImportFrom(...globs)`         | Module may only import from the listed paths                      | `.should().onlyImportFrom('**/domain/**')`              |
 | `notImportFromCondition(...globs)` | Module must not import from the listed paths                      | `.should().notImportFromCondition('**/controllers/**')` |
+| `dependOn(...globs)`               | Module must import from at least one path matching a glob         | `.should().satisfy(dependOn('**/logging/**'))`          |
 | `onlyHaveTypeImportsFrom(glob)`    | Imports from matching paths must use `import type`                | `.should().onlyHaveTypeImportsFrom('**/models/**')`     |
 | `notHaveAliasedImports()`          | No named import may use an alias (`import { x as y }`)            | `.should().notHaveAliasedImports()`                     |
 | `notHaveDefaultExport()`           | Module must not have a default export                             | `.should().notHaveDefaultExport()`                      |
@@ -130,6 +131,30 @@ modules(p)
   })
   .check()
 ```
+
+### Required Dependencies
+
+```typescript
+// Every service must import from the logging package
+modules(p)
+  .that()
+  .resideInFolder('**/services/**')
+  .should()
+  .satisfy(dependOn('**/logging/**'))
+  .because('services must use structured logging')
+  .check()
+
+// Server entry point must depend on security middleware
+modules(p)
+  .that()
+  .resideInFile('**/server.ts')
+  .should()
+  .satisfy(dependOn('**/security-middleware/**'))
+  .because('server must initialize security before handling requests')
+  .check()
+```
+
+`dependOn()` completes the import-condition family: `onlyImportFrom` (all imports must match), `notImportFrom` (no imports may match), `dependOn` (at least one import must match). Like the others, it supports `{ ignoreTypeImports: true }` to exclude type-only imports. All three check static `import` declarations only — for import-graph analysis that includes dynamic `import()`, use `beImported()` or `noDeadModules()`.
 
 ### Type-Only Imports from Domain
 

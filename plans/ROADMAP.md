@@ -66,18 +66,18 @@
 
 ## What's Shipped
 
-**1518 tests across 118 files. All checks pass.**
+**1734 tests across 131 files. All checks pass.**
 
 ### Core (P0)
 
-- `project('tsconfig.json')` with singleton caching
+- `project('tsconfig.json')` with singleton caching, `workspace([...tsconfigs])` for monorepos
 - `Predicate<T>` + `Condition<T>` interfaces with combinators
 - `RuleBuilder<T>` with fluent `.that().should().check()` chain
 - `.because()`, `.warn()`, `.severity()`, `.rule({ id, because, suggestion, docs })`
 
 ### Entry Points (P1)
 
-- `modules(p)` — import/dependency rules, type-only import enforcement
+- `modules(p)` — import/dependency rules, type-only import enforcement, `dependOn()`, dynamic import detection
 - `classes(p)` — inheritance, decorators, methods, body analysis
 - `functions(p)` — function declarations, arrow functions, class methods
 - `types(p)` — interfaces + type aliases, type matchers through Partial/Pick

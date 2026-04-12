@@ -42,6 +42,27 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     return `No duplicate function bodies in ${scope} (similarity >= ${String(this._minSimilarity)})`
   }
 
+  /** Check if a file path passes all glob-based filters. */
+  private passesFileFilters(
+    filePath: string,
+    folderMatchers: picomatch.Matcher[],
+    ignoreMatchers: picomatch.Matcher[],
+    testMatchers: picomatch.Matcher[],
+  ): boolean {
+    if (folderMatchers.length > 0 && !folderMatchers.some((m) => m(filePath))) return false
+    if (ignoreMatchers.some((m) => m(filePath))) return false
+    if (testMatchers.some((m) => m(filePath))) return false
+    return true
+  }
+
+  /** Check if a function body meets the minimum line count. */
+  private meetsMinLines(fn: ArchFunction): boolean {
+    const body = fn.getBody()
+    if (!body) return false
+    const lineCount = body.getText().split('\n').length
+    return lineCount >= this._minLines
+  }
+
   /** Collect all functions matching folder/path/test filters. */
   private collectFilteredFunctions(): ArchFunction[] {
     const sourceFiles = this.project.getSourceFiles()
@@ -52,34 +73,14 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     const allFunctions: ArchFunction[] = []
 
     for (const sf of sourceFiles) {
-      const filePath = sf.getFilePath()
-
-      // Folder filter: if folders specified, file must match at least one
-      if (folderMatchers.length > 0 && !folderMatchers.some((m) => m(filePath))) {
+      if (!this.passesFileFilters(sf.getFilePath(), folderMatchers, ignoreMatchers, testMatchers)) {
         continue
       }
 
-      // Ignore paths filter
-      if (ignoreMatchers.some((m) => m(filePath))) {
-        continue
-      }
-
-      // Test file filter
-      if (testMatchers.some((m) => m(filePath))) {
-        continue
-      }
-
-      const fns = collectFunctions(sf)
-      for (const fn of fns) {
-        // minLines filter: count lines in the function body
-        const body = fn.getBody()
-        if (!body) continue
-
-        const bodyText = body.getText()
-        const lineCount = bodyText.split('\n').length
-        if (lineCount < this._minLines) continue
-
-        allFunctions.push(fn)
+      for (const fn of collectFunctions(sf)) {
+        if (this.meetsMinLines(fn)) {
+          allFunctions.push(fn)
+        }
       }
     }
 
@@ -105,8 +106,9 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
 
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
-        const a = items[i]!
-        const b = items[j]!
+        const a = items[i]
+        const b = items[j]
+        if (!a || !b) continue
         // Fast rejection: if node counts differ too much, similarity cannot reach threshold
         const maxCount = Math.max(a.fingerprint.nodeCount, b.fingerprint.nodeCount)
         const minCount = Math.min(a.fingerprint.nodeCount, b.fingerprint.nodeCount)

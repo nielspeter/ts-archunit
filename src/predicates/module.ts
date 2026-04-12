@@ -40,7 +40,7 @@ export function importFrom(...args: [string[], ImportOptions] | string[]): Predi
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
-    description: `import from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    description: 'import from ' + globs.map((g) => `"${g}"`).join(', '),
     test: (sourceFile) =>
       getImportPaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
   }
@@ -64,7 +64,7 @@ export function notImportFrom(
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
-    description: `not import from ${globs.map((g) => `"${g}"`).join(', ')}`,
+    description: 'not import from ' + globs.map((g) => `"${g}"`).join(', '),
     test: (sourceFile) =>
       !getImportPaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
   }

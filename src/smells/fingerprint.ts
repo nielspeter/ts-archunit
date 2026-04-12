@@ -1,5 +1,4 @@
-import type { SyntaxKind } from 'ts-morph'
-import { type Node, Node as NodeClass } from 'ts-morph'
+import { type SyntaxKind, type Node, Node as NodeClass } from 'ts-morph'
 
 /**
  * Structural fingerprint of a function body.
@@ -56,11 +55,14 @@ function lcsLength(a: readonly number[], b: readonly number[]): number {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      curr[j] = a[i - 1] === b[j - 1] ? prev[j - 1]! + 1 : Math.max(prev[j]!, curr[j - 1]!)
+      const prevDiag = prev[j - 1] ?? 0
+      const prevAbove = prev[j] ?? 0
+      const currLeft = curr[j - 1] ?? 0
+      curr[j] = a[i - 1] === b[j - 1] ? prevDiag + 1 : Math.max(prevAbove, currLeft)
     }
     ;[prev, curr] = [curr, prev]
     curr.fill(0)
   }
 
-  return prev[n]!
+  return prev[n] ?? 0
 }

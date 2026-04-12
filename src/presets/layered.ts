@@ -143,22 +143,24 @@ export function layeredArchitecture(p: ArchProject, options: LayeredArchitecture
 
   // --- Innermost isolation (strict mode) ---
   if (options.strict && layerNames.length > 0) {
-    const innermostName = layerNames[layerNames.length - 1]!
-    const innermostGlob = options.layers[innermostName]!
-    const allowedGlobs = [innermostGlob, ...sharedGlobs]
+    const innermostName = layerNames[layerNames.length - 1]
+    const innermostGlob = innermostName !== undefined ? options.layers[innermostName] : undefined
+    if (innermostName && innermostGlob) {
+      const allowedGlobs = [innermostGlob, ...sharedGlobs]
 
-    violations.push(
-      ...dispatchRule(
-        modules(p)
-          .that()
-          .resideInFolder(innermostGlob)
-          .should()
-          .onlyImportFrom(...allowedGlobs),
-        'preset/layered/innermost-isolation',
-        'error',
-        overrides,
-      ),
-    )
+      violations.push(
+        ...dispatchRule(
+          modules(p)
+            .that()
+            .resideInFolder(innermostGlob)
+            .should()
+            .onlyImportFrom(...allowedGlobs),
+          'preset/layered/innermost-isolation',
+          'error',
+          overrides,
+        ),
+      )
+    }
   }
 
   // --- Type imports only for specified layers ---

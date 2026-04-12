@@ -73,6 +73,67 @@ export function parseCliArgs(args: string[]): ParsedArgs {
   })
 }
 
+/** Require rule files to be specified, printing an error and setting exit code if missing. */
+function requireRuleFiles(ruleFiles: string[]): boolean {
+  if (ruleFiles.length > 0) return true
+  console.error(
+    'Error: No rule files specified. Pass rule files as arguments or set them in config.',
+  )
+  process.exitCode = 1
+  return false
+}
+
+/** Handle the `check` subcommand. */
+async function handleCheck(
+  ruleFiles: string[],
+  values: ParsedArgs['values'],
+  config: Awaited<ReturnType<typeof resolveConfig>>,
+  format: OutputFormat | 'auto',
+  baseline: string | undefined,
+  changed: boolean,
+  base: string,
+): Promise<void> {
+  if (!requireRuleFiles(ruleFiles)) return
+
+  if (values.watch === true) {
+    const watchDirs = config.watchDirs ?? ['src']
+    const checkArgs = { ruleFiles, baseline, changed, base, format, fresh: true }
+
+    process.stdout.write('ts-archunit — watching for changes\n\n')
+    resetProjectCache()
+    await runCheck(checkArgs).catch(() => {
+      // Initial violations are printed by runCheck — don't exit
+    })
+    process.stdout.write('\nWatching for changes...\n')
+
+    watchAndRerun({
+      watchDirs,
+      watchFiles: ruleFiles,
+      onChangeDetected: async () => {
+        resetProjectCache()
+        await runCheck(checkArgs)
+      },
+    })
+  } else {
+    const failures = await runCheck({ ruleFiles, baseline, changed, base, format })
+    if (failures > 0) {
+      process.exitCode = 1
+    }
+  }
+}
+
+/** Handle the `baseline` subcommand. */
+async function handleBaseline(ruleFiles: string[], output: string): Promise<void> {
+  if (!requireRuleFiles(ruleFiles)) return
+  await runBaseline({ ruleFiles, output })
+}
+
+/** Handle the `explain` subcommand. */
+async function handleExplain(ruleFiles: string[], markdown: boolean | undefined): Promise<void> {
+  if (!requireRuleFiles(ruleFiles)) return
+  await runExplain({ ruleFiles, markdown })
+}
+
 export async function run(args: string[]): Promise<void> {
   const parsed = parseCliArgs(args)
   const { values, positionals } = parsed
@@ -95,17 +156,13 @@ export async function run(args: string[]): Promise<void> {
     return
   }
 
-  // --watch is only supported with check
   if (values.watch === true && command !== 'check') {
     console.error('Error: --watch is only supported with the check command.')
     process.exitCode = 1
     return
   }
 
-  // Load config file (if any)
   const config = await resolveConfig(values.config)
-
-  // Merge: CLI flags > config file > defaults
   const ruleFiles = positionals.slice(1).length > 0 ? positionals.slice(1) : (config.rules ?? [])
   const format = (values.format ?? config.format ?? 'auto') as OutputFormat | 'auto'
   const baseline = values.baseline ?? config.baseline
@@ -113,69 +170,11 @@ export async function run(args: string[]): Promise<void> {
   const changed = values.changed ?? false
 
   if (command === 'check') {
-    if (ruleFiles.length === 0) {
-      console.error(
-        'Error: No rule files specified. Pass rule files as arguments or set them in config.',
-      )
-      process.exitCode = 1
-      return
-    }
-
-    if (values.watch === true) {
-      const watchDirs = config.watchDirs ?? ['src']
-      const checkArgs = { ruleFiles, baseline, changed, base, format, fresh: true }
-
-      // Initial run
-      process.stdout.write('ts-archunit — watching for changes\n\n')
-      resetProjectCache()
-      await runCheck(checkArgs).catch(() => {
-        // Initial violations are printed by runCheck — don't exit
-      })
-      process.stdout.write('\nWatching for changes...\n')
-
-      // Watch and re-run (non-blocking — watchers run in background)
-      watchAndRerun({
-        watchDirs,
-        watchFiles: ruleFiles,
-        onChangeDetected: async () => {
-          resetProjectCache()
-          await runCheck(checkArgs)
-        },
-      })
-    } else {
-      const failures = await runCheck({
-        ruleFiles,
-        baseline,
-        changed,
-        base,
-        format,
-      })
-
-      if (failures > 0) {
-        process.exitCode = 1
-      }
-    }
+    await handleCheck(ruleFiles, values, config, format, baseline, changed, base)
   } else if (command === 'baseline') {
-    if (ruleFiles.length === 0) {
-      console.error(
-        'Error: No rule files specified. Pass rule files as arguments or set them in config.',
-      )
-      process.exitCode = 1
-      return
-    }
-
-    const output = values.output ?? 'arch-baseline.json'
-    await runBaseline({ ruleFiles, output })
+    await handleBaseline(ruleFiles, values.output ?? 'arch-baseline.json')
   } else if (command === 'explain') {
-    if (ruleFiles.length === 0) {
-      console.error(
-        'Error: No rule files specified. Pass rule files as arguments or set them in config.',
-      )
-      process.exitCode = 1
-      return
-    }
-
-    await runExplain({ ruleFiles, markdown: values.markdown })
+    await handleExplain(ruleFiles, values.markdown)
   } else {
     console.error(`Error: Unknown command "${command}". Use --help for usage.`)
     process.exitCode = 1

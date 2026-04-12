@@ -31,7 +31,8 @@ export function extractCallbacks(callExpr: CallExpression): ExtractedCallback[] 
   const args = callExpr.getArguments()
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!
+    const arg = args[i]
+    if (!arg) continue
     const fn = extractInlineFunction(arg, callExpr, i)
     if (fn) {
       callbacks.push(fn)

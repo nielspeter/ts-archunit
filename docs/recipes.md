@@ -104,11 +104,11 @@ slices(p).matching('packages/*/').should().beFreeOfCycles().check()
 
 Some rules should apply to most files in a folder but skip specific ones — aggregator `index.ts` files that re-export or install hooks, generated code, or test fixtures. ts-archunit offers three exclusion mechanisms, each answering a different question:
 
-| When you want to say… | Use | Why |
-| --- | --- | --- |
-| *"This specific line is a known exception, annotated at the call site"* | Inline `// ts-archunit-exclude` comment | The code author owns the justification; the comment stays next to the code it excuses. |
-| *"These violations are expected — drop them, and warn me if they disappear"* | `.excluding(pattern)` after `.should()` | Stale-detection keeps the exclusion honest: if the excluded code is renamed or deleted, the next run emits a warning. |
-| *"This file is not part of what I'm testing at all — don't even evaluate against it"* | `.and().satisfy(not(<predicate>))` in the `.that()` chain | The rule never walks the file. Use when the exclusion is a structural property, not a suppressed violation. |
+| When you want to say…                                                                 | Use                                                       | Why                                                                                                                   |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| _"This specific line is a known exception, annotated at the call site"_               | Inline `// ts-archunit-exclude` comment                   | The code author owns the justification; the comment stays next to the code it excuses.                                |
+| _"These violations are expected — drop them, and warn me if they disappear"_          | `.excluding(pattern)` after `.should()`                   | Stale-detection keeps the exclusion honest: if the excluded code is renamed or deleted, the next run emits a warning. |
+| _"This file is not part of what I'm testing at all — don't even evaluate against it"_ | `.and().satisfy(not(<predicate>))` in the `.that()` chain | The rule never walks the file. Use when the exclusion is a structural property, not a suppressed violation.           |
 
 ### Excluding a file from a rule's scope (predicate-phase)
 
@@ -120,7 +120,8 @@ import { functions, not, resideInFile, type ArchFunction } from '@nielspeter/ts-
 functions(p)
   .that()
   .resideInFolder('src/repositories/**')
-  .and().satisfy(not(resideInFile<ArchFunction>('src/repositories/index.ts')))
+  .and()
+  .satisfy(not(resideInFile<ArchFunction>('src/repositories/index.ts')))
   .should()
   .beExported()
   .because('repository modules must export their members — except the barrel file')
@@ -201,6 +202,24 @@ modules(p)
   .excluding('index.ts', 'main.ts', 'config.ts', /\.d\.ts$/)
   .check()
 ```
+
+### Shared exclusions across workspaces
+
+When the same exclusion pattern is shared across multiple workspaces, some workspaces may not have matching violations. Use `silent()` to suppress the "unused exclusion" warning for intentionally broad patterns:
+
+```typescript
+import { silent } from '@nielspeter/ts-archunit'
+
+modules(p)
+  .that()
+  .resideInFolder('src/**')
+  .should()
+  .satisfy(noDeadModules())
+  .excluding(silent(/\.d\.ts$/), 'index.ts', 'main.ts')
+  .check()
+```
+
+The `silent()` wrapper only suppresses the warning — the pattern still filters violations when it matches.
 
 ### No unused exports
 

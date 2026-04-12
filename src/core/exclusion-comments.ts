@@ -76,6 +76,112 @@ function parseRuleIdsAndReason(content: string): { ruleIds: string[]; reason: st
   return { ruleIds, reason }
 }
 
+/** Handle a block-end directive line. */
+function handleBlockEnd(
+  openBlocks: Map<string, ExclusionComment>,
+  exclusions: ExclusionComment[],
+  warnings: ExclusionWarning[],
+  filePath: string,
+  lineNum: number,
+): void {
+  if (openBlocks.size === 0) {
+    warnings.push({
+      message: `ts-archunit-exclude-end without matching start`,
+      file: filePath,
+      line: lineNum,
+    })
+    return
+  }
+
+  for (const [, comment] of openBlocks) {
+    comment.endLine = lineNum
+    exclusions.push(comment)
+  }
+  openBlocks.clear()
+}
+
+/** Emit undocumented-exclusion warnings for each rule ID when no reason is given. */
+function warnUndocumented(
+  warnings: ExclusionWarning[],
+  ruleIds: string[],
+  directive: string,
+  filePath: string,
+  lineNum: number,
+): void {
+  for (const ruleId of ruleIds) {
+    warnings.push({
+      message:
+        `Undocumented exclusion at ${filePath}:${String(lineNum)} — ` +
+        `// ${directive} ${ruleId}\n` +
+        `  Fix: Add a reason — // ${directive} ${ruleId}: <why>`,
+      file: filePath,
+      line: lineNum,
+    })
+  }
+}
+
+/** Handle a block-start directive line. */
+function handleBlockStart(
+  content: string,
+  openBlocks: Map<string, ExclusionComment>,
+  warnings: ExclusionWarning[],
+  filePath: string,
+  lineNum: number,
+): void {
+  if (openBlocks.size > 0) {
+    warnings.push({
+      message: `Nested ts-archunit-exclude-start — close existing block first`,
+      file: filePath,
+      line: lineNum,
+    })
+    return
+  }
+
+  const { ruleIds, reason } = parseRuleIdsAndReason(content)
+
+  if (reason === '') {
+    warnUndocumented(warnings, ruleIds, 'ts-archunit-exclude-start', filePath, lineNum)
+  }
+
+  for (const ruleId of ruleIds) {
+    openBlocks.set(ruleId, {
+      ruleId,
+      reason,
+      file: filePath,
+      line: lineNum,
+      isBlock: true,
+    })
+  }
+}
+
+/** Handle a single-line exclude directive. */
+function handleSingleLine(
+  content: string,
+  exclusions: ExclusionComment[],
+  warnings: ExclusionWarning[],
+  filePath: string,
+  lineNum: number,
+): void {
+  // Skip if this was a block start or end (already handled above, but guard)
+  if (content.startsWith('-start') || content.startsWith('-end')) return
+
+  const { ruleIds, reason } = parseRuleIdsAndReason(content)
+
+  if (reason === '') {
+    warnUndocumented(warnings, ruleIds, 'ts-archunit-exclude', filePath, lineNum)
+  }
+
+  for (const ruleId of ruleIds) {
+    exclusions.push({
+      ruleId,
+      reason,
+      file: filePath,
+      line: lineNum,
+      isBlock: false,
+    })
+  }
+}
+
 /**
  * Scan a source file for ts-archunit exclusion comments.
  *
@@ -89,8 +195,6 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
   const lines = sourceText.split('\n')
   const exclusions: ExclusionComment[] = []
   const warnings: ExclusionWarning[] = []
-
-  // Track open block starts: map from ruleId to the ExclusionComment (incomplete)
   const openBlocks = new Map<string, ExclusionComment>()
 
   for (let i = 0; i < lines.length; i++) {
@@ -99,100 +203,22 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
     const lineNum = i + 1
 
     // Check block end first (before start/single so we don't match -start as single)
-    const endMatch = BLOCK_END_RE.exec(line)
-    if (endMatch) {
-      if (openBlocks.size === 0) {
-        warnings.push({
-          message: `ts-archunit-exclude-end without matching start`,
-          file: filePath,
-          line: lineNum,
-        })
-      } else {
-        // Close all open blocks at this end line
-        for (const [, comment] of openBlocks) {
-          comment.endLine = lineNum
-          exclusions.push(comment)
-        }
-        openBlocks.clear()
-      }
+    if (BLOCK_END_RE.test(line)) {
+      handleBlockEnd(openBlocks, exclusions, warnings, filePath, lineNum)
       continue
     }
 
     // Check block start
     const startMatch = BLOCK_START_RE.exec(line)
-    if (startMatch) {
-      const content = startMatch[1]
-      if (!content) continue
-
-      if (openBlocks.size > 0) {
-        warnings.push({
-          message: `Nested ts-archunit-exclude-start — close existing block first`,
-          file: filePath,
-          line: lineNum,
-        })
-        continue
-      }
-
-      const { ruleIds, reason } = parseRuleIdsAndReason(content)
-
-      if (reason === '') {
-        for (const ruleId of ruleIds) {
-          warnings.push({
-            message:
-              `Undocumented exclusion at ${filePath}:${String(lineNum)} — ` +
-              `// ts-archunit-exclude-start ${ruleId}\n` +
-              `  Fix: Add a reason — // ts-archunit-exclude-start ${ruleId}: <why>`,
-            file: filePath,
-            line: lineNum,
-          })
-        }
-      }
-
-      for (const ruleId of ruleIds) {
-        openBlocks.set(ruleId, {
-          ruleId,
-          reason,
-          file: filePath,
-          line: lineNum,
-          isBlock: true,
-        })
-      }
+    if (startMatch?.[1]) {
+      handleBlockStart(startMatch[1], openBlocks, warnings, filePath, lineNum)
       continue
     }
 
     // Check single-line exclude (must not match block directives)
     const singleMatch = SINGLE_LINE_RE.exec(line)
-    if (singleMatch) {
-      const content = singleMatch[1]
-      if (!content) continue
-
-      // Skip if this was a block start or end (already handled above, but guard)
-      if (content.startsWith('-start') || content.startsWith('-end')) continue
-
-      const { ruleIds, reason } = parseRuleIdsAndReason(content)
-
-      if (reason === '') {
-        for (const ruleId of ruleIds) {
-          warnings.push({
-            message:
-              `Undocumented exclusion at ${filePath}:${String(lineNum)} — ` +
-              `// ts-archunit-exclude ${ruleId}\n` +
-              `  Fix: Add a reason — // ts-archunit-exclude ${ruleId}: <why>`,
-            file: filePath,
-            line: lineNum,
-          })
-        }
-      }
-
-      for (const ruleId of ruleIds) {
-        exclusions.push({
-          ruleId,
-          reason,
-          file: filePath,
-          line: lineNum,
-          isBlock: false,
-        })
-      }
+    if (singleMatch?.[1]) {
+      handleSingleLine(singleMatch[1], exclusions, warnings, filePath, lineNum)
     }
   }
 
@@ -217,6 +243,18 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
  * For block comments: the violation must be in the same file and
  * within the line range (start line, end line) inclusive.
  */
+/** Check if a single comment covers the given violation. */
+function commentCoversViolation(comment: ExclusionComment, violationLine: number): boolean {
+  if (comment.isBlock) {
+    return (
+      comment.endLine !== undefined &&
+      violationLine >= comment.line &&
+      violationLine <= comment.endLine
+    )
+  }
+  return violationLine === comment.line + 1
+}
+
 export function isExcludedByComment(
   violation: ArchViolation,
   comments: ExclusionComment[],
@@ -224,26 +262,10 @@ export function isExcludedByComment(
   const ruleId = violation.ruleId
   if (!ruleId) return false
 
-  for (const comment of comments) {
-    if (comment.ruleId !== ruleId) continue
-    if (comment.file !== violation.file) continue
-
-    if (comment.isBlock) {
-      // Block exclusion: violation line must be within the block range
-      if (
-        comment.endLine !== undefined &&
-        violation.line >= comment.line &&
-        violation.line <= comment.endLine
-      ) {
-        return true
-      }
-    } else {
-      // Single-line exclusion: violation must be on the next line after the comment
-      if (violation.line === comment.line + 1) {
-        return true
-      }
-    }
-  }
-
-  return false
+  return comments.some(
+    (comment) =>
+      comment.ruleId === ruleId &&
+      comment.file === violation.file &&
+      commentCoversViolation(comment, violation.line),
+  )
 }

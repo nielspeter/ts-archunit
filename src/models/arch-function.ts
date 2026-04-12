@@ -88,7 +88,8 @@ export function fromFunctionDeclaration(decl: FunctionDeclaration): ArchFunction
  * Precondition: caller must verify the initializer is an ArrowFunction.
  */
 export function fromArrowVariableDeclaration(decl: VariableDeclaration): ArchFunction {
-  const arrow = decl.getInitializerIfKind(SyntaxKind.ArrowFunction)!
+  const arrow = decl.getInitializerIfKind(SyntaxKind.ArrowFunction)
+  if (!arrow) throw new Error('Expected arrow function initializer')
   return {
     getName: () => decl.getName(),
     getSourceFile: () => decl.getSourceFile(),

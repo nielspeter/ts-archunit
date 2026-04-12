@@ -12,6 +12,36 @@ export interface FormatOptions {
   codeFrames?: boolean
 }
 
+/** Format a single violation into a rich terminal section. */
+function formatSingleViolation(
+  v: ArchViolation,
+  index: number,
+  total: number,
+  cwd: string,
+  showCodeFrames: boolean,
+  reason: string | undefined,
+): string {
+  const counter = bold(red(`Architecture Violation [${String(index + 1)} of ${String(total)}]`))
+  const ruleLine = `  ${dim('Rule:')} ${v.rule}`
+  const relativePath = path.relative(cwd, v.file)
+  const locationRef = cyan(relativePath + ':' + String(v.line))
+  const location = `  ${locationRef} ${dim('—')} ${v.element}`
+  const codeLine = showCodeFrames && v.codeFrame ? `\n${v.codeFrame}` : ''
+
+  const whyText = v.because ?? reason
+  const whyLine = whyText ? `  ${dim('Why:')} ${whyText}` : ''
+  const fixLine = v.suggestion ? `  ${dim('Fix:')} ${v.suggestion}` : ''
+  const docsLine = v.docs ? `  ${dim('Docs:')} ${v.docs}` : ''
+
+  const parts = [counter, '', ruleLine, '', location]
+  if (codeLine) parts.push(codeLine)
+  if (whyLine) parts.push(whyLine)
+  if (fixLine) parts.push(fixLine)
+  if (docsLine) parts.push(docsLine)
+
+  return parts.join('\n')
+}
+
 /**
  * Format violations into a rich, readable terminal string.
  *
@@ -28,40 +58,10 @@ export function formatViolations(
   const cwd = options?.cwd ?? process.cwd()
   const showCodeFrames = options?.codeFrames ?? true
   const total = violations.length
-  const sections: string[] = []
 
-  for (let i = 0; i < violations.length; i++) {
-    const v = violations[i]!
-    const counter = bold(red(`Architecture Violation [${String(i + 1)} of ${String(total)}]`))
-
-    // Rule line
-    const ruleLine = `  ${dim('Rule:')} ${v.rule}`
-
-    // Location: relative path + element
-    const relativePath = path.relative(cwd, v.file)
-    const location = `  ${cyan(`${relativePath}:${String(v.line)}`)} ${dim('—')} ${v.element}`
-
-    // Code frame
-    const codeLine = showCodeFrames && v.codeFrame ? `\n${v.codeFrame}` : ''
-
-    // Why / Fix / Docs metadata lines
-    const whyLine = v.because
-      ? `  ${dim('Why:')} ${v.because}`
-      : reason
-        ? `  ${dim('Why:')} ${reason}`
-        : ''
-    const fixLine = v.suggestion ? `  ${dim('Fix:')} ${v.suggestion}` : ''
-    const docsLine = v.docs ? `  ${dim('Docs:')} ${v.docs}` : ''
-
-    const parts = [counter, '', ruleLine]
-    parts.push('', location)
-    if (codeLine) parts.push(codeLine)
-    if (whyLine) parts.push(whyLine)
-    if (fixLine) parts.push(fixLine)
-    if (docsLine) parts.push(docsLine)
-
-    sections.push(parts.join('\n'))
-  }
+  const sections = violations.map((v, i) =>
+    formatSingleViolation(v, i, total, cwd, showCodeFrames, reason),
+  )
 
   return sections.join('\n\n')
 }

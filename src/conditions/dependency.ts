@@ -127,6 +127,57 @@ export function notImportFrom(
 }
 
 /**
+ * Module must import from at least one path matching a glob.
+ * Completes the import-condition family: onlyImportFrom (all),
+ * notImportFrom (none), dependOn (at least one).
+ *
+ * Only considers static `import` declarations. Dynamic `import()`
+ * expressions are not checked — use `beImported()` for import-graph
+ * analysis that includes dynamic imports.
+ *
+ * @example
+ * modules(p)
+ *   .that().resideInFolder('** /services/** ')
+ *   .should().satisfy(dependOn('** /logging/** '))
+ *   .check()
+ */
+export function dependOn(globs: string[], options: ImportOptions): Condition<SourceFile>
+export function dependOn(...globs: string[]): Condition<SourceFile>
+export function dependOn(...args: [string[], ImportOptions] | string[]): Condition<SourceFile> {
+  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
+  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
+  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const ignoreType = options?.ignoreTypeImports === true
+  const matchers = globs.map((g) => picomatch(g))
+  const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
+  return {
+    description:
+      globs.length === 1 ? `depend on ${quotedGlobs}` : `depend on at least one of ${quotedGlobs}`,
+    evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
+      const violations: ArchViolation[] = []
+      for (const sf of sourceFiles) {
+        const hasMatch = sf.getImportDeclarations().some((decl) => {
+          if (ignoreType && isTypeOnlyImport(decl)) return false
+          const importPath = resolveImportPath(decl)
+          return matchers.some((m) => m(importPath))
+        })
+        if (!hasMatch) {
+          violations.push({
+            rule: context.rule,
+            element: sf.getBaseName(),
+            file: sf.getFilePath(),
+            line: 1,
+            message: `${sf.getBaseName()} does not import from any path matching [${globs.join(', ')}]`,
+            because: context.because,
+          })
+        }
+      }
+      return violations
+    },
+  }
+}
+
+/**
  * No import in the module may use an aliased named specifier (`import { x as y }`).
  * Each aliased specifier produces a violation.
  * Does not flag namespace imports (`import * as Foo`) — only named specifier aliases.

@@ -27,78 +27,88 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     return this
   }
 
-  protected detect(): ArchViolation[] {
-    if (!this._pattern) {
-      return []
+  /** Check if a source file contains any function matching the pattern. */
+  private fileMatchesPattern(sf: SourceFile, pattern: ExpressionMatcher): boolean {
+    for (const fn of collectFunctions(sf)) {
+      const body = fn.getBody()
+      if (!body) continue
+
+      const lineCount = body.getText().split('\n').length
+      if (lineCount < this._minLines) continue
+
+      if (searchFunctionBody(fn, pattern).found) return true
     }
+    return false
+  }
+
+  /** Partition files into matching and non-matching based on the pattern. */
+  private partitionByPattern(
+    files: SourceFile[],
+    pattern: ExpressionMatcher,
+  ): { matching: SourceFile[]; nonMatching: SourceFile[] } {
+    const matching: SourceFile[] = []
+    const nonMatching: SourceFile[] = []
+    for (const sf of files) {
+      if (this.fileMatchesPattern(sf, pattern)) {
+        matching.push(sf)
+      } else {
+        nonMatching.push(sf)
+      }
+    }
+    return { matching, nonMatching }
+  }
+
+  /** Build violations for non-matching files in a folder where the majority matches. */
+  private buildFolderViolations(
+    folder: string,
+    matching: SourceFile[],
+    nonMatching: SourceFile[],
+    ruleDescription: string,
+    patternDesc: string,
+  ): ArchViolation[] {
+    const total = matching.length + nonMatching.length
+    const violations: ArchViolation[] = []
+    for (const sf of nonMatching) {
+      violations.push({
+        rule: ruleDescription,
+        element: sf.getBaseName(),
+        file: sf.getFilePath(),
+        line: 1,
+        message:
+          `${String(matching.length)} of ${String(total)} files in ${folder} use ${patternDesc}, ` +
+          `but ${sf.getBaseName()} does not`,
+        because: this._reason,
+      })
+    }
+    return violations
+  }
+
+  protected detect(): ArchViolation[] {
+    if (!this._pattern) return []
 
     const filesByFolder = this.groupFilesByFolder()
-    const violations: ArchViolation[] = []
     const ruleDescription = this.describe()
+    const patternDesc = this._pattern.description
 
-    // Optionally sort folders for grouped output
     const folderEntries = [...filesByFolder.entries()]
     if (this._groupByFolder) {
       folderEntries.sort((a, b) => a[0].localeCompare(b[0]))
     }
 
+    const violations: ArchViolation[] = []
+
     for (const [folder, files] of folderEntries) {
       if (files.length < 2) continue
 
-      // Determine which files match the pattern
-      const matching: SourceFile[] = []
-      const nonMatching: SourceFile[] = []
-
-      for (const sf of files) {
-        const fns = collectFunctions(sf)
-        let fileMatches = false
-
-        for (const fn of fns) {
-          const body = fn.getBody()
-          if (!body) continue
-
-          const bodyText = body.getText()
-          const lineCount = bodyText.split('\n').length
-          if (lineCount < this._minLines) continue
-
-          const result = searchFunctionBody(fn, this._pattern)
-          if (result.found) {
-            fileMatches = true
-            break
-          }
-        }
-
-        if (fileMatches) {
-          matching.push(sf)
-        } else {
-          nonMatching.push(sf)
-        }
-      }
-
-      // Check majority threshold
+      const { matching, nonMatching } = this.partitionByPattern(files, this._pattern)
       const total = matching.length + nonMatching.length
       if (total === 0) continue
-
-      const matchRatio = matching.length / total
-      if (matchRatio < MAJORITY_THRESHOLD) continue
-
-      // Flag non-matching files as inconsistent
+      if (matching.length / total < MAJORITY_THRESHOLD) continue
       if (nonMatching.length === 0) continue
 
-      const patternDesc = this._pattern.description
-      for (const sf of nonMatching) {
-        const filePath = sf.getFilePath()
-        violations.push({
-          rule: ruleDescription,
-          element: sf.getBaseName(),
-          file: filePath,
-          line: 1,
-          message:
-            `${String(matching.length)} of ${String(total)} files in ${folder} use ${patternDesc}, ` +
-            `but ${sf.getBaseName()} does not`,
-          because: this._reason,
-        })
-      }
+      violations.push(
+        ...this.buildFolderViolations(folder, matching, nonMatching, ruleDescription, patternDesc),
+      )
     }
 
     return violations

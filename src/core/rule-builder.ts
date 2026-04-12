@@ -5,6 +5,8 @@ import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import type { RuleDescription } from './rule-description.js'
+import type { SilentExclusion } from './silent-exclusion.js'
+import { isSilent } from './silent-exclusion.js'
 import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 
 /**
@@ -24,6 +26,7 @@ export abstract class RuleBuilder<T> {
   protected _reason?: string
   protected _metadata?: RuleMetadata
   protected _exclusions: (string | RegExp)[] = []
+  protected _silentIndices: Set<number> = new Set()
   protected _phase: 'predicate' | 'condition' = 'predicate'
 
   constructor(protected readonly project: ArchProject) {}
@@ -137,8 +140,15 @@ export abstract class RuleBuilder<T> {
    * // Multiple exclusions, mixed forms
    * .excluding('Asset.getImageUrl', /\/legacy\//, /generated/)
    */
-  excluding(...patterns: (string | RegExp)[]): this {
-    this._exclusions.push(...patterns)
+  excluding(...patterns: (string | RegExp | SilentExclusion)[]): this {
+    for (const p of patterns) {
+      if (isSilent(p)) {
+        this._exclusions.push(p.pattern)
+        this._silentIndices.add(this._exclusions.length - 1)
+      } else {
+        this._exclusions.push(p)
+      }
+    }
     return this
   }
 
@@ -168,6 +178,7 @@ export abstract class RuleBuilder<T> {
       reason: this._reason,
       metadata: this._metadata,
       exclusions: this._exclusions,
+      silentIndices: this._silentIndices,
     })
   }
 
@@ -185,6 +196,7 @@ export abstract class RuleBuilder<T> {
         reason: this._reason,
         metadata: this._metadata,
         exclusions: this._exclusions,
+        silentIndices: this._silentIndices,
       },
       options,
     )
@@ -204,6 +216,7 @@ export abstract class RuleBuilder<T> {
         reason: this._reason,
         metadata: this._metadata,
         exclusions: this._exclusions,
+        silentIndices: this._silentIndices,
       },
       options,
     )
@@ -264,6 +277,7 @@ export abstract class RuleBuilder<T> {
     fork._predicates = [...this._predicates]
     fork._conditions = []
     fork._exclusions = [...this._exclusions]
+    fork._silentIndices = new Set(this._silentIndices)
     fork._metadata = this._metadata ? { ...this._metadata } : undefined
     fork._reason = fork._metadata?.because ?? this._reason
     return fork

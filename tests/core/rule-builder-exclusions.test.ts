@@ -8,6 +8,7 @@ import {
   nameMatches,
   alwaysFail,
 } from '../support/test-rule-builder.js'
+import { silent } from '../../src/core/silent-exclusion.js'
 
 const elements = [
   { name: 'UserService', file: '/project/src/services/user.ts', line: 5, exported: true },
@@ -192,6 +193,68 @@ describe('.excluding()', () => {
     expect(() => {
       selection.should().withCondition(alwaysFail()).excluding('OrderService').check()
     }).not.toThrow()
+    warnSpy.mockRestore()
+  })
+
+  it('silent() exclusion suppresses unused-exclusion warning through builder chain', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const builder = new TestRuleBuilder(stubProject, elements)
+    try {
+      builder
+        .should()
+        .withCondition(alwaysFail())
+        .excluding(silent(/SilentPattern/), 'LoudPattern')
+        .rule({ id: 'test/silent-rule' })
+        .check()
+    } catch {
+      // expected — other violations remain
+    }
+    // silent(/SilentPattern/) should NOT warn, but 'LoudPattern' should
+    const warnings = warnSpy.mock.calls.map((c) => String(c[0]))
+    const unusedWarnings = warnings.filter((w) => w.includes('Unused exclusion'))
+    expect(unusedWarnings).toHaveLength(1)
+    expect(unusedWarnings[0]).toContain('LoudPattern')
+    expect(unusedWarnings[0]).not.toContain('SilentPattern')
+    warnSpy.mockRestore()
+  })
+
+  it('silent() exclusion still filters violations when matched', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const builder = new TestRuleBuilder(stubProject, elements)
+    try {
+      builder
+        .should()
+        .withCondition(alwaysFail())
+        .excluding(silent(/Helper$/))
+        .check()
+      expect.unreachable('should have thrown')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ArchRuleError)
+      if (error instanceof ArchRuleError) {
+        expect(error.violations).toHaveLength(2)
+        const names = error.violations.map((v) => v.element)
+        expect(names).not.toContain('FooHelper')
+        expect(names).not.toContain('BarHelper')
+      }
+    }
+    warnSpy.mockRestore()
+  })
+
+  it('silent() exclusion preserved across fork', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const selection = new TestRuleBuilder(stubProject, elements)
+      .that()
+      .withPredicate(nameMatches(/Service$/))
+      .excluding(silent(/NonExistent/))
+
+    try {
+      selection.should().withCondition(alwaysFail()).check()
+    } catch {
+      // expected
+    }
+    // silent exclusion should not warn even after fork
+    const warnings = warnSpy.mock.calls.map((c) => String(c[0]))
+    expect(warnings.filter((w) => w.includes('Unused exclusion'))).toHaveLength(0)
     warnSpy.mockRestore()
   })
 

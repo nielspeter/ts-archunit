@@ -43,7 +43,7 @@ export function haveNameStartingWith<T extends Named>(prefix: string): Predicate
     description: `have name starting with "${prefix}"`,
     test: (element) => {
       const name = element.getName()
-      return name !== undefined && name.startsWith(prefix)
+      return name?.startsWith(prefix) ?? false
     },
   }
 }
@@ -56,7 +56,7 @@ export function haveNameEndingWith<T extends Named>(suffix: string): Predicate<T
     description: `have name ending with "${suffix}"`,
     test: (element) => {
       const name = element.getName()
-      return name !== undefined && name.endsWith(suffix)
+      return name?.endsWith(suffix) ?? false
     },
   }
 }

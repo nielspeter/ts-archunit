@@ -29,7 +29,7 @@ export interface MatchResult {
  */
 function findMatchesByKind(node: Node, matcher: ExpressionMatcher): Node[] {
   const matches: Node[] = []
-  for (const kind of matcher.syntaxKinds!) {
+  for (const kind of matcher.syntaxKinds ?? []) {
     for (const descendant of node.getDescendantsOfKind(kind)) {
       if (matcher.matches(descendant)) {
         matches.push(descendant)

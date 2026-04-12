@@ -4,16 +4,17 @@ All public exports from `ts-archunit`, organized by category.
 
 ## Entry Points
 
-| Export      | Signature                                        | Description                                                      |
-| ----------- | ------------------------------------------------ | ---------------------------------------------------------------- |
-| `project`   | `project(tsConfigPath: string): ArchProject`     | Load a TypeScript project. Cached per path.                      |
-| `modules`   | `modules(p: ArchProject): ModuleRuleBuilder`     | Rule builder for source files (imports/dependencies).            |
-| `classes`   | `classes(p: ArchProject): ClassRuleBuilder`      | Rule builder for class declarations.                             |
-| `functions` | `functions(p: ArchProject): FunctionRuleBuilder` | Rule builder for functions, arrow functions, class methods.      |
-| `types`     | `types(p: ArchProject): TypeRuleBuilder`         | Rule builder for interfaces and type aliases.                    |
-| `slices`    | `slices(p: ArchProject): SliceRuleBuilder`       | Rule builder for file groupings (cycles, layers).                |
-| `calls`     | `calls(p: ArchProject): CallRuleBuilder`         | Rule builder for call expressions.                               |
-| `within`    | `within(sel: CallRuleBuilder): ScopedContext`    | Scoped rule builder for callback functions inside matched calls. |
+| Export      | Signature                                         | Description                                                      |
+| ----------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| `project`   | `project(tsConfigPath: string): ArchProject`      | Load a TypeScript project. Cached per path.                      |
+| `workspace` | `workspace(tsConfigPaths: string[]): ArchProject` | Load multiple tsconfigs into a unified project for monorepo use. |
+| `modules`   | `modules(p: ArchProject): ModuleRuleBuilder`      | Rule builder for source files (imports/dependencies).            |
+| `classes`   | `classes(p: ArchProject): ClassRuleBuilder`       | Rule builder for class declarations.                             |
+| `functions` | `functions(p: ArchProject): FunctionRuleBuilder`  | Rule builder for functions, arrow functions, class methods.      |
+| `types`     | `types(p: ArchProject): TypeRuleBuilder`          | Rule builder for interfaces and type aliases.                    |
+| `slices`    | `slices(p: ArchProject): SliceRuleBuilder`        | Rule builder for file groupings (cycles, layers).                |
+| `calls`     | `calls(p: ArchProject): CallRuleBuilder`          | Rule builder for call expressions.                               |
+| `within`    | `within(sel: CallRuleBuilder): ScopedContext`     | Scoped rule builder for callback functions inside matched calls. |
 
 ## Rule Builders
 
@@ -33,16 +34,16 @@ All public exports from `ts-archunit`, organized by category.
 
 Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`).
 
-| Method            | Signature                                       | Description                                                                                                                                                                         |
-| ----------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.excluding()`    | `.excluding(...patterns: (string \| RegExp)[])` | Permanently suppress violations matching element name (e.g., `'MyService.doWork'`), file path, or message. Strings use exact match; regex uses `.test()`. Warns on unused patterns. |
-| `.because()`      | `.because(reason: string)`                      | Attach a human-readable rationale to the rule.                                                                                                                                      |
-| `.rule()`         | `.rule(metadata: RuleMetadata)`                 | Attach rich metadata (id, because, suggestion, docs).                                                                                                                               |
-| `.check()`        | `.check(options?: CheckOptions)`                | Execute rule; throw on violations.                                                                                                                                                  |
-| `.warn()`         | `.warn(options?: CheckOptions)`                 | Execute rule; log violations without throwing.                                                                                                                                      |
-| `.severity()`     | `.severity(level: 'error' \| 'warn')`           | Execute with the given severity.                                                                                                                                                    |
-| `.violations()`   | `.violations(): ArchViolation[]`                | Execute rule, return violations without throwing. For programmatic access and presets.                                                                                              |
-| `.describeRule()` | `.describeRule(): RuleDescription`              | Return rule metadata without executing. Used by `explain` command.                                                                                                                  |
+| Method            | Signature                                                          | Description                                                                                                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.excluding()`    | `.excluding(...patterns: (string \| RegExp \| SilentExclusion)[])` | Permanently suppress violations matching element name (e.g., `'MyService.doWork'`), file path, or message. Strings use exact match; regex uses `.test()`. Warns on unused patterns. Wrap with `silent()` to suppress the warning. |
+| `.because()`      | `.because(reason: string)`                                         | Attach a human-readable rationale to the rule.                                                                                                                                                                                    |
+| `.rule()`         | `.rule(metadata: RuleMetadata)`                                    | Attach rich metadata (id, because, suggestion, docs).                                                                                                                                                                             |
+| `.check()`        | `.check(options?: CheckOptions)`                                   | Execute rule; throw on violations.                                                                                                                                                                                                |
+| `.warn()`         | `.warn(options?: CheckOptions)`                                    | Execute rule; log violations without throwing.                                                                                                                                                                                    |
+| `.severity()`     | `.severity(level: 'error' \| 'warn')`                              | Execute with the given severity.                                                                                                                                                                                                  |
+| `.violations()`   | `.violations(): ArchViolation[]`                                   | Execute rule, return violations without throwing. For programmatic access and presets.                                                                                                                                            |
+| `.describeRule()` | `.describeRule(): RuleDescription`                                 | Return rule metadata without executing. Used by `explain` command.                                                                                                                                                                |
 
 ## Exclusion Comments
 
@@ -168,12 +169,13 @@ Available on all entry points via `.that()`.
 
 ## Dependency Conditions
 
-| Export                    | Signature                                          | Description                                                                 |
-| ------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
-| `onlyImportFrom`          | `onlyImportFrom(...globs)` or `(globs[], options)` | Module may only import from listed paths. Options: `{ ignoreTypeImports }`. |
-| `conditionNotImportFrom`  | `notImportFrom(...globs)` or `(globs[], options)`  | Module must not import from listed paths. Options: `{ ignoreTypeImports }`. |
-| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])`      | Imports from matching paths must use `import type`.                         |
-| `notHaveAliasedImports`   | `notHaveAliasedImports()`                          | No named import may use an alias (`import { x as y }`).                     |
+| Export                    | Signature                                          | Description                                                                           |
+| ------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `onlyImportFrom`          | `onlyImportFrom(...globs)` or `(globs[], options)` | Module may only import from listed paths. Options: `{ ignoreTypeImports }`.           |
+| `conditionNotImportFrom`  | `notImportFrom(...globs)` or `(globs[], options)`  | Module must not import from listed paths. Options: `{ ignoreTypeImports }`.           |
+| `dependOn`                | `dependOn(...globs)` or `(globs[], options)`       | Module must import from at least one matching path. Options: `{ ignoreTypeImports }`. |
+| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])`      | Imports from matching paths must use `import type`.                                   |
+| `notHaveAliasedImports`   | `notHaveAliasedImports()`                          | No named import may use an alias (`import { x as y }`).                               |
 
 ## Body Analysis Matchers
 
@@ -339,14 +341,15 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Check Options
 
-| Export              | Signature                                      | Description                                       |
-| ------------------- | ---------------------------------------------- | ------------------------------------------------- |
-| `withBaseline`      | `withBaseline(path: string): Baseline`         | Load a baseline file for gradual adoption.        |
-| `generateBaseline`  | `generateBaseline(violations, path): void`     | Write a baseline file from current violations.    |
-| `collectViolations` | `collectViolations(...rules): ArchViolation[]` | Collect violations from multiple rules.           |
-| `diffAware`         | `diffAware(base: string): DiffFilter`          | Only report violations in changed files.          |
-| `Baseline`          | class                                          | Baseline instance for filtering known violations. |
-| `DiffFilter`        | class                                          | Diff filter instance.                             |
+| Export              | Signature                                            | Description                                                           |
+| ------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| `withBaseline`      | `withBaseline(path: string): Baseline`               | Load a baseline file for gradual adoption.                            |
+| `generateBaseline`  | `generateBaseline(violations, path): void`           | Write a baseline file from current violations.                        |
+| `collectViolations` | `collectViolations(...rules): ArchViolation[]`       | Collect violations from multiple rules.                               |
+| `diffAware`         | `diffAware(base: string): DiffFilter`                | Only report violations in changed files.                              |
+| `Baseline`          | class                                                | Baseline instance for filtering known violations.                     |
+| `DiffFilter`        | class                                                | Diff filter instance.                                                 |
+| `silent`            | `silent(pattern: string \| RegExp): SilentExclusion` | Wrap an exclusion pattern to suppress the "unused exclusion" warning. |
 
 ## ArchFunction Model
 
@@ -537,12 +540,15 @@ See [Architecture Presets](/presets) for full configuration options.
 
 ### `ts-archunit/rules/errors`
 
-| Export                      | Target    | Description                                  |
-| --------------------------- | --------- | -------------------------------------------- |
-| `noGenericErrors()`         | classes   | No `new Error()` -- use typed domain errors. |
-| `noTypeErrors()`            | classes   | No `new TypeError()`.                        |
-| `functionNoGenericErrors()` | functions | No `new Error()` in functions.               |
-| `functionNoTypeErrors()`    | functions | No `new TypeError()` in functions.           |
+| Export                      | Target    | Description                                   |
+| --------------------------- | --------- | --------------------------------------------- |
+| `noGenericErrors()`         | classes   | No `new Error()` -- use typed domain errors.  |
+| `noTypeErrors()`            | classes   | No `new TypeError()`.                         |
+| `functionNoGenericErrors()` | functions | No `new Error()` in functions.                |
+| `functionNoTypeErrors()`    | functions | No `new TypeError()` in functions.            |
+| `noSilentCatch()`           | classes   | Catch blocks must reference the caught error. |
+| `functionNoSilentCatch()`   | functions | Catch blocks must reference the caught error. |
+| `moduleNoSilentCatch()`     | modules   | Catch blocks must reference the caught error. |
 
 ### `ts-archunit/rules/naming`
 

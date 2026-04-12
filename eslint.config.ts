@@ -4,7 +4,7 @@ import prettierConfig from 'eslint-config-prettier'
 
 export default tseslint.config(
   {
-    ignores: ['tests/fixtures/**'],
+    ignores: ['dist/**', 'coverage/**', 'tests/fixtures/**', 'docs/.vitepress/**'],
   },
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,

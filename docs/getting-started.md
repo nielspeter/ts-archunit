@@ -110,6 +110,34 @@ modules(p)
   .check()
 ```
 
+## Monorepo Setup
+
+In a monorepo with multiple workspaces, use `workspace()` instead of `project()` to unify the import graph across packages. This makes cross-workspace imports visible to `noDeadModules()`, `noUnusedExports()`, and all other conditions.
+
+```typescript
+import { describe, it } from 'vitest'
+import { workspace, modules, noUnusedExports } from '@nielspeter/ts-archunit'
+
+const ws = workspace([
+  'apps/web/tsconfig.json',
+  'apps/api/tsconfig.json',
+  'packages/shared/tsconfig.json',
+])
+
+describe('Architecture', () => {
+  it('shared package has no unused exports', () => {
+    modules(ws)
+      .that()
+      .resideInFolder('**/packages/shared/src/**')
+      .should()
+      .satisfy(noUnusedExports())
+      .check()
+  })
+})
+```
+
+`workspace()` returns a standard `ArchProject` — all existing entry points and conditions work unchanged. Paths are sorted alphabetically; the first tsconfig after sorting provides compiler options for type checking.
+
 ## Organizing Rules
 
 Use `describe` blocks to group rules by concern:

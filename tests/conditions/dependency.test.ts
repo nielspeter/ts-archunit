@@ -6,6 +6,7 @@ import {
   notImportFrom,
   onlyHaveTypeImportsFrom,
   notHaveAliasedImports,
+  dependOn,
 } from '../../src/conditions/dependency.js'
 import type { ConditionContext } from '../../src/core/condition.js'
 
@@ -100,6 +101,86 @@ describe('dependency conditions', () => {
 
     it('has correct description', () => {
       expect(notHaveAliasedImports().description).toBe('not have aliased imports')
+    })
+  })
+
+  describe('dependOn', () => {
+    it('passes when module imports from a path matching the glob', () => {
+      const sf = getSourceFile('src/domain/order.ts')
+      // order.ts imports from shared/validation — matches **/shared/**
+      const condition = dependOn('**/shared/**')
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(0)
+    })
+
+    it('reports a violation when no imports match the glob', () => {
+      const sf = getSourceFile('src/domain/order.ts')
+      // order.ts does not import from infra
+      const condition = dependOn('**/infra/**')
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(1)
+      expect(violations[0]!.message).toContain('does not import from any path matching')
+    })
+
+    it('reports a violation for a module with no imports', () => {
+      const sf = getSourceFile('src/domain/entity.ts')
+      const condition = dependOn('**/shared/**')
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(1)
+    })
+
+    it('checks multiple modules independently', () => {
+      const sf1 = getSourceFile('src/domain/order.ts')
+      const sf2 = getSourceFile('src/domain/entity.ts')
+      // order.ts imports from shared — passes; entity.ts has no imports — fails
+      const condition = dependOn('**/shared/**')
+      const violations = condition.evaluate([sf1, sf2], ctx)
+      expect(violations).toHaveLength(1)
+      expect(violations[0]!.element).toBe('entity.ts')
+    })
+
+    it('ignores type-only imports when ignoreTypeImports is set', () => {
+      const sf = getSourceFile('src/domain/typed-service.ts')
+      // typed-service.ts has type-only import from infra
+      const condition = dependOn(['**/infra/**'], { ignoreTypeImports: true })
+      const violations = condition.evaluate([sf], ctx)
+      // type-only import should not count — violation expected
+      expect(violations).toHaveLength(1)
+    })
+
+    it('array overload with multiple globs and ignoreTypeImports', () => {
+      const sf = getSourceFile('src/domain/typed-service.ts')
+      // typed-service.ts has type-only imports from infra and shared
+      // With ignoreTypeImports, neither counts — violation expected
+      const condition = dependOn(['**/infra/**', '**/shared/**'], { ignoreTypeImports: true })
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(1)
+    })
+
+    it('counts type-only imports by default', () => {
+      const sf = getSourceFile('src/domain/typed-service.ts')
+      const condition = dependOn('**/infra/**')
+      const violations = condition.evaluate([sf], ctx)
+      // type-only import from infra should count by default — no violation
+      expect(violations).toHaveLength(0)
+    })
+
+    it('has correct description for single glob', () => {
+      expect(dependOn('**/logging/**').description).toBe('depend on "**/logging/**"')
+    })
+
+    it('has correct description for multiple globs', () => {
+      expect(dependOn('**/a/**', '**/b/**').description).toBe(
+        'depend on at least one of "**/a/**", "**/b/**"',
+      )
+    })
+
+    it('accepts multiple globs (any match satisfies)', () => {
+      const sf = getSourceFile('src/domain/order.ts')
+      // order.ts imports from shared and domain — either glob should satisfy
+      const condition = dependOn('**/infra/**', '**/shared/**')
+      const violations = condition.evaluate([sf], ctx)
+      expect(violations).toHaveLength(0)
     })
   })
 

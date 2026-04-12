@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { applyFilters } from '../../src/core/execute-rule.js'
 import type { ArchViolation } from '../../src/core/violation.js'
+import { silent } from '../../src/core/silent-exclusion.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -151,6 +152,59 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
       // 'Service' does NOT match — it's a substring, not the full element name
       const result = applyFilters(violations, { exclusions: ['Service'] })
       expect(result).toHaveLength(1)
+    })
+  })
+
+  describe('silent exclusions suppress unused-exclusion warnings', () => {
+    it('silent exclusion matching nothing does not warn', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const violations = [makeViolation()]
+      const silentPattern = silent(/nonexistent/)
+      applyFilters(violations, {
+        exclusions: [silentPattern.pattern],
+        silentIndices: new Set([0]),
+        metadata: { id: 'test-rule' },
+      })
+      expect(console.warn).not.toHaveBeenCalled()
+    })
+
+    it('non-silent exclusion matching nothing still warns', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const violations = [makeViolation()]
+      applyFilters(violations, {
+        exclusions: [/nonexistent/],
+        silentIndices: new Set(),
+        metadata: { id: 'test-rule' },
+      })
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Unused exclusion'))
+    })
+
+    it('mixed silent and non-silent: only non-silent warns', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const violations = [makeViolation()]
+      // Index 0 = silent (no match), Index 1 = non-silent (no match)
+      applyFilters(violations, {
+        exclusions: [/\.d\.ts$/, /also-nonexistent/],
+        silentIndices: new Set([0]),
+        metadata: { id: 'test-rule' },
+      })
+      // Only the non-silent pattern should trigger a warning
+      expect(console.warn).toHaveBeenCalledTimes(1)
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('also-nonexistent'))
+    })
+
+    it('silent exclusion still filters violations when it matches', () => {
+      const violations = [makeViolation()]
+      const result = applyFilters(violations, {
+        exclusions: [/images\.ts/],
+        silentIndices: new Set([0]),
+      })
+      expect(result).toHaveLength(0) // still filters, just doesn't warn when unused
+    })
+
+    it('silent() helper creates correct SilentExclusion shape', () => {
+      const s = silent(/\.d\.ts$/)
+      expect(s.pattern).toEqual(/\.d\.ts$/)
     })
   })
 

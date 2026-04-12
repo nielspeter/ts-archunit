@@ -91,7 +91,9 @@ export class CrossLayerBuilder {
     // Compute pairs between consecutive layers
     const allPairs: LayerPair[] = []
     for (let i = 0; i < layers.length - 1; i++) {
-      allPairs.push(...computePairs(layers[i]!, layers[i + 1]!, fn))
+      const left = layers[i]
+      const right = layers[i + 1]
+      if (left && right) allPairs.push(...computePairs(left, right, fn))
     }
 
     return new MappedCrossLayerBuilder(layers, allPairs)

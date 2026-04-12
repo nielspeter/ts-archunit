@@ -54,8 +54,8 @@ export function beFreeOfCycles(): Condition<Slice> {
         const cyclePath = [...cycleNames, cycleNames[0]].join(' -> ')
 
         // Find one concrete file causing the cycle for the violation location
-        const fromSlice = cycleNames[0]!
-        const toSlice = cycleNames[1] ?? cycleNames[0]!
+        const fromSlice = cycleNames[0] ?? ''
+        const toSlice = cycleNames[1] ?? fromSlice
         const details = findSliceDependencyDetails(slices, fromSlice, toSlice, fileToSlice)
         const firstDetail = details[0]
 

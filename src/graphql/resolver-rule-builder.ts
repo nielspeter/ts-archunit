@@ -53,8 +53,8 @@ export function resolveFieldReturning(pattern: RegExp | string): Predicate<ArchF
  * ```
  */
 export class ResolverRuleBuilder extends TerminalBuilder {
-  private _predicates: Predicate<ArchFunction>[] = []
-  private _conditions: Condition<ArchFunction>[] = []
+  private readonly _predicates: Predicate<ArchFunction>[] = []
+  private readonly _conditions: Condition<ArchFunction>[] = []
 
   constructor(private readonly sourceFiles: SourceFile[]) {
     super()

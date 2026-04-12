@@ -1,5 +1,5 @@
 // Core — project loader
-export { project, resetProjectCache } from './core/project.js'
+export { project, workspace, resetProjectCache } from './core/project.js'
 export type { ArchProject } from './core/project.js'
 
 // Core — predicate interface & combinators
@@ -69,6 +69,7 @@ export {
   notImportFrom as conditionNotImportFrom,
   onlyHaveTypeImportsFrom,
   notHaveAliasedImports,
+  dependOn,
 } from './conditions/dependency.js'
 
 // Module entry point
@@ -249,6 +250,10 @@ export { diffAware, DiffFilter } from './helpers/diff-aware.js'
 // Exclusion comments
 export { parseExclusionComments, isExcludedByComment } from './core/exclusion-comments.js'
 export type { ExclusionComment, ExclusionWarning, ParseResult } from './core/exclusion-comments.js'
+
+// Silent exclusion wrapper
+export { silent } from './core/silent-exclusion.js'
+export type { SilentExclusion } from './core/silent-exclusion.js'
 
 // Baseline generation helper
 export { collectViolations } from './helpers/baseline-generator.js'

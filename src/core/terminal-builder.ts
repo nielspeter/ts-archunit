@@ -2,6 +2,8 @@ import type { ArchViolation } from './violation.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import type { RuleDescription } from './rule-description.js'
+import type { SilentExclusion } from './silent-exclusion.js'
+import { isSilent } from './silent-exclusion.js'
 import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 
 /**
@@ -20,6 +22,7 @@ export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
   private readonly _exclusions: (string | RegExp)[] = []
+  private readonly _silentIndices: Set<number> = new Set()
 
   /**
    * Attach a human-readable rationale to the rule.
@@ -55,8 +58,15 @@ export abstract class TerminalBuilder {
    *
    * Emits a warning if an exclusion matches zero violations (stale exclusion).
    */
-  excluding(...patterns: (string | RegExp)[]): this {
-    this._exclusions.push(...patterns)
+  excluding(...patterns: (string | RegExp | SilentExclusion)[]): this {
+    for (const p of patterns) {
+      if (isSilent(p)) {
+        this._exclusions.push(p.pattern)
+        this._silentIndices.add(this._exclusions.length - 1)
+      } else {
+        this._exclusions.push(p)
+      }
+    }
     return this
   }
 
@@ -84,6 +94,7 @@ export abstract class TerminalBuilder {
       reason: this._reason,
       metadata: this._metadata,
       exclusions: this._exclusions,
+      silentIndices: this._silentIndices,
     })
   }
 
@@ -101,6 +112,7 @@ export abstract class TerminalBuilder {
         reason: this._reason,
         metadata: this._metadata,
         exclusions: this._exclusions,
+        silentIndices: this._silentIndices,
       },
       options,
     )
@@ -120,6 +132,7 @@ export abstract class TerminalBuilder {
         reason: this._reason,
         metadata: this._metadata,
         exclusions: this._exclusions,
+        silentIndices: this._silentIndices,
       },
       options,
     )

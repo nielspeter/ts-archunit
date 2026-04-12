@@ -179,7 +179,7 @@ function findGraphqlFiles(
     }
   }
 
-  return results.sort()
+  return results.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 }
 
 /**

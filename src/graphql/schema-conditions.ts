@@ -13,7 +13,7 @@ import type { SchemaElement } from './schema-predicates.js'
  */
 export function haveFields(...names: string[]): Condition<SchemaElement> {
   return {
-    description: `have fields ${names.map((n) => `"${n}"`).join(', ')}`,
+    description: 'have fields ' + names.map((n) => `"${n}"`).join(', '),
     evaluate(elements: SchemaElement[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const element of elements) {
@@ -49,7 +49,7 @@ export function haveFields(...names: string[]): Condition<SchemaElement> {
  */
 export function acceptArgs(...names: string[]): Condition<SchemaElement> {
   return {
-    description: `accept args ${names.map((n) => `"${n}"`).join(', ')}`,
+    description: 'accept args ' + names.map((n) => `"${n}"`).join(', '),
     evaluate(elements: SchemaElement[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const element of elements) {

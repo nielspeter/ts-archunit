@@ -418,6 +418,9 @@ describe('Hygiene', () => {
         /notHaveArgumentWithProperty/,
         // Project loader — single point of failure with descriptive message
         'project',
+        'workspace',
+        // Precondition guard — caller must verify the initializer
+        'fromArrowVariableDeclaration',
         // GraphQL schema loader — requires graphql peer dep
         'requireGraphQL',
         'loadSchemaFromGlob',
