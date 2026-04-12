@@ -54,12 +54,25 @@ Inspired by Java's [ArchUnit](https://www.archunit.org/). Powered by [ts-morph](
 - Every route has schema validation
 - GraphQL collection types have standard pagination fields
 
+**Code smells & antipatterns**
+
+- Detect copy-pasted logic across files (AST fingerprint similarity)
+- Find inconsistent sibling files (same folder, different structure)
+
+**GraphQL**
+
+- Schema types have required fields (`id`, pagination)
+- Resolvers follow naming conventions
+- No N+1 query patterns in resolver implementations
+
 **Architecture boundaries**
 
 - Layer ordering: controllers → services → repositories → domain
 - Feature modules are cycle-free
 - Routes ↔ schemas ↔ SDK types stay in sync
+- Cross-layer consistency: routes ↔ schemas ↔ SDK types
 - Monorepo-aware: `workspace()` unifies imports across packages
+- Ready-made presets: `layeredArchitecture()`, `strictBoundaries()`, `dataLayerIsolation()`
 
 [See all rule examples →](/what-to-check)
 
@@ -154,6 +167,9 @@ slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 | **JSX element rules** (design system, a11y)        | ✅          | ❌                 | ❌                       |
 | **Type checking** (string vs typed union)          | ✅          | ❌                 | ❌                       |
 | Cycle detection                                    | ✅          | ✅                 | ❌                       |
+| **Smell detection** (duplicates, inconsistencies)  | ✅          | ❌                 | ❌                       |
+| **Cross-layer consistency** (routes ↔ schemas)     | ✅          | ❌                 | ❌                       |
+| **Architecture presets** (one-liner setups)        | ✅          | ❌                 | ❌                       |
 | Baseline (gradual adoption)                        | ✅          | ❌                 | ❌                       |
 | GitHub PR annotations                              | ✅          | ❌                 | ❌                       |
 
@@ -227,4 +243,4 @@ ts-archunit is the guardrail. Rules run in CI. Violations show up inline on the 
 
 [Get Started →](/getting-started) — install, write your first rule, run it in 5 minutes.
 
-[What Can It Check?](/what-to-check) — browse 21 categories of rules as one-liner examples.
+[What Can It Check?](/what-to-check) — browse 24 categories of rules as one-liner examples.

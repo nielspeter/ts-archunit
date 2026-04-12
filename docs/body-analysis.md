@@ -17,7 +17,7 @@ Body analysis fills this gap. It traverses the AST inside every method body (for
 
 Matchers are the building blocks of body analysis rules. Each matcher targets a specific kind of AST node -- function calls, constructor invocations, property access, object properties, or arbitrary expressions. You pass a matcher to a condition like `notContain()` to define what should (or should not) appear inside method and function bodies.
 
-Six matchers cover the most common expression patterns:
+Seven matchers cover the most common patterns:
 
 ### `call(target)`
 
@@ -101,6 +101,25 @@ jsxElement(/^motion\./) // matches <motion.div>, <motion.span>, etc.
 ```typescript
 // Functions in pages/ must not render raw <div>
 functions(p).that().resideInFile('**/pages/**/*.tsx').should().notContain(jsxElement('div')).check()
+```
+
+### `comment(pattern)`
+
+Matches comments attached to AST nodes -- leading and trailing comment ranges. Use this to detect TODO markers, deferred-work stubs, or hack annotations in code bodies.
+
+```typescript
+import { comment, STUB_PATTERNS } from '@nielspeter/ts-archunit'
+
+comment('HACK') // matches // HACK: workaround for...
+comment(/FIXME/) // matches // FIXME: this needs cleanup
+comment(STUB_PATTERNS) // matches TODO, FIXME, HACK, XXX, STUB, "not implemented", etc.
+```
+
+The exported `STUB_PATTERNS` constant matches common deferred-work markers: `TODO`, `FIXME`, `HACK`, `XXX`, `STUB`, `DEFERRED`, `PLACEHOLDER`, `not implemented`, and `coming soon`.
+
+```typescript
+// No stub comments in production code
+functions(p).that().resideInFolder('**/src/**').should().notContain(comment(STUB_PATTERNS)).check()
 ```
 
 ## String vs Regex

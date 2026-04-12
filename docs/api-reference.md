@@ -207,14 +207,16 @@ Available on all entry points via `.that()`.
 
 ## Body Analysis Matchers
 
-| Export       | Signature                                                                         | Description                                               |
-| ------------ | --------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `call`       | `call(target: string \| RegExp)`                                                  | Match function/method call expressions.                   |
-| `newExpr`    | `newExpr(target: string \| RegExp)`                                               | Match constructor invocations (`new ...`).                |
-| `access`     | `access(target: string \| RegExp)`                                                | Match property access expressions.                        |
-| `property`   | `property(name: string \| RegExp, value?: boolean \| number \| string \| RegExp)` | Match property assignments by name and optional value.    |
-| `expression` | `expression(target: string \| RegExp)`                                            | Match any expression by text.                             |
-| `jsxElement` | `jsxElement(tag: string \| RegExp)`                                               | Match JSX elements by tag name (tag-only, no attributes). |
+| Export          | Signature                                                                         | Description                                                     |
+| --------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `call`          | `call(target: string \| RegExp)`                                                  | Match function/method call expressions.                         |
+| `newExpr`       | `newExpr(target: string \| RegExp)`                                               | Match constructor invocations (`new ...`).                      |
+| `access`        | `access(target: string \| RegExp)`                                                | Match property access expressions.                              |
+| `property`      | `property(name: string \| RegExp, value?: boolean \| number \| string \| RegExp)` | Match property assignments by name and optional value.          |
+| `expression`    | `expression(target: string \| RegExp)`                                            | Match any expression by text.                                   |
+| `jsxElement`    | `jsxElement(tag: string \| RegExp)`                                               | Match JSX elements by tag name (tag-only, no attributes).       |
+| `comment`       | `comment(pattern: string \| RegExp)`                                              | Match comments attached to AST nodes.                           |
+| `STUB_PATTERNS` | `RegExp`                                                                          | Matches common stub markers: TODO, FIXME, HACK, XXX, STUB, etc. |
 
 ## Body Analysis Conditions
 
