@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-03-30
+**Updated:** 2026-04-12
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 43 completed, 0 remaining
+**Total Plans:** 43 completed + proposal 010, 0 remaining
 
 ---
 
@@ -195,4 +195,4 @@
 
 ## Completed
 
-43 of 43 original plans implemented. 1658 tests across 128 files.
+43 of 43 original plans implemented + proposal 010 (JSX Element Rules). 1824 tests across 141 files.

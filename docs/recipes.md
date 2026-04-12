@@ -289,6 +289,83 @@ modules(p)
   .warn()
 ```
 
+## Design System Compliance
+
+JSX element rules let you enforce that teams use design system components instead of raw HTML. These rules work for any component library — Material UI, Chakra, Radix, or internal systems.
+
+```typescript
+import { jsxElements, jsxElement, functions, STANDARD_HTML_TAGS } from '@nielspeter/ts-archunit'
+
+// Ban raw HTML form elements — use design system components
+jsxElements(p)
+  .that()
+  .areHtmlElements('button', 'input', 'select', 'textarea')
+  .should()
+  .notExist()
+  .because('use design system components instead of raw HTML form elements')
+  .check()
+
+// No raw <div> in pages — use layout primitives
+jsxElements(p)
+  .that()
+  .areHtmlElements('div', 'span')
+  .and()
+  .resideInFolder('**/pages/**')
+  .should()
+  .notExist()
+  .because('pages must compose design system layout components')
+  .check()
+
+// No <a> tags — use <Link> from the router
+jsxElements(p)
+  .that()
+  .areHtmlElements('a')
+  .should()
+  .notExist()
+  .because('use <Link> for client-side navigation')
+  .check()
+
+// Every <img> must have alt text
+jsxElements(p)
+  .that()
+  .areHtmlElements('img')
+  .should()
+  .haveAttribute('alt')
+  .because('images must have alt text for accessibility')
+  .check()
+
+// No inline styles — use utility classes
+jsxElements(p).should().notHaveAttribute('style').check()
+
+// No dangerouslySetInnerHTML
+jsxElements(p).should().notHaveAttribute('dangerouslySetInnerHTML').check()
+
+// Interactive elements must have aria-label
+jsxElements(p)
+  .that()
+  .withAttribute('onClick')
+  .should()
+  .haveAttribute('aria-label')
+  .because('interactive elements need accessible labels')
+  .check()
+
+// Test IDs on interactive elements for E2E
+jsxElements(p)
+  .that()
+  .areHtmlElements('button', 'input', 'select', 'a')
+  .should()
+  .haveAttribute('data-testid')
+  .because('interactive elements need test IDs for Playwright')
+  .check()
+```
+
+For body-analysis integration with existing entry points:
+
+```typescript
+// Functions in pages must not render raw <div>
+functions(p).that().resideInFile('**/pages/**/*.tsx').should().notContain(jsxElement('div')).check()
+```
+
 ## Combining Recipes
 
 In practice, you combine multiple recipes in a single test file. Group them by concern with `describe` blocks, and add `.rule()` metadata so violations include actionable context — the `because` field explains why the rule exists, and the `suggestion` field tells the developer exactly how to fix it:

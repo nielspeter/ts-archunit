@@ -174,6 +174,21 @@ describe('Body Analysis', () => {
     /* ... */
   })
 })
+
+describe('JSX Rules', () => {
+  it('no raw HTML form elements', () => {
+    jsxElements(p)
+      .that()
+      .areHtmlElements('button', 'input', 'select')
+      .should()
+      .notExist()
+      .because('use design system components')
+      .check()
+  })
+  it('images must have alt text', () => {
+    jsxElements(p).that().areHtmlElements('img').should().haveAttribute('alt').check()
+  })
+})
 ```
 
 ### Named Selections

@@ -333,3 +333,52 @@ export function comment(pattern: string | RegExp): ExpressionMatcher {
     },
   }
 }
+
+/**
+ * Extract the tag name from a JsxElement or JsxSelfClosingElement node.
+ */
+function getJsxTagName(node: Node): string | undefined {
+  if (Node.isJsxElement(node)) {
+    return node.getOpeningElement().getTagNameNode().getText()
+  }
+  if (Node.isJsxSelfClosingElement(node)) {
+    return node.getTagNameNode().getText()
+  }
+  return undefined
+}
+
+/**
+ * Match a JSX element by tag name.
+ *
+ * Targets `JsxElement` (has children) and `JsxSelfClosingElement` (no children).
+ * This is a **tag-only** matcher — it cannot check attributes. Use the
+ * `jsxElements()` entry point for attribute-level rules.
+ *
+ * @param tagOrRegex - Exact tag name (e.g. 'div', 'Button') or regex.
+ *
+ * @example
+ * jsxElement('div')                    // matches <div>...</div> and <div />
+ * jsxElement('Button')                 // matches <Button>...</Button>
+ * jsxElement(/^motion\./)              // matches <motion.div>, <motion.span>, etc.
+ */
+export function jsxElement(tagOrRegex: string | RegExp): ExpressionMatcher {
+  if (typeof tagOrRegex === 'string') {
+    return {
+      description: `JSX element <${tagOrRegex}>`,
+      syntaxKinds: [SyntaxKind.JsxElement, SyntaxKind.JsxSelfClosingElement],
+      matches(node: Node): boolean {
+        const tag = getJsxTagName(node)
+        return tag === tagOrRegex
+      },
+    }
+  }
+  return {
+    description: `JSX element matching ${String(tagOrRegex)}`,
+    syntaxKinds: [SyntaxKind.JsxElement, SyntaxKind.JsxSelfClosingElement],
+    matches(node: Node): boolean {
+      const tag = getJsxTagName(node)
+      if (tag === undefined) return false
+      return tagOrRegex.test(tag)
+    },
+  }
+}

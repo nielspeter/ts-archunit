@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-04-12
+
+### Added
+
+- **`jsxElements(p)` entry point** — new rule builder for JSX element architecture rules. Operates on `JsxElement` and `JsxSelfClosingElement` nodes across all `.tsx`/`.jsx` files. Enforces design system compliance, accessibility attributes, and structural JSX conventions.
+- **`ArchJsxElement` model** — wraps JSX elements with `getName()`, `isHtmlElement()`, `isComponent()`, `hasAttribute()`, `getAttribute()`, `getAttributeNames()`, `hasChildren()`. Dot-notation tags (`motion.div`, `Icons.Check`) are always classified as components. Spread attributes safely skipped via `Node.isJsxAttribute()` type predicate.
+- **`STANDARD_HTML_TAGS` constant** — array of all standard HTML tag names per the WHATWG HTML Living Standard. Use with `areHtmlElements(...STANDARD_HTML_TAGS)` for unambiguous "all standard HTML" matching that excludes custom elements and dot-notation components.
+- **JSX predicates:** `areHtmlElements(...tags)` (requires at least one tag), `areComponents(...names?)`, `withAttribute(name)`, `withAttributeMatching(name, value)`. Distinct `with*` naming for predicates avoids dual-use confusion with conditions.
+- **JSX conditions:** `notExist()`, `haveAttribute(name)`, `notHaveAttribute(name)`, `haveAttributeMatching(name, value)`, `notHaveAttributeMatching(name, value)`. Violations delegate to core `createViolation()` for code frames. Distinguishes absent, valueless, and wrong-value attributes in messages.
+- **`jsxElement(tag)` body-analysis matcher** — `ExpressionMatcher` targeting JSX elements by tag name (string or regex). Integrates with existing `notContain()`/`contain()` on `functions()`, `modules()`, `classes()` entry points.
+- **`JsxRuleBuilder`** — extends `RuleBuilder<ArchJsxElement>` with identity predicates (`haveNameMatching`, `resideInFile`, `resideInFolder` — predicate-only, following `CallRuleBuilder` pattern), JSX-specific predicates, and JSX conditions.
+- **Documentation:** `docs/jsx.md` (full JSX rules page with tag classification, attribute access, predicate/condition naming rationale, `jsxElement()` matcher, `STANDARD_HTML_TAGS`, `.excluding()` incremental adoption, known limitations). Updated `getting-started.md`, `what-to-check.md`, `api-reference.md`, `recipes.md` (Design System Compliance recipe).
+
 ## [0.8.0] - 2026-04-12
 
 ### Added

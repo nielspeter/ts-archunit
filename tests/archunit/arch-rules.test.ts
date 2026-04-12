@@ -410,12 +410,13 @@ describe('Hygiene', () => {
       .should()
       .satisfy(functionNoGenericErrors())
       .excluding(
-        // Argument validation in condition factories — thrown at construction time, not evaluation
+        // Argument validation in predicate/condition factories — thrown at construction time, not evaluation
         /haveMaxExports/,
         /havePropertyNamed/,
         /notHavePropertyNamed/,
         /haveArgumentWithProperty/,
         /notHaveArgumentWithProperty/,
+        'areHtmlElements',
         // Project loader — single point of failure with descriptive message
         'project',
         'workspace',

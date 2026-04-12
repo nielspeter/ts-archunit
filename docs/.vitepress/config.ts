@@ -31,6 +31,7 @@ export default defineConfig({
           { text: 'Type Rules', link: '/types' },
           { text: 'Body Analysis', link: '/body-analysis' },
           { text: 'Call Rules', link: '/calls' },
+          { text: 'JSX Element Rules', link: '/jsx' },
           { text: 'Pattern Templates', link: '/patterns' },
           { text: 'Slices & Layers', link: '/slices' },
           { text: 'Cross-Layer Validation', link: '/cross-layer' },

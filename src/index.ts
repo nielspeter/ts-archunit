@@ -189,6 +189,7 @@ export {
   expression,
   property,
   comment,
+  jsxElement,
   STUB_PATTERNS,
 } from './helpers/matchers.js'
 export type { ExpressionMatcher } from './helpers/matchers.js'
@@ -356,6 +357,28 @@ export { mustCall, classMustCall } from './rules/architecture.js'
 
 // Standard rules — hygiene (plan 0042)
 export { noDeadModules, noUnusedExports, noStubComments, noEmptyBodies } from './rules/hygiene.js'
+
+// JSX entry point (proposal 010)
+export { jsxElements, JsxRuleBuilder } from './builders/jsx-rule-builder.js'
+export type { ArchJsxElement } from './models/arch-jsx-element.js'
+export { collectJsxElements, STANDARD_HTML_TAGS } from './models/arch-jsx-element.js'
+
+// JSX predicates (standalone)
+export {
+  areHtmlElements,
+  areComponents,
+  withAttribute as jsxWithAttribute,
+  withAttributeMatching as jsxWithAttributeMatching,
+} from './predicates/jsx.js'
+
+// JSX conditions (standalone)
+export {
+  notExist as jsxNotExist,
+  haveAttribute as jsxHaveAttribute,
+  notHaveAttribute as jsxNotHaveAttribute,
+  haveAttributeMatching as jsxHaveAttributeMatching,
+  notHaveAttributeMatching as jsxNotHaveAttributeMatching,
+} from './conditions/jsx.js'
 
 // CLI config (plan 0020)
 export { defineConfig } from './cli/config.js'

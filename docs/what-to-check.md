@@ -302,6 +302,48 @@ calls(p)
   .check()
 ```
 
+## JSX Element Rules
+
+Enforce design system compliance, accessibility, and structural conventions on JSX elements in `.tsx` files.
+
+```typescript
+import { jsxElements, jsxElement, modules, STANDARD_HTML_TAGS } from '@nielspeter/ts-archunit'
+
+// No raw <button> — use design system components
+jsxElements(p)
+  .that()
+  .areHtmlElements('button', 'input', 'select')
+  .should()
+  .notExist()
+  .because('use design system components')
+  .check()
+
+// Every <img> must have alt text
+jsxElements(p).that().areHtmlElements('img').should().haveAttribute('alt').check()
+
+// No inline styles
+jsxElements(p).should().notHaveAttribute('style').check()
+
+// No dangerouslySetInnerHTML
+jsxElements(p).should().notHaveAttribute('dangerouslySetInnerHTML').check()
+
+// Interactive elements must have aria-label
+jsxElements(p).that().withAttribute('onClick').should().haveAttribute('aria-label').check()
+
+// Ban all standard HTML in pages folder
+jsxElements(p)
+  .that()
+  .areHtmlElements(...STANDARD_HTML_TAGS)
+  .and()
+  .resideInFolder('**/pages/**')
+  .should()
+  .notExist()
+  .check()
+
+// Quick body-analysis check: no <script> tags
+modules(p).that().resideInFile('**/*.tsx').should().notContain(jsxElement('script')).check()
+```
+
 ## Scoped Rules (within)
 
 Narrow the scope of a rule to code inside matched call sites, such as route handler callbacks.

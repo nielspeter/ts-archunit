@@ -4,17 +4,18 @@ All public exports from `ts-archunit`, organized by category.
 
 ## Entry Points
 
-| Export      | Signature                                         | Description                                                      |
-| ----------- | ------------------------------------------------- | ---------------------------------------------------------------- |
-| `project`   | `project(tsConfigPath: string): ArchProject`      | Load a TypeScript project. Cached per path.                      |
-| `workspace` | `workspace(tsConfigPaths: string[]): ArchProject` | Load multiple tsconfigs into a unified project for monorepo use. |
-| `modules`   | `modules(p: ArchProject): ModuleRuleBuilder`      | Rule builder for source files (imports/dependencies).            |
-| `classes`   | `classes(p: ArchProject): ClassRuleBuilder`       | Rule builder for class declarations.                             |
-| `functions` | `functions(p: ArchProject): FunctionRuleBuilder`  | Rule builder for functions, arrow functions, class methods.      |
-| `types`     | `types(p: ArchProject): TypeRuleBuilder`          | Rule builder for interfaces and type aliases.                    |
-| `slices`    | `slices(p: ArchProject): SliceRuleBuilder`        | Rule builder for file groupings (cycles, layers).                |
-| `calls`     | `calls(p: ArchProject): CallRuleBuilder`          | Rule builder for call expressions.                               |
-| `within`    | `within(sel: CallRuleBuilder): ScopedContext`     | Scoped rule builder for callback functions inside matched calls. |
+| Export        | Signature                                         | Description                                                      |
+| ------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| `project`     | `project(tsConfigPath: string): ArchProject`      | Load a TypeScript project. Cached per path.                      |
+| `workspace`   | `workspace(tsConfigPaths: string[]): ArchProject` | Load multiple tsconfigs into a unified project for monorepo use. |
+| `modules`     | `modules(p: ArchProject): ModuleRuleBuilder`      | Rule builder for source files (imports/dependencies).            |
+| `classes`     | `classes(p: ArchProject): ClassRuleBuilder`       | Rule builder for class declarations.                             |
+| `functions`   | `functions(p: ArchProject): FunctionRuleBuilder`  | Rule builder for functions, arrow functions, class methods.      |
+| `types`       | `types(p: ArchProject): TypeRuleBuilder`          | Rule builder for interfaces and type aliases.                    |
+| `slices`      | `slices(p: ArchProject): SliceRuleBuilder`        | Rule builder for file groupings (cycles, layers).                |
+| `calls`       | `calls(p: ArchProject): CallRuleBuilder`          | Rule builder for call expressions.                               |
+| `jsxElements` | `jsxElements(p: ArchProject): JsxRuleBuilder`     | Rule builder for JSX elements in .tsx/.jsx files.                |
+| `within`      | `within(sel: CallRuleBuilder): ScopedContext`     | Scoped rule builder for callback functions inside matched calls. |
 
 ## Rule Builders
 
@@ -28,6 +29,7 @@ All public exports from `ts-archunit`, organized by category.
 | `TypeRuleBuilder`           | Builder returned by `types()`.                             |
 | `SliceRuleBuilder`          | Builder returned by `slices()`.                            |
 | `CallRuleBuilder`           | Builder returned by `calls()`.                             |
+| `JsxRuleBuilder`            | Builder returned by `jsxElements()`.                       |
 | `ScopedFunctionRuleBuilder` | Builder returned by `within().functions()`.                |
 
 ## Rule Builder Methods
@@ -134,6 +136,32 @@ Available on all entry points via `.that()`.
 | `withArgMatching` | `withArgMatching(index: number, pattern: string \| RegExp)` | Argument at index matches regex or exact string.                            |
 | `withStringArg`   | `withStringArg(index: number, glob: string)`                | String literal argument at index matches glob pattern.                      |
 
+## JSX Predicates
+
+| Export                     | Signature                                                      | Description                                               |
+| -------------------------- | -------------------------------------------------------------- | --------------------------------------------------------- |
+| `areHtmlElements`          | `areHtmlElements(...tags: string[])`                           | Matches HTML intrinsic elements with the given tag names. |
+| `areComponents`            | `areComponents(...names?: string[])`                           | Matches component elements. No args = all components.     |
+| `jsxWithAttribute`         | `withAttribute(name: string)`                                  | Filter to elements that have the named attribute.         |
+| `jsxWithAttributeMatching` | `withAttributeMatching(name: string, value: string \| RegExp)` | Filter to elements where attribute matches value.         |
+
+## JSX Conditions
+
+| Export                        | Signature                                                         | Description                                          |
+| ----------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
+| `jsxNotExist`                 | `notExist()`                                                      | Filtered JSX element set must be empty.              |
+| `jsxHaveAttribute`            | `haveAttribute(name: string)`                                     | Every matched element must have the named attribute. |
+| `jsxNotHaveAttribute`         | `notHaveAttribute(name: string)`                                  | No matched element may have the named attribute.     |
+| `jsxHaveAttributeMatching`    | `haveAttributeMatching(name: string, value: string \| RegExp)`    | Attribute must exist and match value.                |
+| `jsxNotHaveAttributeMatching` | `notHaveAttributeMatching(name: string, value: string \| RegExp)` | Attribute must not match (or be absent).             |
+
+## JSX Utilities
+
+| Export               | Description                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `STANDARD_HTML_TAGS` | `readonly string[]` — All standard HTML tag names for use with `areHtmlElements()`. |
+| `collectJsxElements` | `(sf: SourceFile) => ArchJsxElement[]` — Collect JSX elements from a source file.   |
+
 ## Structural Conditions
 
 | Export                      | Signature                      | Description                                     |
@@ -179,13 +207,14 @@ Available on all entry points via `.that()`.
 
 ## Body Analysis Matchers
 
-| Export       | Signature                                                                         | Description                                            |
-| ------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `call`       | `call(target: string \| RegExp)`                                                  | Match function/method call expressions.                |
-| `newExpr`    | `newExpr(target: string \| RegExp)`                                               | Match constructor invocations (`new ...`).             |
-| `access`     | `access(target: string \| RegExp)`                                                | Match property access expressions.                     |
-| `property`   | `property(name: string \| RegExp, value?: boolean \| number \| string \| RegExp)` | Match property assignments by name and optional value. |
-| `expression` | `expression(target: string \| RegExp)`                                            | Match any expression by text.                          |
+| Export       | Signature                                                                         | Description                                               |
+| ------------ | --------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `call`       | `call(target: string \| RegExp)`                                                  | Match function/method call expressions.                   |
+| `newExpr`    | `newExpr(target: string \| RegExp)`                                               | Match constructor invocations (`new ...`).                |
+| `access`     | `access(target: string \| RegExp)`                                                | Match property access expressions.                        |
+| `property`   | `property(name: string \| RegExp, value?: boolean \| number \| string \| RegExp)` | Match property assignments by name and optional value.    |
+| `expression` | `expression(target: string \| RegExp)`                                            | Match any expression by text.                             |
+| `jsxElement` | `jsxElement(tag: string \| RegExp)`                                               | Match JSX elements by tag name (tag-only, no attributes). |
 
 ## Body Analysis Conditions
 
