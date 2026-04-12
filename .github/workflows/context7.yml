@@ -8,8 +8,11 @@ on:
 jobs:
   update-docs:
     runs-on: ubuntu-latest
+    env:
+      # rennf93/upsert-context7@1.1 internally uses actions/setup-python@v5 (Node 20)
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Add/Refresh Context7 Documentation
         id: context7
