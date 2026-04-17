@@ -17,7 +17,7 @@ Body analysis fills this gap. It traverses the AST inside every method body (for
 
 Matchers are the building blocks of body analysis rules. Each matcher targets a specific kind of AST node -- function calls, constructor invocations, property access, object properties, or arbitrary expressions. You pass a matcher to a condition like `notContain()` to define what should (or should not) appear inside method and function bodies.
 
-Seven matchers cover the most common patterns:
+Nine matchers cover the most common patterns:
 
 ### `call(target)`
 
@@ -101,6 +101,72 @@ jsxElement(/^motion\./) // matches <motion.div>, <motion.span>, etc.
 ```typescript
 // Functions in pages/ must not render raw <div>
 functions(p).that().resideInFile('**/pages/**/*.tsx').should().notContain(jsxElement('div')).check()
+```
+
+### `typeAssertion(options?)`
+
+Matches type assertion expressions — both `as Type` and the legacy angle-bracket `<Type>value` form. By default, `as const` is excluded from matches (it narrows types rather than widening them, so it's idiomatic for literal preservation). Pass `{ allowConst: false }` to match `as const` too.
+
+Does NOT match `satisfies` expressions — those are validation, not assertions, and should not be banned.
+
+| Option                  | Matcher matches `as const`? | With `notContain()` — is `as const` allowed in code? |
+| ----------------------- | --------------------------- | ---------------------------------------------------- |
+| default (`{}`)          | no                          | yes — idiomatic literal preservation                 |
+| `{ allowConst: false }` | yes                         | no — bans ALL `as` expressions                       |
+
+```typescript
+import { typeAssertion } from '@nielspeter/ts-archunit'
+
+typeAssertion() // matches `data as User`, `<User>data`; skips `as const`
+typeAssertion({ allowConst: false }) // matches all `as` expressions including `as const`
+```
+
+```typescript
+// No type assertions anywhere in src/
+modules(p).that().resideInFolder('**/src/**').should().notContain(typeAssertion()).check()
+```
+
+### `nonNullAssertion()`
+
+Matches `!` non-null assertion expressions.
+
+```typescript
+import { nonNullAssertion } from '@nielspeter/ts-archunit'
+
+nonNullAssertion() // matches `user!`, `arr[0]!`, `fn()!`
+```
+
+```typescript
+// No ! assertions in domain code — handle null explicitly
+functions(p).that().resideInFolder('**/domain/**').should().notContain(nonNullAssertion()).check()
+```
+
+### Composition with `within()`
+
+Matchers are lego bricks — they compose with any body-analysis entry point, including scoped rules via `within()`:
+
+```typescript
+import { calls, within, typeAssertion, nonNullAssertion } from '@nielspeter/ts-archunit'
+
+// Ban `as` inside vitest `describe()` callbacks — test code must be type-safe too
+within(calls(p).that().withMethod('describe'))
+  .functions()
+  .should()
+  .notContain(typeAssertion())
+  .check()
+
+// Ban `!` inside route handler callbacks only, allow elsewhere
+within(
+  calls(p)
+    .that()
+    .onObject('app')
+    .and()
+    .withMethod(/^(get|post|put|delete)$/),
+)
+  .functions()
+  .should()
+  .notContain(nonNullAssertion())
+  .check()
 ```
 
 ### `comment(pattern)`

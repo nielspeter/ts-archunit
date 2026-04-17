@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`typeAssertion()` and `nonNullAssertion()` matchers** — compose with any body-analysis entry point (`classes`, `functions`, `modules`, `within()`). `typeAssertion()` matches both `as Type` AND `<Type>value` angle-bracket forms. `typeAssertion({ allowConst: false })` bans `as const` too; default `true` allows `as const` as idiomatic literal preservation.
+- **Function and module variants of the TypeScript rules** — `functionNoTypeAssertions()`, `functionNoNonNullAssertions()`, `moduleNoTypeAssertions()`, `moduleNoNonNullAssertions()` exported from `@nielspeter/ts-archunit/rules/typescript`. Mirror the class/function/module family pattern used by `rules/security.ts` and `rules/errors.ts`.
+
+### Breaking
+
+Two user-visible behavior changes to `noTypeAssertions()` / `noNonNullAssertions()`:
+
+- **Scope widened** — they now scan constructors, getters, and setters in addition to methods. This is a bug fix (matches the scope of `noSilentCatch()`), but existing codebases with a clean baseline will see new violations for assertions inside ctors/getters/setters. **Action:** regenerate your baseline (`npx ts-archunit baseline`) before upgrading to absorb the new coverage.
+- **Violation message format changed** — from `${Class}.${method} uses type assertion — use type guards instead` to `${Class} contains type assertion at line N`. Consistent with every other rule in `rules/security.ts` and `rules/errors.ts`.
+  - If you use `.excluding('UserService.load')` with the `Class.method` format, those exclusions will no longer match. Migration options:
+    - **Class-wide (over-broad):** `.excluding('UserService')` — exempts every method in the class
+    - **Method-precise:** use inline `// ts-archunit-exclude` comments on the specific lines, OR file+line-based exclusion patterns
+  - Add `.because('use type guards instead')` to restore the actionable hint in violation output.
+  - Snapshot tests and log-parsers keyed to the old message format will need updates.
+
+### Changed
+
+- `rules/typescript.ts` refactored from custom `evaluate()` logic to matcher composition — ~60 LOC removed, aligns with the pattern used across the rest of `rules/`.
+
 ## [0.9.0] - 2026-04-12
 
 ### Added

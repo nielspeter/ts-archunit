@@ -53,6 +53,12 @@ describe('typescript rules', () => {
       expect(violations.some((v) => v.message.includes('type assertion'))).toBe(true)
     })
 
+    it('violation message uses the generic "<Class> contains ... at line N" format', () => {
+      const condition = noTypeAssertions()
+      const violations = condition.evaluate([findClass('AssertionClass')], context)
+      expect(violations[0]!.message).toMatch(/AssertionClass contains type assertion at line \d+/)
+    })
+
     it('allows as const', () => {
       const condition = noTypeAssertions()
       const violations = condition.evaluate([findClass('AssertionClass')], context)
@@ -67,8 +73,51 @@ describe('typescript rules', () => {
       expect(violations).toHaveLength(0)
     })
 
-    it('has correct description', () => {
-      expect(noTypeAssertions().description).toBe('have no type assertions (as) in method bodies')
+    it('scans constructor bodies (not just methods)', () => {
+      const p = new Project({
+        useInMemoryFileSystem: true,
+        compilerOptions: { strict: true },
+      })
+      const sf = p.createSourceFile(
+        'test.ts',
+        `
+        interface User { name: string }
+        export class WithCtorAssertion {
+          constructor(data: unknown) {
+            const user = data as User
+          }
+        }
+      `,
+      )
+      const cls = sf.getClasses()[0]!
+      const violations = noTypeAssertions().evaluate([cls], context)
+      expect(violations).toHaveLength(1)
+    })
+
+    it('scans getter bodies', () => {
+      const p = new Project({
+        useInMemoryFileSystem: true,
+        compilerOptions: { strict: true },
+      })
+      const sf = p.createSourceFile(
+        'test.ts',
+        `
+        interface User { name: string }
+        export class WithGetterAssertion {
+          private data: unknown = {}
+          get user(): User {
+            return this.data as User
+          }
+        }
+      `,
+      )
+      const cls = sf.getClasses()[0]!
+      const violations = noTypeAssertions().evaluate([cls], context)
+      expect(violations).toHaveLength(1)
+    })
+
+    it('has matcher-derived description', () => {
+      expect(noTypeAssertions().description).toBe('not contain type assertion')
     })
   })
 
@@ -81,10 +130,37 @@ describe('typescript rules', () => {
       expect(violations.some((v) => v.message.includes('non-null assertion'))).toBe(true)
     })
 
+    it('violation message uses the generic "<Class> contains ... at line N" format', () => {
+      const condition = noNonNullAssertions()
+      const violations = condition.evaluate([findClass('NonNullClass')], context)
+      expect(violations[0]!.message).toMatch(/NonNullClass contains non-null assertion at line \d+/)
+    })
+
     it('passes for clean class with no non-null assertions', () => {
       const condition = noNonNullAssertions()
       const violations = condition.evaluate([findClass('CleanService')], context)
       expect(violations).toHaveLength(0)
+    })
+
+    it('scans setter bodies', () => {
+      const p = new Project({
+        useInMemoryFileSystem: true,
+        compilerOptions: { strict: true },
+      })
+      const sf = p.createSourceFile(
+        'test.ts',
+        `
+        export class WithSetterNonNull {
+          private _data?: { name: string }
+          set name(v: string) {
+            this._data!.name = v
+          }
+        }
+      `,
+      )
+      const cls = sf.getClasses()[0]!
+      const violations = noNonNullAssertions().evaluate([cls], context)
+      expect(violations).toHaveLength(1)
     })
   })
 })

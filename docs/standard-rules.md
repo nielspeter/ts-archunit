@@ -16,21 +16,33 @@ TypeScript's type system only helps if you actually use it. These rules catch th
 
 ```typescript
 import {
+  // Class variants
   noAnyProperties,
   noTypeAssertions,
   noNonNullAssertions,
+  // Function variants — target ArchFunction (standalone functions, arrow functions)
+  functionNoTypeAssertions,
+  functionNoNonNullAssertions,
+  // Module variants — scan entire file
+  moduleNoTypeAssertions,
+  moduleNoNonNullAssertions,
 } from '@nielspeter/ts-archunit/rules/typescript'
 ```
 
-| Rule                    | Target  | What it checks                                                |
-| ----------------------- | ------- | ------------------------------------------------------------- |
-| `noAnyProperties()`     | classes | Class properties must not be typed as `any`                   |
-| `noTypeAssertions()`    | classes | Method bodies must not contain `as` casts (allows `as const`) |
-| `noNonNullAssertions()` | classes | Method bodies must not contain `!` non-null assertions        |
+| Rule                            | Target    | What it checks                                                  |
+| ------------------------------- | --------- | --------------------------------------------------------------- |
+| `noAnyProperties()`             | classes   | Class properties must not be typed as `any`                     |
+| `noTypeAssertions()`            | classes   | Class bodies must not contain `as` casts (allows `as const`)    |
+| `noNonNullAssertions()`         | classes   | Class bodies must not contain `!` non-null assertions           |
+| `functionNoTypeAssertions()`    | functions | Function bodies must not contain `as` casts (allows `as const`) |
+| `functionNoNonNullAssertions()` | functions | Function bodies must not contain `!` non-null assertions        |
+| `moduleNoTypeAssertions()`      | modules   | Source file must not contain `as` casts (allows `as const`)     |
+| `moduleNoNonNullAssertions()`   | modules   | Source file must not contain `!` non-null assertions            |
 
-`noTypeAssertions` allows `as const` since that narrows types rather than widening them. All three rules target class declarations — use them with `classes(p)` and scope to the layers where type safety matters most:
+`noTypeAssertions` (and its variants) allow `as const` since that narrows types rather than widening them. The class variants scan methods, constructors, getters, and setters. Module variants scan the entire file — broader than function/class and useful for "nowhere in src/" enforcement.
 
 ```typescript
+// Classes
 classes(p)
   .that()
   .areExported()
@@ -38,7 +50,21 @@ classes(p)
   .satisfy(noAnyProperties())
   .because('any bypasses the type checker')
   .check()
+
+// Standalone functions
+functions(p).that().resideInFolder('**/src/**').should().satisfy(functionNoTypeAssertions()).check()
+
+// Whole file
+modules(p)
+  .that()
+  .resideInFolder('**/domain/**')
+  .should()
+  .satisfy(moduleNoNonNullAssertions())
+  .because('domain layer handles null explicitly')
+  .check()
 ```
+
+**Tip:** the underlying `typeAssertion()` and `nonNullAssertion()` matchers (from `@nielspeter/ts-archunit`) are directly composable with `notContain()` on any entry point, including `within()` callbacks and future entry points. The rule functions above are thin wrappers for the common cases.
 
 ## Security (`ts-archunit/rules/security`)
 

@@ -382,3 +382,79 @@ export function jsxElement(tagOrRegex: string | RegExp): ExpressionMatcher {
     },
   }
 }
+
+/**
+ * Options for the `typeAssertion()` matcher.
+ */
+export interface TypeAssertionOptions {
+  /**
+   * Whether to allow `as const` in user code (default: true).
+   *
+   * | Option                 | Matcher matches `as const`? | With `notContain()` — is `as const` allowed in code? |
+   * | ---------------------- | --------------------------- | ---------------------------------------------------- |
+   * | default (`true`)       | no                          | yes — idiomatic literal preservation                 |
+   * | `{ allowConst: false }` | yes                         | no — bans ALL `as` expressions                      |
+   *
+   * Does NOT affect angle-bracket assertions (`<Type>value`) — those can't
+   * express `as const` and are always matched.
+   */
+  readonly allowConst?: boolean
+}
+
+/**
+ * Match type assertion expressions — both `as Type` and the legacy
+ * angle-bracket `<Type>value` form.
+ *
+ * By default, `as const` is excluded from matches (it narrows types rather
+ * than widening them, so it's idiomatic for literal preservation). The
+ * `allowConst` option does not affect angle-bracket assertions — those
+ * can't express `as const` and are always matched.
+ *
+ * Does NOT match `satisfies` expressions — those are validation, not
+ * assertions, and should not be banned.
+ *
+ * @example
+ * // Allow `as const` in user code (default)
+ * classes(p).should().notContain(typeAssertion()).check()
+ *
+ * @example
+ * // Ban `as const` too — no `as` expressions of any kind
+ * modules(p).should().notContain(typeAssertion({ allowConst: false })).check()
+ */
+export function typeAssertion(options?: TypeAssertionOptions): ExpressionMatcher {
+  const allowConst = options?.allowConst ?? true
+  return {
+    description: 'type assertion',
+    syntaxKinds: [SyntaxKind.AsExpression, SyntaxKind.TypeAssertionExpression],
+    matches(node: Node): boolean {
+      // Angle-bracket `<Type>value` — can't be `as const`, always matches
+      if (Node.isTypeAssertion(node)) return true
+      if (!Node.isAsExpression(node)) return false
+      if (!allowConst) return true
+      const typeNode = node.getTypeNode()
+      if (typeNode && Node.isTypeReference(typeNode)) {
+        const typeName = typeNode.getTypeName()
+        if (Node.isIdentifier(typeName) && typeName.getText() === 'const') {
+          return false
+        }
+      }
+      return true
+    },
+  }
+}
+
+/**
+ * Match `!` non-null assertion expressions.
+ *
+ * @example
+ * functions(p).should().notContain(nonNullAssertion()).check()
+ */
+export function nonNullAssertion(): ExpressionMatcher {
+  return {
+    description: 'non-null assertion',
+    syntaxKinds: [SyntaxKind.NonNullExpression],
+    matches(node: Node): boolean {
+      return Node.isNonNullExpression(node)
+    },
+  }
+}
