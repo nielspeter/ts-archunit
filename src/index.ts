@@ -181,7 +181,7 @@ export {
   exactly,
 } from './helpers/type-matchers.js'
 
-// Body analysis helpers (plan 0011)
+// Body analysis helpers (plan 0011 + 0046)
 export {
   call,
   access,
@@ -190,9 +190,11 @@ export {
   property,
   comment,
   jsxElement,
+  typeAssertion,
+  nonNullAssertion,
   STUB_PATTERNS,
 } from './helpers/matchers.js'
-export type { ExpressionMatcher } from './helpers/matchers.js'
+export type { ExpressionMatcher, TypeAssertionOptions } from './helpers/matchers.js'
 
 // Body analysis conditions (for advanced composition)
 export {

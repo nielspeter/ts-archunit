@@ -1,14 +1,22 @@
-import { Node, SyntaxKind } from 'ts-morph'
-import type { ClassDeclaration } from 'ts-morph'
+import type { ClassDeclaration, SourceFile } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
-import { createViolation } from '../core/violation.js'
+import { createViolation, getElementName } from '../core/violation.js'
+import type { ArchFunction } from '../models/arch-function.js'
+import { typeAssertion, nonNullAssertion } from '../helpers/matchers.js'
+import { classNotContain } from '../conditions/body-analysis.js'
+import { functionNotContain } from '../conditions/body-analysis-function.js'
+import { moduleNotContain } from '../conditions/body-analysis-module.js'
 
 /**
  * Class properties must not be typed as `any`.
  *
  * Detects both explicit `any` and untyped properties that resolve to `any`.
  * Use `unknown` with type narrowing instead.
+ *
+ * Uses custom `evaluate()` — inspects type resolution via `getType().getText()`,
+ * not AST nodes. Not expressible via the `ExpressionMatcher` pattern used by
+ * the other rules in this file.
  *
  * @example
  * classes(p).that().resideInFolder('** /src/** ')
@@ -27,7 +35,7 @@ export function noAnyProperties(): Condition<ClassDeclaration> {
             violations.push(
               createViolation(
                 prop,
-                `${cls.getName() ?? '<anonymous>'}.${prop.getName()} is typed as 'any' — use a specific type or 'unknown'`,
+                `${getElementName(cls)}.${prop.getName()} is typed as 'any' — use a specific type or 'unknown'`,
                 context,
               ),
             )
@@ -39,11 +47,12 @@ export function noAnyProperties(): Condition<ClassDeclaration> {
   }
 }
 
+// ─── Class variants ──────────────────────────────────────────────
+
 /**
- * Method bodies must not contain `as` type assertions.
- *
+ * Class bodies must not contain `as` type assertions.
  * Allows `as const` (narrows types, doesn't widen).
- * Use type guards or explicit type annotations instead.
+ * Scans methods, constructors, getters, and setters.
  *
  * @example
  * classes(p).that().haveNameEndingWith('Service')
@@ -51,38 +60,13 @@ export function noAnyProperties(): Condition<ClassDeclaration> {
  *   .check()
  */
 export function noTypeAssertions(): Condition<ClassDeclaration> {
-  return {
-    description: 'have no type assertions (as) in method bodies',
-    evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
-      const violations: ArchViolation[] = []
-      for (const cls of elements) {
-        for (const method of cls.getMethods()) {
-          const body = method.getBody()
-          if (!body) continue
-          for (const asExpr of body.getDescendantsOfKind(SyntaxKind.AsExpression)) {
-            const typeNode = asExpr.getTypeNode()
-            if (typeNode && Node.isTypeReference(typeNode) && typeNode.getText() === 'const') {
-              continue
-            }
-            violations.push(
-              createViolation(
-                asExpr,
-                `${cls.getName() ?? '<anonymous>'}.${method.getName()} uses type assertion — use type guards instead`,
-                context,
-              ),
-            )
-          }
-        }
-      }
-      return violations
-    },
-  }
+  return classNotContain(typeAssertion())
 }
 
 /**
- * Method bodies must not contain non-null assertions (`!`).
- *
+ * Class bodies must not contain non-null assertions (`!`).
  * Handle null/undefined explicitly instead of asserting it away.
+ * Scans methods, constructors, getters, and setters.
  *
  * @example
  * classes(p).that().resideInFolder('** /domain/** ')
@@ -90,26 +74,51 @@ export function noTypeAssertions(): Condition<ClassDeclaration> {
  *   .check()
  */
 export function noNonNullAssertions(): Condition<ClassDeclaration> {
-  return {
-    description: 'have no non-null assertions (!) in method bodies',
-    evaluate(elements: ClassDeclaration[], context: ConditionContext): ArchViolation[] {
-      const violations: ArchViolation[] = []
-      for (const cls of elements) {
-        for (const method of cls.getMethods()) {
-          const body = method.getBody()
-          if (!body) continue
-          for (const expr of body.getDescendantsOfKind(SyntaxKind.NonNullExpression)) {
-            violations.push(
-              createViolation(
-                expr,
-                `${cls.getName() ?? '<anonymous>'}.${method.getName()} uses non-null assertion — handle the null case explicitly`,
-                context,
-              ),
-            )
-          }
-        }
-      }
-      return violations
-    },
-  }
+  return classNotContain(nonNullAssertion())
+}
+
+// ─── Function variants ───────────────────────────────────────────
+
+/**
+ * Function bodies must not contain `as` type assertions (allows `as const`).
+ * Use type guards or explicit type annotations instead.
+ *
+ * @example
+ * functions(p).that().resideInFolder('** /src/** ')
+ *   .should().satisfy(functionNoTypeAssertions())
+ *   .check()
+ */
+export function functionNoTypeAssertions(): Condition<ArchFunction> {
+  return functionNotContain(typeAssertion())
+}
+
+/**
+ * Function bodies must not contain non-null assertions (`!`).
+ * Handle null/undefined explicitly instead of asserting it away.
+ */
+export function functionNoNonNullAssertions(): Condition<ArchFunction> {
+  return functionNotContain(nonNullAssertion())
+}
+
+// ─── Module variants ─────────────────────────────────────────────
+
+/**
+ * Source file must not contain any `as` type assertions (allows `as const`).
+ * Broader than the function/class variants — catches top-level code,
+ * class methods, functions, arrow functions, and any other expressions.
+ *
+ * @example
+ * modules(p).that().resideInFolder('** /src/** ')
+ *   .should().satisfy(moduleNoTypeAssertions())
+ *   .check()
+ */
+export function moduleNoTypeAssertions(): Condition<SourceFile> {
+  return moduleNotContain(typeAssertion())
+}
+
+/**
+ * Source file must not contain any `!` non-null assertions.
+ */
+export function moduleNoNonNullAssertions(): Condition<SourceFile> {
+  return moduleNotContain(nonNullAssertion())
 }
