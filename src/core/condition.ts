@@ -17,6 +17,21 @@ export interface ConditionContext {
   suggestion?: string
   /** Link to documentation from .rule({ docs }) */
   docs?: string
+  /**
+   * Index of the call argument to fold into the violation element/message.
+   *
+   * Read by `calls()` conditions in `src/conditions/call.ts` when building
+   * violations — threaded into `archCall.getName({ withArgument: ... })`
+   * so identity-keyed registrations (HTTP routes, event handlers,
+   * registry entries, etc.) can be excluded individually rather than
+   * only by file. See proposal 011 / plan 0057.
+   *
+   * Conditions for other builder types (class, function, module, JSX,
+   * etc.) simply ignore this field — it's a `calls()`-specific concern
+   * placed on the shared context because abstraction cost would exceed
+   * the leak for one optional primitive.
+   */
+  identifyByArgument?: number
 }
 
 /**

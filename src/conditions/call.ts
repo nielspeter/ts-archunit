@@ -7,6 +7,10 @@ import { getFunctionBody, findMatchesInNode } from '../helpers/body-traversal.js
 
 /**
  * Helper to create a violation from an ArchCall.
+ *
+ * The `element` field uses the argument-enriched name when
+ * `context.identifyByArgument` is set, but **never** elides — exclusion
+ * patterns key on the element string, so stability is required.
  */
 function createCallViolation(
   archCall: ArchCall,
@@ -15,12 +19,24 @@ function createCallViolation(
 ): ArchViolation {
   return {
     rule: context.rule,
-    element: archCall.getName() ?? '<call>',
+    element: archCall.getName({ withArgument: context.identifyByArgument }) ?? '<call>',
     file: archCall.getSourceFile().getFilePath(),
     line: archCall.getStartLineNumber(),
     message,
     because: context.because,
   }
+}
+
+/**
+ * Resolve the name for use in a violation MESSAGE (elision enabled).
+ *
+ * If `context.identifyByArgument` is set and the indexed argument's
+ * `getText()` exceeds 80 characters, the literal portion is elided
+ * (`slice(0, 38) + '…' + slice(-38)`) so CI output stays scannable.
+ * The element field NEVER elides — see {@link createCallViolation}.
+ */
+function callNameForMessage(archCall: ArchCall, context: ConditionContext): string {
+  return archCall.getName({ withArgument: context.identifyByArgument, elide: true }) ?? '<call>'
 }
 
 /**
@@ -33,7 +49,7 @@ export function notExist(): Condition<ArchCall> {
       return elements.map((archCall) =>
         createCallViolation(
           archCall,
-          `${archCall.getName() ?? '<call>'} should not exist`,
+          `${callNameForMessage(archCall, context)} should not exist`,
           context,
         ),
       )
@@ -58,7 +74,7 @@ export function haveCallbackContaining(matcher: ExpressionMatcher): Condition<Ar
           violations.push(
             createCallViolation(
               archCall,
-              `${archCall.getName() ?? '<call>'} does not have a callback containing ${matcher.description}`,
+              `${callNameForMessage(archCall, context)} does not have a callback containing ${matcher.description}`,
               context,
             ),
           )
@@ -80,6 +96,10 @@ export function notHaveCallbackContaining(matcher: ExpressionMatcher): Condition
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const archCall of elements) {
+        // Hoist the enriched name once per archCall — the inner match loop
+        // produces multiple violations against the same call, and the
+        // literal-shape walk inside getName({...}) is identical for each.
+        const callName = callNameForMessage(archCall, context)
         const args = archCall.getArguments()
         for (const arg of args) {
           const body = getFunctionBody(arg)
@@ -89,7 +109,7 @@ export function notHaveCallbackContaining(matcher: ExpressionMatcher): Condition
             violations.push(
               createCallViolation(
                 archCall,
-                `${archCall.getName() ?? '<call>'} has callback containing ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+                `${callName} has callback containing ${matcher.description} at line ${String(match.getStartLineNumber())}`,
                 context,
               ),
             )
@@ -166,7 +186,7 @@ export function haveArgumentWithProperty(...names: string[]): Condition<ArchCall
           }
         }
         if (!found) {
-          const callName = archCall.getName() ?? '<call>'
+          const callName = callNameForMessage(archCall, context)
           violations.push(
             createCallViolation(
               archCall,
@@ -204,6 +224,9 @@ export function notHaveArgumentWithProperty(...names: string[]): Condition<ArchC
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const archCall of elements) {
+        // Hoist: inner nested loops (args × names) can produce multiple
+        // violations against the same archCall — same identity work each time.
+        const callName = callNameForMessage(archCall, context)
         const args = archCall.getArguments()
         for (const arg of args) {
           const propNames = getObjectLiteralPropertyNames(arg)
@@ -212,7 +235,7 @@ export function notHaveArgumentWithProperty(...names: string[]): Condition<ArchC
               violations.push(
                 createCallViolation(
                   archCall,
-                  `${archCall.getName() ?? '<call>'} argument has forbidden property "${name}"`,
+                  `${callName} argument has forbidden property "${name}"`,
                   context,
                 ),
               )
@@ -253,7 +276,7 @@ export function haveArgumentContaining(matcher: ExpressionMatcher): Condition<Ar
           violations.push(
             createCallViolation(
               archCall,
-              `${archCall.getName() ?? '<call>'} has no argument containing ${matcher.description}`,
+              `${callNameForMessage(archCall, context)} has no argument containing ${matcher.description}`,
               context,
             ),
           )
@@ -281,6 +304,9 @@ export function notHaveArgumentContaining(matcher: ExpressionMatcher): Condition
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const archCall of elements) {
+        // Hoist: inner match loop produces multiple violations against the
+        // same archCall — same identity work each time.
+        const callName = callNameForMessage(archCall, context)
         const args = archCall.getArguments()
         for (const arg of args) {
           const matches = findMatchesInNode(arg, matcher)
@@ -288,7 +314,7 @@ export function notHaveArgumentContaining(matcher: ExpressionMatcher): Condition
             violations.push(
               createCallViolation(
                 archCall,
-                `${archCall.getName() ?? '<call>'} argument contains ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+                `${callName} argument contains ${matcher.description} at line ${String(match.getStartLineNumber())}`,
                 context,
               ),
             )

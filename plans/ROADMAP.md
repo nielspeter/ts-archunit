@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-04-17
+**Updated:** 2026-06-13
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 43 completed + proposal 010 + plan 0046, 0 remaining
+**Total Plans:** 45 completed + proposal 010, 0 remaining
 
 ---
 
@@ -55,18 +55,20 @@
 
 ## Final batch (completed 2026-03-30)
 
-| Priority | Plan                                              | Effort   | Status               | Depends on       |
-| -------- | ------------------------------------------------- | -------- | -------------------- | ---------------- |
-| **P1**   | ~~Architecture Rule Framework Primitives (0041)~~ | 2.5 days | COMPLETED 2026-03-30 | 0011, 0007       |
-| **P1**   | ~~Standard Architecture Rule Conditions (0042)~~  | 0.5 day  | COMPLETED 2026-03-30 | 0041             |
-| **P1**   | ~~Architecture Presets (0040)~~                   | 1.5 days | COMPLETED 2026-03-30 | 0041, 0042       |
-| **P1**   | ~~Docs, Explain Command, and Recipes (0043)~~     | 1 day    | COMPLETED 2026-03-30 | 0041, 0042, 0040 |
+| Priority | Plan                                                                | Effort   | Status               | Depends on       |
+| -------- | ------------------------------------------------------------------- | -------- | -------------------- | ---------------- |
+| **P1**   | ~~Architecture Rule Framework Primitives (0041)~~                   | 2.5 days | COMPLETED 2026-03-30 | 0011, 0007       |
+| **P1**   | ~~Standard Architecture Rule Conditions (0042)~~                    | 0.5 day  | COMPLETED 2026-03-30 | 0041             |
+| **P1**   | ~~Architecture Presets (0040)~~                                     | 1.5 days | COMPLETED 2026-03-30 | 0041, 0042       |
+| **P1**   | ~~Docs, Explain Command, and Recipes (0043)~~                       | 1 day    | COMPLETED 2026-03-30 | 0041, 0042, 0040 |
+| **P2**   | ~~TypeScript Assertion Matchers + Function/Module Variants (0046)~~ | 0.5 day  | COMPLETED 2026-04-12 |                  |
+| **P1**   | ~~Argument-Aware Identity for `calls()` Rules (0057)~~              | 1 day    | COMPLETED 2026-06-13 | none             |
 
 ---
 
 ## What's Shipped
 
-**1734 tests across 131 files. All checks pass.**
+**1894 tests across 140 files. All checks pass.**
 
 ### Core (P0)
 

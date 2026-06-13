@@ -1,5 +1,6 @@
 import type { ArchProject } from '../core/project.js'
 import { RuleBuilder } from '../core/rule-builder.js'
+import type { ConditionContext } from '../core/condition.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchCall } from '../models/arch-call.js'
 import { collectCalls } from '../models/arch-call.js'
@@ -60,8 +61,26 @@ import {
  * ```
  */
 export class CallRuleBuilder extends RuleBuilder<ArchCall> {
+  /**
+   * Argument index to fold into the violation element/message. Set by
+   * `.identifiedByArg(index)`. Threaded into `ConditionContext.identifyByArgument`
+   * so the eight `archCall.getName()` sites in `src/conditions/call.ts`
+   * can build identity-keyed violation strings.
+   *
+   * Survives `fork()` via `Object.assign(fork, this)` in the base class
+   * (primitive field; no explicit copy needed). See plan 0057.
+   */
+  protected _identifyByArgument?: number
+
   protected getElements(): ArchCall[] {
     return this.project.getSourceFiles().flatMap(collectCalls)
+  }
+
+  protected override buildConditionContext(): ConditionContext {
+    return {
+      ...super.buildConditionContext(),
+      identifyByArgument: this._identifyByArgument,
+    }
   }
 
   // --- Identity predicates (subset: no areExported/areNotExported) ---
@@ -105,6 +124,59 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
 
   withStringArg(index: number, glob: string): this {
     return this.addPredicate(callWithStringArg(index, glob))
+  }
+
+  // --- Identity enrichment ---
+
+  /**
+   * Fold the indexed argument's source text into the violation
+   * `element` and `message`, so identity-keyed registrations (HTTP
+   * routes, event handlers, registry entries, etc.) can be excluded
+   * individually rather than only by file.
+   *
+   * When the indexed argument is a `StringLiteral` or
+   * `NoSubstitutionTemplateLiteral`, the violation reads
+   * `` `${callee}(${rawText})` `` (e.g. `app.post("/auth/token")`).
+   * Otherwise (template with substitutions, `as const`, parenthesized,
+   * identifier, spread, out-of-bounds, non-string literal) it degrades
+   * gracefully to the bare `${callee}` form.
+   *
+   * **Identity scope — predicates see the bare callee.** This method
+   * affects violation output and `.excluding()` matching only;
+   * predicates that read `archCall.getName()` (e.g. `haveNameMatching`,
+   * `haveNameStartingWith`) continue to see the bare `app.post`. To
+   * filter by argument value, use `.withStringArg(i, glob)` or
+   * `.withArgMatching(i, pattern)`.
+   *
+   * @example Filtering by path AND naming each violation by path:
+   * ```ts
+   * calls(p).that()
+   *   .onObject('app').withMethod(/^(get|post)$/)
+   *   .withStringArg(0, '/auth/**')     // filter: only /auth routes
+   *   .identifiedByArg(0)                // identity: name violations by path
+   *   .should().haveArgumentWithProperty('preHandler')
+   *   .excluding(/"\/auth\/(login|register)"/)
+   *   .check()
+   * ```
+   *
+   * @example Footgun — predicates do NOT see the enriched name:
+   * ```ts
+   * // This produces ZERO violations regardless of source — the
+   * // predicate sees bare "app.post", which never matches the regex.
+   * calls(p).that()
+   *   .haveNameMatching(/app\.post\("\/auth/)   // <-- never matches
+   *   .identifiedByArg(0)
+   *   .should()...
+   * ```
+   *
+   * See proposal 011 / plan 0057 for the full design, the 8-case
+   * generic-pattern table, and the edge-case behavior matrix.
+   *
+   * @param index — zero-based argument index to fold into the identity.
+   */
+  identifiedByArg(index: number): this {
+    this._identifyByArgument = index
+    return this
   }
 
   // --- Condition methods ---

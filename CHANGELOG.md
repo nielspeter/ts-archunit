@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-06-13
+
+### Added
+
+- **`calls().identifiedByArg(index)`** — opt-in builder method that folds a string-literal argument into the violation `element` and `message`, so identity-keyed registrations (HTTP routes, event handlers, command names, registry entries, DI tokens, migration ids, etc.) can be excluded individually rather than only by file. Default behavior unchanged. The element field preserves the literal verbatim (exclusion stability); rendered violation messages elide the middle of literals longer than 80 characters. Predicates continue to see the bare callee — use `withStringArg(i, glob)` or `withArgMatching(i, pattern)` to filter by argument value. See proposal 011 / plan 0057 for the design, the 8-case generic-pattern table, and the edge-case behavior matrix.
+
 ## [0.10.0] - 2026-04-17
 
 ### Added
