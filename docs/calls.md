@@ -90,6 +90,65 @@ Matches calls where the argument at the given index is a string literal matching
 calls(p).that().withStringArg(0, '/api/users/**')
 ```
 
+## Identity enrichment
+
+### `identifiedByArg(index)`
+
+Folds the indexed argument's source text into the violation `element` and `message`, so identity-keyed registrations can be excluded individually rather than only by file.
+
+By default, `calls()` violations name the callee — `app.post`, `bus.on`, `flags.define`. When many things register through the same call, every violation collapses to the same name and `.excluding()` can only operate at file granularity. `.identifiedByArg(index)` folds a chosen string-literal argument into the element name so you can exclude individual registrations:
+
+```typescript
+// Without .identifiedByArg(0) — every violation is "app.post"
+// With it — "app.post(\"/auth/token\")", "app.post(\"/oidc/authorize\")", etc.
+calls(p)
+  .that()
+  .onObject('app')
+  .withMethod(/^(get|post|put|patch|delete)$/)
+  .identifiedByArg(0)
+  .should()
+  .haveArgumentWithProperty('preHandler')
+  .excluding(/"\/auth\/(login|register)"/, 'app.get("/.well-known/openid-configuration")')
+  .check()
+```
+
+The same shape applies to any string-keyed registration:
+
+| Pattern                | Call                                      | Identity needed  |
+| ---------------------- | ----------------------------------------- | ---------------- |
+| HTTP routes            | `app.post("/auth/token", handler)`        | the path         |
+| Test discovery         | `describe("auth", () => ...)`             | the suite name   |
+| Event/PubSub           | `bus.on("user.created", handler)`         | the event name   |
+| Command/message router | `router.handle("createOrder", handler)`   | the command name |
+| Validator registry     | `registry.register("email", validator)`   | the type key     |
+| Feature flags          | `flags.define("new-checkout", true)`      | the flag key     |
+| DI container           | `container.register("UserRepo", impl)`    | the token        |
+| DB migrations          | `migrator.register("0042_add_users", fn)` | the migration id |
+
+**Graceful degrade.** If the indexed argument isn't a `StringLiteral` or no-substitution template literal, the element name stays bare. Dynamic registrations (`app.post(buildPath(), h)`, `app.post(ROUTES.AUTH, h)`, ``app.post(`/auth/${env}`, h)``, `app.post('/foo' as const, h)`) all degrade to `app.post`.
+
+**Identity scope — predicates see the bare callee.** This method affects violation output and `.excluding()` matching only. Predicates that read `archCall.getName()` continue to see the bare name:
+
+```typescript
+// ❌ Silent zero-match — predicate sees bare "app.post", regex never hits
+calls(p)
+  .that().haveNameMatching(/app\.post\("\/auth/)
+  .identifiedByArg(0)
+  .should()...
+
+// ✅ Filter with withStringArg, then enrich identity for output
+calls(p)
+  .that()
+  .onObject('app').withMethod(/^(get|post)$/)
+  .withStringArg(0, '/auth/**')   // ← filter by arg
+  .identifiedByArg(0)              // ← name violations by arg
+  .should()...
+```
+
+**Long literals.** The `element` field always preserves the literal verbatim (exclusion patterns need stable keys). The rendered violation `message` elides the middle of literals longer than 80 characters with `…` so CI output stays scannable.
+
+See proposal 011 / plan 0057 for the full design and edge-case behavior.
+
 ## Call Conditions
 
 Conditions define the assertions enforced on calls that pass the predicate filter. They let you verify what happens inside callback arguments (e.g., every route handler must call `authenticate()`) or inspect the structure of non-callback arguments (e.g., every route must pass a schema object). If any matched call violates the condition, the rule reports it.

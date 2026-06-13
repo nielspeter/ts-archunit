@@ -330,13 +330,7 @@ export abstract class RuleBuilder<T> {
     }
 
     // Step 4: Build context for conditions
-    const context: ConditionContext = {
-      rule: this.buildRuleDescription(),
-      because: this._reason,
-      ruleId: this._metadata?.id,
-      suggestion: this._metadata?.suggestion,
-      docs: this._metadata?.docs,
-    }
+    const context = this.buildConditionContext()
 
     // Step 5: Evaluate all conditions (AND — all must pass)
     const violations: ArchViolation[] = []
@@ -345,5 +339,22 @@ export abstract class RuleBuilder<T> {
     }
 
     return violations
+  }
+
+  /**
+   * Build the `ConditionContext` passed to each condition.
+   *
+   * Subclasses with builder-specific context fields (e.g. `CallRuleBuilder`'s
+   * `_identifyByArgument`) override this to extend the base context.
+   * Call `super.buildConditionContext()` and spread the result.
+   */
+  protected buildConditionContext(): ConditionContext {
+    return {
+      rule: this.buildRuleDescription(),
+      because: this._reason,
+      ruleId: this._metadata?.id,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+    }
   }
 }

@@ -136,6 +136,12 @@ Available on all entry points via `.that()`.
 | `withArgMatching` | `withArgMatching(index: number, pattern: string \| RegExp)` | Argument at index matches regex or exact string.                            |
 | `withStringArg`   | `withStringArg(index: number, glob: string)`                | String literal argument at index matches glob pattern.                      |
 
+### CallRuleBuilder identity enrichment
+
+| Method            | Signature                        | Description                                                                                                                                                                                                             |
+| ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identifiedByArg` | `identifiedByArg(index: number)` | Opt-in: fold the indexed string-literal argument into the violation `element` and `message` so individual registrations can be `.excluding()`-targeted. See `docs/calls.md` for details and the Identity scope footgun. |
+
 ## JSX Predicates
 
 | Export                     | Signature                                                      | Description                                               |
