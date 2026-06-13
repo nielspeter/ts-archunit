@@ -1,6 +1,6 @@
 # Proposal 011 — Argument-Aware Identity for `calls()` Rules
 
-**Status:** Proposal v2.1 (settled after proposer review)
+**Status:** Implemented (v0.11.0, 2026-06-13 — see plan 0057)
 **Date:** 2026-06-11
 **Priority:** High
 **Affects:** `calls()` builder, `ArchCall.getName()`, `ConditionContext`, `createCallViolation`, violation messages
