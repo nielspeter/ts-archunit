@@ -73,7 +73,9 @@ describe('jsxText() matcher', () => {
   it('matches JsxText with prose', () => {
     const sf = createTsxProject(`const x = <button>Save</button>`)
     const matcher = jsxText()
-    const text = sf.getDescendantsOfKind(SyntaxKind.JsxText).find((t) => t.getText().includes('Save'))!
+    const text = sf
+      .getDescendantsOfKind(SyntaxKind.JsxText)
+      .find((t) => t.getText().includes('Save'))!
     expect(matcher.matches(text)).toBe(true)
   })
 
@@ -120,7 +122,9 @@ describe('jsxText() matcher', () => {
   it('matches numeric-only text (no letter-gate baked in)', () => {
     const sf = createTsxProject(`const x = <div>123</div>`)
     const matcher = jsxText()
-    const text = sf.getDescendantsOfKind(SyntaxKind.JsxText).find((t) => t.getText().includes('123'))!
+    const text = sf
+      .getDescendantsOfKind(SyntaxKind.JsxText)
+      .find((t) => t.getText().includes('123'))!
     expect(matcher.matches(text)).toBe(true)
   })
 

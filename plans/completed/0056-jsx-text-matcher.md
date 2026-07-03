@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** DRAFT
+- **State:** Done — shipped in v0.12.0 (2026-07-03)
 - **Priority:** P3 — small additive matcher, unblocks i18n-style rules
 - **Effort:** ~3 hours
 - **Created:** 2026-06-10
