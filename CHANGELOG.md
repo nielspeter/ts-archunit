@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-07-03
+
+### Added
+
+- **`jsxText()` matcher** — detects hardcoded JSX text content: `JsxText` children of JSX elements (`<button>Save</button>`), plus expression-wrapped literals (`<div>{"Save"}</div>` and ``<div>{`Save`}</div>``). Skips inter-element whitespace, dynamic expressions (`{count}`, `{t("save")}`), templates with substitution, and attribute values (braced or quoted) — those remain the domain of the `jsxElements()` entry point. Composes with `notContain()` for i18n enforcement. Takes no options and bakes in no letter filter — scope with folder/file predicates or `.excluding(...)`. Complements the existing `jsxElement()` matcher.
+
 ## [0.11.0] - 2026-06-13
 
 ### Added

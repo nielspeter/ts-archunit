@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-06-13
+**Updated:** 2026-07-03
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 45 completed + proposal 010, 0 remaining
+**Total Plans:** 46 completed + proposal 010, 0 remaining
 
 ---
 
@@ -63,12 +63,13 @@
 | **P1**   | ~~Docs, Explain Command, and Recipes (0043)~~                       | 1 day    | COMPLETED 2026-03-30 | 0041, 0042, 0040 |
 | **P2**   | ~~TypeScript Assertion Matchers + Function/Module Variants (0046)~~ | 0.5 day  | COMPLETED 2026-04-12 |                  |
 | **P1**   | ~~Argument-Aware Identity for `calls()` Rules (0057)~~              | 1 day    | COMPLETED 2026-06-13 | none             |
+| **P3**   | ~~`jsxText()` Matcher (0056)~~                                      | ~3 hours | COMPLETED 2026-07-03 | none             |
 
 ---
 
 ## What's Shipped
 
-**1894 tests across 140 files. All checks pass.**
+**1910 tests across 140 files. All checks pass.**
 
 ### Core (P0)
 

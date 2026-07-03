@@ -344,6 +344,26 @@ jsxElements(p)
 modules(p).that().resideInFile('**/*.tsx').should().notContain(jsxElement('script')).check()
 ```
 
+### Hardcoded text (i18n)
+
+Enforce that user-facing text goes through a translation function instead of being hardcoded as JSX children. `jsxText()` matches text content (`<button>Save</button>`) and expression-wrapped literals (`{"Save"}`, ``{`Save`}``), but not dynamic values (`{count}`, `{t("save")}`) or attribute values (which are the domain of `jsxElements()`).
+
+```typescript
+import { modules, jsxText } from '@nielspeter/ts-archunit'
+
+// No hardcoded user-facing text in components — route it through t()
+modules(p)
+  .that()
+  .resideInFolder('src/components/**')
+  .should()
+  .notContain(jsxText())
+  .because('User-facing text must go through t()')
+  .excluding('src/components/Icon.tsx') // single-glyph icons
+  .check()
+```
+
+`jsxText()` takes no options and bakes in no letter filter — `<div>123</div>` matches. Narrow with folder/file predicates or `.excluding(...)`. Note that text inside translation wrappers like `<Trans>` also matches; scope those out the same way if you use them.
+
 ## Scoped Rules (within)
 
 Narrow the scope of a rule to code inside matched call sites, such as route handler callbacks.
