@@ -90,14 +90,22 @@ functions(p)
   .check()
 ```
 
-| Capability                                         | ts-archunit | dependency-cruiser | eslint-plugin-boundaries |
-| -------------------------------------------------- | ----------- | ------------------ | ------------------------ |
-| Import path rules                                  | Yes         | Yes                | Yes                      |
-| **Body analysis** (what's called inside functions) | Yes         | No                 | No                       |
-| **Type checking** (string vs typed union)          | Yes         | No                 | No                       |
-| Cycle detection                                    | Yes         | Yes                | No                       |
-| Baseline (gradual adoption)                        | Yes         | No                 | No                       |
-| GitHub PR annotations                              | Yes         | No                 | No                       |
+| Capability                                         | ts-archunit | [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) | [eslint-plugin-boundaries](https://github.com/javierbrea/eslint-plugin-boundaries) | [Biome](https://biomejs.dev) | [ts-arch](https://github.com/ts-arch/ts-arch) |
+| -------------------------------------------------- | ----------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------- | --------------------------------------------- |
+| Import path rules                                  | Yes         | Yes                | Yes                      | Yes   | Yes     |
+| **Body analysis** (what's called inside functions) | Yes         | No                 | No                       | No    | No      |
+| **Type checking** (string vs typed union)          | Yes         | No                 | No                       | No    | No      |
+| JSX element rules                                  | Yes         | No                 | No                       | No    | No      |
+| Cross-layer rules                                  | Yes         | No                 | No                       | No    | Partial |
+| Cycle detection                                    | Yes         | Yes                | No                       | No    | Yes     |
+| Code smell detection (duplicate bodies)            | Yes         | No                 | No                       | No    | No      |
+| Code metrics (cyclomatic, LOC)                     | Yes         | No                 | No                       | No    | No      |
+| Pattern matching (reusable rule templates)         | Yes         | No                 | No                       | No    | No      |
+| Baseline (gradual adoption)                        | Yes         | No                 | No                       | No    | No      |
+| Diff-aware / PR-only checking                      | Yes         | No                 | No                       | No    | No      |
+| Watch mode                                         | Yes         | No                 | No                       | Yes   | No      |
+| Inline exclusion comments                          | Yes         | No                 | Via ESLint               | Yes   | No      |
+| GitHub PR annotations                              | Yes         | No                 | Via ESLint               | No    | No      |
 
 ## Quick Start with Presets
 
@@ -302,30 +310,42 @@ smells
 
 ## Compared to Other Tools
 
-| Capability                                        | ts-archunit | [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) | [ArchUnitTS](https://github.com/LukasNiessen/ArchUnitTS) |
-| ------------------------------------------------- | ----------- | -------------------------------------------------------------------- | -------------------------------------------------------- |
-| Import path rules                                 | Yes         | Yes                                                                  | Yes                                                      |
-| **Body analysis** (calls, access, constructors)   | Yes         | No                                                                   | No                                                       |
-| **Type checking** (resolved types via ts-morph)   | Yes         | No                                                                   | No                                                       |
-| Class rules (inheritance, decorators, members)    | Yes         | No                                                                   | No                                                       |
-| Function rules (params, return types, async)      | Yes         | No                                                                   | No                                                       |
-| Cycle detection                                   | Yes         | Yes                                                                  | Yes                                                      |
-| Parameterized presets                             | Yes         | Flat config                                                          | No                                                       |
-| Baseline / gradual adoption                       | Yes         | No                                                                   | No                                                       |
-| GitHub PR annotations                             | Yes         | No                                                                   | No                                                       |
-| Violation messages with fix suggestions           | Yes         | No                                                                   | No                                                       |
-| `explain` command (dump rules as JSON for agents) | Yes         | No                                                                   | No                                                       |
-| OO metrics (LCOM, coupling, instability)          | No          | No                                                                   | Yes                                                      |
-| PlantUML diagram compliance                       | No          | No                                                                   | Yes                                                      |
-| Dependency graph visualization                    | No          | Yes (dot, HTML)                                                      | No                                                       |
-| License checking                                  | No          | Yes                                                                  | No                                                       |
-| Nx monorepo support                               | No          | No                                                                   | Yes                                                      |
+| Capability                                            | ts-archunit     | [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) | [ArchUnitTS](https://github.com/LukasNiessen/ArchUnitTS) | [Biome](https://biomejs.dev) | [ts-arch](https://github.com/ts-arch/ts-arch) |
+| ----------------------------------------------------- | --------------- | -------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------- | --------------------------------------------- |
+| Import path rules                                     | Yes             | Yes                                                                  | Yes                                                      | Yes (`noRestrictedImports`)  | Yes                                           |
+| **Body analysis** (calls, access, constructors)       | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| **Type checking** (resolved types via ts-morph)       | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Class rules (inheritance, decorators, members)        | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Function rules (params, return types, async)          | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| JSX element rules                                     | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Cross-layer rules (pair-condition per layer)          | Yes             | No                                                                   | No                                                       | No                           | Partial (layered slices)                      |
+| Cycle detection                                       | Yes             | Yes                                                                  | Yes                                                      | No                           | Yes                                           |
+| Parameterized presets                                 | Yes             | Flat config                                                          | No                                                       | No                           | No                                            |
+| Pattern matching (reusable rule templates)            | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Code smell detection (duplicate bodies, siblings)     | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Code metrics                                          | Cyclomatic, LOC | No                                                                   | LCOM, coupling, instability                              | No                           | No                                            |
+| Baseline / gradual adoption                           | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Diff-aware / PR-only checking                         | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Watch mode                                            | Yes             | No                                                                   | No                                                       | Yes                          | No                                            |
+| Inline exclusion comments                             | Yes             | No                                                                   | No                                                       | Yes (`biome-ignore`)         | No                                            |
+| JSON output format                                    | Yes             | Yes                                                                  | Via vitest                                               | Yes                          | Via test runner                               |
+| GitHub PR annotations                                 | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| Violation messages with fix suggestions               | Yes             | No                                                                   | No                                                       | Partial (autofixes)          | No                                            |
+| `explain` command (dump rules as JSON for agents)     | Yes             | No                                                                   | No                                                       | No                           | No                                            |
+| PlantUML diagram compliance                           | No              | No                                                                   | Yes                                                      | No                           | No                                            |
+| Dependency graph visualization                        | No              | Yes (dot, HTML)                                                      | No                                                       | No                           | No                                            |
+| License checking                                      | No              | Yes                                                                  | No                                                       | No                           | No                                            |
+| Nx monorepo support                                   | No              | No                                                                   | Yes                                                      | No                           | No                                            |
 
-**Use ts-archunit** when you need to enforce what happens _inside_ functions — call patterns, error types, missing delegation, stub comments — and when AI agents are generating code that needs architectural guardrails. This is the only tool that catches "service calls parseInt instead of extractCount()".
+**Use ts-archunit** when you need to enforce what happens _inside_ functions — call patterns, error types, missing delegation, stub comments — and when AI agents are generating code that needs architectural guardrails. This is the only tool that catches "service calls parseInt instead of extractCount()", flags duplicate function bodies as smells, and can restrict checking to only the files changed in a PR.
 
 **Use dependency-cruiser** when you only need import direction rules and want fast graph visualization, license compliance checking, or stability metrics. It's faster (no ts-morph project load) and has mature HTML/dot reporting.
 
 **Use ArchUnitTS** when you need OO metrics (LCOM cohesion, coupling factor, distance from main sequence), PlantUML diagram validation, or Nx monorepo project-graph awareness.
+
+**Use Biome** when you want a fast Rust-based lint + format toolchain and only need lint-level import restrictions (`noRestrictedImports`) — not architecture rules over class hierarchies, function bodies, or slice cycles. Pair it with ts-archunit if you want both.
+
+**Use ts-arch** when you want the classic ArchUnit-style fluent API scoped to file/folder dependency rules and layered slices, and don't need body analysis, type-checker rules, or CI integrations like baselines, diff-aware runs, or GitHub annotations.
 
 **Use ts-archunit + dependency-cruiser together** if you want both body-level enforcement and dependency graph visualization.
 
