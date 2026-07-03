@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Project, SyntaxKind } from 'ts-morph'
-import { jsxElement } from '../../src/helpers/matchers.js'
+import { jsxElement, jsxText } from '../../src/helpers/matchers.js'
 
 function createTsxProject(code: string) {
   const project = new Project({
@@ -64,5 +64,105 @@ describe('jsxElement() matcher', () => {
   it('has descriptive description for regex', () => {
     const matcher = jsxElement(/^Button/)
     expect(matcher.description).toContain('matching')
+  })
+})
+
+describe('jsxText() matcher', () => {
+  // --- Matches (positive cases) ---
+
+  it('matches JsxText with prose', () => {
+    const sf = createTsxProject(`const x = <button>Save</button>`)
+    const matcher = jsxText()
+    const text = sf.getDescendantsOfKind(SyntaxKind.JsxText).find((t) => t.getText().includes('Save'))!
+    expect(matcher.matches(text)).toBe(true)
+  })
+
+  it('matches JsxExpression wrapping a string literal', () => {
+    const sf = createTsxProject(`const x = <div>{"Save"}</div>`)
+    const matcher = jsxText()
+    const expr = sf.getDescendantsOfKind(SyntaxKind.JsxExpression)[0]!
+    expect(matcher.matches(expr)).toBe(true)
+  })
+
+  it('matches JsxExpression wrapping a no-substitution template literal', () => {
+    const sf = createTsxProject('const x = <div>{`Save`}</div>')
+    const matcher = jsxText()
+    const expr = sf.getDescendantsOfKind(SyntaxKind.JsxExpression)[0]!
+    expect(matcher.matches(expr)).toBe(true)
+  })
+
+  it('matches multiple JsxText nodes in one element', () => {
+    const sf = createTsxProject(`const x = <div>Hello <span /> world</div>`)
+    const matcher = jsxText()
+    const matched = sf.getDescendantsOfKind(SyntaxKind.JsxText).filter((t) => matcher.matches(t))
+    expect(matched).toHaveLength(2)
+  })
+
+  it('matches single-character text (no letter-gate baked in)', () => {
+    const sf = createTsxProject(`const x = <div>×</div>`)
+    const matcher = jsxText()
+    const text = sf.getDescendantsOfKind(SyntaxKind.JsxText).find((t) => t.getText().includes('×'))!
+    expect(matcher.matches(text)).toBe(true)
+  })
+
+  // --- Does NOT match (negative cases) ---
+
+  it('does not match whitespace-only JsxText', () => {
+    const sf = createTsxProject(`const x = (
+  <div>
+    <span />
+  </div>
+)`)
+    const matcher = jsxText()
+    const texts = sf.getDescendantsOfKind(SyntaxKind.JsxText)
+    expect(texts.length).toBeGreaterThan(0)
+    for (const t of texts) {
+      expect(matcher.matches(t)).toBe(false)
+    }
+  })
+
+  it('does not match JsxExpression wrapping an identifier', () => {
+    const sf = createTsxProject(`const x = <div>{count}</div>`)
+    const matcher = jsxText()
+    const expr = sf.getDescendantsOfKind(SyntaxKind.JsxExpression)[0]!
+    expect(matcher.matches(expr)).toBe(false)
+  })
+
+  it('does not match JsxExpression wrapping a call expression', () => {
+    const sf = createTsxProject(`const x = <div>{t("save")}</div>`)
+    const matcher = jsxText()
+    const expr = sf.getDescendantsOfKind(SyntaxKind.JsxExpression)[0]!
+    expect(matcher.matches(expr)).toBe(false)
+  })
+
+  it('does not match a template literal with substitution', () => {
+    const sf = createTsxProject('const x = <div>{`Hello ${name}`}</div>')
+    const matcher = jsxText()
+    const expr = sf.getDescendantsOfKind(SyntaxKind.JsxExpression)[0]!
+    expect(matcher.matches(expr)).toBe(false)
+  })
+
+  it('does not match an empty JsxExpression', () => {
+    const sf = createTsxProject(`const x = <div>{/* comment */}</div>`)
+    const matcher = jsxText()
+    const expr = sf.getDescendantsOfKind(SyntaxKind.JsxExpression)[0]!
+    expect(matcher.matches(expr)).toBe(false)
+  })
+
+  it('does not match a plain string literal outside JSX', () => {
+    const sf = createTsxProject(`const x = "Save"`)
+    const matcher = jsxText()
+    for (const node of sf.getDescendants()) {
+      expect(matcher.matches(node)).toBe(false)
+    }
+  })
+
+  // --- Structural ---
+
+  it('has correct syntaxKinds for efficient traversal', () => {
+    const matcher = jsxText()
+    expect(matcher.syntaxKinds).toContain(SyntaxKind.JsxText)
+    expect(matcher.syntaxKinds).toContain(SyntaxKind.JsxExpression)
+    expect(matcher.syntaxKinds).toHaveLength(2)
   })
 })

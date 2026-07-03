@@ -17,7 +17,7 @@ Body analysis fills this gap. It traverses the AST inside every method body (for
 
 Matchers are the building blocks of body analysis rules. Each matcher targets a specific kind of AST node -- function calls, constructor invocations, property access, object properties, or arbitrary expressions. You pass a matcher to a condition like `notContain()` to define what should (or should not) appear inside method and function bodies.
 
-Nine matchers cover the most common patterns:
+Ten matchers cover the most common patterns:
 
 ### `call(target)`
 
@@ -101,6 +101,30 @@ jsxElement(/^motion\./) // matches <motion.div>, <motion.span>, etc.
 ```typescript
 // Functions in pages/ must not render raw <div>
 functions(p).that().resideInFile('**/pages/**/*.tsx').should().notContain(jsxElement('div')).check()
+```
+
+### `jsxText()`
+
+Matches hardcoded JSX text content — the children of JSX elements. Where `jsxElement()` matches elements by tag and the [`jsxElements()` entry point](/jsx) handles attribute values, `jsxText()` closes the remaining gap: literal prose rendered as element children. The motivating use case is i18n enforcement — "no hardcoded user-facing text; everything goes through `t()`".
+
+It matches `JsxText` nodes with non-whitespace content, plus `JsxExpression` nodes wrapping a bare string literal or no-substitution template literal (which render identically to plain text and would otherwise be a trivial bypass). It does **not** match inter-element whitespace, dynamic expressions like `{count}` or `{t("save")}`, or templates with substitution. No letter-presence filter is baked in — `<div>123</div>` matches; layer your own pattern if you need one.
+
+```typescript
+import { jsxText } from '@nielspeter/ts-archunit'
+
+// matches:   <button>Save</button>   <div>{"Save"}</div>   <div>{`Save`}</div>
+// no match:  <div>{count}</div>   <div>{t("save")}</div>   <div>{`Hi ${name}`}</div>
+```
+
+```typescript
+// Components must route user-facing text through t()
+modules(p)
+  .that()
+  .resideInFolder('src/components/**')
+  .should()
+  .notContain(jsxText())
+  .because('User-facing text must go through t()')
+  .check()
 ```
 
 ### `typeAssertion(options?)`

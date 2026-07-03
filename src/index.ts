@@ -190,6 +190,7 @@ export {
   property,
   comment,
   jsxElement,
+  jsxText,
   typeAssertion,
   nonNullAssertion,
   STUB_PATTERNS,

@@ -221,6 +221,7 @@ Available on all entry points via `.that()`.
 | `property`         | `property(name: string \| RegExp, value?: boolean \| number \| string \| RegExp)` | Match property assignments by name and optional value.          |
 | `expression`       | `expression(target: string \| RegExp)`                                            | Match any expression by text.                                   |
 | `jsxElement`       | `jsxElement(tag: string \| RegExp)`                                               | Match JSX elements by tag name (tag-only, no attributes).       |
+| `jsxText`          | `jsxText()`                                                                        | Match hardcoded JSX text content (children, incl. `{"..."}`).   |
 | `typeAssertion`    | `typeAssertion(options?: { allowConst?: boolean })`                               | Match `as Type` expressions. Excludes `as const` by default.    |
 | `nonNullAssertion` | `nonNullAssertion()`                                                              | Match `!` non-null assertion expressions.                       |
 | `comment`          | `comment(pattern: string \| RegExp)`                                              | Match comments attached to AST nodes.                           |
