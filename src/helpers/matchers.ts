@@ -398,9 +398,14 @@ export function jsxElement(tagOrRegex: string | RegExp): ExpressionMatcher {
  *   identically to plain text and would otherwise be a trivial bypass.
  *
  * Does NOT match: inter-element whitespace, `{expr}` wrapping an identifier
- * or call (`<div>{t("save")}</div>`), or templates with substitution
- * (`` <div>{`Hi ${name}`}</div> ``). No letter-presence filter is baked in —
- * `<div>123</div>` matches; layer your own pattern if you need one.
+ * or call (`<div>{t("save")}</div>`), templates with substitution
+ * (`` <div>{`Hi ${name}`}</div> ``), or attribute values whether braced or
+ * quoted (`title={"Save"}`, `title="Save"`) — those belong to the
+ * `jsxElements()` entry point. No letter-presence filter is baked in —
+ * `<div>123</div>` matches; the matcher takes no options, so to narrow which
+ * text is flagged, scope the rule with folder/file predicates or
+ * `.excluding(...)`. Note: text inside translation wrappers like `<Trans>`
+ * also matches — scope those out the same way if your i18n setup uses them.
  *
  * @example
  * modules(p)
@@ -420,6 +425,12 @@ export function jsxText(): ExpressionMatcher {
         return node.getLiteralText().trim().length > 0
       }
       if (Node.isJsxExpression(node)) {
+        // A JsxExpression appears in two positions: as an element child
+        // (`<div>{"x"}</div>`) or as an attribute value (`<div title={"x"} />`).
+        // Attribute values are the domain of the `jsxElements()` entry point —
+        // only match child position (parent is a JsxElement or JsxFragment).
+        const parent = node.getParent()
+        if (!Node.isJsxElement(parent) && !Node.isJsxFragment(parent)) return false
         const expr = node.getExpression()
         if (!expr) return false
         if (Node.isStringLiteral(expr)) return true

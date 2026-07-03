@@ -107,14 +107,16 @@ functions(p).that().resideInFile('**/pages/**/*.tsx').should().notContain(jsxEle
 
 Matches hardcoded JSX text content — the children of JSX elements. Where `jsxElement()` matches elements by tag and the [`jsxElements()` entry point](/jsx) handles attribute values, `jsxText()` closes the remaining gap: literal prose rendered as element children. The motivating use case is i18n enforcement — "no hardcoded user-facing text; everything goes through `t()`".
 
-It matches `JsxText` nodes with non-whitespace content, plus `JsxExpression` nodes wrapping a bare string literal or no-substitution template literal (which render identically to plain text and would otherwise be a trivial bypass). It does **not** match inter-element whitespace, dynamic expressions like `{count}` or `{t("save")}`, or templates with substitution. No letter-presence filter is baked in — `<div>123</div>` matches; layer your own pattern if you need one.
+It matches `JsxText` nodes with non-whitespace content, plus `JsxExpression` nodes wrapping a bare string literal or no-substitution template literal (which render identically to plain text and would otherwise be a trivial bypass). It does **not** match inter-element whitespace, dynamic expressions like `{count}` or `{t("save")}`, templates with substitution, or attribute values — braced or quoted (`title={"Save"}`, `title="Save"`), which are the domain of the [`jsxElements()` entry point](/jsx). No letter-presence filter is baked in — `<div>123</div>` matches. The matcher takes no options: to narrow which text is flagged, scope the rule with folder/file predicates or `.excluding(...)`.
 
 ```typescript
 import { jsxText } from '@nielspeter/ts-archunit'
 
 // matches:   <button>Save</button>   <div>{"Save"}</div>   <div>{`Save`}</div>
-// no match:  <div>{count}</div>   <div>{t("save")}</div>   <div>{`Hi ${name}`}</div>
+// no match:  <div>{count}</div>   <div>{t("save")}</div>   <div>{`Hi ${name}`}</div>   <img alt={"x"} />
 ```
+
+> **Note:** text inside translation-wrapper components like `<Trans>` or `<FormattedMessage>` is also JSX text content, so it matches too. If your i18n setup uses those, scope them out with folder/file predicates, `.excluding(...)`, or a custom matcher.
 
 ```typescript
 // Components must route user-facing text through t()
