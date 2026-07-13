@@ -1,15 +1,10 @@
 import path from 'node:path'
-import type { ArchViolation } from '../core/violation.js'
+import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { importFresh } from './watch.js'
 
-/**
- * Minimal interface for rule builders the CLI runner consumes.
- * The runner collects `.violations()` (non-throwing, severity-stamped) and
- * owns filtering/formatting/exit — it no longer calls the throwing `.check()`.
- */
-export interface RuleBuilderLike {
-  violations: () => ArchViolation[]
-}
+// Re-exported for existing importers; the type lives in core so presets can
+// return RuleBuilderLike[] without depending on CLI infrastructure.
+export type { RuleBuilderLike } from '../core/rule-builder-like.js'
 
 export interface LoadOptions {
   /** Use cache-busting imports for watch mode. Default: false */
