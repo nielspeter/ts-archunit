@@ -55,15 +55,15 @@ This rule slots into the **existing** non-iterating builder pattern. It is not a
 
 ### How it joins what's already there
 
-| Existing concept                                                                                     | Where it lives                   | This plan reuses it via                                                                       |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `TerminalBuilder` (abstract base)                                                                    | `src/core/terminal-builder.ts`   | `TsconfigBuilder extends TerminalBuilder`                                                     |
-| Non-iterating builder precedent                                                                      | `SmellBuilder` (`src/smells/`)   | Same pattern — concrete subclass implements `collectViolations()`                             |
-| Top-level entry-point precedent                                                                           | `project(p)`, `smells.duplicateBodies(p)` | New flat `tsconfig(p)` entry point                                                   |
-| `.because()` / `.rule()` / `.excluding()` / `.check()` / `.warn()` / `.severity()` / `.violations()` | Inherited from `TerminalBuilder` | Inherited the same way                                                                        |
-| Baseline / diff / format pipeline                                                                    | `executeCheck`, `executeWarn`    | Inherited via `TerminalBuilder.check()`                                                       |
-| `ArchProject.getSourceFiles()` pattern (public, not `_project`)                                      | `src/core/project.ts`            | Add `getCompilerOptions()` to `ArchProject` interface; builder reads via the public interface |
-| `createViolation()`                                                                                  | `src/core/violation.ts`          | Used as-is; tsconfig path becomes the violation's `file`, line `1`                            |
+| Existing concept                                                                                     | Where it lives                            | This plan reuses it via                                                                       |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `TerminalBuilder` (abstract base)                                                                    | `src/core/terminal-builder.ts`            | `TsconfigBuilder extends TerminalBuilder`                                                     |
+| Non-iterating builder precedent                                                                      | `SmellBuilder` (`src/smells/`)            | Same pattern — concrete subclass implements `collectViolations()`                             |
+| Top-level entry-point precedent                                                                      | `project(p)`, `smells.duplicateBodies(p)` | New flat `tsconfig(p)` entry point                                                            |
+| `.because()` / `.rule()` / `.excluding()` / `.check()` / `.warn()` / `.severity()` / `.violations()` | Inherited from `TerminalBuilder`          | Inherited the same way                                                                        |
+| Baseline / diff / format pipeline                                                                    | `executeCheck`, `executeWarn`             | Inherited via `TerminalBuilder.check()`                                                       |
+| `ArchProject.getSourceFiles()` pattern (public, not `_project`)                                      | `src/core/project.ts`                     | Add `getCompilerOptions()` to `ArchProject` interface; builder reads via the public interface |
+| `createViolation()`                                                                                  | `src/core/violation.ts`                   | Used as-is; tsconfig path becomes the violation's `file`, line `1`                            |
 
 No new top-level architecture. One new `TerminalBuilder` subclass; one new top-level entry point; one new public method on `ArchProject`. Everything else is reuse.
 
@@ -310,9 +310,9 @@ That's the only doc-asset coupling.
 | File                                      | Change                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------- |
 | `src/core/project.ts`                     | Add `getCompilerOptions()` to interface; implement in both factories |
-| `src/tsconfig/tsconfig-builder.ts`          | New — `TsconfigBuilder extends TerminalBuilder`                      |
-| `src/tsconfig/strict-family.ts`             | New — `resolveFlag`, `isStrictFamily`, `STRICT_FAMILY` constant      |
-| `src/tsconfig/index.ts`                     | New — flat `tsconfig()` entry-point export                           |
+| `src/tsconfig/tsconfig-builder.ts`        | New — `TsconfigBuilder extends TerminalBuilder`                      |
+| `src/tsconfig/strict-family.ts`           | New — `resolveFlag`, `isStrictFamily`, `STRICT_FAMILY` constant      |
+| `src/tsconfig/index.ts`                   | New — flat `tsconfig()` entry-point export                           |
 | `src/index.ts`                            | Export `tsconfig` and `TsconfigBuilder`                              |
 | `tests/config/tsconfig.test.ts`           | New — full Phase 2 inventory                                         |
 | `docs/rules.md` (or appropriate doc page) | New section                                                          |
@@ -360,7 +360,7 @@ Reviewed via the `review-proposal` skill (architect + product lenses), grounded 
 
 - **Namespace collision (product) — RESOLVED 2026-07-13: going flat `tsconfig(p)`; `tsconfig` is the only foreseen config assertion, so no namespace.** `config` clashed with the existing `defineConfig`/`CliConfig` (`src/index.ts`, `src/cli/config.ts`, "configure the tool"). The plan body now uses the flat entry point throughout; a non-`config`-named namespace can be introduced later only if a real cluster (`packageJson`, `nodeVersion`) emerges.
 - **`createViolation()` can't be reused as claimed** (lines 66, 213). It takes a ts-morph `Node` (`violation.ts:153`) and derives file/line/codeFrame from it; tsconfig isn't a `SourceFile` in the project. Construct the `ArchViolation` literal directly (set `element` = flag name, omit `codeFrame`). The architecture-fit table is factually wrong.
-- **`STRICT_FAMILY` is incomplete and self-undermining.** Missing `strictBuiltinIteratorReturn` (TS 5.6, governed by `strict`) → `.requires({ strictBuiltinIteratorReturn: true })` falsely fails on a `strict:true` project. And the hardcoded list contradicts the "new TS flags land automatically" claim (line 144) — the *input* auto-updates; the resolution list is a manual allowlist to chase each TS release. State the tension; pin to a TS version with a guard test.
+- **`STRICT_FAMILY` is incomplete and self-undermining.** Missing `strictBuiltinIteratorReturn` (TS 5.6, governed by `strict`) → `.requires({ strictBuiltinIteratorReturn: true })` falsely fails on a `strict:true` project. And the hardcoded list contradicts the "new TS flags land automatically" claim (line 144) — the _input_ auto-updates; the resolution list is a manual allowlist to chase each TS release. State the tension; pin to a TS version with a guard test.
 - **ADR-005:** the plan's own sample uses `as` (line 184, `(STRICT_FAMILY as readonly string[])`) — use `.some((f) => f === key)`. And array/object-valued options (`lib`, `paths`, `types`) break flat `===` → false positives; restrict to primitive/enum keys, deep-compare, or document as unsupported.
 
 ### Should-fix

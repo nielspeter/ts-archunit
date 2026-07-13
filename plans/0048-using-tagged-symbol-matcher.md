@@ -565,7 +565,12 @@ functions(p)
 modules(p).should().notContain(usingTagged('internal')).check()
 
 // SDK package may use experimental features; downstream consumers may not.
-functions(p).that().resideInFolder('!src/sdk/**').should().notContain(usingTagged('experimental')).check()
+functions(p)
+  .that()
+  .resideInFolder('!src/sdk/**')
+  .should()
+  .notContain(usingTagged('experimental'))
+  .check()
 ```
 
 ### Index exports
@@ -729,21 +734,21 @@ Rule wrappers re-exported via the new `./rules/deprecation` sub-path
 
 ## Files changed
 
-| File                                    | Change                                                          |
-| --------------------------------------- | --------------------------------------------------------------- |
-| `src/helpers/symbol-resolution.ts`      | New — reusable resolver + `unwrapAliases` + reference/symbol/declaration caches |
-| `src/helpers/matchers.ts`               | +1 primitive (`usingTagged`) + `usingDeprecated` wrapper + `TagMatcherOptions` |
-| `src/index.ts`                          | Export `usingTagged`, `usingDeprecated`, `TagMatcherOptions`     |
-| `src/rules/deprecation.ts`              | New — 3 one-line `@deprecated` rule variants                     |
-| `package.json`                          | Add `./rules/deprecation` sub-path export                       |
+| File                                    | Change                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `src/helpers/symbol-resolution.ts`      | New — reusable resolver + `unwrapAliases` + reference/symbol/declaration caches     |
+| `src/helpers/matchers.ts`               | +1 primitive (`usingTagged`) + `usingDeprecated` wrapper + `TagMatcherOptions`      |
+| `src/index.ts`                          | Export `usingTagged`, `usingDeprecated`, `TagMatcherOptions`                        |
+| `src/rules/deprecation.ts`              | New — 3 one-line `@deprecated` rule variants                                        |
+| `package.json`                          | Add `./rules/deprecation` sub-path export                                           |
 | `tests/helpers/matchers-tagged.test.ts` | New — matcher tests + 1 wrapper test + 2 descriptor tests + 3 edge/regression tests |
-| `tests/rules/deprecation.test.ts`       | New — 6 rule smoke tests                                        |
-| `tests/fixtures/deprecation/**`         | New fixtures: same-file, cross-file, cross-package, JSX, types  |
-| `docs/body-analysis.md`                 | Document symbol-resolving matchers section                      |
-| `docs/standard-rules.md`                | Add the `@deprecated` rule family + lifecycle narrative (no separate page) |
-| `docs/api-reference.md`                 | Update matcher and rules tables                                 |
-| `README.md`                             | One-paragraph mention in Standard Rules section                 |
-| `CHANGELOG.md`                          | `### Added` under next version                                  |
+| `tests/rules/deprecation.test.ts`       | New — 6 rule smoke tests                                                            |
+| `tests/fixtures/deprecation/**`         | New fixtures: same-file, cross-file, cross-package, JSX, types                      |
+| `docs/body-analysis.md`                 | Document symbol-resolving matchers section                                          |
+| `docs/standard-rules.md`                | Add the `@deprecated` rule family + lifecycle narrative (no separate page)          |
+| `docs/api-reference.md`                 | Update matcher and rules tables                                                     |
+| `README.md`                             | One-paragraph mention in Standard Rules section                                     |
+| `CHANGELOG.md`                          | `### Added` under next version                                                      |
 
 No new runtime dependencies. Symbol resolution uses ts-morph APIs
 already in use by `noAnyProperties()`.
@@ -902,10 +907,10 @@ family**. Because the resolver, alias unwrapping, and caches are extracted
 into `src/helpers/symbol-resolution.ts` (not closure-local to `usingTagged`),
 several follow-on plans become small:
 
-| Future plan           | Reuses                                                                 |
-| --------------------- | --------------------------------------------------------------------- |
-| `untypedImports()`    | `symbol-resolution.ts` (resolver + caches) + `isFromExternalLibrary`  |
-| `referencesAnyType()` | Symbol → type → `'any'` text comparison                               |
+| Future plan           | Reuses                                                               |
+| --------------------- | -------------------------------------------------------------------- |
+| `untypedImports()`    | `symbol-resolution.ts` (resolver + caches) + `isFromExternalLibrary` |
+| `referencesAnyType()` | Symbol → type → `'any'` text comparison                              |
 | `usesUnsafeReturn()`  | Symbol → return type → flow into call site                           |
 
 Each becomes a 0.5-day plan instead of a 2-day plan, because the

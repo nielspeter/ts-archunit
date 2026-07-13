@@ -42,7 +42,10 @@ describe('loadRuleFiles', () => {
 
   it('skips items that are not rule-builder-like', async () => {
     const file = path.join(tmpDir, 'rules-mixed.mjs')
-    fs.writeFileSync(file, `export default [{ violations: () => [] }, 'not-a-builder', 42, null];\n`)
+    fs.writeFileSync(
+      file,
+      `export default [{ violations: () => [] }, 'not-a-builder', 42, null];\n`,
+    )
     const result = await loadRuleFiles([file])
     expect(result).toHaveLength(1)
   })
@@ -72,7 +75,10 @@ describe('loadRuleFiles', () => {
     const file1 = path.join(tmpDir, 'rules-a.mjs')
     const file2 = path.join(tmpDir, 'rules-b.mjs')
     fs.writeFileSync(file1, `export default [{ violations: () => [] }];\n`)
-    fs.writeFileSync(file2, `export default [{ violations: () => [] }, { violations: () => [] }];\n`)
+    fs.writeFileSync(
+      file2,
+      `export default [{ violations: () => [] }, { violations: () => [] }];\n`,
+    )
     const result = await loadRuleFiles([file1, file2])
     expect(result).toHaveLength(3)
   })

@@ -118,7 +118,7 @@ does not fail).
 
 The `--with-vitest` flag (generate `tests/architecture.test.ts`) is
 **deferred out of v1.** The obvious wrapper is subtly broken — importing
-`./arch.rules` at the top of the test file throws during *test collection*
+`./arch.rules` at the top of the test file throws during _test collection_
 (a "failed to load test file" error, not a readable failing test), and it
 bypasses `ts-archunit.config.ts`'s baseline. Doing it right means asserting
 inside `it()` through the same config/baseline path as `check`, which is
@@ -133,7 +133,7 @@ follow-up if demand appears.
 severity-carrying builders, spread into the default export:
 
 ```typescript
-export default [...recommended(p), /* custom builders */]
+export default [...recommended(p) /* custom builders */]
 ```
 
 This flows through the standard builder-export path — no self-executing preset
@@ -303,17 +303,17 @@ init`" with the command output.
 
 ## Files changed
 
-| File                                   | Change                                                                |
-| -------------------------------------- | --------------------------------------------------------------------- |
-| `src/cli/commands/init.ts`             | New — subcommand implementation (inline string templates)              |
-| `src/cli/index.ts`                     | Wire `init` branch + extend shared `parseArgs` (incl. `--no-baseline`) |
-| `tests/cli/init.test.ts`               | New                                                                    |
+| File                       | Change                                                                 |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `src/cli/commands/init.ts` | New — subcommand implementation (inline string templates)              |
+| `src/cli/index.ts`         | Wire `init` branch + extend shared `parseArgs` (incl. `--no-baseline`) |
+| `tests/cli/init.test.ts`   | New                                                                    |
 
 (The `check` runner / `loadRuleFiles` / severity-primitive changes that make the generated `export default [...recommended(p)]` run are in **plan 0060**, not here.)
-| `docs/getting-started.md`              | Lead with `init`                                                      |
-| `docs/cli.md`                          | Document `init` subcommand                                            |
-| `README.md`                            | Update Install section                                                |
-| `CHANGELOG.md`                         | `### Added`                                                           |
+| `docs/getting-started.md` | Lead with `init` |
+| `docs/cli.md` | Document `init` subcommand |
+| `README.md` | Update Install section |
+| `CHANGELOG.md` | `### Added` |
 
 No new runtime dependencies. Templates are inline TS strings in the
 init implementation; no separate template files in the published package.
@@ -363,6 +363,7 @@ Reviewed via the `review-proposal` skill (architect + product lenses), grounded 
 ### Should-fix
 
 All RESOLVED 2026-07-13 in the plan body:
+
 - File placement → `src/cli/commands/init.ts` + dispatch branch (Phase 1).
 - Flags → extend the shared `parseArgs` table; `--no-baseline` handled explicitly (Phase 1).
 - package.json write → zero-dep detect-indent path; fidelity promise dropped (Phase 2).

@@ -148,12 +148,18 @@ count down into errors vs warnings:
   "summary": { "total": 2, "errors": 1, "warnings": 1, "reason": null },
   "violations": [
     {
-      "rule": "…", "ruleId": "domain/no-parse-int", "severity": "error",
-      "element": "OrderService.getTotal", "file": "src/domain/order.ts", "line": 42,
-      "message": "…", "because": "…", "suggestion": "use this.extractCount()",
-      "docs": "…"
-    }
-  ]
+      "rule": "…",
+      "ruleId": "domain/no-parse-int",
+      "severity": "error",
+      "element": "OrderService.getTotal",
+      "file": "src/domain/order.ts",
+      "line": 42,
+      "message": "…",
+      "because": "…",
+      "suggestion": "use this.extractCount()",
+      "docs": "…",
+    },
+  ],
 }
 ```
 

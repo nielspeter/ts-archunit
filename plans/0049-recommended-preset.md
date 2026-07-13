@@ -53,7 +53,7 @@ not error:
 
 | Rule                            | Severity | Why it's universal                                                                |
 | ------------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `functionNoEval`                | error    | `eval` is ~never legitimate in production code                                     |
+| `functionNoEval`                | error    | `eval` is ~never legitimate in production code                                    |
 | `functionNoFunctionConstructor` | error    | The `Function` constructor is `eval` in disguise                                  |
 | `functionNoSilentCatch`         | warn     | Catch-and-swallow is usually a bug — but intentional empty catches exist, so warn |
 | `noEmptyBodies`                 | warn     | Empty bodies are usually stubs — but no-op callbacks / DI constructors exist      |
@@ -107,7 +107,7 @@ Guidance (document in `docs/presets.md`):
 - Don't stack both without overriding the overlapping ids to `'off'` in one.
 
 **Value caveat (agent-delivery priority):** under an AI-agent-delivery lens
-`recommended` is the *marginal* member of the 0060 → 0044 → 0049 trio —
+`recommended` is the _marginal_ member of the 0060 → 0044 → 0049 trio —
 `agentGuardrails` already delivers the agent floor. `recommended`'s distinct
 value is the **general-project** onboarding floor + the 0050 scaffolder anchor;
 if the near-term goal is purely agent delivery, 0049 can be deferred behind 0044.
@@ -164,7 +164,7 @@ recommended(p, {
 - **Opt-in ladder (the contract).** A new rule joins `recommended()` at
   `warn` (or `off`) in a **minor** version; it is promoted to `error` only
   in a **major**. This is the only version of the policy that is both
-  honest and enforceable: any genuinely useful new rule flags *someone's*
+  honest and enforceable: any genuinely useful new rule flags _someone's_
   previously-passing code, so "add at error in a minor" would break CI on a
   minor bump — exactly the `eslint:all` mistake.
 - A rule qualifies for `recommended()` only if it meets the
@@ -289,4 +289,4 @@ Reviewed via the `review-proposal` skill (architect + product lenses), grounded 
 
 - Refusing `strict()`/`eslint:all` is the right call, well-argued. Namespaced ids + `overrides` escape hatch is correct. ADR-006 fit (generic bundle in core) is right.
 
-**Next step:** trim + re-tier the set, fix the stability policy to an opt-in ladder, `extends PresetBaseOptions`, `preset/recommended/*` ids, add the baseline story — *then* it can safely seed 0050.
+**Next step:** trim + re-tier the set, fix the stability policy to an opt-in ladder, `extends PresetBaseOptions`, `preset/recommended/*` ids, add the baseline story — _then_ it can safely seed 0050.

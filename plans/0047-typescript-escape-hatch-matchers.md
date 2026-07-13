@@ -98,7 +98,7 @@ Same generic-primitive-vs-rule-catalog distinction as vitest vs. a preconfigured
 The rule variants delegate to `classNotContain` / `functionNotContain` / `moduleNotContain`, which walk different node sets:
 
 - `moduleNotContain` → `searchModuleBody` does a **full-file descendant walk** — it reaches every `any`/broad-type position (parameters, return types, property declarations, locals).
-- `classNotContain` / `functionNotContain` → `searchClassBody` / `searchFunctionBody` (`src/helpers/body-traversal.ts:84,130`) walk only method/constructor/accessor **bodies**. Parameter types, return types, and property declarations are *siblings* of the body, not descendants — so a class/function-scoped `anyAnnotation`/`broadType` rule would silently miss `data: any`, `m(x: any)`, `m(): any`, `function f(a: any): any`. False confidence, worse than not shipping.
+- `classNotContain` / `functionNotContain` → `searchClassBody` / `searchFunctionBody` (`src/helpers/body-traversal.ts:84,130`) walk only method/constructor/accessor **bodies**. Parameter types, return types, and property declarations are _siblings_ of the body, not descendants — so a class/function-scoped `anyAnnotation`/`broadType` rule would silently miss `data: any`, `m(x: any)`, `m(): any`, `function f(a: any): any`. False confidence, worse than not shipping.
 
 **Decision (2026-07-13):** ship `anyAnnotation`, `broadType`, and `tsDirective` as **module-scoped rules only**. Module scope fully covers the common "ban `any`/broad types in this area of the codebase" rule (scope by folder with a `resideInFolder` predicate). `doubleCast` is an in-body expression, so it ships all three scopes unaffected. `tsDirective` is module-only for the additional reason that suppression comments are file-level trivia.
 
@@ -430,10 +430,10 @@ no index.ts change needed there.
 
 7. `docs/body-analysis.md` — document 4 new matchers alongside
    `typeAssertion`, `nonNullAssertion`. Update count 9 → 13.
-7. `docs/standard-rules.md` — add the new rules to the TypeScript
+8. `docs/standard-rules.md` — add the new rules to the TypeScript
    section with examples.
-8. `docs/api-reference.md` — extend the matcher and rules tables.
-9. `CHANGELOG.md` — `### Added` entries under Unreleased.
+9. `docs/api-reference.md` — extend the matcher and rules tables.
+10. `CHANGELOG.md` — `### Added` entries under Unreleased.
 
 ## Test strategy (~21 tests)
 
@@ -487,17 +487,17 @@ coverage.
 
 ## Files changed
 
-| File                                          | Change                                     |
-| --------------------------------------------- | ------------------------------------------ |
+| File                                          | Change                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------ |
 | `src/helpers/matchers.ts`                     | Extract `matchCommentRanges()`; +4 matchers + 4 option/union types |
-| `src/rules/typescript.ts`                     | +6 rule functions (one-liners)             |
-| `src/index.ts`                                | +4 matcher exports, +4 type exports        |
-| `tests/helpers/matchers-escape-hatch.test.ts` | new — 15 matcher tests                     |
-| `tests/rules/typescript-escape-hatch.test.ts` | new — 6 rule smoke tests                   |
-| `docs/body-analysis.md`                       | Document 4 new matchers, update count 9→13 |
-| `docs/standard-rules.md`                      | Add rules with examples                    |
-| `docs/api-reference.md`                       | Update matcher + rules tables              |
-| `CHANGELOG.md`                                | `### Added` under next version             |
+| `src/rules/typescript.ts`                     | +6 rule functions (one-liners)                                     |
+| `src/index.ts`                                | +4 matcher exports, +4 type exports                                |
+| `tests/helpers/matchers-escape-hatch.test.ts` | new — 15 matcher tests                                             |
+| `tests/rules/typescript-escape-hatch.test.ts` | new — 6 rule smoke tests                                           |
+| `docs/body-analysis.md`                       | Document 4 new matchers, update count 9→13                         |
+| `docs/standard-rules.md`                      | Add rules with examples                                            |
+| `docs/api-reference.md`                       | Update matcher + rules tables                                      |
+| `CHANGELOG.md`                                | `### Added` under next version                                     |
 
 No `package.json` changes, no new runtime dependencies.
 
@@ -555,7 +555,7 @@ Reviewed via the `review-proposal` skill (architect + product lenses), grounded 
 - **RESOLVED 2026-07-13 — added.** "Position relative to typescript-eslint" section is now in the plan body, with the `domain/**` vs `adapters/**` composability example. (0047 overlapped `no-explicit-any`, `ban-ts-comment`, `no-unsafe-function-type`, `no-empty-object-type` and had no positioning; now it does.)
 - **RESOLVED 2026-07-13 — kept + fixed.** `tsDirective` stays for its typed allow-list, but the plan now specifies extracting a shared `matchCommentRanges(node, predicate)` helper (used by both `comment()` and `tsDirective()` — no copy-pasted trivia-dedup), and the option shape is now the explicit `{ allow: [...] }` instead of the inverted "pass the ones you keep."
 - **`broadType` false-positives on user-defined `Function`/`Object` types** (name-based `getTypeName().getText()`, no symbol resolution), and `{}`-default-on bans the legit `<T extends {}>` generic-constraint idiom. Reconsider defaulting `empty` on; document the shadowing limitation.
-- **Soften "`any` is never correct in production code"** — the blunt matcher is right, but state the escape hatch (scope the *rule* with `resideInFolder`/exclusions) explicitly rather than the absolutist claim.
+- **Soften "`any` is never correct in production code"** — the blunt matcher is right, but state the escape hatch (scope the _rule_ with `resideInFolder`/exclusions) explicitly rather than the absolutist claim.
 
 ### Minor
 

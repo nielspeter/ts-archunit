@@ -164,12 +164,12 @@ agentGuardrails(p, {
 
 All conditions below already exist in the tree — the preset composes them, it adds no new conditions.
 
-| Rule ID                              | Entry point            | Condition (source)                                 | Default |
-| ------------------------------------ | ---------------------- | -------------------------------------------------- | ------- |
-| `preset/agent/no-inline-logic/<api>` | `functions(p)`         | native `.notContain(call(api))` (builder method)   | error   |
-| `preset/agent/no-generic-errors`     | `functions(p)`         | `functionNoGenericErrors()` (`rules/errors.ts`)    | error   |
-| `preset/agent/no-stubs`              | `functions(p)`         | `noStubComments()` (`rules/hygiene.ts`)            | error   |
-| `preset/agent/no-empty-bodies`       | `functions(p)`         | `noEmptyBodies()` (`rules/hygiene.ts`)            | error   |
+| Rule ID                              | Entry point              | Condition (source)                               | Default |
+| ------------------------------------ | ------------------------ | ------------------------------------------------ | ------- |
+| `preset/agent/no-inline-logic/<api>` | `functions(p)`           | native `.notContain(call(api))` (builder method) | error   |
+| `preset/agent/no-generic-errors`     | `functions(p)`           | `functionNoGenericErrors()` (`rules/errors.ts`)  | error   |
+| `preset/agent/no-stubs`              | `functions(p)`           | `noStubComments()` (`rules/hygiene.ts`)          | error   |
+| `preset/agent/no-empty-bodies`       | `functions(p)`           | `noEmptyBodies()` (`rules/hygiene.ts`)           | error   |
 | `preset/agent/no-copy-paste`         | `smells.duplicateBodies` | `DuplicateBodiesBuilder` (a `TerminalBuilder`)   | warn    |
 
 ### Wiring — the returning form (plan 0060, Option 2)
@@ -188,30 +188,48 @@ export interface AgentGuardrailsOptions extends PresetBaseOptions {
   noCopyPaste?: boolean
 }
 
-export function agentGuardrails(p: ArchProject, options: AgentGuardrailsOptions): RuleBuilderLike[] {
+export function agentGuardrails(
+  p: ArchProject,
+  options: AgentGuardrailsOptions,
+): RuleBuilderLike[] {
   validateOverrides(options.overrides, collectRuleIds(options))
   const builders: RuleBuilderLike[] = []
 
-  const push = (builder: FunctionRuleBuilder | DuplicateBodiesBuilder, id: string, def: RuleSeverity) => {
+  const push = (
+    builder: FunctionRuleBuilder | DuplicateBodiesBuilder,
+    id: string,
+    def: RuleSeverity,
+  ) => {
     const sev = options.overrides?.[id] ?? def
     if (sev !== 'off') builders.push(builder.rule({ id }).asSeverity(sev))
   }
 
   for (const api of options.noInlineLogic ?? [])
-    push(functions(p).that().resideInFile(options.src).should().notContain(call(api)),
-         `preset/agent/no-inline-logic/${api}`, 'error')
+    push(
+      functions(p).that().resideInFile(options.src).should().notContain(call(api)),
+      `preset/agent/no-inline-logic/${api}`,
+      'error',
+    )
   if (options.noGenericErrors)
-    push(functions(p).that().resideInFile(options.src).should().satisfy(functionNoGenericErrors()),
-         'preset/agent/no-generic-errors', 'error')
+    push(
+      functions(p).that().resideInFile(options.src).should().satisfy(functionNoGenericErrors()),
+      'preset/agent/no-generic-errors',
+      'error',
+    )
   if (options.noStubs)
-    push(functions(p).that().resideInFile(options.src).should().satisfy(noStubComments()),
-         'preset/agent/no-stubs', 'error')
+    push(
+      functions(p).that().resideInFile(options.src).should().satisfy(noStubComments()),
+      'preset/agent/no-stubs',
+      'error',
+    )
   if (options.noEmptyBodies)
-    push(functions(p).that().resideInFile(options.src).should().satisfy(noEmptyBodies()),
-         'preset/agent/no-empty-bodies', 'error')
+    push(
+      functions(p).that().resideInFile(options.src).should().satisfy(noEmptyBodies()),
+      'preset/agent/no-empty-bodies',
+      'error',
+    )
   if (options.noCopyPaste)
-    push(smells.duplicateBodies(p).withMinSimilarity(0.9),
-         'preset/agent/no-copy-paste', 'warn')
+    push(smells.duplicateBodies(p).withMinSimilarity(0.9), 'preset/agent/no-copy-paste', 'warn')
 
   return builders
 }
@@ -277,14 +295,14 @@ export default [
 
 ### New page
 
-| Page                | Content                                                                                                                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page                | Content                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `docs/ai-agents.md` | Why AI agents need architecture guardrails. The three-step workflow: `agentGuardrails` setup → `explain --format agent` into project instructions → agent runs `check --format json` in its edit loop and self-corrects. |
 
 ### Updated pages
 
-| Page                      | What changes                                                                        |
-| ------------------------- | ----------------------------------------------------------------------------------- |
+| Page                      | What changes                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------ |
 | `docs/getting-started.md` | Add "AI Agent Setup" section: `agentGuardrails` one-liner + `explain --format agent` |
 | `docs/cli.md`             | Document the `--format agent` flag on `explain`                                      |
 | `docs/presets.md`         | Add `agentGuardrails` preset                                                         |
@@ -295,13 +313,13 @@ export default [
 | File                                     | Type                                                                          | Phase |
 | ---------------------------------------- | ----------------------------------------------------------------------------- | ----- |
 | `src/cli/commands/explain.ts`            | Modified — add `agent` format output                                          | 1     |
-| `src/cli/index.ts`                       | Modified — route the `agent` explain format flag                             | 1     |
+| `src/cli/index.ts`                       | Modified — route the `agent` explain format flag                              | 1     |
 | `src/core/rule-metadata.ts`              | Modified — add `imperative` field                                             | 1     |
 | `src/core/rule-description.ts`           | Modified — add `imperative` field                                             | 1     |
 | `src/core/rule-builder.ts`               | Modified — add `buildImperative()`, populate `imperative` in `describeRule()` | 1     |
 | `src/core/terminal-builder.ts`           | Modified — populate `imperative` in `describeRule()`                          | 1     |
-| `src/core/format-json.ts`                | Modified — include `codeFrame` in `check --format json` (agent loop payload) | 1     |
-| `src/presets/agent-guardrails.ts`        | New — agent guardrails preset (returning form, `RuleBuilderLike[]`)          | 2     |
+| `src/core/format-json.ts`                | Modified — include `codeFrame` in `check --format json` (agent loop payload)  | 1     |
+| `src/presets/agent-guardrails.ts`        | New — agent guardrails preset (returning form, `RuleBuilderLike[]`)           | 2     |
 | `src/presets/index.ts`                   | Modified — re-export `agentGuardrails`                                        | 2     |
 | `docs/ai-agents.md`                      | New                                                                           | 3     |
 | `tests/cli/explain-agent-format.test.ts` | New — agent format tests                                                      | 1     |

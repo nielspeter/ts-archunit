@@ -187,15 +187,15 @@ Seven plans are authored but not yet completed. All plan files live in `plans/` 
 
 Plans 0047–0055 were reviewed 2026-07-13 (architect + product) and their key design decisions locked — each carries a `Review` line in its Status block and a `## Review findings` section. Plan 0060 was split out of 0050 during that review.
 
-| Priority | Plan                                            | Effort      | State                     | Depends on |
-| -------- | ----------------------------------------------- | ----------- | ------------------------- | ---------- |
-| **P0**   | Agent-Facing Rule Surface (0044)                | ~1.5–2 days | Ready                     | 0040, 0043, 0060 |
-| **P2**   | `tsconfig()` Config-Assertion Rule (0055)       | 0.5–1 day   | Reviewed — flat API       | none       |
-| **P2**   | TypeScript Escape-Hatch Matchers (0047)         | ~1 day      | Reviewed — module-only    | 0046       |
-| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048)    | ~1–1.5 days | Reviewed — `@deprecated`  | 0011, 0013, 0046 |
-| **P2***  | `check` Unified Pipeline / Preset Support (0060) | ~1 day      | Reviewed — Option 2       | 0020, 0016, 0040 |
-| **P2***  | `recommended()` Sensible-Defaults Preset (0049) | 0.5 day     | Reviewed — thin + returning form | standard rules, 0060 |
-| **P2***  | `ts-archunit init` CLI Scaffolder (0050)        | 0.5–1 day   | Reviewed — returning form | 0049, 0060 |
+| Priority | Plan                                             | Effort      | State                            | Depends on           |
+| -------- | ------------------------------------------------ | ----------- | -------------------------------- | -------------------- |
+| **P0**   | Agent-Facing Rule Surface (0044)                 | ~1.5–2 days | Ready                            | 0040, 0043, 0060     |
+| **P2**   | `tsconfig()` Config-Assertion Rule (0055)        | 0.5–1 day   | Reviewed — flat API              | none                 |
+| **P2**   | TypeScript Escape-Hatch Matchers (0047)          | ~1 day      | Reviewed — module-only           | 0046                 |
+| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048)     | ~1–1.5 days | Reviewed — `@deprecated`         | 0011, 0013, 0046     |
+| **P2\*** | `check` Unified Pipeline / Preset Support (0060) | ~1 day      | Reviewed — Option 2              | 0020, 0016, 0040     |
+| **P2\*** | `recommended()` Sensible-Defaults Preset (0049)  | 0.5 day     | Reviewed — thin + returning form | standard rules, 0060 |
+| **P2\*** | `ts-archunit init` CLI Scaffolder (0050)         | 0.5–1 day   | Reviewed — returning form        | 0049, 0060           |
 
 \* Draft priority is TBD (likely P2 once approved).
 

@@ -142,7 +142,9 @@ describe('runCheck', () => {
     vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     mockLoadRuleFiles.mockImplementation((files) => {
       if (files[0] === 'a.ts') {
-        return Promise.reject(new ArchRuleError([v({ element: 'FromA', severity: 'error' })], 'preset'))
+        return Promise.reject(
+          new ArchRuleError([v({ element: 'FromA', severity: 'error' })], 'preset'),
+        )
       }
       return Promise.resolve([{ violations: () => [v({ element: 'FromB', severity: 'error' })] }])
     })

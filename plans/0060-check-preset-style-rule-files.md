@@ -15,7 +15,7 @@ Round-2 review found the systemic blocker: `dispatchRule('warn', …)` (`src/pre
 
 **Decision: Option 2 — extend plan 0040's `.violations()` (return) vs `.check()` (throw) dual surface up to the preset level, and have the CLI run one unified non-throwing pipeline.**
 
-- **Presets gain a returning form.** For a rule *bundle* like `recommended` the natural form is an **array of severity-carrying builders** (`RuleBuilderLike[]`) — identical in shape to a builder-export rule file. This requires two new primitives (see "New primitives"), because today `.severity()` is a *terminal* that executes on the spot and `ArchViolation` carries no severity: a **non-terminal `.asSeverity('error'|'warn')`** that sets builder state and returns `this`, plus a **`severity` field on `ArchViolation`**. (A cross-cutting aggregating preset that dedups across builders may instead return a severity-tagged `ArchViolation[]`; same principle, added incrementally.)
+- **Presets gain a returning form.** For a rule _bundle_ like `recommended` the natural form is an **array of severity-carrying builders** (`RuleBuilderLike[]`) — identical in shape to a builder-export rule file. This requires two new primitives (see "New primitives"), because today `.severity()` is a _terminal_ that executes on the spot and `ArchViolation` carries no severity: a **non-terminal `.asSeverity('error'|'warn')`** that sets builder state and returns `this`, plus a **`severity` field on `ArchViolation`**. (A cross-cutting aggregating preset that dedups across builders may instead return a severity-tagged `ArchViolation[]`; same principle, added incrementally.)
 - **The CLI owns one pipeline.** `runCheck` collects `builder.violations()` from each builder, tags each with the builder's severity, and runs a shared non-throwing `filterAndReport` (baseline → diff → format → count). Exit code = the **error**-severity count; warns are baseline-filtered and formatted but never fail the build.
 - **`loadRuleFiles` stays a pure loader.** The generated `arch.rules.ts` (plan 0050) does `export default [...recommended(p)]`, flowing through the standard builder-export path — no throw to catch, warns handled.
 - **Bare throwing preset calls** (`layeredArchitecture(p)` at top level, no export) remain supported via a best-effort `ArchRuleError` catch — but that shape carries **error-severity only** (documented limitation; prefer the returning `export default` form).
@@ -25,7 +25,7 @@ This dissolves the earlier stdio-suppression hack and the exceptions-as-control-
 
 ## Problem
 
-The CLI `check` command cannot run **preset-style** rule files — files whose top-level code *calls* a preset or rule rather than exporting builders. This surfaced while reviewing plan 0050 (`init` scaffolder), which generates exactly such a file:
+The CLI `check` command cannot run **preset-style** rule files — files whose top-level code _calls_ a preset or rule rather than exporting builders. This surfaced while reviewing plan 0050 (`init` scaffolder), which generates exactly such a file:
 
 ```typescript
 // arch.rules.ts — the natural, documented shape
@@ -41,8 +41,8 @@ those.)
 
 `loadRuleFiles` (`src/cli/load-rules.ts`) only accepts a **default export** of builders (objects with `.check()`), which the runner then calls. Against a preset-style file:
 
-- If the preset **passes**, it exports nothing → `extractDefault` returns `undefined` → zero builders → `check` exits 0. (Correct *outcome* by luck — the preset did run and pass at import — but `check` applied none of its own `CheckOptions`.)
-- If the preset **finds error-severity violations**, it throws `ArchRuleError` during `import()` → `loadRuleFiles` propagates the throw → `runCheck` (which only catches per-*builder* `.check()` throws) lets it **crash** (uncaught).
+- If the preset **passes**, it exports nothing → `extractDefault` returns `undefined` → zero builders → `check` exits 0. (Correct _outcome_ by luck — the preset did run and pass at import — but `check` applied none of its own `CheckOptions`.)
+- If the preset **finds error-severity violations**, it throws `ArchRuleError` during `import()` → `loadRuleFiles` propagates the throw → `runCheck` (which only catches per-_builder_ `.check()` throws) lets it **crash** (uncaught).
 - Either way, because the preset ran at import time with no access to `CheckOptions`, `--baseline` / `--changed` / `--format json` are **silently ignored** — this is the always-true, strongest motivation (stronger than the "zero rules" framing, which only misleads when a preset-style file is mixed with expected builder exports).
 
 Presets (`recommended`, `layeredArchitecture`, `dataLayerIsolation`, `strictBoundaries`) are the recommended way to configure ts-archunit, yet they don't work with the CLI's own `check` command. This is a general gap, and a hard dependency of plan 0050.
@@ -133,17 +133,17 @@ With the returning form, `export default [...layeredArchitecture builders, ...da
 
 ## Files changed
 
-| File                                    | Change                                                                 |
-| --------------------------------------- | ---------------------------------------------------------------------- |
-| `src/core/violation.ts`                 | Add `severity: 'error' \| 'warn'` field (default `'error'`)             |
-| `src/core/rule-builder.ts` + `terminal-builder.ts` | Add non-terminal `.asSeverity(level): this` (sets `_severity`, no execute) |
-| `src/core/execute-rule.ts`              | Extract shared non-throwing `filterAndReport(violations, ctx, options)` |
-| `src/core/format-json.ts`               | Serialize `severity`; extend `summary` to `{ total, errors, warnings, reason }` (coordinate with 0044's `codeFrame`) |
-| `src/cli/commands/check.ts`             | Severity-aware unified pipeline: read `.asSeverity()` + collect `.violations()` → stamp → `filterAndReport`; **`--format json` aggregates ALL violations into one document**; error-count exit; best-effort import-time `ArchRuleError` catch |
-| `src/cli/load-rules.ts`                 | `RuleBuilderLike` gains `.violations()` + severity accessor; stays a pure loader (best-effort import-time `ArchRuleError` catch) |
-| `tests/cli/check-preset-style.test.ts`  | New                                                                    |
-| `docs/cli.md`                           | Document the unified pipeline + returning-form rule files              |
-| `CHANGELOG.md`                          | Entry                                                                  |
+| File                                               | Change                                                                                                                                                                                                                                        |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/violation.ts`                            | Add `severity: 'error' \| 'warn'` field (default `'error'`)                                                                                                                                                                                   |
+| `src/core/rule-builder.ts` + `terminal-builder.ts` | Add non-terminal `.asSeverity(level): this` (sets `_severity`, no execute)                                                                                                                                                                    |
+| `src/core/execute-rule.ts`                         | Extract shared non-throwing `filterAndReport(violations, ctx, options)`                                                                                                                                                                       |
+| `src/core/format-json.ts`                          | Serialize `severity`; extend `summary` to `{ total, errors, warnings, reason }` (coordinate with 0044's `codeFrame`)                                                                                                                          |
+| `src/cli/commands/check.ts`                        | Severity-aware unified pipeline: read `.asSeverity()` + collect `.violations()` → stamp → `filterAndReport`; **`--format json` aggregates ALL violations into one document**; error-count exit; best-effort import-time `ArchRuleError` catch |
+| `src/cli/load-rules.ts`                            | `RuleBuilderLike` gains `.violations()` + severity accessor; stays a pure loader (best-effort import-time `ArchRuleError` catch)                                                                                                              |
+| `tests/cli/check-preset-style.test.ts`             | New                                                                                                                                                                                                                                           |
+| `docs/cli.md`                                      | Document the unified pipeline + returning-form rule files                                                                                                                                                                                     |
+| `CHANGELOG.md`                                     | Entry                                                                                                                                                                                                                                         |
 
 No new dependencies.
 
