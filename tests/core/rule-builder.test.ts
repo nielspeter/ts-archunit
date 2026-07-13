@@ -246,6 +246,22 @@ describe('RuleBuilder', () => {
     })
   })
 
+  describe('rule metadata propagates to violations (agent payload)', () => {
+    it('falls back because/suggestion/docs from .because()/.rule() when the condition sets none', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(alwaysFail('bad'))
+        .because('domain must stay pure')
+        .rule({ suggestion: 'extract a helper', docs: 'https://adr/1' })
+        .violations()
+      expect(violations.length).toBeGreaterThan(0)
+      expect(violations[0]?.because).toBe('domain must stay pure')
+      expect(violations[0]?.suggestion).toBe('extract a helper')
+      expect(violations[0]?.docs).toBe('https://adr/1')
+    })
+  })
+
   describe('predicate combination', () => {
     it('ANDs multiple predicates together', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
