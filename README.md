@@ -353,7 +353,10 @@ smells
 
 ```bash
 npm install -D @nielspeter/ts-archunit
+npx ts-archunit init   # scaffold config + rules + npm scripts
 ```
+
+`init` generates a `ts-archunit.config.ts`, an `arch.rules.ts` seeded with the `recommended` safety floor (or `--preset agent-guardrails`), and `arch` / `arch:baseline` scripts — then run `npm run arch`.
 
 Requires Node.js >= 24 and a `tsconfig.json`. Works with vitest (recommended) or jest.
 
