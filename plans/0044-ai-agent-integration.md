@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Ready
+- **State:** IMPLEMENTED (2026-07-13, branch `feat/0044-agent-facing-surface`) — Phase 1 (`explain --format agent` + `imperative` field + `codeFrame` in json), Phase 2 (`agentGuardrails` returning-form preset), Phase 3 (docs) all landed with tests; the full agent workflow verified end-to-end.
 - **Priority:** P0 — The library's core value proposition is guiding AI coding agents
 - **Effort:** ~1.5–2 days (returning-form preset + `codeFrame` in JSON added in round 4)
 - **Created:** 2026-04-01
