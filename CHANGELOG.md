@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Rule severity in the CLI** — `.asSeverity('error' | 'warn')`, a non-terminal builder method that marks a rule's severity _without_ executing it, so severity-carrying builders can be collected into a rule file's `export default` array. `check` reports **warn**-severity violations but they never fail the run; only **error**-severity violations set a non-zero exit. `ArchViolation` gains an optional `severity` field. (Plan 0060.)
+- **Single-document, severity-aware `check --format json`** — the JSON output is now one document for the whole run (previously one blob per rule, which was not valid JSON for multi-rule files). Each violation carries `severity`; the summary reports `{ total, errors, warnings, reason }`. Intended for CI tooling and AI coding agents that consume the JSON to self-correct.
+- **`check` runs preset-returning rule files** — a rule file can `export default [...myPreset(p)]` where the preset returns severity-carrying builders. A file that instead self-executes a throwing preset at import is handled by a best-effort catch (error-severity only).
+
+### Fixed
+
+- **Rule metadata now reaches per-violation output** — `.because()` and `.rule({ because, suggestion, docs })` previously flowed only to `explain` and the error header, never to individual violations, so `check --format json` returned `suggestion: null` even when the author set one. Per-violation `because` / `suggestion` / `docs` now fall back to the rule metadata when the condition sets none (per-violation values still take precedence).
+
+### Changed
+
+- **`check` collects `.violations()` instead of calling `.check()` per builder** — it gathers every builder's violations into one unified list, then filters / formats / exits once. Single-rule behavior is unchanged; multi-rule `--format json` is now a single valid document. `collectViolations()` (used by `baseline`) likewise switched to `.violations()`.
+
 ## [0.12.0] - 2026-07-03
 
 ### Added
