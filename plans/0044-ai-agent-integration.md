@@ -219,6 +219,8 @@ export function agentGuardrails(p: ArchProject, options: AgentGuardrailsOptions)
 
 (`.rule({ id })` and `.asSeverity(level)` both return `this`; `.asSeverity` is plan 0060's non-terminal severity setter. A vitest user who wants throwing behavior spreads the array through a `.check()` helper.)
 
+**Metadata is agent-facing (elided in the sketch).** Each `.rule()` call also carries `because` / `suggestion` / `imperative` — not just `id`. This is load-bearing for agent delivery: the `imperative` renders the rule as an actionable "Do NOT…" bullet in `explain --format agent`, and the `suggestion` is what the agent reads from `check --format json` to self-correct. A rule with only `{ id }` gives the agent "no-generic-errors violated" and no fix. (Same requirement as `recommended`, plan 0049.)
+
 ### Condition-wiring notes (grounded in the current API)
 
 - **`.satisfy()` is the idiomatic bridge**, not a workaround. `functionNoGenericErrors()`, `noStubComments()`, and `noEmptyBodies()` are standalone conditions with no fluent wrapper on `FunctionRuleBuilder`; every test and doc applies them via `.satisfy(<condition>())` (e.g. `tests/integration/errors-functions.test.ts`, `tests/integration/hygiene-rules.test.ts`, `docs/standard-rules.md`). `.satisfy()` lives on the base `RuleBuilder` and accepts `Predicate<T> | Condition<T>`.

@@ -86,6 +86,32 @@ No `strict()` sibling either (see "Why not a `strict()` preset"). The excluded
 strict-tier rules stay available as standalone rules users opt into
 explicitly — never bundled.
 
+### Relationship to `agentGuardrails` (0044) — overlap (agent-lens)
+
+`recommended` and `agentGuardrails` (the agent-specific preset in plan 0044)
+**overlap on two rules**: `noEmptyBodies` (both use the same `noEmptyBodies()`
+condition) and `eval` (`recommended`'s `functionNoEval` vs `agentGuardrails`'s
+`noInlineLogic: ['eval', …]`). If an agent's rules file spreads **both** —
+`export default [...recommended(p), ...agentGuardrails(p)]` — those violations
+appear **twice** in `check --format json`, under different ids
+(`preset/recommended/no-empty-bodies` and `preset/agent/no-empty-bodies`) —
+noise for the agent parsing them.
+
+Guidance (document in `docs/presets.md`):
+
+- For **agent-focused** setups, prefer `agentGuardrails` **alone** — it already
+  covers the agent-relevant floor (`eval` via `noInlineLogic`, empty bodies,
+  stubs, generic errors, copy-paste). `recommended` adds only
+  `functionNoFunctionConstructor` and `functionNoSilentCatch` on top.
+- For **general** (non-agent) projects, use `recommended`.
+- Don't stack both without overriding the overlapping ids to `'off'` in one.
+
+**Value caveat (agent-delivery priority):** under an AI-agent-delivery lens
+`recommended` is the *marginal* member of the 0060 → 0044 → 0049 trio —
+`agentGuardrails` already delivers the agent floor. `recommended`'s distinct
+value is the **general-project** onboarding floor + the 0050 scaffolder anchor;
+if the near-term goal is purely agent delivery, 0049 can be deferred behind 0044.
+
 ## API shape
 
 ```typescript
@@ -168,11 +194,16 @@ aggregating + throwing:
 
 - `validateOverrides(overrides, [...RULE_IDS])` — typo guard (from `shared.ts`).
 - For each of the four rules, build
-  `functions(p).that().resideInFolder(include).should().satisfy(cond)`, then set
-  its id + severity with `.rule({ id })` and the **non-terminal**
+  `functions(p).that().resideInFolder(include).should().satisfy(cond)`, then
+  `.rule({ id, because, suggestion, imperative })` and the **non-terminal**
   `.asSeverity(effective)` where `effective = overrides[id] ?? defaultSeverity`
   (plan 0060's new primitive — sets state, returns `this`, does not execute).
   Skip any rule overridden to `'off'`.
+- **Metadata is agent-facing, not optional here.** Each rule sets `because` /
+  `suggestion` / `imperative` so it renders as an actionable "Do NOT…" bullet in
+  `explain --format agent` (plan 0044's CLAUDE.md block) AND carries a
+  `suggestion` in `check --format json` for the agent to self-correct. A rule
+  with only `{ id }` gives the agent "functionNoEval violated" and no fix.
 - Return the `RuleBuilderLike[]`.
 
 The CLI's unified pipeline (plan 0060) applies baseline/format and derives the
