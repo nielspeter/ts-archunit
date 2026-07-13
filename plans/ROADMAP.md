@@ -189,7 +189,7 @@ Plans 0047–0055 were reviewed 2026-07-13 (architect + product) and their key d
 
 | Priority | Plan                                            | Effort      | State                     | Depends on |
 | -------- | ----------------------------------------------- | ----------- | ------------------------- | ---------- |
-| **P0**   | Agent-Facing Rule Surface (0044)                | ~1.5 days   | Ready                     | 0040, 0043 |
+| **P0**   | Agent-Facing Rule Surface (0044)                | ~1.5–2 days | Ready                     | 0040, 0043, 0060 |
 | **P2**   | `tsconfig()` Config-Assertion Rule (0055)       | 0.5–1 day   | Reviewed — flat API       | none       |
 | **P2**   | TypeScript Escape-Hatch Matchers (0047)         | ~1 day      | Reviewed — module-only    | 0046       |
 | **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048)    | ~1–1.5 days | Reviewed — `@deprecated`  | 0011, 0013, 0046 |
@@ -199,7 +199,9 @@ Plans 0047–0055 were reviewed 2026-07-13 (architect + product) and their key d
 
 \* Draft priority is TBD (likely P2 once approved).
 
-**Build sequence** (least-dependent first): **0055 → 0047 → 0048 → 0060 → 0049 → 0050.** 0044 (Agent-Facing Rule Surface) is independent and can slot anywhere. 0060 (the CLI's severity-aware unified pipeline + preset support) was split out of 0050's review — it's an independently-valuable gap (presets don't run under `check` today, and warns bypass baseline/format) and a hard prerequisite for both `recommended`'s returning form (0049) and the `init` scaffolder (0050).
+**Current priority — AI-agent delivery** (chosen 2026-07-13): the mission is guiding AI coding agents, so the lead program is **0060 → 0044 → 0049**. 0060 (severity-aware unified `check` pipeline) underpins the agent's `check --format json` loop and `agentGuardrails`' returning form; 0044 is the delivery vehicle (agent-format rules block that drives the check-in-loop workflow, `agentGuardrails` preset, `codeFrame` in the JSON payload); 0049 gives the broader rule floor. **Deferred under this priority:** 0055, 0050, 0047, 0048 (see per-plan value notes — 0048 lowest value/cost; trim 0047 to `doubleCast`).
+
+**Full dependency-ordered sequence** (if building everything): **0055 → 0047 → 0048 → 0060 → 0049 → 0044 → 0050.** 0060 is the linchpin — an independently-valuable gap (presets don't run under `check` today, and warns bypass baseline/format) and a hard prerequisite for `agentGuardrails` (0044), `recommended`'s returning form (0049), and the `init` scaffolder (0050).
 
 ### Plan 0044 phases (MCP server dropped — the CLI already exposes the same surface)
 
