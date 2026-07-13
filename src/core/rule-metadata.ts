@@ -16,4 +16,12 @@ export interface RuleMetadata {
 
   /** Link to documentation — ADR, wiki, style guide */
   docs?: string
+
+  /**
+   * Imperative one-liner for AI-agent system prompts, e.g.
+   * "Do NOT throw new Error() in repositories". Surfaced by
+   * `explain --format agent`. When unset, a heuristic is derived from the
+   * rule's predicate/condition description.
+   */
+  imperative?: string
 }

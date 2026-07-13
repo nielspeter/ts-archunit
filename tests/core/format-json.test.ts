@@ -32,9 +32,16 @@ describe('formatViolationsJson', () => {
           because: null,
           suggestion: null,
           docs: null,
+          codeFrame: null,
         },
       ],
     })
+  })
+
+  it('includes codeFrame when present (agent loop payload)', () => {
+    const output = formatViolationsJson([mv({ codeFrame: '  > 42 | parseInt(x)' })])
+    const parsed = JSON.parse(output) as { violations: Array<{ codeFrame: string | null }> }
+    expect(parsed.violations[0]?.codeFrame).toBe('  > 42 | parseInt(x)')
   })
 
   it('serializes severity and summary error/warning counts', () => {

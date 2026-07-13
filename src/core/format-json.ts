@@ -29,6 +29,7 @@ export function formatViolationsJson(violations: ArchViolation[], reason?: strin
       because: v.because ?? null,
       suggestion: v.suggestion ?? null,
       docs: v.docs ?? null,
+      codeFrame: v.codeFrame ?? null,
     })),
   }
   return JSON.stringify(output, null, 2)

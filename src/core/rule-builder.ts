@@ -166,6 +166,7 @@ export abstract class RuleBuilder<T> {
       because: this._reason,
       suggestion: this._metadata?.suggestion,
       docs: this._metadata?.docs,
+      imperative: this._metadata?.imperative ?? this.buildImperative(),
     }
   }
 
@@ -309,6 +310,21 @@ export abstract class RuleBuilder<T> {
     if (predicateDesc) parts.push(`that ${predicateDesc}`)
     if (conditionDesc) parts.push(`should ${conditionDesc}`)
     return parts.join(' ')
+  }
+
+  /**
+   * Build an imperative "Do NOT … / MUST …" sentence for AI-agent system
+   * prompts (`explain --format agent`). Heuristic FALLBACK — a rule author's
+   * `.rule({ imperative })` overrides it.
+   */
+  private buildImperative(): string {
+    const scope = this._predicates.map((p) => p.description).join(' and ')
+    const conds = this._conditions.map((c) => c.description).join(' and ')
+    if (!conds) return this.buildRuleDescription() || 'Follow the architecture rule.'
+    const isNegative = /^(not|no)\b/i.test(conds)
+    const body = conds.replace(/^(not|no)\s+/i, '')
+    const scopeSuffix = scope ? ` (in code that ${scope})` : ''
+    return `${isNegative ? 'Do NOT' : 'MUST'} ${body}${scopeSuffix}`
   }
 
   /**
