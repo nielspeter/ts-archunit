@@ -27,22 +27,22 @@ describe('loadRuleFiles', () => {
 
   it('loads a module that exports a default array of rule builders', async () => {
     const file = path.join(tmpDir, 'rules-array.mjs')
-    fs.writeFileSync(file, `export default [{ check: () => {} }, { check: () => {} }];\n`)
+    fs.writeFileSync(file, `export default [{ violations: () => [] }, { violations: () => [] }];\n`)
     const result = await loadRuleFiles([file])
     expect(result).toHaveLength(2)
-    expect(typeof result[0]!.check).toBe('function')
+    expect(typeof result[0]!.violations).toBe('function')
   })
 
   it('loads a module that exports a default factory function', async () => {
     const file = path.join(tmpDir, 'rules-factory.mjs')
-    fs.writeFileSync(file, `export default function() { return [{ check: () => {} }]; };\n`)
+    fs.writeFileSync(file, `export default function() { return [{ violations: () => [] }]; };\n`)
     const result = await loadRuleFiles([file])
     expect(result).toHaveLength(1)
   })
 
   it('skips items that are not rule-builder-like', async () => {
     const file = path.join(tmpDir, 'rules-mixed.mjs')
-    fs.writeFileSync(file, `export default [{ check: () => {} }, 'not-a-builder', 42, null];\n`)
+    fs.writeFileSync(file, `export default [{ violations: () => [] }, 'not-a-builder', 42, null];\n`)
     const result = await loadRuleFiles([file])
     expect(result).toHaveLength(1)
   })
@@ -71,15 +71,15 @@ describe('loadRuleFiles', () => {
   it('loads multiple files and merges rule builders', async () => {
     const file1 = path.join(tmpDir, 'rules-a.mjs')
     const file2 = path.join(tmpDir, 'rules-b.mjs')
-    fs.writeFileSync(file1, `export default [{ check: () => {} }];\n`)
-    fs.writeFileSync(file2, `export default [{ check: () => {} }, { check: () => {} }];\n`)
+    fs.writeFileSync(file1, `export default [{ violations: () => [] }];\n`)
+    fs.writeFileSync(file2, `export default [{ violations: () => [] }, { violations: () => [] }];\n`)
     const result = await loadRuleFiles([file1, file2])
     expect(result).toHaveLength(3)
   })
 
   it('resolves relative paths', async () => {
     const file = path.join(tmpDir, 'rules-relative.mjs')
-    fs.writeFileSync(file, `export default [{ check: () => {} }];\n`)
+    fs.writeFileSync(file, `export default [{ violations: () => [] }];\n`)
     // Pass the absolute path — loadRuleFiles calls path.resolve internally
     const result = await loadRuleFiles([file])
     expect(result).toHaveLength(1)

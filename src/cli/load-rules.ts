@@ -1,10 +1,14 @@
 import path from 'node:path'
-import type { CheckOptions } from '../core/check-options.js'
+import type { ArchViolation } from '../core/violation.js'
 import { importFresh } from './watch.js'
 
-/** Minimal interface for rule builders — only needs .check() */
+/**
+ * Minimal interface for rule builders the CLI runner consumes.
+ * The runner collects `.violations()` (non-throwing, severity-stamped) and
+ * owns filtering/formatting/exit — it no longer calls the throwing `.check()`.
+ */
 export interface RuleBuilderLike {
-  check: (opts?: CheckOptions) => void
+  violations: () => ArchViolation[]
 }
 
 export interface LoadOptions {
@@ -76,6 +80,8 @@ function isRuleBuilderLike(value: unknown): value is RuleBuilderLike {
   if (value === null || value === undefined || typeof value !== 'object') {
     return false
   }
-  // Structural type check: must have a 'check' method
-  return 'check' in value && typeof (value as Record<string, unknown>)['check'] === 'function'
+  // Structural type check: must have a 'violations' method
+  return (
+    'violations' in value && typeof (value as Record<string, unknown>)['violations'] === 'function'
+  )
 }

@@ -10,7 +10,6 @@ vi.mock('../../src/cli/load-rules.js', () => ({
 }))
 
 import { loadRuleFiles } from '../../src/cli/load-rules.js'
-import { ArchRuleError } from '../../src/core/errors.js'
 
 const mockLoadRuleFiles = vi.mocked(loadRuleFiles)
 
@@ -34,19 +33,17 @@ describe('runBaseline', () => {
     const dir = createTmpDir()
     const outputPath = path.join(dir, 'baseline.json')
 
-    // Builder that throws an ArchRuleError with one violation
+    // Builder that reports one violation via .violations()
     const builder = {
-      check: () => {
-        throw new ArchRuleError([
-          {
-            rule: 'test rule',
-            element: 'TestClass',
-            file: '/src/test.ts',
-            line: 10,
-            message: 'test violation',
-          },
-        ])
-      },
+      violations: () => [
+        {
+          rule: 'test rule',
+          element: 'TestClass',
+          file: '/src/test.ts',
+          line: 10,
+          message: 'test violation',
+        },
+      ],
     }
     mockLoadRuleFiles.mockResolvedValue([builder])
 
@@ -71,7 +68,7 @@ describe('runBaseline', () => {
     })
 
     // No violations — builder passes
-    mockLoadRuleFiles.mockResolvedValue([{ check: () => undefined }])
+    mockLoadRuleFiles.mockResolvedValue([{ violations: () => [] }])
 
     await runBaseline({ ruleFiles: ['rules.ts'], output: outputPath })
 
