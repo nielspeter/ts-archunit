@@ -1,8 +1,8 @@
 # CLI
 
-Run architecture rules without a test runner. The CLI wraps the same API you use in vitest/jest behind `npx ts-archunit` commands.
+The CLI is the default way to run ts-archunit. `npx ts-archunit init` scaffolds a rule file (`arch.rules.ts`) and `npm run arch` runs it — no test runner required, with baseline, diff-aware checks, and CI-friendly output built in.
 
-Most teams should put rules in test files and run them with vitest. The CLI is for teams that need standalone rule execution — pre-commit hooks, CI pipelines without a JS test runner, or one-off audits against unfamiliar codebases.
+Prefer to run architecture rules inside your existing vitest/jest suite instead? That works too and is fully supported — see [Running Rules in Tests](/running-in-tests). This page documents the CLI (the golden-path default); the two forms differ only in how a rule is terminated and run (conversion table on that page).
 
 ## Commands
 

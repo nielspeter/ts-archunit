@@ -34,6 +34,28 @@ classes(p).that().extend('BaseService').should().notContain(call('parseInt')).ch
 
 The chain handles filtering, AST traversal, violation collection, code frame generation, and error formatting. You focus on _what_ to enforce, not _how_ to traverse the AST.
 
+## Two Ways to Run Rules
+
+The same rule chain can run two ways. Pick by how your team already works — they enforce identical rules.
+
+- **CLI rule file (the [golden-path default](/getting-started)).** Rules live in `arch.rules.ts` as an `export default [...]` array of **un-terminated** builders; `ts-archunit check` (`npm run arch`) runs them. No test runner needed; baseline, diff-aware checks, and `--format json/github` built in.
+- **Test file.** Rules live in a vitest/jest test and end in `.check()`; your test runner runs them. Best if you already run tests in CI and want per-rule reporter output. See [Running Rules in Tests](/running-in-tests).
+
+They differ only in how a rule is terminated and run:
+
+| Concern      | CLI rule file (`arch.rules.ts`)         | Test file (vitest)     |
+| ------------ | --------------------------------------- | ---------------------- |
+| Rule ends in | **nothing** — bare builder in the array | `.check()`             |
+| Warning      | `.asSeverity('warn')`                   | `.warn()`              |
+| Baseline     | `--baseline` flag / config              | `.check({ baseline })` |
+| Run with     | `npm run arch`                          | `npx vitest run`       |
+
+::: warning
+A builder ending in `.check()` inside a rule-file array is executed on the spot and returns `undefined` — the CLI **silently skips it**. In a rule file, leave builders un-terminated. See the [conversion guide](/running-in-tests#converting-between-the-two-forms).
+:::
+
+Examples on the rest of this page show the fluent chain ending in `.check()` (the test-file terminal) to illustrate execution; in a rule file, drop the `.check()` per the conversion above.
+
 ## Project
 
 Everything starts with loading a TypeScript project:
