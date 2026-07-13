@@ -29,7 +29,8 @@ Options:
   --output <path>       Output path for baseline file (default: arch-baseline.json)
   --changed             Only report violations in changed files (git diff)
   --base <branch>       Base branch for diff (default: main)
-  --format <format>     Output format: terminal, json, github, auto (default: auto)
+  --format <format>     check: terminal, json, github, auto (default: auto)
+                        explain: json (default), markdown, agent
   --markdown            Output explain results as markdown table
   -w, --watch           Watch for changes and re-run (check command only)
   --config <path>       Path to config file
@@ -129,9 +130,13 @@ async function handleBaseline(ruleFiles: string[], output: string): Promise<void
 }
 
 /** Handle the `explain` subcommand. */
-async function handleExplain(ruleFiles: string[], markdown: boolean | undefined): Promise<void> {
+async function handleExplain(
+  ruleFiles: string[],
+  markdown: boolean | undefined,
+  format: string | undefined,
+): Promise<void> {
   if (!requireRuleFiles(ruleFiles)) return
-  await runExplain({ ruleFiles, markdown })
+  await runExplain({ ruleFiles, markdown, format })
 }
 
 export async function run(args: string[]): Promise<void> {
@@ -174,7 +179,7 @@ export async function run(args: string[]): Promise<void> {
   } else if (command === 'baseline') {
     await handleBaseline(ruleFiles, values.output ?? 'arch-baseline.json')
   } else if (command === 'explain') {
-    await handleExplain(ruleFiles, values.markdown)
+    await handleExplain(ruleFiles, values.markdown, values.format)
   } else {
     console.error(`Error: Unknown command "${command}". Use --help for usage.`)
     process.exitCode = 1

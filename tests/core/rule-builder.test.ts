@@ -284,6 +284,36 @@ describe('RuleBuilder', () => {
     })
   })
 
+  describe('buildImperative (agent explain)', () => {
+    it('renders a negative condition as "Do NOT …"', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition({ description: 'not contain call to eval', evaluate: () => [] })
+        .describeRule()
+      expect(desc.imperative).toMatch(/^Do NOT contain call to eval/)
+    })
+
+    it('renders a positive condition as "MUST …"', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition({ description: 'have name matching /X/', evaluate: () => [] })
+        .describeRule()
+      expect(desc.imperative).toMatch(/^MUST have name matching/)
+    })
+
+    it('uses .rule({ imperative }) verbatim when set', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition(alwaysPass())
+        .rule({ imperative: 'Do NOT foo' })
+        .describeRule()
+      expect(desc.imperative).toBe('Do NOT foo')
+    })
+  })
+
   describe('predicate combination', () => {
     it('ANDs multiple predicates together', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
