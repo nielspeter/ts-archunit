@@ -19,11 +19,12 @@ describe('formatViolationsJson', () => {
     const output = formatViolationsJson(violations)
     const parsed: unknown = JSON.parse(output)
     expect(parsed).toEqual({
-      summary: { total: 1, reason: null },
+      summary: { total: 1, errors: 1, warnings: 0, reason: null },
       violations: [
         {
           rule: 'test rule',
           ruleId: null,
+          severity: 'error',
           element: 'MyService.getTotal',
           file: '/project/src/service.ts',
           line: 42,
@@ -34,6 +35,21 @@ describe('formatViolationsJson', () => {
         },
       ],
     })
+  })
+
+  it('serializes severity and summary error/warning counts', () => {
+    const violations = [
+      mv({ element: 'A', severity: 'error' }),
+      mv({ element: 'B', severity: 'warn' }),
+      mv({ element: 'C' }), // absent → defaults to error
+    ]
+    const output = formatViolationsJson(violations)
+    const parsed = JSON.parse(output) as {
+      summary: { total: number; errors: number; warnings: number }
+      violations: Array<{ severity: string }>
+    }
+    expect(parsed.summary).toMatchObject({ total: 3, errors: 2, warnings: 1 })
+    expect(parsed.violations.map((v) => v.severity)).toEqual(['error', 'warn', 'error'])
   })
 
   it('formats multiple violations with correct count', () => {
