@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** READY TO BUILD — dependencies shipped in v0.13.0 (2026-07-13); a 0.5-day build.
+- **State:** IMPLEMENTED (2026-07-13, branch `feat/0050-init-cli-scaffolder`) — `runInit` + dispatch/parseArgs/HELP_TEXT wiring, source-root detection, package.json merge (indent/EOL preserving), both returning-form presets, all message/CI fixes; 21 tests + drift guard; docs (cli/getting-started/README) + CHANGELOG. Verified end-to-end (scaffold → generated files correct). Shape presets excluded from v1 per round-2 review.
 - **Review round 2 (2026-07-13):** full-panel review (architect + product + customer + devops) against shipped v0.13.0 code. Verdict: buildable after five fixes, all folded into the body below —
   1. **Shape presets gated out of v1.** `--preset layered|data-layer|strict-boundaries` are throwing/self-executing (no returning form), so they'd (a) crash the generated `arch:baseline` (`runBaseline` doesn't catch `ArchRuleError` the way `runCheck` does) and (b) produce a file that can't compose with spread presets. `init` v1 offers only the two returning-form presets.
   2. **`agent-guardrails` added as a `--preset`** + signposting in the scaffold + closing message — the library's flagship use case must be reachable from its front door.
