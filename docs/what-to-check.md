@@ -1,8 +1,17 @@
 # What to Check
 
-Scan this page in 2 minutes. Find your pain point. Copy the rule.
+Find your pain point, copy the rule. A gallery of real rules organized by what they enforce.
 
-Every example is a real rule you can paste into `arch.test.ts` and run with `npx vitest run`.
+**Structural rules:** [Import Dependencies](#import-dependencies) · [Layer Ordering](#layer-ordering) · [Cycle Detection](#cycle-detection) · [Naming Conventions](#naming-conventions) · [Class Structure](#class-structure) · [Containment](#containment) · [Inheritance](#inheritance) · [Decorators](#decorators)
+**Behavioral rules:** [Body Analysis](#body-analysis) · [Type Safety](#type-safety) · [Call Matching](#call-matching-framework-agnostic) · [Function Signatures](#function-signatures) · [Complexity & Size](#complexity-size)
+**JSX & framework:** [JSX Element Rules](#jsx-element-rules) · [GraphQL Rules](#graphql-rules)
+**Cross-cutting:** [Pattern Templates](#pattern-templates) · [Standard Rules](#standard-rules-ready-to-use) · [Smell Detection](#smell-detection) · [Cross-Layer Consistency](#cross-layer-consistency) · [Custom Rules](#custom-rules)
+**Adoption:** [Gradual Adoption](#gradual-adoption) · [Exclusions](#exclusions-permanent-exceptions) · [Rich Messages](#rich-violation-messages)
+**[Customizable recipes](#customizable-recipes)** — one-liners you adjust to your ORM / folders / domain terms.
+
+::: tip Which form are these in?
+Every snippet below ends in `.check()` — the **test-file** form. In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]`; a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
 
 ## Import Dependencies
 
@@ -597,8 +606,143 @@ const haveJsDoc = defineCondition('have JSDoc', (elements, context) => {
 classes(p).that().areExported().should().satisfy(haveJsDoc).check()
 ```
 
----
+## Customizable Recipes
 
-Every example is copy-pasteable. Add `const p = project('tsconfig.json')` at the top, wrap each in `it()`, and run with `npx vitest run`.
+These aren't shipped as standard rules because they need project-specific tuning — your ORM name, folder layout, or domain terms. Copy the one-liner and adjust the pattern.
+
+### Logic placement — keep operations in the right layer
+
+DB queries belong in repositories, HTTP calls in gateways, parsing in validators. Customize the regex to your libraries (avoid broad patterns like `/query|execute/` — they match `executeTask`, `queryString`).
+
+```typescript
+const dbPattern = /prisma|knex|drizzle/
+
+// No DB calls outside repositories
+functions(p)
+  .that()
+  .resideInFolder('**/services/**')
+  .should()
+  .notContain(call(dbPattern))
+  .rule({ id: 'placement/no-db-in-services', because: 'DB access belongs in repositories' })
+  .check()
+
+// No HTTP in the domain layer
+functions(p)
+  .that()
+  .resideInFolder('**/domain/**')
+  .should()
+  .notContain(call(/fetch|axios|got/))
+  .because('domain must not make HTTP calls — use a gateway')
+  .check()
+
+// No date construction in business logic (inject a clock for testability)
+functions(p).that().resideInFolder('**/services/**').should().notContain(newExpr('Date')).check()
+```
+
+### Delegation — a layer must USE its dependency
+
+The inverse of "must not contain": assert a function _must_ call something matching a pattern.
+
+```typescript
+// Services must delegate to the data layer
+functions(p)
+  .that()
+  .resideInFolder('**/services/**')
+  .should()
+  .satisfy(mustCall(/Repository/))
+  .because('services must delegate to the data layer')
+  .check()
+
+// Handlers must validate input first
+functions(p)
+  .that()
+  .resideInFolder('**/handlers/**')
+  .should()
+  .satisfy(mustCall(/validate|parse|check/))
+  .check()
+```
+
+### Boundary control — features stay self-contained
+
+```typescript
+const features = ['auth', 'billing', 'orders']
+for (const f of features) {
+  modules(p)
+    .that()
+    .resideInFolder(`**/features/${f}/**`)
+    .should()
+    .onlyImportFrom(`**/features/${f}/**`, '**/shared/**')
+    .because(`${f} must not depend on other features`)
+    .check()
+}
+// Or use the `strictBoundaries` preset, which does this automatically.
+
+// Internal modules only reachable through the barrel
+modules(p)
+  .that()
+  .resideInFile('**/internal/**/*.ts')
+  .should()
+  .onlyBeImportedVia('**/index.ts', '**/internal/**')
+  .check()
+```
+
+### Dead code & hygiene
+
+```typescript
+// No orphaned files (nobody imports them)
+modules(p)
+  .that()
+  .resideInFolder('src/**')
+  .should()
+  .satisfy(noDeadModules())
+  .excluding('index.ts', 'main.ts', 'config.ts', /\.d\.ts$/)
+  .check()
+
+// No unused exports
+modules(p).that().resideInFolder('src/**').should().satisfy(noUnusedExports()).check()
+
+// No TODO/FIXME left in production
+functions(p).that().resideInFolder('src/**').should().satisfy(noStubComments()).check()
+```
+
+For broad exclusion patterns that legitimately match nothing in some workspaces, wrap them in `silent()` to suppress the stale-exclusion warning: `.excluding(silent(/\.d\.ts$/), 'index.ts')`. See [Setup & Best Practices](/setup-best-practices#suppressing-individual-violations) for baseline-vs-`.excluding()` guidance.
+
+### Export hygiene
+
+```typescript
+// Named exports only (easier to refactor and tree-shake)
+modules(p).that().resideInFolder('src/**').should().notHaveDefaultExport().check()
+
+// Too many exports suggests the file should be split (warn, don't fail)
+modules(p).that().resideInFolder('src/**').should().haveMaxExports(10).asSeverity('warn')
+```
+
+### Centralized parsing & logging
+
+```typescript
+// Only src/parsers/ may call JSON.parse
+functions(p)
+  .that()
+  .resideInFolder('src/**')
+  .and()
+  .satisfy(not(resideInFolder('**/parsers/**')))
+  .should()
+  .satisfy(functionNoJsonParse())
+  .because('use the typed parsers in src/parsers/')
+  .check()
+
+// No raw console.* — use the logger abstraction
+functions(p)
+  .that()
+  .resideInFolder('src/**')
+  .should()
+  .satisfy(functionNoConsole())
+  .because('use Logger from @app/logger')
+  .check()
+```
+
+(Design-system / JSX recipes live in [JSX Element Rules](#jsx-element-rules) above.)
+
+---
 
 For full details: [Modules](/modules) · [Classes](/classes) · [Functions](/functions) · [Types](/types) · [Body Analysis](/body-analysis) · [Calls](/calls) · [Slices](/slices) · [Patterns](/patterns) · [Smells](/smell-detection) · [GraphQL](/graphql) · [Cross-Layer](/cross-layer) · [Standard Rules](/standard-rules) · [Metrics](/metrics) · [Custom Rules](/custom-rules) · [Violations](/violation-reporting)
