@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] - 2026-07-13
+
+### Added
+
+- **`tsconfig(p)` config-assertion rule** — assert a project's resolved TypeScript compiler options with `.requires(spec: Partial<CompilerOptions>)`. A flat top-level entry point (like `project` / `smells`) returning a `TerminalBuilder`, so it composes with `.because()` / `.rule()` / `.excluding()` / `.asSeverity()` / `.check()` / `.warn()` / baseline / diff. Mirrors tsc's strict-family resolution (`strict: true` implies its nine sub-flags — `strictNullChecks`, `strictBuiltinIteratorReturn`, etc. — with explicit overrides winning), resolves `extends`, deep-compares array/object options, and renders enum-backed options (`target`, `module`, `moduleResolution`) by name in messages. One violation per mismatched flag (flag name is the `element`). Exported from `@nielspeter/ts-archunit`. (Plan 0055.)
+
 ## [0.14.0] - 2026-07-13
 
 ### Added

@@ -16,6 +16,7 @@ All public exports from `ts-archunit`, organized by category.
 | `calls`       | `calls(p: ArchProject): CallRuleBuilder`          | Rule builder for call expressions.                               |
 | `jsxElements` | `jsxElements(p: ArchProject): JsxRuleBuilder`     | Rule builder for JSX elements in .tsx/.jsx files.                |
 | `within`      | `within(sel: CallRuleBuilder): ScopedContext`     | Scoped rule builder for callback functions inside matched calls. |
+| `tsconfig`    | `tsconfig(p: ArchProject): TsconfigBuilder`       | Assert the project's resolved TypeScript compiler options.       |
 
 ## Rule Builders
 
@@ -23,6 +24,7 @@ All public exports from `ts-archunit`, organized by category.
 | --------------------------- | ---------------------------------------------------------- |
 | `RuleBuilder`               | Base rule builder class.                                   |
 | `TerminalBuilder`           | Base terminal builder class (slices, smells, cross-layer). |
+| `TsconfigBuilder`           | Builder returned by `tsconfig()`; adds `.requires()`.      |
 | `ModuleRuleBuilder`         | Builder returned by `modules()`.                           |
 | `ClassRuleBuilder`          | Builder returned by `classes()`.                           |
 | `FunctionRuleBuilder`       | Builder returned by `functions()`.                         |

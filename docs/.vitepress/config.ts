@@ -36,6 +36,7 @@ export default defineConfig({
           { text: 'Slices & Layers', link: '/slices' },
           { text: 'Cross-Layer Validation', link: '/cross-layer' },
           { text: 'Smell Detection', link: '/smell-detection' },
+          { text: 'Project-Config Rules', link: '/config-rules' },
           { text: 'GraphQL Rules', link: '/graphql' },
           { text: 'Standard Rules', link: '/standard-rules' },
           { text: 'Architecture Presets', link: '/presets' },
