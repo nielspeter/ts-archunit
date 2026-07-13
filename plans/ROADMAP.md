@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-07-13
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 53 completed + proposal 010, 2 open (see "Open Plans" below)
+**Total Plans:** 53 completed + proposal 010, 4 open (see "Open Plans" below)
 
 ---
 
@@ -183,17 +183,18 @@
 
 ## Open Plans
 
-Three plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
+Four plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
 
 Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, and the **`tsconfig()` config-assertion rule (0055, v0.15.0)**: the severity-aware unified `check` pipeline, the agent-facing surface (`explain --format agent`, `agentGuardrails`, `codeFrame`), the thin `recommended()` floor, one-command onboarding, and strict-config drift protection. The features shipped faster than the docs — **plan 0061 (docs restructure)** now makes the narrative catch up (golden path, one reconciled workflow, coherent IA); it's P1 because docs coherence gates adoption of all the above. The two matcher plans are independent, reviewed 2026-07-13 with design decisions locked.
 
 | Priority | Plan                                         | Effort      | State                            | Depends on       |
 | -------- | -------------------------------------------- | ----------- | -------------------------------- | ---------------- |
-| **P1**   | Docs Restructure — Golden Path (0061)        | ~2–3 days   | Reviewed (full panel) — building | none (docs-only) |
+| **P1**   | Docs Restructure — Golden Path (0061)        | ~2–3 days   | Built — reviewed, ready to merge | none (docs-only) |
+| **P1**   | Shape Presets → Returning Form (0062)        | ~1 day      | Draft — breaking (v0.16.0)       | none             |
 | **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | Reviewed — module-only           | 0046             |
 | **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | Reviewed — `@deprecated`         | 0011, 0013, 0046 |
 
-**Suggested next order:** **0061** (in progress — the on-ramp to everything shipped), then the standalone matchers **0047 → 0048** (0048 lowest value/cost; trim 0047 to `doubleCast`).
+**Suggested next order:** **0061** (built — merge to deploy), then **0062** (unifies the preset family on the returning form — deletes 0061's shape-preset caveat, fixes the `arch:baseline` crash and the lost warn-path in shape presets; surfaced by 0061's docs review), then the standalone matchers **0047 → 0048** (0048 lowest value/cost; trim 0047 to `doubleCast`).
 
 ---
 
