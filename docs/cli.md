@@ -6,6 +6,40 @@ Most teams should put rules in test files and run them with vitest. The CLI is f
 
 ## Commands
 
+### `init` — Scaffold a Project
+
+Generate a working ts-archunit setup in one command — no hand-authoring config or rule files.
+
+```bash
+# Scaffold with the recommended safety floor (default)
+npx ts-archunit init
+
+# Scaffold for an AI-agent workflow
+npx ts-archunit init --preset agent-guardrails
+
+# Preview without writing
+npx ts-archunit init --dry-run
+```
+
+It creates:
+
+- **`ts-archunit.config.ts`** — the discoverable config (`rules`, `baseline`, `format`).
+- **`arch.rules.ts`** — a rule file that spreads your chosen preset in the returning form (`export default [...recommended(p)]`), with commented examples for adding custom rules.
+- **`arch-baseline.json`** — an empty baseline placeholder.
+- **`package.json` scripts** — `arch` (`ts-archunit check`) and `arch:baseline` (`ts-archunit baseline`), added only if absent.
+
+| Option              | Effect                                                                      |
+| ------------------- | --------------------------------------------------------------------------- |
+| `--preset <name>`   | `recommended` (default) or `agent-guardrails`. Both are spreadable presets. |
+| `--tsconfig <path>` | tsconfig to wire in (default `tsconfig.json`).                              |
+| `--no-baseline`     | Skip `arch-baseline.json` (and omit the `baseline` config field).           |
+| `--force`           | Overwrite existing files. Without it, `init` refuses and lists conflicts.   |
+| `--dry-run`         | Print what would be created; write nothing.                                 |
+
+`init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do.
+
+Shape presets (layered / data-layer / strict-boundaries) aren't offered by `init` yet — add them by hand.
+
 ### `check` — Run Rules
 
 ```bash

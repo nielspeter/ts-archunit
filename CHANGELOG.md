@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`ts-archunit init` CLI scaffolder** — one command generates a working setup: a discoverable `ts-archunit.config.ts`, an `arch.rules.ts` that spreads a returning-form preset (`--preset recommended` (default) | `agent-guardrails`), an empty `arch-baseline.json`, and `arch` / `arch:baseline` npm scripts. Detects the source root from tsconfig `include`/`rootDir` and threads it into the preset `include`. Non-destructive by default (`--force` to overwrite, `--dry-run` to preview); `--tsconfig` and `--no-baseline` supported. Shape presets are excluded from v1 (no returning form). Brownfield-aware closing message (errors fail CI, warnings don't; baseline before gating CI). (Plan 0050.)
+
 ## [0.13.0] - 2026-07-13
 
 ### Added

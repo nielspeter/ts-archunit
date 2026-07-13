@@ -12,6 +12,22 @@
 npm install -D @nielspeter/ts-archunit
 ```
 
+## Fastest Start — `init`
+
+Scaffold a working setup in one command instead of hand-writing config and rule files:
+
+```bash
+npx ts-archunit init
+```
+
+This creates `ts-archunit.config.ts`, an `arch.rules.ts` seeded with the [`recommended`](/presets#recommended) safety floor, an empty `arch-baseline.json`, and `arch` / `arch:baseline` npm scripts. Then:
+
+```bash
+npm run arch
+```
+
+Building with an AI coding agent? Scaffold the agent guardrails instead — `npx ts-archunit init --preset agent-guardrails` — and see the [AI Agents](/ai-agents) guide. Full flag reference: [CLI › init](/cli#init-scaffold-a-project).
+
 ## Quick Start with Presets
 
 The fastest way to add architecture rules. One function call enforces an entire architecture pattern:
