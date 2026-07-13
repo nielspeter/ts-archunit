@@ -1,5 +1,9 @@
 # Metrics
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 Built-in metric rules for complexity, size, and method count thresholds. These rules catch the slow creep of large classes, long functions, and tangled control flow before they become entrenched. Use them as guardrails in CI -- they are cheaper than code review for objective limits.
 
 ```typescript

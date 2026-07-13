@@ -1,5 +1,9 @@
 # Type Rules
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 The `types()` entry point operates on interfaces and type aliases. Use it to enforce type-level conventions using the TypeScript type checker.
 
 ## When to Use

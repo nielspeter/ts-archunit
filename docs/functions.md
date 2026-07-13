@@ -1,5 +1,9 @@
 # Function Rules
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 The `functions()` entry point operates on functions, arrow functions, and class methods. ts-archunit wraps all of these in a unified `ArchFunction` model.
 
 ## When to Use

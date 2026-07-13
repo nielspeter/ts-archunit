@@ -1,5 +1,9 @@
 # JSX Element Rules
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 The `jsxElements()` entry point operates on JSX elements across all `.tsx` and `.jsx` source files. Use it to enforce design system compliance, accessibility requirements, and structural conventions at the architecture level.
 
 ## When to Use

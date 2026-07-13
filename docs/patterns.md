@@ -1,5 +1,9 @@
 # Pattern Templates
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 Pattern templates enforce return type shapes across functions. Use them to ensure that all functions in a folder return objects with the expected structure -- for example, every list endpoint must return `{ total, skip, limit, items }`. This catches missing or mistyped fields at CI time, before inconsistent response shapes reach production and break clients.
 
 ## When to Use
