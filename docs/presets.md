@@ -141,12 +141,12 @@ export default [
 
 ### Generated rules
 
-| Rule ID                                   | Enforces                                  | Default |
+| Rule ID                                      | Enforces                       | Default |
 | -------------------------------------------- | ------------------------------ | ------- |
-| `preset/recommended/no-eval`              | No `eval()`                               | error   |
-| `preset/recommended/no-function-constructor` | No `Function` constructor              | error   |
-| `preset/recommended/no-silent-catch`      | No empty/silent `catch` blocks            | warn    |
-| `preset/recommended/no-empty-bodies`      | No empty function bodies                  | warn    |
+| `preset/recommended/no-eval`                 | No `eval()`                    | error   |
+| `preset/recommended/no-function-constructor` | No `Function` constructor      | error   |
+| `preset/recommended/no-silent-catch`         | No empty/silent `catch` blocks | warn    |
+| `preset/recommended/no-empty-bodies`         | No empty function bodies       | warn    |
 
 Two `error`, two `warn`. The warn rules have known, suppressible false positives (intentional empty catches, no-op callbacks), so they surface without failing the build.
 
