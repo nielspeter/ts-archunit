@@ -3,13 +3,16 @@
 ## Status
 
 - **State:** DRAFT — captured for decision, not yet scheduled
+- **Review (2026-07-13):** Ship (after deps). **Decisions applied 2026-07-13:** (1) execution model — the generated `arch.rules.ts` uses the **returning form** (`export default [...recommended(p)]`), run by plan 0060's severity-aware unified pipeline (Option 2), so warns are baseline-filtered not lost; (2) generate the discoverable `ts-archunit.config.ts`, not `arch.config.ts`; (3) defer `--with-vitest` to a later version; (4) mechanical fixes (commands/init.ts, shared parseArgs + explicit `--no-baseline`, zero-dep package.json write, constrained `--preset`, write atomicity, specified closing message). Plan text ready; build scheduled last (after 0055/0047/0048/0049 + the `check` fix). See "Review findings" below.
 - **Priority:** TBD (likely P2 once approved)
 - **Effort:** 0.5–1 day
 - **Created:** 2026-05-05
-- **Depends on:** Plan 0049 (`recommended()` preset) — the generated
-  `arch.rules.ts` calls `recommended(p)` as its starter line. Plan 0020
-  (existing CLI runner) already established the CLI infrastructure
-  (`src/cli/`); this plan adds an `init` subcommand.
+- **Depends on:** Plan 0049 (thin `recommended()` preset) — the generated
+  `ts-archunit.config.ts` + `arch.rules.ts` call `recommended(p)` as the
+  starter line via the **returning form** (`export default [...recommended(p)]`).
+  **Plus plan 0060** (severity-aware unified `check` pipeline — Option 2, see
+  "Execution model"). Plan 0020 (existing CLI runner) established the CLI
+  infrastructure (`src/cli/`); this plan adds an `init` subcommand.
 
 ## Problem
 
@@ -17,7 +20,7 @@ Adopting ts-archunit currently requires a developer to:
 
 1. Install the package.
 2. Read the docs to learn the config shape.
-3. Hand-author `arch.config.ts` with the right `defineConfig` call.
+3. Hand-author `ts-archunit.config.ts` with the right `defineConfig` call.
 4. Hand-author `arch.rules.ts` with imports and rule chains.
 5. Decide on baseline strategy and run `npx ts-archunit baseline` if
    adopting on an existing codebase.
@@ -41,7 +44,11 @@ with zero further configuration.
 
 Generated files (defaults can be overridden by flags — see "API"):
 
-### `arch.config.ts`
+### `ts-archunit.config.ts`
+
+Generated with the **discoverable** name `resolveConfig` looks for
+(`ts-archunit.config.ts`/`.js`) — not `arch.config.ts`, which `check`
+would never find, leaving `ts-archunit check` with no rules.
 
 ```typescript
 import { defineConfig } from '@nielspeter/ts-archunit'
@@ -57,22 +64,29 @@ export default defineConfig({
 
 ### `arch.rules.ts`
 
+A builder-export rule file — `recommended(p)` returns severity-carrying
+builders (plan 0049 / 0060 Option 2), spread into the default export alongside
+any custom rules. `check` runs them through its unified pipeline, applying
+baseline, format, and warn/error severity.
+
 ```typescript
 import { project, recommended } from '@nielspeter/ts-archunit'
+// Uncomment the imports you need for the examples below:
+// import { classes, slices, call } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
-// Sensible defaults for any TypeScript project.
-// See https://nielspeter.github.io/ts-archunit/presets#recommended
-recommended(p)
+// Rules are collected into the default export; `ts-archunit check` runs them.
+export default [
+  // Thin universal safety floor (see plan 0049).
+  ...recommended(p),
 
-// Add project-specific rules below.
-// Examples:
-//   classes(p).that().resideInFolder('src/services/**')
-//     .should().notContain(call('parseInt'))
-//     .check()
-//
-//   modules(p).should().beFreeOfCycles().check()
+  // Add project-specific rules below — builders, no .check().
+  // (Builders default to error; append .asSeverity('warn') to warn, not fail.)
+  //   classes(p).that().resideInFolder('src/services/**')
+  //     .should().notContain(call('parseInt')),
+  //   slices(p).matching('src/feature-').should().beFreeOfCycles(),
+]
 ```
 
 ### `arch-baseline.json`
@@ -100,24 +114,48 @@ existing `arch` or `arch:baseline` scripts, the command warns and
 skips the script-modification step (writes a one-line note to stdout,
 does not fail).
 
-### Optional: vitest test wrapper
+### Deferred to a later version: `--with-vitest` wrapper
 
-With `--with-vitest` flag, also generates
-`tests/architecture.test.ts`:
+The `--with-vitest` flag (generate `tests/architecture.test.ts`) is
+**deferred out of v1.** The obvious wrapper is subtly broken — importing
+`./arch.rules` at the top of the test file throws during *test collection*
+(a "failed to load test file" error, not a readable failing test), and it
+bypasses `ts-archunit.config.ts`'s baseline. Doing it right means asserting
+inside `it()` through the same config/baseline path as `check`, which is
+more than v1 needs. Ship `init` without it; add a correct wrapper in a
+follow-up if demand appears.
+
+## Execution model — how the generated files run under `check`
+
+`loadRuleFiles` (`src/cli/load-rules.ts`) accepts a rule file that
+`export default`s an array of builders. The generated `arch.rules.ts` uses the
+**returning form** (plan 0049 / 0060, Option 2): `recommended(p)` returns
+severity-carrying builders, spread into the default export:
 
 ```typescript
-import { describe, it } from 'vitest'
-import './arch.rules'
-
-describe('architecture', () => {
-  it('rules pass', () => {
-    // arch.rules.ts runs at import time and throws on violation
-  })
-})
+export default [...recommended(p), /* custom builders */]
 ```
 
-This integrates ts-archunit into existing vitest test runs without
-the user needing a separate CI step.
+This flows through the standard builder-export path — no self-executing preset
+call, no `ArchRuleError` to catch. Plan **0060** makes `runCheck` severity-aware
+and baseline/format-uniform (collect `.violations()` + per-builder severity →
+one pipeline), so the two `warn` rules in `recommended` are baseline-filtered
+and formatted rather than lost — which is what makes the brownfield baseline
+story (below) actually hold.
+
+**Dependencies:** the returning form of `recommended` (plan 0049) and the
+severity-aware unified pipeline (plan 0060). Verify with a **Phase 0 spike**
+that `export default [...recommended(p)]` runs through `check` with warns
+baseline-filtered and exit 0, error rules → exit 1, before writing templates.
+
+(An earlier draft had the generated file call bare `recommended(p)`
+self-executing, requiring `check` to catch import-time throws — plan 0060's
+rejected catch-the-throw model. The returning form is cleaner and carries warn
+severity, which the throwing model can't. **Shape-specific presets**
+(`--preset layered|data-layer|strict-boundaries`) are throwing presets without
+a returning form yet, so their generated file is a self-executing call handled
+by 0060's best-effort fallback catch — error-severity only; noted in `--preset`
+below.)
 
 ## API
 
@@ -125,15 +163,20 @@ the user needing a separate CI step.
 npx ts-archunit init [options]
 
 Options:
-  --preset <name>        Starter preset to wire into arch.rules.ts.
-                         Default: 'recommended'. Other values:
-                         'layered', 'data-layer', 'strict-boundaries'.
+  --preset <name>        Starter preset wired into arch.rules.ts. Default:
+                         'recommended'. Only presets the package actually
+                         exports are accepted; shape-specific values
+                         ('layered', 'data-layer', 'strict-boundaries')
+                         generate the call with placeholder folder globs and
+                         a fill-me-in comment (a bare call would instant-fail
+                         on a mismatched layout).
   --no-baseline          Skip arch-baseline.json creation.
-  --with-vitest          Also generate tests/architecture.test.ts.
   --tsconfig <path>      Override tsconfig path. Default: 'tsconfig.json'.
   --force                Overwrite existing files. Default: refuse and exit
                          non-zero with a list of conflicts.
   --dry-run              Print what would be created; don't write.
+
+(`--with-vitest` deferred — see "Deferred to a later version".)
 ```
 
 No interactive prompts in v1. Flags cover every decision; users who
@@ -143,7 +186,7 @@ want to script the init or run it in CI get deterministic behavior.
 
 `init` without `--force` is **non-destructive**:
 
-- If any of the four files already exists, the command lists the
+- If any of the generated files already exists, the command lists the
   conflicts and exits with code 1.
 - `--force` overwrites without confirmation.
 - `--dry-run` always succeeds and shows what would happen.
@@ -165,42 +208,90 @@ What `init` _does_ detect:
   or pass `--tsconfig <path>`").
 - Presence of `package.json`. If missing, the script-entry step is
   skipped silently.
-- Presence of vitest in `package.json` `dependencies` /
-  `devDependencies`. If found and `--with-vitest` not specified,
-  print a one-line tip: "Detected vitest — pass `--with-vitest` to
-  generate a test wrapper."
+- (vitest detection tip removed — `--with-vitest` is deferred out of v1;
+  see "Deferred to a later version".)
 
 ## Implementation phases
 
+### Phase 0 — `check` preset-style support spike (~30 min)
+
+Prerequisite (see "Execution model"), specified as **plan 0060**. Confirm that
+`export default [...recommended(p)]` runs through `check`'s severity-aware
+unified pipeline: **error** rules → exit 1; the **warn** rules → formatted,
+exit 0, and **baseline-filtered on re-run** (the brownfield story). Land plans
+0049 (returning-form `recommended`) and 0060 before `init` proceeds.
+
 ### Phase 1 — Subcommand skeleton (~1 hour)
 
-Add `init` to the CLI entry point in `src/cli/`. Wire flag parsing.
+Add `src/cli/commands/init.ts` + a `handleInit` wrapper + an
+`else if (command === 'init')` branch in `src/cli/index.ts` (the established
+pattern — check/baseline/explain all live in `commands/*.ts`). **Extend the
+single shared `parseArgs` options table** in `index.ts` (it runs `strict:true`,
+so unknown flags throw). Node's `parseArgs` has no `--no-x` negation —
+register `--no-baseline` as a distinct boolean and handle it explicitly.
 Implement file-conflict detection (no-write for now).
 
 ### Phase 2 — File generators (~2–3 hours)
 
-- `arch.config.ts` template with simple substitution for `--tsconfig`.
-- `arch.rules.ts` template with preset switch (`recommended`,
-  `layered`, etc.).
+- `ts-archunit.config.ts` template (discoverable name) with `--tsconfig`
+  substitution.
+- `arch.rules.ts` template with a preset switch constrained to exported presets.
+  Two subtleties the generator MUST handle: (a) **import specifier** — `recommended`
+  is root-exported (`@nielspeter/ts-archunit`), but the shape presets export only
+  from the `./presets` subpath, so `--preset layered|data-layer|strict-boundaries`
+  must emit `import { ... } from '@nielspeter/ts-archunit/presets'` or the file
+  crashes on load; (b) **name mapping** — kebab flag → export name
+  (`layered`→`layeredArchitecture`, `data-layer`→`dataLayerIsolation`,
+  `strict-boundaries`→`strictBoundaries`). Shape presets also get placeholder
+  globs + a fill-me-in comment. `--tsconfig` substitution applies to BOTH
+  `ts-archunit.config.ts` and the `project('tsconfig.json')` line in
+  `arch.rules.ts` (the self-executing file is the sole tsconfig source under
+  Option A) — otherwise the two diverge.
 - `arch-baseline.json` empty seed.
-- `package.json` script-entry merge (read, parse, conditionally add,
-  write back with original formatting preserved as much as possible —
-  use the existing JSON the user has, don't normalize whitespace).
-- `tests/architecture.test.ts` template (when `--with-vitest`).
+- `package.json` script-entry merge: read, parse, conditionally add the
+  scripts, write back with `JSON.stringify(pkg, null, detectedIndent) + '\n'`
+  (detect the indent; **no new dependency** — drop the "preserve formatting
+  exactly" promise a JSON round-trip can't keep).
+- **Write atomicity:** stage all files and flush on success (temp + rename, or
+  buffer then write), so a mid-run failure never leaves a half-scaffolded project.
+- **Closing message (required):** after writing, print a next-steps block,
+  branched on whether `src` is non-empty:
+  - greenfield → "Created N files. Next: `npm run arch`."
+  - existing code → also "Adopting on an existing codebase? Run
+    `npm run arch:baseline` first to accept current violations as tracked
+    legacy debt." The single most important UX artifact — how a brownfield
+    user understands the first run's `warn`s.
+  - **Warn-path (resolved via 0060 Option 2):** because `recommended()` returns
+    severity-carrying builders and the CLI pipeline baseline-filters warns, the
+    two `warn` rules ARE silenced by `arch:baseline` — so the brownfield message
+    is accurate. (This is why 0060 is a hard dependency.)
+  - Source-root detection for the greenfield/brownfield branch (and the
+    generated `watchDirs`) should derive from the tsconfig `include`/`rootDir`,
+    not a hardcoded `src` — projects using `lib/`, `app/`, or `packages/*/src`
+    would otherwise be misclassified as greenfield.
 
 ### Phase 3 — Tests (~2 hours)
 
 `tests/cli/init.test.ts`:
 
-- Empty cwd — generates all four files, exits 0.
+- Empty cwd — generates the three files (`ts-archunit.config.ts`,
+  `arch.rules.ts`, `arch-baseline.json`), exits 0.
+- Generated project runs: `ts-archunit check` discovers the config and loads
+  the preset-style `arch.rules.ts` cleanly (depends on Phase 0).
 - Conflicting file present — exits 1, lists conflicts, writes nothing.
+- Mid-run write failure leaves nothing (atomicity).
 - `--force` overwrites cleanly.
 - `--dry-run` writes nothing, prints plan.
-- `--with-vitest` adds the test wrapper.
-- Each `--preset` value generates the expected `arch.rules.ts` line.
+- Each accepted `--preset` value generates the expected `arch.rules.ts` line.
+- Closing message: brownfield (non-empty `src`) includes the baseline step;
+  greenfield does not.
 - No `tsconfig.json` — exits 1 with helpful message.
-- No `package.json` — generates the three .ts/.json files but skips
-  script-entry (with a one-line stdout note).
+- No `package.json` — generates the .ts/.json files but skips script-entry
+  (one-line stdout note).
+- **Generated examples typecheck** — extract the commented example lines from
+  the `arch.rules.ts` template, uncomment, and `tsc` them, so template drift
+  (wrong API / missing imports) is caught. (The examples use `classes`/`call`
+  and `slices().matching().beFreeOfCycles()`, with matching import hints.)
 
 ### Phase 4 — Docs (~30 min)
 
@@ -214,11 +305,11 @@ init`" with the command output.
 
 | File                                   | Change                                                                |
 | -------------------------------------- | --------------------------------------------------------------------- |
-| `src/cli/init.ts`                      | New — subcommand implementation                                       |
-| `src/cli/index.ts` (or main entry)     | Wire `init` subcommand                                                |
-| `src/cli/templates/arch.config.ts.tpl` | Template (string literal in code; not a separate file shipped to npm) |
-| `src/cli/templates/arch.rules.ts.tpl`  | Template per preset                                                   |
-| `tests/cli/init.test.ts`               | New                                                                   |
+| `src/cli/commands/init.ts`             | New — subcommand implementation (inline string templates)              |
+| `src/cli/index.ts`                     | Wire `init` branch + extend shared `parseArgs` (incl. `--no-baseline`) |
+| `tests/cli/init.test.ts`               | New                                                                    |
+
+(The `check` runner / `loadRuleFiles` / severity-primitive changes that make the generated `export default [...recommended(p)]` run are in **plan 0060**, not here.)
 | `docs/getting-started.md`              | Lead with `init`                                                      |
 | `docs/cli.md`                          | Document `init` subcommand                                            |
 | `README.md`                            | Update Install section                                                |
@@ -253,7 +344,35 @@ and `npm run arch`. That's the bar `eslint --init` and `vitest`
 established. Without it, ts-archunit's adoption story stalls at the
 config-authoring step regardless of how good the rule library is.
 
-The dependency on plan 0049 (`recommended()`) is real: without that
-preset, the generated `arch.rules.ts` either calls nothing (worthless)
-or is much longer (more brittle template, harder to keep current as
-the rule library grows). Land 0049 first.
+The dependencies are real: **plan 0049** (thin `recommended()`) gives the
+generated file its one-line anchor, and **plan 0060** (the `check`
+preset-style fix) is what lets that file run at all under `ts-archunit check`.
+Land both before `init`.
+
+## Review findings — 2026-07-13
+
+Reviewed via the `review-proposal` skill (architect + product lenses), grounded against `resolve-config.ts`, `load-rules.ts`, `cli/index.ts`, `cli/config.ts`. Existing-code survey: **no duplication** — `init` is new and the CLI infra it extends (commands dispatch, `defineConfig`/`CliConfig`, `runBaseline`) all exist.
+
+**Verdict: Rewrite the plan.** Right idea and right scope instincts, but as drafted it generates a project that fails — or silently false-passes — on the first run.
+
+### Blocking (fix before implementation)
+
+- **RESOLVED 2026-07-13 — generate `ts-archunit.config.ts`.** The discoverable name `resolveConfig` (`src/cli/resolve-config.ts:5`) actually searches for. `arch.config.ts` (undiscoverable) is gone; "zero further configuration" now holds.
+- **RESOLVED 2026-07-13 — Option A.** Confirmed against `load-rules.ts`: `loadRuleFiles` only accepts a default-export of builders, so a bare `recommended(p)` file silently passes on zero rules or crashes on import-throw. Fix: teach `check`/`loadRuleFiles` to support preset-style self-executing files (wrap import, catch `ArchRuleError`, extract violations) — mirrors 0044's MCP execution model, independently valuable. The generated file stays a simple `recommended(p)` call. Gated by a Phase 0 spike. `--with-vitest` (the contradicting consumer) is deferred out of v1. See "Execution model."
+
+### Should-fix
+
+All RESOLVED 2026-07-13 in the plan body:
+- File placement → `src/cli/commands/init.ts` + dispatch branch (Phase 1).
+- Flags → extend the shared `parseArgs` table; `--no-baseline` handled explicitly (Phase 1).
+- package.json write → zero-dep detect-indent path; fidelity promise dropped (Phase 2).
+- `--preset` → constrained to exported presets; shape-specific presets get placeholder globs + a comment (API + Phase 2).
+- Write atomicity → temp+rename / stage-then-flush (Phase 2).
+- Closing message → specified, branched on brownfield vs greenfield (Phase 2).
+- `--with-vitest` → deferred out of v1 (see "Deferred to a later version").
+
+### Praise
+
+- No-interactive-prompts, non-destructive-unless-`--force` + `--dry-run`, inline templates (not shipped `.tpl` files), and no framework auto-detection (ADR-006) are all correct calls.
+
+**Next step:** gate behind a fixed 0049; fix the two blocking bugs (config name + execution model) in the plan first; then it's a real 0.5–1 day.

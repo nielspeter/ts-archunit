@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-07-03
+**Updated:** 2026-07-13
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 46 completed + proposal 010, 0 remaining
+**Total Plans:** 48 completed + proposal 010, 7 open (see "Open Plans" below)
 
 ---
 
@@ -181,21 +181,40 @@
 
 ---
 
-## Next
+## Open Plans
 
-| Priority | Plan                        | Effort | Status | Depends on |
-| -------- | --------------------------- | ------ | ------ | ---------- |
-| **P0**   | AI Agent Integration (0044) | 3 days | Ready  | 0040, 0043 |
+Seven plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
 
-### Plan 0044 phases
+Plans 0047–0055 were reviewed 2026-07-13 (architect + product) and their key design decisions locked — each carries a `Review` line in its Status block and a `## Review findings` section. Plan 0060 was split out of 0050 during that review.
 
-1. **MCP Server** (1.5 days) — `check_architecture` + `explain_rules` tools for real-time agent feedback
-2. **System Prompt Generator** (0.5 day) — `ts-archunit context` outputs agent-optimized markdown
-3. **Agent Guardrails Preset** (0.5 day) — one-liner preset for common AI agent mistakes
-4. **Documentation** (0.5 day) — AI agent setup guide, MCP reference
+| Priority | Plan                                            | Effort      | State                     | Depends on |
+| -------- | ----------------------------------------------- | ----------- | ------------------------- | ---------- |
+| **P0**   | Agent-Facing Rule Surface (0044)                | ~1.5 days   | Ready                     | 0040, 0043 |
+| **P2**   | `tsconfig()` Config-Assertion Rule (0055)       | 0.5–1 day   | Reviewed — flat API       | none       |
+| **P2**   | TypeScript Escape-Hatch Matchers (0047)         | ~1 day      | Reviewed — module-only    | 0046       |
+| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048)    | ~1–1.5 days | Reviewed — `@deprecated`  | 0011, 0013, 0046 |
+| **P2***  | `check` Unified Pipeline / Preset Support (0060) | ~1 day      | Reviewed — Option 2       | 0020, 0016, 0040 |
+| **P2***  | `recommended()` Sensible-Defaults Preset (0049) | 0.5 day     | Reviewed — thin + returning form | standard rules, 0060 |
+| **P2***  | `ts-archunit init` CLI Scaffolder (0050)        | 0.5–1 day   | Reviewed — returning form | 0049, 0060 |
+
+\* Draft priority is TBD (likely P2 once approved).
+
+**Build sequence** (least-dependent first): **0055 → 0047 → 0048 → 0060 → 0049 → 0050.** 0044 (Agent-Facing Rule Surface) is independent and can slot anywhere. 0060 (the CLI's severity-aware unified pipeline + preset support) was split out of 0050's review — it's an independently-valuable gap (presets don't run under `check` today, and warns bypass baseline/format) and a hard prerequisite for both `recommended`'s returning form (0049) and the `init` scaffolder (0050).
+
+### Plan 0044 phases (MCP server dropped — the CLI already exposes the same surface)
+
+1. **Agent-Optimized Explain Format** (0.5 day) — `explain --format agent` emits imperative markdown for system prompts; new `imperative` field on rule metadata/description
+2. **Agent Guardrails Preset** (0.5 day) — `agentGuardrails(p, {...})` one-liner bundling function-variant body-analysis rules for common agent mistakes
+3. **Documentation** (0.5 day) — `docs/ai-agents.md` + getting-started / cli / presets updates
+
+The original MCP server (`check_architecture` / `explain_rules`) was deferred — it duplicated `npx ts-archunit check --format json` / `explain` without adding capability. See 0044's "Deferred: MCP server" section (revisit only if cold-start latency is measured to hurt the agent loop, and evaluate a CLI daemon before MCP).
+
+### Adoption cluster (0060 → 0049 → 0050)
+
+0060 (severity-aware unified `check` pipeline), 0049 (thin `recommended()`, returning form), and 0050 (`init` scaffolder) form the onboarding chain. The design (Option 2, decided 2026-07-13): `recommended()` returns severity-carrying builders; the generated `arch.rules.ts` does `export default [...recommended(p)]`; 0060's pipeline runs them with baseline/format/severity applied uniformly (so the two `warn` rules are baseline-filtered, not lost to `console.warn`). Build 0060 first (the pipeline), then 0049 (returning-form recommended), then 0050. 0055, 0047, and 0048 stand alone. Design decisions for 0047–0060 are locked (see each plan's `## Review findings` / design-decision sections); they still need a scheduling/go decision.
 
 ---
 
 ## Completed
 
-43 of 43 original plans implemented + proposal 010 (JSX Element Rules) + plan 0046 (TypeScript Assertion Matchers). 1861 tests across 141 files.
+48 plans implemented + proposal 010 (JSX Element Rules). Latest: `jsxText()` matcher (0056, v0.12.0). 1910 tests across 140 files.

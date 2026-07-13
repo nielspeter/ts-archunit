@@ -3,8 +3,9 @@
 ## Status
 
 - **State:** PROPOSED
+- **Review (2026-07-13):** Ship with changes. **Decisions applied 2026-07-13:** (1) scope — `anyAnnotation`/`broadType`/`tsDirective` ship module-only, `doubleCast` all 3 scopes (Option A, no signature-aware traversal); (2) `tsDirective` kept with a shared `matchCommentRanges()` helper + `{ allow: [...] }` shape; (3) added the "Position relative to typescript-eslint" section. Plan text ready; build scheduled later. See "Review findings" below.
 - **Priority:** P2 — extends the existing `rules/typescript` family; no blockers
-- **Effort:** 1 day
+- **Effort:** ~1 day (module-only scope; no signature-aware traversal)
 - **Created:** 2026-04-19
 - **Depends on:** 0046 (typeAssertion + nonNullAssertion matchers landed the pattern)
 
@@ -51,12 +52,17 @@ belong next to `typeAssertion()` and `nonNullAssertion()` in
 
 - Four new matchers in `src/helpers/matchers.ts`:
   - `anyAnnotation()` — every explicit `any` type
-  - `tsDirective(kinds?)` — `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck`
+  - `tsDirective(options?)` — `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck`
   - `broadType(options?)` — `Function` / `Object` / `{}`
   - `doubleCast(options?)` — nested `as X as Y`
-- Rule variants in `src/rules/typescript.ts` for class / function /
-  module, matching the 0046 convention (one-line delegations to
-  `classNotContain` / `functionNotContain` / `moduleNotContain`).
+- Rule variants in `src/rules/typescript.ts` (one-line delegations to
+  `classNotContain` / `functionNotContain` / `moduleNotContain`), scoped
+  to where the body-traversal engine can actually reach the target nodes
+  (see "Rule-variant scope"):
+  - `anyAnnotation` / `broadType` / `tsDirective` — **module variant only**
+  - `doubleCast` — class / function / module (all three)
+- A "Position relative to typescript-eslint" section (see below) — why
+  these matchers earn their place next to the lint catalog.
 - Tests for each matcher and each rule variant.
 - Documentation in `docs/body-analysis.md`, `docs/standard-rules.md`,
   `docs/api-reference.md`, and `CHANGELOG.md`.
@@ -76,6 +82,27 @@ belong next to `typeAssertion()` and `nonNullAssertion()` in
 - **Tier 2 boundary-validation preset** — deferred to plan 0048.
 - **Tier 3 dataflow-lite** — out of scope; design phase only, not a
   ticket yet.
+
+## Position relative to typescript-eslint
+
+These matchers overlap established lint rules — `@typescript-eslint/no-explicit-any`, `ban-ts-comment`, `no-unsafe-function-type`, `no-empty-object-type`. Shipping them does not replace those tools; it puts the same checks in the **primitive layer** where they compose with project-shape predicates:
+
+- **Architectural cut.** `modules(p).that().resideInFolder('src/domain/**').should().satisfy(moduleNoAnyAnnotations())` bans `any` in the domain layer while tolerating it at `src/adapters/**` untyped-library boundaries — a folder-scoped policy that a flat lint rule + `overrides` matrix grows brittle expressing past a couple of splits.
+- **Baseline adoption.** Adopt incrementally on an existing codebase via the same `withBaseline()` flow as every other rule.
+- **One test artifact.** Architecture rules live in one place, fail PRs like unit tests, no second tool / config / CI step.
+
+Same generic-primitive-vs-rule-catalog distinction as vitest vs. a preconfigured runner (mirrors plan 0048's positioning). The catalog is convenient when its rules match your needs; the primitive layer is what you compose when they don't. Many teams run both.
+
+## Rule-variant scope — why `anyAnnotation`/`broadType`/`tsDirective` are module-only
+
+The rule variants delegate to `classNotContain` / `functionNotContain` / `moduleNotContain`, which walk different node sets:
+
+- `moduleNotContain` → `searchModuleBody` does a **full-file descendant walk** — it reaches every `any`/broad-type position (parameters, return types, property declarations, locals).
+- `classNotContain` / `functionNotContain` → `searchClassBody` / `searchFunctionBody` (`src/helpers/body-traversal.ts:84,130`) walk only method/constructor/accessor **bodies**. Parameter types, return types, and property declarations are *siblings* of the body, not descendants — so a class/function-scoped `anyAnnotation`/`broadType` rule would silently miss `data: any`, `m(x: any)`, `m(): any`, `function f(a: any): any`. False confidence, worse than not shipping.
+
+**Decision (2026-07-13):** ship `anyAnnotation`, `broadType`, and `tsDirective` as **module-scoped rules only**. Module scope fully covers the common "ban `any`/broad types in this area of the codebase" rule (scope by folder with a `resideInFolder` predicate). `doubleCast` is an in-body expression, so it ships all three scopes unaffected. `tsDirective` is module-only for the additional reason that suppression comments are file-level trivia.
+
+Class/function-scoped `any`/broad-type bans — the niche "strict this class, loose its file-mate" case — are deferred to a future plan that adds a signature-aware traversal (params + return + property positions) to `body-traversal.ts`. Not built on speculation here.
 
 ## Design
 
@@ -119,7 +146,7 @@ production code. Teams that need to allow it in a specific folder use
 per-rule exclusions (plan 0026) or `resideInFolder` predicates, not
 matcher options.
 
-### Matcher 2: `tsDirective(kinds?)`
+### Matcher 2: `tsDirective(options?)`
 
 **What it matches:** the three TypeScript suppression comments.
 
@@ -134,29 +161,46 @@ matcher options.
 1. Ergonomics — users don't have to memorize the three names.
 2. Message quality — `file contains @ts-ignore directive at line 42` is
    clearer than `comment containing '@ts-ignore'`.
-3. Selective allowance — `tsDirective(['ts-expect-error'])` bans
-   `@ts-ignore` and `@ts-nocheck` while keeping `@ts-expect-error`
+3. Selective allowance — `tsDirective({ allow: ['ts-expect-error'] })`
+   bans `@ts-ignore` and `@ts-nocheck` while keeping `@ts-expect-error`
    (which is safer because it fails when the suppression becomes
    unnecessary).
 
-**Implementation sketch:** delegate to the existing `comment()`
-traversal (visit every node's leading/trailing comment ranges with
-dedup), but test against a known set of directives rather than a
-user-supplied pattern.
+**Implementation sketch:** first **extract a shared
+`matchCommentRanges(node, predicate)` helper** from the existing
+`comment()` matcher — it currently owns the leading/trailing
+comment-range traversal + dedup inside its closure (`matchers.ts:303-333`).
+Both `comment()` and `tsDirective()` call the shared helper; no
+copy-pasted trivia logic. `tsDirective()` tests each comment against the
+directive set rather than a user-supplied pattern.
 
 ```typescript
 export type TsDirective = 'ts-ignore' | 'ts-expect-error' | 'ts-nocheck'
 
-export function tsDirective(kinds?: readonly TsDirective[]): ExpressionMatcher {
-  const allowed = new Set<TsDirective>(kinds ?? ['ts-ignore', 'ts-expect-error', 'ts-nocheck'])
-  // match comments whose text contains any of the allowed directives
-  // (reuse the dedup + leading/trailing traversal logic from comment())
+export interface TsDirectiveOptions {
+  /**
+   * Directives to ALLOW (not flag). Default `[]` — all three are banned.
+   * e.g. `{ allow: ['ts-expect-error'] }` bans `@ts-ignore` + `@ts-nocheck`
+   * but permits `@ts-expect-error` (safer — it errors when the suppression
+   * becomes unnecessary).
+   */
+  readonly allow?: readonly TsDirective[]
+}
+
+export function tsDirective(options?: TsDirectiveOptions): ExpressionMatcher {
+  const allowed = new Set<TsDirective>(options?.allow ?? [])
+  const banned = (['ts-ignore', 'ts-expect-error', 'ts-nocheck'] as const).filter(
+    (d) => !allowed.has(d),
+  )
+  // match comments whose text contains any BANNED directive,
+  // via the shared matchCommentRanges() helper.
   ...
 }
 ```
 
-**Default:** all three directives banned. Passing a subset allow-lists
-the rest.
+**Default:** all three directives banned. `{ allow: [...] }` opts specific
+directives out — an explicit allow-list, not the inverted "pass the ones
+you keep" shape of the original sketch.
 
 **Edge case:** `@ts-nocheck` only has effect as the first non-trivia
 line of a file. We don't enforce position — if a user writes it
@@ -213,6 +257,17 @@ export function broadType(options?: BroadTypeOptions): ExpressionMatcher {
 - `unknown[]` — not a broad type in the same sense; `unknown` forces
   narrowing at use. A team that wants to ban it can `expression(/: unknown/)`.
 
+**Known limitations (document these):**
+
+- Name-based, no symbol resolution — a user-defined `interface Function {}` or
+  a local type named `Object` would match (false positive). Acceptable given
+  the pure-AST constraint (ADR-002), but call it out. Namespaced forms like
+  `NS.Function` (a `QualifiedName`) won't match.
+- `empty: true` (default) bans the legitimate `<T extends {}>` "non-nullish"
+  generic-constraint idiom. Teams that use it override `broadType({ empty: false })`
+  or scope the rule. Documented so it isn't a surprise; the default stays on
+  because bare `: {}` annotations are far more often a mistake than intent.
+
 ### Matcher 4: `doubleCast(options?)`
 
 **What it matches:** `AsExpression` whose direct child expression is
@@ -267,43 +322,41 @@ double-reporting.
 
 ### Rule variants in `src/rules/typescript.ts`
 
-Follow plan 0046's convention exactly. Each of the four matchers gets
-three rule variants (class / function / module) as one-line
-delegations. Twelve new rule functions, all trivial wrappers:
+Follow plan 0046's convention (one-line delegations), scoped per the
+"Rule-variant scope" decision above. **Six** new rule functions:
 
 ```typescript
-// any annotation
-export function noAnyAnnotations(): Condition<ClassDeclaration> {
-  return classNotContain(anyAnnotation())
-}
-export function functionNoAnyAnnotations(): Condition<ArchFunction> {
-  return functionNotContain(anyAnnotation())
-}
+// any annotation — module-only (body traversal can't reach param/return/property positions)
 export function moduleNoAnyAnnotations(): Condition<SourceFile> {
   return moduleNotContain(anyAnnotation())
 }
 
-// ts-directive (module-scope only — directives are file-level comments;
-// class/function variants would be confusing since `@ts-nocheck` must be
-// at file top. Ship module variant first; add class/function if demand shows up.)
-export function moduleNoTsDirectives(kinds?: readonly TsDirective[]): Condition<SourceFile> {
-  return moduleNotContain(tsDirective(kinds))
+// broad type — module-only (same reason)
+export function moduleNoBroadTypes(options?: BroadTypeOptions): Condition<SourceFile> {
+  return moduleNotContain(broadType(options))
 }
 
-// broad type
-export function noBroadTypes(options?: BroadTypeOptions): Condition<ClassDeclaration> { ... }
-export function functionNoBroadTypes(options?: BroadTypeOptions): Condition<ArchFunction> { ... }
-export function moduleNoBroadTypes(options?: BroadTypeOptions): Condition<SourceFile> { ... }
+// ts-directive — module-only (file-level suppression comments)
+export function moduleNoTsDirectives(options?: TsDirectiveOptions): Condition<SourceFile> {
+  return moduleNotContain(tsDirective(options))
+}
 
-// double cast
-export function noDoubleCasts(options?: DoubleCastOptions): Condition<ClassDeclaration> { ... }
-export function functionNoDoubleCasts(options?: DoubleCastOptions): Condition<ArchFunction> { ... }
-export function moduleNoDoubleCasts(options?: DoubleCastOptions): Condition<SourceFile> { ... }
+// double cast — in-body expression, so all three scopes ship
+export function noDoubleCasts(options?: DoubleCastOptions): Condition<ClassDeclaration> {
+  return classNotContain(doubleCast(options))
+}
+export function functionNoDoubleCasts(options?: DoubleCastOptions): Condition<ArchFunction> {
+  return functionNotContain(doubleCast(options))
+}
+export function moduleNoDoubleCasts(options?: DoubleCastOptions): Condition<SourceFile> {
+  return moduleNotContain(doubleCast(options))
+}
 ```
 
-**Rule count:** 10 new rule functions (4 matchers × 3 variants, minus 2
-class/function variants for `tsDirective` which don't make semantic
-sense). `tsDirective` is module-only.
+**Rule count:** 6 new rule functions — `doubleCast` ×3 scopes + one
+module variant each for `anyAnnotation` / `broadType` / `tsDirective`.
+Class/function variants for the three module-only matchers are deferred
+(see "Rule-variant scope").
 
 ### Naming
 
@@ -324,7 +377,12 @@ export {
   broadType,
   doubleCast,
 } from './helpers/matchers.js'
-export type { TsDirective, BroadTypeOptions, DoubleCastOptions } from './helpers/matchers.js'
+export type {
+  TsDirective,
+  TsDirectiveOptions,
+  BroadTypeOptions,
+  DoubleCastOptions,
+} from './helpers/matchers.js'
 ```
 
 Rule variants re-export via the existing `./rules/typescript` sub-path;
@@ -334,31 +392,33 @@ no index.ts change needed there.
 
 ### Phase 1 — Matchers (~1 hour)
 
-1. Add `anyAnnotation()`, `tsDirective()`, `broadType()`, `doubleCast()`
+1. Extract a shared `matchCommentRanges(node, predicate)` helper from
+   `comment()` (used by both `comment()` and `tsDirective()`).
+2. Add `anyAnnotation()`, `tsDirective()`, `broadType()`, `doubleCast()`
    and associated types to `src/helpers/matchers.ts`.
-2. Export from `src/index.ts`.
+3. Export from `src/index.ts`.
 
 **Files changed:**
 
-- `src/helpers/matchers.ts` — +4 matchers (~80 LOC)
+- `src/helpers/matchers.ts` — extract `matchCommentRanges()`; +4 matchers (~90 LOC)
 - `src/index.ts` — +4 exports
 
 ### Phase 2 — Rule variants (~30 min)
 
-3. Add the 10 new rule functions to `src/rules/typescript.ts` as
-   one-liners.
+4. Add the 6 new rule functions to `src/rules/typescript.ts` as
+   one-liners (per "Rule-variant scope").
 
 **Files changed:**
 
-- `src/rules/typescript.ts` — +10 rule functions (~70 LOC of mostly
+- `src/rules/typescript.ts` — +6 rule functions (~45 LOC of mostly
   JSDoc + one-line bodies)
 
 ### Phase 3 — Tests (~2–3 hours)
 
-4. Matcher unit tests in a new
+5. Matcher unit tests in a new
    `tests/helpers/matchers-escape-hatch.test.ts` (mirror
    `matchers-typescript.test.ts` from plan 0046).
-5. Rule smoke tests in
+6. Rule smoke tests in
    `tests/rules/typescript-escape-hatch.test.ts`.
 
 **Files changed:**
@@ -368,14 +428,14 @@ no index.ts change needed there.
 
 ### Phase 4 — Docs (~1 hour)
 
-6. `docs/body-analysis.md` — document 4 new matchers alongside
+7. `docs/body-analysis.md` — document 4 new matchers alongside
    `typeAssertion`, `nonNullAssertion`. Update count 9 → 13.
 7. `docs/standard-rules.md` — add the new rules to the TypeScript
    section with examples.
 8. `docs/api-reference.md` — extend the matcher and rules tables.
 9. `CHANGELOG.md` — `### Added` entries under Unreleased.
 
-## Test strategy (~25 tests)
+## Test strategy (~21 tests)
 
 ### Matcher tests (15)
 
@@ -392,7 +452,7 @@ no index.ts change needed there.
 - Matches `// @ts-ignore` line comment
 - Matches `/* @ts-expect-error */` block comment
 - Matches `// @ts-nocheck` at file top
-- Respects `kinds` allow-list: `tsDirective(['ts-expect-error'])`
+- Respects the allow-list: `tsDirective({ allow: ['ts-expect-error'] })`
   does NOT match `@ts-expect-error` but DOES match the other two
 
 `broadType()` — 4 tests:
@@ -410,11 +470,13 @@ no index.ts change needed there.
 - Does NOT match `x as A as B` when `throughUnknownOrAny: true`
   (inner type isn't `unknown`/`any`)
 
-### Rule smoke tests (10)
+### Rule smoke tests (6)
 
-One happy path + one violation per rule variant for each of the 10 new
+One happy path + one violation per rule variant for each of the 6 new
 rule functions. Each test instantiates the fixture project, runs the
-rule, asserts violation count.
+rule, asserts violation count. (The module-only matchers are exercised
+against param/return/property positions to lock the full-file coverage
+that class/function scope could not provide.)
 
 ### Existing test impact
 
@@ -427,11 +489,11 @@ coverage.
 
 | File                                          | Change                                     |
 | --------------------------------------------- | ------------------------------------------ |
-| `src/helpers/matchers.ts`                     | +4 matchers + 3 option/union types         |
-| `src/rules/typescript.ts`                     | +10 rule functions (one-liners)            |
-| `src/index.ts`                                | +4 matcher exports, +3 type exports        |
+| `src/helpers/matchers.ts`                     | Extract `matchCommentRanges()`; +4 matchers + 4 option/union types |
+| `src/rules/typescript.ts`                     | +6 rule functions (one-liners)             |
+| `src/index.ts`                                | +4 matcher exports, +4 type exports        |
 | `tests/helpers/matchers-escape-hatch.test.ts` | new — 15 matcher tests                     |
-| `tests/rules/typescript-escape-hatch.test.ts` | new — 10 rule smoke tests                  |
+| `tests/rules/typescript-escape-hatch.test.ts` | new — 6 rule smoke tests                   |
 | `docs/body-analysis.md`                       | Document 4 new matchers, update count 9→13 |
 | `docs/standard-rules.md`                      | Add rules with examples                    |
 | `docs/api-reference.md`                       | Update matcher + rules tables              |
@@ -448,16 +510,18 @@ No `package.json` changes, no new runtime dependencies.
   the `typeAssertion` / `nonNullAssertion` pair left open:
   - `anyAnnotation()` — every explicit `any` in a type position
     (annotations, parameters, returns, generics).
-  - `tsDirective(kinds?)` — `@ts-ignore`, `@ts-expect-error`,
-    `@ts-nocheck` suppression comments. Pass a subset to allow-list.
+  - `tsDirective(options?)` — `@ts-ignore`, `@ts-expect-error`,
+    `@ts-nocheck` suppression comments. Pass `{ allow: [...] }` to
+    permit specific directives.
   - `broadType(options?)` — `Function`, `Object`, `{}` type annotations.
   - `doubleCast(options?)` — `x as A as B` type laundering. Pass
     `{ throughUnknownOrAny: true }` to match only the common
     `as unknown as T` form.
-- **Ten new rule variants in `rules/typescript`** — `noAnyAnnotations`,
-  `noBroadTypes`, `noDoubleCasts` with class/function/module flavors,
-  plus `moduleNoTsDirectives` (directives are file-level; no class or
-  function variant).
+- **Six new rule variants in `rules/typescript`** — `noDoubleCasts`
+  with class/function/module flavors, plus module-only
+  `moduleNoAnyAnnotations`, `moduleNoBroadTypes`, `moduleNoTsDirectives`
+  (see "Rule-variant scope" — the body-traversal engine can't reach
+  type-position nodes at class/function scope).
 ```
 
 ## Rollout
@@ -475,3 +539,30 @@ migration guide needed.
 - **`as any`** — already caught by `typeAssertion()` + `anyAnnotation()`
   when both are enabled. No dedicated matcher.
 - **`satisfies` operator** — the preferred alternative, not a problem.
+
+## Review findings — 2026-07-13
+
+Reviewed via the `review-proposal` skill (architect + product lenses), grounded against the actual body-traversal engine. Existing-code survey: **no duplication** — all four matchers are new and follow the shipped 0046 `ExpressionMatcher` pattern.
+
+**Verdict: Ship with changes.** Two of the four matchers are mis-scoped as written; one is largely redundant; the two that carry the weight (`doubleCast`, `anyAnnotation`) are sound.
+
+### Blocking (fix before implementation)
+
+- **`anyAnnotation()` and `broadType()` class/function rule variants silently miss their primary positions.** `classNotContain`/`functionNotContain` delegate to `searchClassBody`/`searchFunctionBody` (`src/helpers/body-traversal.ts:84,130`), which walk only method/constructor/accessor bodies. Parameter type annotations, return-type annotations, and property declarations are **siblings** of the body, not descendants — so `noAnyAnnotations()` (class) misses `data: any`, `m(x: any)`, `m(): any`, and `functionNoAnyAnnotations()` misses `function f(a: any): any` entirely. This is false confidence, worse than not shipping. The **module** variants work (full-file descendant walk); `doubleCast` works at all scopes (in-body expression). **RESOLVED 2026-07-13 — Option A (module-only):** `anyAnnotation`/`broadType`/`tsDirective` ship module-scoped rules only; `doubleCast` keeps all three scopes. Rule count drops from 10 → 6. Class/function scope deferred to a future signature-aware-traversal plan. See the "Rule-variant scope" section in the plan body.
+
+### Should-fix
+
+- **RESOLVED 2026-07-13 — added.** "Position relative to typescript-eslint" section is now in the plan body, with the `domain/**` vs `adapters/**` composability example. (0047 overlapped `no-explicit-any`, `ban-ts-comment`, `no-unsafe-function-type`, `no-empty-object-type` and had no positioning; now it does.)
+- **RESOLVED 2026-07-13 — kept + fixed.** `tsDirective` stays for its typed allow-list, but the plan now specifies extracting a shared `matchCommentRanges(node, predicate)` helper (used by both `comment()` and `tsDirective()` — no copy-pasted trivia-dedup), and the option shape is now the explicit `{ allow: [...] }` instead of the inverted "pass the ones you keep."
+- **`broadType` false-positives on user-defined `Function`/`Object` types** (name-based `getTypeName().getText()`, no symbol resolution), and `{}`-default-on bans the legit `<T extends {}>` generic-constraint idiom. Reconsider defaulting `empty` on; document the shadowing limitation.
+- **Soften "`any` is never correct in production code"** — the blunt matcher is right, but state the escape hatch (scope the *rule* with `resideInFolder`/exclusions) explicitly rather than the absolutist claim.
+
+### Minor
+
+- RESOLVED 2026-07-13 — the rule-variant section was rewritten to the module-only scope; the count is now a consistent **6** throughout (the stale "twelve"/"10" figures are gone).
+
+### Praise
+
+- `doubleCast()`'s anti-double-report logic is correct and it's the highest-value matcher (uniquely not expressible otherwise). Non-goals section is exemplary scope discipline. ADR-005 clean in all sketches.
+
+**Value ranking (both reviewers):** `doubleCast` > `anyAnnotation` > `broadType` > `tsDirective`. Lead with `doubleCast`'s uniqueness, not catalog symmetry.
