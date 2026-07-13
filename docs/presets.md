@@ -157,6 +157,8 @@ export default [
 
 Uses function-variant rules, so standalone functions, arrow functions, and class methods are all covered. Each rule carries `because` / `suggestion` / `imperative` metadata so the agent gets an actionable fix in `explain --format agent` and `check --format json`. Accepts the same `overrides` map as every preset (below).
 
+> `agentGuardrails` overlaps a general `recommended` floor on empty bodies and `eval`. Running both double-reports those locations (different rule ids). For agent-focused projects, prefer `agentGuardrails` alone; otherwise override the duplicated ids to `'off'` in one preset.
+
 ## Overrides
 
 Every preset accepts `overrides` to change individual rule severity:

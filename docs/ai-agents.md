@@ -55,8 +55,11 @@ Generate an imperative rule block and append it to the agent's instructions:
 npx ts-archunit explain arch.rules.ts --format agent >> CLAUDE.md
 ```
 
-The output is a self-contained block wrapped in sentinel markers so re-running
-replaces it in place:
+The output is a self-contained block wrapped in sentinel markers. The command
+writes to stdout, so `>>` **appends** — running it twice stacks two blocks. The
+markers delimit a managed span: to regenerate cleanly, replace the text between
+`<!-- ts-archunit:start -->` and `<!-- ts-archunit:end -->` (your editor or a
+small `sed`/`awk` splice), or generate into a dedicated file the agent reads.
 
 ```markdown
 <!-- ts-archunit:start -->
@@ -125,6 +128,16 @@ export default [
   // + layered/boundary rules as builders
 ]
 ```
+
+::: warning
+Entries must be **un-terminated builders** — do not end your own rules with
+`.check()` / `.warn()` (those execute immediately and are silently skipped by
+the runner). See [CLI § rule files](/cli#rule-files).
+:::
+
+If you also run the [`recommended`](/presets) preset, note it overlaps
+`agentGuardrails` on empty bodies and `eval` — use `agentGuardrails` alone for
+agent setups, or override the duplicated ids to `'off'` in one of them.
 
 ## Why no MCP server?
 
