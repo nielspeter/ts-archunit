@@ -216,6 +216,36 @@ describe('RuleBuilder', () => {
     })
   })
 
+  describe('.asSeverity()', () => {
+    it('is non-terminal — sets severity, returns this, does not throw or warn', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const configured = builder.should().withCondition(alwaysFail('bad'))
+      const chained = configured.asSeverity('warn')
+      expect(chained).toBe(configured)
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+
+    it('stamps warn severity onto .violations()', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(alwaysFail('bad'))
+        .asSeverity('warn')
+        .violations()
+      expect(violations.length).toBeGreaterThan(0)
+      expect(violations.every((v) => v.severity === 'warn')).toBe(true)
+    })
+
+    it('defaults .violations() severity to error when asSeverity is not called', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder.should().withCondition(alwaysFail('bad')).violations()
+      expect(violations.length).toBeGreaterThan(0)
+      expect(violations.every((v) => v.severity === 'error')).toBe(true)
+    })
+  })
+
   describe('predicate combination', () => {
     it('ANDs multiple predicates together', () => {
       const builder = new TestRuleBuilder(stubProject, elements)

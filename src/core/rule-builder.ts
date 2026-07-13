@@ -28,6 +28,7 @@ export abstract class RuleBuilder<T> {
   protected _exclusions: (string | RegExp)[] = []
   protected _silentIndices: Set<number> = new Set()
   protected _phase: 'predicate' | 'condition' = 'predicate'
+  protected _severity?: 'error' | 'warn'
 
   constructor(protected readonly project: ArchProject) {}
 
@@ -174,12 +175,14 @@ export abstract class RuleBuilder<T> {
    */
   violations(): ArchViolation[] {
     const raw = this.evaluate()
-    return applyFilters(raw, {
+    const filtered = applyFilters(raw, {
       reason: this._reason,
       metadata: this._metadata,
       exclusions: this._exclusions,
       silentIndices: this._silentIndices,
     })
+    const sev: 'error' | 'warn' = this._severity ?? 'error'
+    return filtered.map((v) => ({ ...v, severity: sev }))
   }
 
   /**
@@ -220,6 +223,17 @@ export abstract class RuleBuilder<T> {
       },
       options,
     )
+  }
+
+  /**
+   * Set the severity this rule reports at WITHOUT executing it (non-terminal).
+   * Returns `this` so the builder can be collected into a rule array and run by
+   * the CLI pipeline; its `.violations()` stamp each result with this severity.
+   * Distinct from the terminal `.severity()` below, which executes immediately.
+   */
+  asSeverity(level: 'error' | 'warn'): this {
+    this._severity = level
+    return this
   }
 
   /**
