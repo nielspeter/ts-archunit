@@ -45,9 +45,12 @@ npx ts-archunit explain arch.rules.ts
 
 # Markdown table
 npx ts-archunit explain arch.rules.ts --markdown
+
+# Agent format — imperative markdown for a system prompt / project instructions
+npx ts-archunit explain arch.rules.ts --format agent >> CLAUDE.md
 ```
 
-Outputs a structured description of every rule — id, description, because, suggestion — without executing them. See [Explain Command](/explain) for use cases.
+Outputs a structured description of every rule — id, description, because, suggestion — without executing them. `--format agent` emits an imperative "Do NOT … / MUST …" block (with a check-in-loop preamble and sentinel markers) for AI coding agents — see [AI Agents](/ai-agents). See [Explain Command](/explain) for use cases.
 
 ## Options
 

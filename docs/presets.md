@@ -121,6 +121,42 @@ strictBoundaries(p, {
 
 Boundary folders are discovered dynamically from the glob pattern. `src/features/*` finds all immediate subdirectories under `src/features/`.
 
+## `agentGuardrails`
+
+Targets the mistakes AI coding agents make most often — inline logic, generic errors, stub comments, empty bodies, copy-paste. Where the presets above enforce _where_ code goes, `agentGuardrails` enforces _how_ it is written. See [AI Agents](/ai-agents) for the full workflow.
+
+Unlike the other presets, it **returns** severity-carrying builders (it does not throw), so you spread it into a rule file's default export:
+
+```typescript
+import { project } from '@nielspeter/ts-archunit'
+import { agentGuardrails } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+export default [
+  ...agentGuardrails(p, {
+    src: 'src/**',
+    noInlineLogic: ['parseInt', 'JSON.parse', 'eval'],
+    noGenericErrors: true,
+    noStubs: true,
+    noEmptyBodies: true,
+    noCopyPaste: true,
+  }),
+]
+```
+
+### Generated rules
+
+| Rule ID                              | Enforces                                    | Default |
+| ------------------------------------ | ------------------------------------------- | ------- |
+| `preset/agent/no-inline-logic/<api>` | No inline call to a banned API (one per entry) | error |
+| `preset/agent/no-generic-errors`     | No `throw new Error()` — use typed errors   | error   |
+| `preset/agent/no-stubs`              | No TODO/FIXME/"not implemented" stub comments | error |
+| `preset/agent/no-empty-bodies`       | No empty function bodies                    | error   |
+| `preset/agent/no-copy-paste`         | No near-identical function bodies (≥ 0.9 similarity) | warn |
+
+Uses function-variant rules, so standalone functions, arrow functions, and class methods are all covered. Each rule carries `because` / `suggestion` / `imperative` metadata so the agent gets an actionable fix in `explain --format agent` and `check --format json`. Accepts the same `overrides` map as every preset (below).
+
 ## Overrides
 
 Every preset accepts `overrides` to change individual rule severity:
