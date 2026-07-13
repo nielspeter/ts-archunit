@@ -7,7 +7,7 @@ How to roll ts-archunit out on a real project without drowning in violations or 
 Add rules in this order. Each rung is safe to stop on.
 
 1. **Floor** — `npx ts-archunit init` gives you [`recommended`](/presets#recommended): a handful of universally-dangerous checks that fire on almost no healthy code. This is your green baseline.
-2. **Shape** — add a [preset](/presets) that matches your architecture: `layeredArchitecture` for layers, `strictBoundaries` for feature modules, `dataLayerIsolation` for the repository pattern. One function call, several coordinated rules.
+2. **Shape** — add a [preset](/presets) that matches your architecture: `layeredArchitecture` for layers, `strictBoundaries` for feature modules, `dataLayerIsolation` for the repository pattern. One function call, several coordinated rules. **These run differently from the floor:** unlike `recommended`/`agentGuardrails` (which return builders you spread into `arch.rules.ts`), the shape presets _self-execute and throw_ on a violation, so today you run them in a [test file](/running-in-tests) (call `layeredArchitecture(p, {...})` inside an `it()`), not in the `export default [...]` array. A returning form for the rule-file path is planned.
 3. **Baseline** — on an existing codebase, run `npm run arch:baseline` and commit `arch-baseline.json` so only _new_ violations fail. See [Adopting on existing code](#adopting-on-an-existing-codebase).
 4. **CI** — wire `npx ts-archunit check --format github` into your PR pipeline (see [Getting Started](/getting-started)). Only gate CI _after_ the baseline is committed.
 5. **Custom rules — last** — encode the conventions specific to your team with [`definePredicate` / `defineCondition`](/custom-rules). These are the highest-value rules, but they're also the ones only you can write, so add them once the scaffolding is stable.
@@ -51,7 +51,7 @@ git add arch-baseline.json && git commit
 # only NOW gate CI on `npm run arch`
 ```
 
-As you fix legacy violations, regenerate the baseline to ratchet down — it can only shrink. Baseline identity is content-based and path-relative, so it's stable across machines and CI checkouts.
+As you fix legacy violations, regenerate the baseline to ratchet down — it can only shrink. A baselined violation is identified by its content (rule + element + message), not its file path, so the baseline is stable across machines and CI checkouts.
 
 ## Suppressing individual violations
 

@@ -8,8 +8,10 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Get Started', link: '/getting-started' },
+      { text: 'Guide', link: '/setup-best-practices' },
       { text: 'What to Check', link: '/what-to-check' },
-      { text: 'Reference', link: '/api-reference' },
+      { text: 'CLI', link: '/cli' },
+      { text: 'API', link: '/api-reference' },
       { text: 'GitHub', link: 'https://github.com/NielsPeter/ts-archunit' },
     ],
 

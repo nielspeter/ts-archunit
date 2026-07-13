@@ -9,8 +9,8 @@ Find your pain point, copy the rule. A gallery of real rules organized by what t
 **Adoption:** [Gradual Adoption](#gradual-adoption) · [Exclusions](#exclusions-permanent-exceptions) · [Rich Messages](#rich-violation-messages)
 **[Customizable recipes](#customizable-recipes)** — one-liners you adjust to your ORM / folders / domain terms.
 
-::: tip Which form are these in?
-Every snippet below ends in `.check()` — the **test-file** form. In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]`; a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+::: tip Rule file or test file?
+Snippets here end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
 :::
 
 ## Import Dependencies
@@ -610,6 +610,8 @@ classes(p).that().areExported().should().satisfy(haveJsDoc).check()
 
 These aren't shipped as standard rules because they need project-specific tuning — your ORM name, folder layout, or domain terms. Copy the one-liner and adjust the pattern.
 
+> Helpers used below (`call`, `newExpr`, `not`, `resideInFolder`, `silent`, `mustCall`, `noDeadModules`, `noUnusedExports`, `noStubComments`, `functionNoJsonParse`, `functionNoConsole`) all import from `@nielspeter/ts-archunit`.
+
 ### Logic placement — keep operations in the right layer
 
 DB queries belong in repositories, HTTP calls in gateways, parsing in validators. Customize the regex to your libraries (avoid broad patterns like `/query|execute/` — they match `executeTask`, `queryString`).
@@ -714,7 +716,7 @@ For broad exclusion patterns that legitimately match nothing in some workspaces,
 modules(p).that().resideInFolder('src/**').should().notHaveDefaultExport().check()
 
 // Too many exports suggests the file should be split (warn, don't fail)
-modules(p).that().resideInFolder('src/**').should().haveMaxExports(10).asSeverity('warn')
+modules(p).that().resideInFolder('src/**').should().haveMaxExports(10).warn()
 ```
 
 ### Centralized parsing & logging

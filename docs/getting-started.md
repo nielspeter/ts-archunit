@@ -27,7 +27,7 @@ Building with an AI coding agent? Scaffold the agent guardrails instead — `npx
 
 ## 2. First run
 
-Pick your case — this matters, because the `recommended` floor includes a couple of rules that _fail_ (e.g. no `eval`, no `Function` constructor):
+The `recommended` floor is thin — its only failing rules are no `eval` and no `Function` constructor, so a healthy codebase is usually green out of the gate. But as you add shape presets and your own rules (next steps), an existing codebase _will_ surface legacy violations. Get in the habit now — it's the safe default and costs nothing:
 
 **New or small project** — just run it. You'll almost certainly be green:
 
@@ -35,7 +35,7 @@ Pick your case — this matters, because the `recommended` floor includes a coup
 npm run arch
 ```
 
-**Existing codebase** — snapshot current violations first, so your first run isn't a wall of red for legacy code you haven't cleaned up yet:
+**Existing codebase** — snapshot current violations first, so your first gated run isn't a wall of red for legacy code you haven't cleaned up yet:
 
 ```bash
 npm run arch:baseline   # records today's violations as accepted debt
@@ -47,7 +47,7 @@ npm run arch            # now only NEW violations fail
 
 ## 3. What you just got
 
-The generated `arch.rules.ts` looks like this:
+The generated `arch.rules.ts` looks roughly like this (trimmed — the real file also has commented examples and an `agentGuardrails` pointer):
 
 ```typescript
 import { project } from '@nielspeter/ts-archunit'

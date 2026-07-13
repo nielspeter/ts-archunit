@@ -99,5 +99,5 @@ The forms differ only in how a rule is **terminated** and **run**. When you move
 | Run with     | `npm run arch` (`ts-archunit check`)             | `npx vitest run`                    |
 
 ::: warning Don't paste a `.check()` rule into a rule file
-A builder that ends in `.check()` (or `.warn()`) inside a CLI rule file's `export default [...]` array executes immediately and returns `undefined` — the CLI **silently skips it and the rule never runs**. In a rule file, leave builders un-terminated and use `.asSeverity('warn')` for warnings. (The reverse is safe: a bare builder in a test does nothing until you call `.check()`.)
+A builder that ends in `.check()` (or `.warn()`) inside a CLI rule file's `export default [...]` array executes immediately and returns `undefined` — the CLI **silently skips it**. Worse, if that `.check()` _fails_, it throws while the array is still being built, so **every other rule in the same file is dropped too** — a passing run that was actually enforcing nothing. In a rule file, leave builders un-terminated and use `.asSeverity('warn')` for warnings. (The reverse is safe: a bare builder in a test does nothing until you call `.check()`.)
 :::
