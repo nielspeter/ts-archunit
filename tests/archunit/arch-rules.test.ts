@@ -452,6 +452,8 @@ describe('Hygiene', () => {
       .excluding(
         'getVersion', // CLI: reads package.json version
         'withBaseline', // baseline: parses baseline JSON file
+        'readJsonc', // init: parses the user's tsconfig for source-root detection
+        'planPackageJson', // init: parses the user's package.json to merge scripts
       )
       .rule({
         id: 'security/no-json-parse',

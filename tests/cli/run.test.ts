@@ -62,6 +62,24 @@ describe('run', () => {
     expect(process.exitCode).toBe(1)
   })
 
+  it('lists the init subcommand and its flags in --help', async () => {
+    const chunks: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      chunks.push(String(chunk))
+      return true
+    })
+    await run(['--help'])
+    const output = chunks.join('')
+    expect(output).toContain('ts-archunit init')
+    expect(output).toContain('--preset')
+  })
+
+  it('sets exitCode=1 when init gets an invalid --preset', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await run(['init', '--preset', 'nope', '--tsconfig', 'definitely-missing.json'])
+    expect(process.exitCode).toBe(1)
+  })
+
   it('rejects a --format value not valid for check (e.g. agent)', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     await run(['check', 'rules.ts', '--format', 'agent'])

@@ -8,6 +8,7 @@ import { resolveConfig } from './resolve-config.js'
 import { runCheck } from './commands/check.js'
 import { runBaseline } from './commands/baseline.js'
 import { runExplain } from './commands/explain.js'
+import { runInit } from './commands/init.js'
 import { watchAndRerun } from './watch.js'
 
 function getVersion(): string {
@@ -20,11 +21,17 @@ const HELP_TEXT = `
 ts-archunit — Architecture testing for TypeScript
 
 Usage:
+  ts-archunit init                      Scaffold config + rules for a new project
   ts-archunit check [files...]          Run architecture rules
   ts-archunit baseline [files...]       Generate baseline file
   ts-archunit explain [files...]        Dump all active rules as JSON
 
 Options:
+  --preset <name>       init: starter preset — recommended (default) | agent-guardrails
+  --tsconfig <path>     init: tsconfig path to wire in (default: tsconfig.json)
+  --no-baseline         init: skip arch-baseline.json
+  --force               init: overwrite existing files
+  --dry-run             init: print what would be created; write nothing
   --baseline <path>     Baseline file for filtering known violations
   --output <path>       Output path for baseline file (default: arch-baseline.json)
   --changed             Only report violations in changed files (git diff)
@@ -50,6 +57,11 @@ interface ParsedArgs {
     version?: boolean
     watch?: boolean
     markdown?: boolean
+    preset?: string
+    tsconfig?: string
+    force?: boolean
+    'dry-run'?: boolean
+    'no-baseline'?: boolean
   }
   positionals: string[]
 }
@@ -68,6 +80,11 @@ export function parseCliArgs(args: string[]): ParsedArgs {
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', short: 'v', default: false },
       watch: { type: 'boolean', short: 'w', default: false },
+      preset: { type: 'string' },
+      tsconfig: { type: 'string' },
+      force: { type: 'boolean', default: false },
+      'dry-run': { type: 'boolean', default: false },
+      'no-baseline': { type: 'boolean', default: false },
     },
     allowPositionals: true,
     strict: true,
@@ -179,6 +196,19 @@ export async function run(args: string[]): Promise<void> {
   if (values.watch === true && command !== 'check') {
     console.error('Error: --watch is only supported with the check command.')
     process.exitCode = 1
+    return
+  }
+
+  // `init` scaffolds the config, so it runs before config resolution.
+  if (command === 'init') {
+    const code = runInit({
+      preset: values.preset,
+      tsconfig: values.tsconfig,
+      force: values.force,
+      dryRun: values['dry-run'],
+      noBaseline: values['no-baseline'],
+    })
+    if (code !== 0) process.exitCode = code
     return
   }
 
