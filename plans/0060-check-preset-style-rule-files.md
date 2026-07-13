@@ -5,7 +5,7 @@
 - **State:** DRAFT — captured for decision, not yet scheduled
 - **Review (2026-07-13):** Reviewed (architect + product). Design decision made — **Option 2 (returning form + unified pipeline)**; see "Design decision (RESOLVED)" below. Resolves the warn-path gates in 0049/0050.
 - **Priority:** TBD (likely P2 once approved)
-- **Effort:** ~1–1.5 days (the runCheck refactor + shared `filterAndReport` helper + two new primitives — `ArchViolation.severity` and a non-terminal `.asSeverity()`; see "Design decision" and "New primitives")
+- **Effort:** ~1.5 days (runCheck refactor + shared `filterAndReport` helper + two new primitives — `ArchViolation.severity` and non-terminal `.asSeverity()` — + the agent-facing `--format json` contract: single-document aggregation, `severity`, summary counts)
 - **Created:** 2026-07-13
 - **Depends on:** Nothing new. Builds on plan 0020 (CLI runner), 0016 (baseline), 0040 (`.violations()` / `throwIfViolations`).
 
@@ -77,13 +77,23 @@ Verified absent today (`src/core/rule-builder.ts:230` — `.severity()` is a ter
 1. `import` the file. `extractDefault` → array of **severity-carrying builders** — the shape both a builder-export file and a preset's returning form produce (`export default [...recommended(p), myRule(p)]`). `loadRuleFiles` stays a pure loader.
 2. `runCheck` reads each builder's `.asSeverity()` state (default `'error'`), collects `builder.violations()` (non-throwing terminal from plan 0040), and stamps each violation with that severity, into one list.
 3. **Fallback:** if `import()` itself throws `ArchRuleError` (a bare top-level throwing preset call with no export), catch it and add `err.violations` — **error-severity only** (documented limitation). A non-`ArchRuleError` throw (syntax error, bad tsconfig) is a real failure and propagates.
-4. The combined, severity-tagged list runs through a shared non-throwing `filterAndReport(violations, ctx, options): number` — baseline `filterNew` → diff `filterToChanged` → format-branch → count — formatting **per-source** (per builder) so multi-builder files keep their individual `reason`/metadata. Exit code = the **error**-severity count after filtering; warns are filtered + formatted but don't fail.
+4. The combined, severity-tagged list runs through a shared non-throwing `filterAndReport(violations, ctx, options): number` — baseline `filterNew` → diff `filterToChanged` → format-branch → count. Output is grouped **per-source** for the human/terminal + `github` formats (so multi-builder files keep their individual `reason`/metadata), while **`--format json` emits a single aggregated document** (see "Agent-facing `--format json` contract"). Exit code = the **error**-severity count after filtering; warns are filtered + formatted but don't fail.
 
 This is what makes **baseline + `--format` + warns all work with presets**: everything arrives as severity-tagged data through `.violations()`, so the CLI — not the preset — owns filtering, formatting, and the exit decision. Nothing self-prints via `console.warn`, so there is nothing to suppress.
 
 `filterAndReport` is extracted from the throwing `executeCheck` (`src/core/execute-rule.ts`) so both it and the new path share the three format branches (no drift).
 
 Broader framing: the contract is **"a rule file contributes severity-tagged violations — via exported builders' `.violations()`, or (best-effort) via an `ArchRuleError` thrown on import."** One pipeline, not two special shapes.
+
+### Agent-facing `--format json` contract (the agent loop consumes this)
+
+Plan 0044 makes `check --format json` the payload of the AI agent's edit loop, so the JSON contract is load-bearing here — and today's code doesn't meet it:
+
+1. **One JSON document, not per-builder blobs.** `executeCheck` currently writes `formatViolationsJson(...) + '\n'` **per builder** (`src/core/execute-rule.ts:112`), so a multi-builder file (`recommended` = 4 builders; `agentGuardrails` = several) emits several concatenated JSON objects — **not valid JSON**, so an agent's `JSON.parse` fails. The unified pipeline must aggregate **all** violations across all builders/sources into **one** `formatViolationsJson` call → a single parseable document. Per-source grouping (step 4 above) applies only to the human/terminal + `github` formats; **JSON is always one array** (each violation already carries its own `rule`/`because`/`suggestion` as fields, so aggregating loses nothing).
+2. **Serialize `severity`.** `formatViolationsJson` must include the new `ArchViolation.severity` field so the agent distinguishes blocking (`error`) from advisory (`warn`). The agent uses the process exit code (0/1) for pass/fail and per-violation `severity` to prioritize.
+3. **Summary counts.** Extend the JSON `summary` from `{ total, reason }` to also carry `{ errors, warnings }`, so the agent sees "N blocking, M advisory" without scanning the array.
+
+(`formatViolationsJson` is also gaining `codeFrame` in plan 0044 — coordinate the two edits to `src/core/format-json.ts`.)
 
 ### stdio hygiene (only the bare-throw fallback)
 
@@ -108,7 +118,9 @@ With the returning form, `export default [...layeredArchitecture builders, ...da
 - Returning-form file (`export default [...recommended(p)]`) with error violations → reported, exit 1.
 - Returning-form file with **only warn** violations → formatted + reported, **exit 0** (does not fail) — the case the throwing model couldn't handle.
 - Warn violations filtered by `withBaseline()` → suppressed on re-run (the brownfield baseline case).
-- `--format json` output includes **both** error and warn violations, severity-tagged.
+- `--format json` output includes **both** error and warn violations, each tagged with `severity`.
+- **Multi-builder file emits ONE valid JSON document** — `JSON.parse` of the full stdout succeeds (not concatenated per-builder blobs). This is the agent-loop contract.
+- JSON `summary` carries `{ total, errors, warnings }`.
 - Builder-export file still works (regression), incl. per-source `reason`/metadata preserved across multiple builders.
 - Bare throwing preset call (no export) → error-severity violations surface via the fallback catch, no double-print; documented warn-loss for this shape.
 - Syntax error / missing tsconfig → real error, non-zero, not a silent pass.
@@ -126,7 +138,8 @@ With the returning form, `export default [...layeredArchitecture builders, ...da
 | `src/core/violation.ts`                 | Add `severity: 'error' \| 'warn'` field (default `'error'`)             |
 | `src/core/rule-builder.ts` + `terminal-builder.ts` | Add non-terminal `.asSeverity(level): this` (sets `_severity`, no execute) |
 | `src/core/execute-rule.ts`              | Extract shared non-throwing `filterAndReport(violations, ctx, options)` |
-| `src/cli/commands/check.ts`             | Severity-aware unified pipeline: read `.asSeverity()` + collect `.violations()` → stamp → `filterAndReport`; error-count exit; best-effort import-time `ArchRuleError` catch |
+| `src/core/format-json.ts`               | Serialize `severity`; extend `summary` to `{ total, errors, warnings, reason }` (coordinate with 0044's `codeFrame`) |
+| `src/cli/commands/check.ts`             | Severity-aware unified pipeline: read `.asSeverity()` + collect `.violations()` → stamp → `filterAndReport`; **`--format json` aggregates ALL violations into one document**; error-count exit; best-effort import-time `ArchRuleError` catch |
 | `src/cli/load-rules.ts`                 | `RuleBuilderLike` gains `.violations()` + severity accessor; stays a pure loader (best-effort import-time `ArchRuleError` catch) |
 | `tests/cli/check-preset-style.test.ts`  | New                                                                    |
 | `docs/cli.md`                           | Document the unified pipeline + returning-form rule files              |
