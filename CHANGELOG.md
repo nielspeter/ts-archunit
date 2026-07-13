@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`recommended(p, options?)` preset** — a deliberately thin, universal safety floor for any TypeScript project: `functionNoEval` + `functionNoFunctionConstructor` (error), `functionNoSilentCatch` + `noEmptyBodies` (warn). Returns severity-carrying builders (`export default [...recommended(p)]`); ids `preset/recommended/*`; opt-in-ladder severity via `overrides`. Exported from `@nielspeter/ts-archunit/presets`. Overlaps `agentGuardrails` on empty-bodies + eval. (Plan 0049.)
 - **`agentGuardrails(p, options)` preset** — a one-liner bundling the mistakes AI coding agents make most often (inline logic, generic errors, stub comments, empty bodies, copy-paste). Returns severity-carrying builders (`export default [...agentGuardrails(p, { … })]`); each rule carries agent-facing `because` / `suggestion` / `imperative` metadata. Exported from `@nielspeter/ts-archunit/presets`. (Plan 0044.)
 - **`explain --format agent`** — emits an imperative "Do NOT … / MUST …" markdown block for AI-agent system prompts / project instructions, with a check-in-loop preamble and `<!-- ts-archunit:start/end -->` sentinel markers for idempotent updates. Backed by a new optional `imperative` field on `RuleMetadata` / `RuleDescription` (with a heuristic fallback). See the new **AI Agents** guide.
 - **`codeFrame` in `check --format json`** — each violation now includes the source snippet, so an agent can locate it without re-reading the file.

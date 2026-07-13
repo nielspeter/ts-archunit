@@ -121,6 +121,37 @@ strictBoundaries(p, {
 
 Boundary folders are discovered dynamically from the glob pattern. `src/features/*` finds all immediate subdirectories under `src/features/`.
 
+## `recommended`
+
+A deliberately **thin, universal safety floor** for any TypeScript project — the handful of things dangerous regardless of project shape that fire ~never on healthy code. It is _not_ a full architecture; shape-specific rules (layer order, cycles, delegation) are yours to add.
+
+Like `agentGuardrails`, it **returns** severity-carrying builders (it does not throw), so spread it into the default export:
+
+```typescript
+import { project } from '@nielspeter/ts-archunit'
+import { recommended } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+export default [
+  ...recommended(p),
+  // ...your shape-specific rules
+]
+```
+
+### Generated rules
+
+| Rule ID                                   | Enforces                                  | Default |
+| ----------------------------------------- | ----------------------------------------- | ------- |
+| `preset/recommended/no-eval`              | No `eval()`                               | error   |
+| `preset/recommended/no-function-constructor` | No `Function` constructor              | error   |
+| `preset/recommended/no-silent-catch`      | No empty/silent `catch` blocks            | warn    |
+| `preset/recommended/no-empty-bodies`      | No empty function bodies                  | warn    |
+
+Two `error`, two `warn`. The warn rules have known, suppressible false positives (intentional empty catches, no-op callbacks), so they surface without failing the build. Options: `include` (source glob, defaults to files under `src/`) and the shared `overrides` map (below). Adopt on an existing codebase with [`--baseline`](/cli#check-run-rules) for the warn rules.
+
+> Overlaps `agentGuardrails` on empty bodies and `eval` — for agent-focused projects prefer `agentGuardrails` alone, or override the duplicated ids to `'off'` in one preset.
+
 ## `agentGuardrails`
 
 Targets the mistakes AI coding agents make most often — inline logic, generic errors, stub comments, empty bodies, copy-paste. Where the presets above enforce _where_ code goes, `agentGuardrails` enforces _how_ it is written. See [AI Agents](/ai-agents) for the full workflow.
