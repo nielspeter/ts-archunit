@@ -285,6 +285,12 @@ smells
   .warn()
 ```
 
+Assert the project's own TypeScript strictness (with `strict`-family resolution, so `strict: true` implies its sub-flags):
+
+```typescript
+tsconfig(p).requires({ strict: true, noUncheckedIndexedAccess: true }).check()
+```
+
 ### More Features
 
 - **[Call matching](https://nielspeter.github.io/ts-archunit/calls)** — framework-agnostic route/handler inspection (Express, Fastify, Hono)
