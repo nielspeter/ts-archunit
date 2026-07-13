@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-07-13
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 48 completed + proposal 010, 7 open (see "Open Plans" below)
+**Total Plans:** 51 completed + proposal 010, 4 open (see "Open Plans" below)
 
 ---
 
@@ -69,7 +69,7 @@
 
 ## What's Shipped
 
-**1910 tests across 140 files. All checks pass.**
+**1963 tests across 145 files. All checks pass.**
 
 ### Core (P0)
 
@@ -183,40 +183,23 @@
 
 ## Open Plans
 
-Seven plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
+Four plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
 
-Plans 0047–0055 were reviewed 2026-07-13 (architect + product) and their key design decisions locked — each carries a `Review` line in its Status block and a `## Review findings` section. Plan 0060 was split out of 0050 during that review.
+The AI-agent delivery program — **0060 → 0044 → 0049** — shipped in **v0.13.0** (2026-07-13): the severity-aware unified `check` pipeline, the agent-facing surface (`explain --format agent`, `agentGuardrails`, `codeFrame`), and the thin `recommended()` floor. The four remaining plans were reviewed 2026-07-13 (architect + product) and their key design decisions locked — each carries a `Review` line in its Status block and a `## Review findings` section.
 
-| Priority | Plan                                             | Effort      | State                            | Depends on           |
-| -------- | ------------------------------------------------ | ----------- | -------------------------------- | -------------------- |
-| **P0**   | Agent-Facing Rule Surface (0044)                 | ~1.5–2 days | Ready                            | 0040, 0043, 0060     |
-| **P2**   | `tsconfig()` Config-Assertion Rule (0055)        | 0.5–1 day   | Reviewed — flat API              | none                 |
-| **P2**   | TypeScript Escape-Hatch Matchers (0047)          | ~1 day      | Reviewed — module-only           | 0046                 |
-| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048)     | ~1–1.5 days | Reviewed — `@deprecated`         | 0011, 0013, 0046     |
-| **P2\*** | `check` Unified Pipeline / Preset Support (0060) | ~1 day      | Reviewed — Option 2              | 0020, 0016, 0040     |
-| **P2\*** | `recommended()` Sensible-Defaults Preset (0049)  | 0.5 day     | Reviewed — thin + returning form | standard rules, 0060 |
-| **P2\*** | `ts-archunit init` CLI Scaffolder (0050)         | 0.5–1 day   | Reviewed — returning form        | 0049, 0060           |
+| Priority | Plan                                         | Effort      | State                     | Depends on       |
+| -------- | -------------------------------------------- | ----------- | ------------------------- | ---------------- |
+| **P2**   | `tsconfig()` Config-Assertion Rule (0055)    | 0.5–1 day   | Reviewed — flat API       | none             |
+| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | Reviewed — module-only    | 0046             |
+| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | Reviewed — `@deprecated`  | 0011, 0013, 0046 |
+| **P2**   | `ts-archunit init` CLI Scaffolder (0050)     | 0.5–1 day   | Reviewed — returning form | 0049, 0060       |
 
-\* Draft priority is TBD (likely P2 once approved).
+**Remaining** (all standalone now that the agent program shipped): 0050 (`init` scaffolder — generates `arch.rules.ts` that spreads `recommended()`/`agentGuardrails()`), then the independent matchers 0055, 0047, 0048 (0048 lowest value/cost; trim 0047 to `doubleCast`).
 
-**Current priority — AI-agent delivery** (chosen 2026-07-13): the mission is guiding AI coding agents, so the lead program is **0060 → 0044 → 0049**. 0060 (severity-aware unified `check` pipeline) underpins the agent's `check --format json` loop and `agentGuardrails`' returning form; 0044 is the delivery vehicle (agent-format rules block that drives the check-in-loop workflow, `agentGuardrails` preset, `codeFrame` in the JSON payload); 0049 gives the broader rule floor. **Deferred under this priority:** 0055, 0050, 0047, 0048 (see per-plan value notes — 0048 lowest value/cost; trim 0047 to `doubleCast`).
-
-**Full dependency-ordered sequence** (if building everything): **0055 → 0047 → 0048 → 0060 → 0049 → 0044 → 0050.** 0060 is the linchpin — an independently-valuable gap (presets don't run under `check` today, and warns bypass baseline/format) and a hard prerequisite for `agentGuardrails` (0044), `recommended`'s returning form (0049), and the `init` scaffolder (0050).
-
-### Plan 0044 phases (MCP server dropped — the CLI already exposes the same surface)
-
-1. **Agent-Optimized Explain Format** (0.5 day) — `explain --format agent` emits imperative markdown for system prompts; new `imperative` field on rule metadata/description
-2. **Agent Guardrails Preset** (0.5 day) — `agentGuardrails(p, {...})` one-liner bundling function-variant body-analysis rules for common agent mistakes
-3. **Documentation** (0.5 day) — `docs/ai-agents.md` + getting-started / cli / presets updates
-
-The original MCP server (`check_architecture` / `explain_rules`) was deferred — it duplicated `npx ts-archunit check --format json` / `explain` without adding capability. See 0044's "Deferred: MCP server" section (revisit only if cold-start latency is measured to hurt the agent loop, and evaluate a CLI daemon before MCP).
-
-### Adoption cluster (0060 → 0049 → 0050)
-
-0060 (severity-aware unified `check` pipeline), 0049 (thin `recommended()`, returning form), and 0050 (`init` scaffolder) form the onboarding chain. The design (Option 2, decided 2026-07-13): `recommended()` returns severity-carrying builders; the generated `arch.rules.ts` does `export default [...recommended(p)]`; 0060's pipeline runs them with baseline/format/severity applied uniformly (so the two `warn` rules are baseline-filtered, not lost to `console.warn`). Build 0060 first (the pipeline), then 0049 (returning-form recommended), then 0050. 0055, 0047, and 0048 stand alone. Design decisions for 0047–0060 are locked (see each plan's `## Review findings` / design-decision sections); they still need a scheduling/go decision.
+**Suggested next order** (if building everything): **0050 → 0055 → 0047 → 0048.** 0050 (`init` scaffolder) completes the onboarding chain — it generates an `arch.rules.ts` that spreads the now-shipped `recommended()` / `agentGuardrails()` returning-form presets. The three matchers (0055, 0047, 0048) are independent; design decisions for all four are locked (see each plan's `## Review findings` / design-decision sections) and they still need a scheduling/go decision.
 
 ---
 
 ## Completed
 
-48 plans implemented + proposal 010 (JSX Element Rules). Latest: `jsxText()` matcher (0056, v0.12.0). 1910 tests across 140 files.
+51 plans implemented + proposal 010 (JSX Element Rules). Latest: AI-agent delivery program — unified `check` pipeline (0060), agent-facing surface (0044), `recommended()` floor (0049), v0.13.0. 1963 tests across 145 files.

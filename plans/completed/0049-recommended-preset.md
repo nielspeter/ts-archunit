@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** IMPLEMENTED (2026-07-13, branch `feat/0049-recommended-preset`) — thin 4-rule floor (2 error + 2 warn), returning form, `preset/recommended/*` ids, opt-in-ladder overrides, agent-facing metadata; tests + docs landed.
+- **State:** Done (v0.13.0, branch `feat/0049-recommended-preset`) — thin 4-rule floor (2 error + 2 warn), returning form, `preset/recommended/*` ids, opt-in-ladder overrides, agent-facing metadata; tests + docs landed.
 - **Review (2026-07-13):** Ship (thin). **Decisions applied 2026-07-13:** trimmed to a genuinely-universal floor — `functionNoEval` + `functionNoFunctionConstructor` (error), `functionNoSilentCatch` + `noEmptyBodies` (warn); dropped `noDeadModules` + all house-style/opinion rules; opt-in-ladder stability policy; `extends PresetBaseOptions`; `preset/recommended/*` ids; no `strict()`. **Round-2 (2026-07-13):** `recommended()` returns severity-carrying builders (the returning form) per plan 0060's Option 2 — this resolves the warn-tier baseline/format gap. Plan text ready; build scheduled later (after 0055/0047/0048 + 0060, before 0050). See "Review findings" below.
 - **Priority:** TBD (likely P2 once approved)
 - **Effort:** 0.5 day

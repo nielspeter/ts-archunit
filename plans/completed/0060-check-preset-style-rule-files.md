@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** IMPLEMENTED (2026-07-13, branch `feat/0060-unified-check-pipeline`) — primitives, format-json, unified pipeline, and the metadata-propagation fix landed with tests; verified end-to-end. Docs + CHANGELOG done. Remaining nice-to-haves: github per-severity annotations.
+- **State:** Done (v0.13.0, branch `feat/0060-unified-check-pipeline`) — primitives, format-json, unified pipeline, and the metadata-propagation fix landed with tests; verified end-to-end. Docs + CHANGELOG done. Remaining nice-to-haves: github per-severity annotations.
 - **Review (2026-07-13):** Reviewed (architect + product). Design decision made — **Option 2 (returning form + unified pipeline)**; see "Design decision (RESOLVED)" below. Resolves the warn-path gates in 0049/0050.
 - **Priority:** TBD (likely P2 once approved)
 - **Effort:** ~1.5 days (runCheck refactor + shared `filterAndReport` helper + two new primitives — `ArchViolation.severity` and non-terminal `.asSeverity()` — + the agent-facing `--format json` contract: single-document aggregation, `severity`, summary counts)
