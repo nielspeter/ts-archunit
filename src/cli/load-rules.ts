@@ -1,11 +1,10 @@
 import path from 'node:path'
-import type { CheckOptions } from '../core/check-options.js'
+import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { importFresh } from './watch.js'
 
-/** Minimal interface for rule builders — only needs .check() */
-export interface RuleBuilderLike {
-  check: (opts?: CheckOptions) => void
-}
+// Re-exported for existing importers; the type lives in core so presets can
+// return RuleBuilderLike[] without depending on CLI infrastructure.
+export type { RuleBuilderLike } from '../core/rule-builder-like.js'
 
 export interface LoadOptions {
   /** Use cache-busting imports for watch mode. Default: false */
@@ -76,6 +75,8 @@ function isRuleBuilderLike(value: unknown): value is RuleBuilderLike {
   if (value === null || value === undefined || typeof value !== 'object') {
     return false
   }
-  // Structural type check: must have a 'check' method
-  return 'check' in value && typeof (value as Record<string, unknown>)['check'] === 'function'
+  // Structural type check: must have a 'violations' method
+  return (
+    'violations' in value && typeof (value as Record<string, unknown>)['violations'] === 'function'
+  )
 }

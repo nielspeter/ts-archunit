@@ -21,6 +21,7 @@ import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
+  protected _severity?: 'error' | 'warn'
   private readonly _exclusions: (string | RegExp)[] = []
   private readonly _silentIndices: Set<number> = new Set()
 
@@ -81,6 +82,7 @@ export abstract class TerminalBuilder {
       because: this._reason,
       suggestion: this._metadata?.suggestion,
       docs: this._metadata?.docs,
+      imperative: this._metadata?.imperative ?? this._reason,
     }
   }
 
@@ -90,12 +92,14 @@ export abstract class TerminalBuilder {
    */
   violations(): ArchViolation[] {
     const raw = this.collectViolations()
-    return applyFilters(raw, {
+    const filtered = applyFilters(raw, {
       reason: this._reason,
       metadata: this._metadata,
       exclusions: this._exclusions,
       silentIndices: this._silentIndices,
     })
+    const sev: 'error' | 'warn' = this._severity ?? 'error'
+    return filtered.map((v) => ({ ...v, severity: sev }))
   }
 
   /**
@@ -136,6 +140,17 @@ export abstract class TerminalBuilder {
       },
       options,
     )
+  }
+
+  /**
+   * Set the severity this rule reports at WITHOUT executing it (non-terminal).
+   * Returns `this` so the builder can be collected into a rule array and run by
+   * the CLI pipeline; its `.violations()` stamp each result with this severity.
+   * Distinct from the terminal `.severity()` below, which executes immediately.
+   */
+  asSeverity(level: 'error' | 'warn'): this {
+    this._severity = level
+    return this
   }
 
   /**

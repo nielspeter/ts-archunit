@@ -3,8 +3,9 @@
 ## Status
 
 - **State:** PROPOSED
+- **Review (2026-07-13):** Ship with changes. **Decisions applied 2026-07-13:** (1) scope trimmed to the `@deprecated` family — ship `usingTagged` + `usingDeprecated` + 3 deprecated rules; `usingInternal`/`usingExperimental` deferred (`usingTagged('internal')` still works); (2) add a reference-node cache + extract `src/helpers/symbol-resolution.ts`; (3) delete the stale dedup note, fix `syntaxKinds` (7→9) + the `as` cast, rename the option to `tagText`; (4) fold docs into `standard-rules.md`. Plan text ready; build scheduled later. See "Review findings" below.
 - **Priority:** P2 — opens the symbol-resolution layer that several future plans depend on
-- **Effort:** 1.5–2 days
+- **Effort:** ~1–1.5 days (trimmed to `@deprecated`; incl. reusable `symbol-resolution` extraction)
 - **Created:** 2026-05-05
 - **Updated:** 2026-05-05 — two revisions: (1) post-review fixes: alias unwrapping for cross-package/re-export resolution, stateless dedup via deferral instead of in-matcher Set, position vs typescript-eslint section, `localOnly` switched to `isInNodeModules()`. (2) Phase 0 spike against ts-morph 27 resolved every prior open question — corrected `unwrapAliases` to use only `getAliasedSymbol()` (the originally referenced `getExportSymbolIfAlias` is not a ts-morph API), added `Decorator` + `TaggedTemplateExpression` to syntaxKinds, locked inheritance/override behavior, pinned `getCommentText()` semantics, confirmed `skipLibCheck` independence.
 - **Depends on:** 0011 (body-analysis matchers), 0013 (defineCondition — current escape hatch for this capability), 0046 (matcher pattern precedent). Independent of 0047 (different matcher class — pure AST vs symbol resolution).
@@ -91,19 +92,23 @@ shape**, not just one we anticipated, can be expressed with it.
 
 - New matcher `usingTagged(tagName, options?)` in `src/helpers/matchers.ts`
   that resolves the symbol of an AST reference and inspects its
-  declarations' JSDoc tags.
-- Three convenience wrappers as one-liners over `usingTagged`:
+  declarations' JSDoc tags. **This generic primitive works for any tag** —
+  `usingTagged('internal')`, `usingTagged('since', …)` all work the moment
+  it ships.
+- **One** convenience wrapper as a one-liner over `usingTagged`:
   - `usingDeprecated(options?)`
-  - `usingInternal(options?)`
-  - `usingExperimental(options?)`
-- Three rule variants per convenience wrapper (class / function /
-  module) following the 0046 convention.
-- Symbol-level cache so repeated `usingTagged()` calls on the same
-  project pay symbol resolution exactly once per symbol.
+  - (`usingInternal` / `usingExperimental` deferred — demand is weak and the
+    generic `usingTagged('internal')` already covers them; add the one-line
+    wrappers when a user asks. See "Scope: `@deprecated` first".)
+- Three `@deprecated` rule variants (class / function / module) following
+  the 0046 convention.
+- Reference-node + symbol-level caches so repeated `usingTagged()` runs on
+  the same project pay symbol resolution once per reference, then near-zero
+  on re-runs. Extracted to a reusable `src/helpers/symbol-resolution.ts`.
 - Tests covering same-file, cross-file (within project), and
   cross-package (from `node_modules`) declarations.
-- Docs in `docs/body-analysis.md`, a new `docs/deprecation.md` page,
-  `docs/standard-rules.md`, `docs/api-reference.md`, `CHANGELOG.md`.
+- Docs folded into `docs/body-analysis.md` and `docs/standard-rules.md`
+  (no separate page), plus `docs/api-reference.md`, `CHANGELOG.md`.
 
 ## Non-goals
 
@@ -119,7 +124,7 @@ shape**, not just one we anticipated, can be expressed with it.
   need a meta-framework yet.
 - **Cross-function dataflow.** "Does a deprecated value flow into this
   call's argument?" is the Tier 3 dataflow-lite work. Out of scope.
-- **JSDoc parsing of tag arguments beyond `text`.** The `text` option
+- **JSDoc parsing of tag arguments beyond `tagText`.** The `tagText` option
   matches the tag's body string (e.g. `since 2.0`). Anything more
   structured (parsing `@deprecated since {version}` with named
   captures) is out of scope.
@@ -128,6 +133,24 @@ shape**, not just one we anticipated, can be expressed with it.
 - **Banning the tag declarations themselves.** That's the
   `comment('@deprecated')` case — already supported today. This plan
   is about _uses_, not declarations.
+
+## Scope: `@deprecated` first (2026-07-13 decision)
+
+Ship the generic `usingTagged` primitive + the `usingDeprecated` wrapper + the
+three `@deprecated` rule variants. Defer the `usingInternal` / `usingExperimental`
+wrappers and their rule variants.
+
+Rationale: the primitive covers every tag on day one — `usingTagged('internal')`
+and `usingTagged('experimental')` work mechanically without the wrappers, so
+deferring them costs only a one-line convenience, not capability. Demand clearly
+supports `@deprecated` (typescript-eslint shipped `no-deprecated`); `@internal` is
+moderate (`stripInternal` + API-extractor already cover much of it) and
+`@experimental` is speculative. The wrappers + their rules are trivially additive
+later (three one-liners each), non-breaking. `usingInternal` is the first to add
+if an `@internal` package-boundary need materializes.
+
+This halves the shipped rule surface (9 → 3) and the docs, keeping the plan
+matched to demand while still landing the full symbol-resolution infrastructure.
 
 ## Design
 
@@ -278,10 +301,10 @@ export interface TagMatcherOptions {
    * Restrict matches to tags whose body text matches a string/regex.
    *
    * @example
-   * usingTagged('deprecated', { text: /since 2\./ })
+   * usingTagged('deprecated', { tagText: /since 2\./ })
    * // matches only `@deprecated since 2.x` declarations
    */
-  readonly text?: string | RegExp
+  readonly tagText?: string | RegExp
 
   /**
    * Skip declarations whose source file is inside `node_modules`.
@@ -303,52 +326,51 @@ export function usingTagged(
 ): ExpressionMatcher
 ```
 
-### Convenience wrappers (one-liners)
+### Convenience wrapper (one-liner)
 
 ```typescript
 export function usingDeprecated(options?: TagMatcherOptions): ExpressionMatcher {
   return usingTagged('deprecated', options)
 }
 
-export function usingInternal(options?: TagMatcherOptions): ExpressionMatcher {
-  return usingTagged('internal', options)
-}
-
-export function usingExperimental(options?: TagMatcherOptions): ExpressionMatcher {
-  return usingTagged('experimental', options)
-}
+// Deferred (2026-07-13) — the generic primitive already covers these;
+// add the wrappers when demand appears:
+//   usingInternal(options?)     → usingTagged('internal', options)
+//   usingExperimental(options?) → usingTagged('experimental', options)
 ```
 
-These are pure ergonomics — every team that knows the tag name doesn't
-have to import `usingTagged` and pass a string. Same pattern as
-`call()` (primitive) → `noEval()` / `noConsole()` (curried).
+Pure ergonomics — a team that knows the tag name doesn't have to import
+`usingTagged` and pass a string. Same pattern as `call()` (primitive) →
+`noEval()` / `noConsole()` (curried).
 
 ### Implementation sketch
 
 ```typescript
 // Project-scoped caches (one per matcher instance, sharable across calls)
 function makeCaches() {
+  // Keyed on the *reference* node — skips getSymbol() (the type-checker cost) on re-runs.
+  const referenceDecisions = new WeakMap<Node, boolean>()
   const symbolDecisions = new WeakMap<Symbol, boolean>()
   const declarationDecisions = new WeakMap<Node, boolean>()
-  return { symbolDecisions, declarationDecisions }
+  return { referenceDecisions, symbolDecisions, declarationDecisions }
 }
 
 export function usingTagged(
   tagName: string | RegExp,
   options?: TagMatcherOptions,
 ): ExpressionMatcher {
-  const text = options?.text
+  const tagText = options?.tagText
   const localOnly = options?.localOnly ?? false
   const matchTagName =
     typeof tagName === 'string' ? (n: string) => n === tagName : (n: string) => tagName.test(n)
   const matchText =
-    text === undefined
+    tagText === undefined
       ? () => true
-      : typeof text === 'string'
-        ? (s: string) => s.includes(text)
-        : (s: string) => (text as RegExp).test(s)
+      : typeof tagText === 'string'
+        ? (s: string) => s.includes(tagText)
+        : (s: string) => tagText.test(s)
 
-  const { symbolDecisions, declarationDecisions } = makeCaches()
+  const { referenceDecisions, symbolDecisions, declarationDecisions } = makeCaches()
 
   function declarationCarriesTag(decl: Node): boolean {
     const cached = declarationDecisions.get(decl)
@@ -443,11 +465,16 @@ export function usingTagged(
       SyntaxKind.ImportSpecifier,
       SyntaxKind.JsxOpeningElement,
       SyntaxKind.JsxSelfClosingElement,
+      SyntaxKind.Decorator,
+      SyntaxKind.TaggedTemplateExpression,
     ],
     matches(node: Node): boolean {
+      const cached = referenceDecisions.get(node)
+      if (cached !== undefined) return cached
       const sym = resolveSymbolFor(node)
-      if (!sym) return false
-      return symbolCarriesTag(sym)
+      const result = sym ? symbolCarriesTag(sym) : false
+      referenceDecisions.set(node, result)
+      return result
     },
   }
 }
@@ -460,19 +487,14 @@ matcher (e.g. one with different options) gets fresh caches —
 correctness is preserved. The `WeakMap` keys are `Symbol` and `Node`
 instances, both stable across one project lifetime.
 
-**Edge — duplicate hits on `obj.oldMethod()`**: this is both a
-`PropertyAccessExpression` and lives inside a `CallExpression`. ts-morph
-emits both in the descendant walk. The `PropertyAccessExpression`
-matcher fires on `oldMethod`, but the `CallExpression` matcher resolves
-the _call's_ expression, which is the same property access — symbol is
-the same, so both nodes match. Two violations for one call.
+**Edge — duplicate hits on `obj.oldMethod()`**: handled by the stateless
+deferral above (see "Avoiding double-fires across overlapping syntax
+kinds"). `resolveSymbolFor` returns `undefined` for the `CallExpression`
+when its callee is a `PropertyAccessExpression`, so only the
+`PropertyAccessExpression` arm fires — exactly one violation, no
+condition-layer dedup needed.
 
-**Fix:** prefer the `PropertyAccessExpression`'s match when a
-`CallExpression` wraps it; the condition layer can dedupe by
-`(symbol, source-file, line)`. Document explicitly. (See "Open
-questions" below.)
-
-### Rule variants in `src/rules/typescript.ts` (or new `src/rules/deprecation.ts`?)
+### Rule variants in `src/rules/deprecation.ts`
 
 Decision: put deprecation rules in their own file
 `src/rules/deprecation.ts`. They are not "TypeScript safety" concerns —
@@ -486,12 +508,7 @@ focused on the post-0047 escape-hatch family.
 import type { ClassDeclaration, SourceFile } from 'ts-morph'
 import type { Condition } from '../core/condition.js'
 import type { ArchFunction } from '../models/arch-function.js'
-import {
-  usingDeprecated,
-  usingInternal,
-  usingExperimental,
-  type TagMatcherOptions,
-} from '../helpers/matchers.js'
+import { usingDeprecated, type TagMatcherOptions } from '../helpers/matchers.js'
 import { classNotContain } from '../conditions/body-analysis.js'
 import { functionNotContain } from '../conditions/body-analysis-function.js'
 import { moduleNotContain } from '../conditions/body-analysis-module.js'
@@ -507,11 +524,12 @@ export function moduleNoUseOfDeprecated(opts?: TagMatcherOptions): Condition<Sou
   return moduleNotContain(usingDeprecated(opts))
 }
 
-// @internal — analogous trio
-// @experimental — analogous trio
+// @internal / @experimental rule wrappers deferred (2026-07-13) — add
+// alongside their convenience wrappers when demand appears.
 ```
 
-Nine rule wrappers total (3 tags × 3 scopes). All one-liners.
+Three `@deprecated` rule wrappers. All one-liners. (The `usingInternal` /
+`usingExperimental` families follow the identical pattern when added.)
 
 ### Composition examples (for docs)
 
@@ -540,14 +558,19 @@ functions(p)
 // Pre-2.0 deprecations are blockers; 2.0+ deprecations are warnings.
 functions(p)
   .should()
-  .satisfy(functionNoUseOfDeprecated({ text: /(since 1\.|since 0\.)/ }))
+  .satisfy(functionNoUseOfDeprecated({ tagText: /(since 1\.|since 0\.)/ }))
   .check()
 
 // Don't reach into another package's @internal symbols.
-modules(p).should().notContain(usingInternal()).check()
+modules(p).should().notContain(usingTagged('internal')).check()
 
 // SDK package may use experimental features; downstream consumers may not.
-functions(p).that().resideInFolder('!src/sdk/**').should().notContain(usingExperimental()).check()
+functions(p)
+  .that()
+  .resideInFolder('!src/sdk/**')
+  .should()
+  .notContain(usingTagged('experimental'))
+  .check()
 ```
 
 ### Index exports
@@ -559,8 +582,7 @@ export {
   // existing matchers...
   usingTagged,
   usingDeprecated,
-  usingInternal,
-  usingExperimental,
+  // usingInternal, usingExperimental — deferred (see "Scope: @deprecated first")
 } from './helpers/matchers.js'
 
 export type { TagMatcherOptions } from './helpers/matchers.js'
@@ -581,18 +603,22 @@ Rule wrappers re-exported via the new `./rules/deprecation` sub-path
 
 ### Phase 1 — `usingTagged()` matcher with cache (~3 hours)
 
-1. Add `TagMatcherOptions`, `usingTagged()`, and the symbol/declaration
-   caches to `src/helpers/matchers.ts`.
-2. Add the three convenience wrappers (`usingDeprecated`,
-   `usingInternal`, `usingExperimental`).
-3. Export from `src/index.ts`.
+1. Create `src/helpers/symbol-resolution.ts` with the reusable pieces:
+   `resolveSymbolFor()`, `unwrapAliases()`, and the reference/symbol/
+   declaration caches. (This is what makes the follow-on symbol-resolving
+   matchers cheap — see "Strategic note.")
+2. Add `TagMatcherOptions` and `usingTagged()` to `src/helpers/matchers.ts`,
+   built on the extracted resolver.
+3. Add the `usingDeprecated` convenience wrapper.
+4. Export from `src/index.ts`.
 
-**Files changed:** `src/helpers/matchers.ts`, `src/index.ts`.
+**Files changed:** `src/helpers/symbol-resolution.ts` (new),
+`src/helpers/matchers.ts`, `src/index.ts`.
 
 ### Phase 2 — Rule wrappers (~1 hour)
 
-4. Create `src/rules/deprecation.ts` with nine one-line rule variants.
-5. Add `./rules/deprecation` sub-path export to `package.json`.
+5. Create `src/rules/deprecation.ts` with three one-line `@deprecated` rule variants.
+6. Add `./rules/deprecation` sub-path export to `package.json`.
 
 **Files changed:** `src/rules/deprecation.ts` (new), `package.json`.
 
@@ -615,21 +641,20 @@ Rule wrappers re-exported via the new `./rules/deprecation` sub-path
 `tests/rules/deprecation.test.ts` (new), several fixture files under
 `tests/fixtures/deprecation/` (new).
 
-### Phase 4 — Docs (~2 hours)
+### Phase 4 — Docs (~1.5 hours)
 
 11. `docs/body-analysis.md` — new section on symbol-resolving matchers,
-    document the four new functions.
-12. `docs/deprecation.md` — new dedicated page covering the recommended
-    deprecation lifecycle (declare with `@deprecated`, ban use with
-    `usingDeprecated()`, optionally enforce removal with `comment()`).
-13. `docs/standard-rules.md` — add the deprecation/internal/experimental
-    rule families.
-14. `docs/api-reference.md` — extend the matcher and rules tables.
-15. `CHANGELOG.md` — `### Added` entries under Unreleased.
-16. README mention — short paragraph in the "Standard Rules Library"
+    document `usingTagged` + `usingDeprecated`.
+12. `docs/standard-rules.md` — add the `@deprecated` rule family, with a
+    short "deprecation lifecycle" narrative (declare with `@deprecated`,
+    ban use with `usingDeprecated()`, optionally enforce removal with
+    `comment()`). No separate page — matches every other rule family.
+13. `docs/api-reference.md` — extend the matcher and rules tables.
+14. `CHANGELOG.md` — `### Added` entries under Unreleased.
+15. README mention — short paragraph in the "Standard Rules Library"
     section pointing to `rules/deprecation`.
 
-## Test strategy (~42 tests)
+## Test strategy (~30 tests)
 
 ### `usingTagged()` matcher (15 tests)
 
@@ -665,9 +690,9 @@ Rule wrappers re-exported via the new `./rules/deprecation` sub-path
   fires.
 - **`localOnly: true` skips node_modules** — same fixture as above,
   matcher does _not_ fire.
-- **`text` option (string)** — only `@deprecated since 1.0` matches,
+- **`tagText` option (string)** — only `@deprecated since 1.0` matches,
   not `@deprecated since 2.0`.
-- **`text` option (regex)** — same, with a regex pattern.
+- **`tagText` option (regex)** — same, with a regex pattern.
 - **`tagName` as regex** — `usingTagged(/^(deprecated|removed)$/)`
   fires on either tag name.
 - **Untagged symbol** — caller uses a non-deprecated function,
@@ -678,21 +703,20 @@ Rule wrappers re-exported via the new `./rules/deprecation` sub-path
   symbol returns the cached result; instrumented test verifies the
   declaration walk runs once.
 
-### Convenience wrappers (3 tests)
+### Convenience wrapper (1 test)
 
 - `usingDeprecated()` is equivalent to `usingTagged('deprecated')`.
-- `usingInternal()` and `usingExperimental()` likewise.
 
-### Rule wrappers (12 tests — 1 violation + 1 happy-path per wrapper)
+### Rule wrappers (6 tests — 1 violation + 1 happy-path per wrapper)
 
-- `noUseOfDeprecated()` / `functionNo*` / `moduleNo*` — each
-  variant gets one positive (caller) and one negative (no caller)
-  fixture.
-- Same for `*Internal` and `*Experimental` rule families.
+- `noUseOfDeprecated()` / `functionNoUseOfDeprecated()` /
+  `moduleNoUseOfDeprecated()` — each gets one positive (caller) and one
+  negative (no caller) fixture. (`*Internal` / `*Experimental` families
+  follow the identical shape when added.)
 
-### Property/JSDoc descriptor assertions (4 tests)
+### Property/JSDoc descriptor assertions (2 tests)
 
-- Each of the four matchers exposes the correct `description` and
+- Each of the two shipped matchers (`usingTagged`, `usingDeprecated`) exposes the correct `description` and
   `syntaxKinds` array (mirroring 0046's matcher metadata tests).
 
 ### Edge / regression (3 tests)
@@ -710,21 +734,21 @@ Rule wrappers re-exported via the new `./rules/deprecation` sub-path
 
 ## Files changed
 
-| File                                    | Change                                                          |
-| --------------------------------------- | --------------------------------------------------------------- |
-| `src/helpers/matchers.ts`               | +1 primitive (`usingTagged`) + 3 wrappers + `TagMatcherOptions` |
-| `src/index.ts`                          | Export the 4 new functions and the type                         |
-| `src/rules/deprecation.ts`              | New — 9 one-line rule variants                                  |
-| `package.json`                          | Add `./rules/deprecation` sub-path export                       |
-| `tests/helpers/matchers-tagged.test.ts` | New — 15 matcher tests + 3 wrapper tests + 4 descriptor tests   |
-| `tests/rules/deprecation.test.ts`       | New — 12 rule smoke tests + 1 dedup regression test             |
-| `tests/fixtures/deprecation/**`         | New fixtures: same-file, cross-file, cross-package, JSX, types  |
-| `docs/body-analysis.md`                 | Document symbol-resolving matchers section                      |
-| `docs/deprecation.md`                   | New dedicated page                                              |
-| `docs/standard-rules.md`                | Add the 9 rule variants                                         |
-| `docs/api-reference.md`                 | Update matcher and rules tables                                 |
-| `README.md`                             | One-paragraph mention in Standard Rules section                 |
-| `CHANGELOG.md`                          | `### Added` under next version                                  |
+| File                                    | Change                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `src/helpers/symbol-resolution.ts`      | New — reusable resolver + `unwrapAliases` + reference/symbol/declaration caches     |
+| `src/helpers/matchers.ts`               | +1 primitive (`usingTagged`) + `usingDeprecated` wrapper + `TagMatcherOptions`      |
+| `src/index.ts`                          | Export `usingTagged`, `usingDeprecated`, `TagMatcherOptions`                        |
+| `src/rules/deprecation.ts`              | New — 3 one-line `@deprecated` rule variants                                        |
+| `package.json`                          | Add `./rules/deprecation` sub-path export                                           |
+| `tests/helpers/matchers-tagged.test.ts` | New — matcher tests + 1 wrapper test + 2 descriptor tests + 3 edge/regression tests |
+| `tests/rules/deprecation.test.ts`       | New — 6 rule smoke tests                                                            |
+| `tests/fixtures/deprecation/**`         | New fixtures: same-file, cross-file, cross-package, JSX, types                      |
+| `docs/body-analysis.md`                 | Document symbol-resolving matchers section                                          |
+| `docs/standard-rules.md`                | Add the `@deprecated` rule family + lifecycle narrative (no separate page)          |
+| `docs/api-reference.md`                 | Update matcher and rules tables                                                     |
+| `README.md`                             | One-paragraph mention in Standard Rules section                                     |
+| `CHANGELOG.md`                          | `### Added` under next version                                                      |
 
 No new runtime dependencies. Symbol resolution uses ts-morph APIs
 already in use by `noAnyProperties()`.
@@ -737,16 +761,16 @@ already in use by `noAnyProperties()`.
 - **`usingTagged(tagName, options?)` matcher** — flags references whose
   resolved symbol's declaration carries a JSDoc tag. The first
   symbol-resolving matcher in ts-archunit; opens the path to other
-  type-aware primitives (`untypedImports`, `referencesAnyType`).
-  Caches per-symbol decisions so repeated rule runs amortize the
-  type-checker cost.
-- **Convenience wrappers**: `usingDeprecated()`, `usingInternal()`,
-  `usingExperimental()` for the most common JSDoc-tagged-API workflows.
+  type-aware primitives (`untypedImports`, `referencesAnyType`) via the
+  reusable `symbol-resolution` helper. Caches per-reference decisions so
+  repeated rule runs skip re-resolution.
+- **Convenience wrapper**: `usingDeprecated()` for the most common
+  JSDoc-tagged-API workflow. (`usingInternal()` / `usingExperimental()`
+  follow when demand appears — `usingTagged('internal')` works today.)
 - **New rules namespace `@nielspeter/ts-archunit/rules/deprecation`** —
-  nine class/function/module variants for banning uses of `@deprecated`,
-  `@internal`, and `@experimental` symbols. All compose with
-  `resideInFolder()` for "production code can't use deprecated APIs;
-  tests can" style rules.
+  three class/function/module variants for banning uses of `@deprecated`
+  symbols. All compose with `resideInFolder()` for "production code can't
+  use deprecated APIs; tests can" style rules.
 ```
 
 ## Performance considerations
@@ -754,9 +778,10 @@ already in use by `noAnyProperties()`.
 - `getSymbol()` forces type-checker work on first call. Empirically
   ts-morph caches symbols at the program level, so the second call on
   the same node is cheap.
-- The matcher's own `WeakMap<Symbol, boolean>` cache amortizes the
-  declaration walk: `oldFn` called 200 times in a project does
-  declaration JSDoc inspection once.
+- The matcher's caches amortize both layers: a `WeakMap<Symbol, boolean>`
+  spares the declaration JSDoc walk (`oldFn` inspected once no matter how
+  many call sites), and a `WeakMap<referenceNode, boolean>` skips
+  `getSymbol()` itself on repeated `.check()` runs over the same project.
 - `syntaxKinds` filtering happens in the condition layer before
   `matches()` runs — most nodes never reach the symbol resolution code.
 - Worst case (large project, no cache hits): ~1ms per unique symbol
@@ -867,8 +892,8 @@ None blocking. Implementation can start.
   works mechanically but the _policy_ (alpha can use beta but not
   public, etc.) is a layered preset — propose separately if demand
   shows up.
-- **`@since` version cutoffs.** `text` option already supports
-  matching by tag body, so `usingTagged('since', { text: /^[12]\./ })`
+- **`@since` version cutoffs.** `tagText` option already supports
+  matching by tag body, so `usingTagged('since', { tagText: /^[12]\./ })`
   works. A dedicated `usedSince(version)` predicate could be cleaner;
   defer until usage emerges.
 - **Banning the _declaration_ of `@deprecated`.** Already handled
@@ -878,15 +903,41 @@ None blocking. Implementation can start.
 ## Strategic note
 
 `usingTagged()` is the gateway to the **symbol-resolution matcher
-family**. Once this lands and the cache pattern is established, several
-follow-on plans become small:
+family**. Because the resolver, alias unwrapping, and caches are extracted
+into `src/helpers/symbol-resolution.ts` (not closure-local to `usingTagged`),
+several follow-on plans become small:
 
-| Future plan           | Reuses                                                      |
-| --------------------- | ----------------------------------------------------------- |
-| `untypedImports()`    | The same symbol cache + `Declaration.isFromExternalLibrary` |
-| `referencesAnyType()` | Symbol → type → `'any'` text comparison                     |
-| `usesUnsafeReturn()`  | Symbol → return type → flow into call site                  |
+| Future plan           | Reuses                                                               |
+| --------------------- | -------------------------------------------------------------------- |
+| `untypedImports()`    | `symbol-resolution.ts` (resolver + caches) + `isFromExternalLibrary` |
+| `referencesAnyType()` | Symbol → type → `'any'` text comparison                              |
+| `usesUnsafeReturn()`  | Symbol → return type → flow into call site                           |
 
 Each becomes a 0.5-day plan instead of a 2-day plan, because the
 infrastructure exists. That's the strategic justification for accepting
 the larger up-front cost in 0048: it pays for itself across follow-ons.
+
+## Review findings — 2026-07-13
+
+Reviewed via the `review-proposal` skill (architect + product lenses), grounded against the consumer (`body-traversal.ts`) and ts-morph's `.d.ts`. Existing-code survey: **no duplication** — `usingTagged`, wrappers, and `rules/deprecation` are all new; symbol resolution (`getSymbol`/`getJsDocs`) is already used by `noAnyProperties`.
+
+**Verdict: Ship with changes** — the hard architectural calls are right; the plan text has contract bugs and is over-scoped.
+
+### Blocking (fix before implementation)
+
+- **RESOLVED 2026-07-13 — deleted.** The "Edge — duplicate hits" note now states the stateless deferral resolves it (no condition-layer dedup, which never existed). `findMatchesByKind` doesn't dedupe, but the `resolveSymbolFor` deferral makes `obj.oldMethod()` fire exactly once.
+- **RESOLVED 2026-07-13 — reconciled.** The implementation-sketch `syntaxKinds` array is now the 9-kind version (adds `Decorator` + `TaggedTemplateExpression`), matching `resolveSymbolFor`, the spike, and the tests.
+- **RESOLVED 2026-07-13 — removed.** The `(text as RegExp)` cast is gone (the branch already narrows to `RegExp`); ADR-005 clean. The option is also renamed `text` → `tagText` throughout.
+
+### Should-fix
+
+- **RESOLVED 2026-07-13 — added + extracted.** A `WeakMap<referenceNode, boolean>` now skips `getSymbol()` on re-runs, and the resolver + alias-unwrap + caches are extracted to `src/helpers/symbol-resolution.ts` so the follow-on matchers (`untypedImports`, `referencesAnyType`) can actually reuse them. CHANGELOG + Performance section corrected.
+- **RESOLVED 2026-07-13 — trimmed.** Shipping `usingTagged` + `usingDeprecated` + the 3 deprecated rules; `usingInternal`/`usingExperimental` wrappers deferred (the generic primitive covers them). `docs/deprecation.md` folded into `standard-rules.md`. See "Scope: `@deprecated` first."
+- **Honest positioning** (open — apply at doc-writing time). The eslint comparison oversells ("brittle past two-three folder splits" — the headline prod-vs-tests case is one `overrides` block). In `standard-rules.md`, add: "for the 90% case (warn on any deprecated usage), typescript-eslint's `no-deprecated` is zero-config and gives editor squiggles; reach for `usingTagged` when you need the architectural cut, generic tags, or baseline adoption."
+- **RESOLVED 2026-07-13 — `text` → `tagText`** aligned throughout. Still to correct at implementation: the design table's "both enum and member checked" (only the member is checked per the sketch — either fix the table or resolve `getExpression().getSymbol()` too).
+
+### Praise
+
+- Reusing `ExpressionMatcher` over a `SymbolMatcher` sibling is the right call. Alias unwrapping is load-bearing and handled seriously (`getAliasedSymbol()` verified to return `undefined`, not throw). Watch-mode staleness is a non-issue (`WeakMap` object identity). `./rules/deprecation` split is correct. Phase 0 spike is exemplary.
+
+**Next step:** apply the three blocking edits + trim to `@deprecated`; the largest open plan then becomes a focused ~1-day change that still lays the full symbol-resolution infra.

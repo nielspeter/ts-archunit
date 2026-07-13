@@ -45,9 +45,12 @@ npx ts-archunit explain arch.rules.ts
 
 # Markdown table
 npx ts-archunit explain arch.rules.ts --markdown
+
+# Agent format — imperative markdown for a system prompt / project instructions
+npx ts-archunit explain arch.rules.ts --format agent >> CLAUDE.md
 ```
 
-Outputs a structured description of every rule — id, description, because, suggestion — without executing them. See [Explain Command](/explain) for use cases.
+Outputs a structured description of every rule — id, description, because, suggestion — without executing them. `--format agent` emits an imperative "Do NOT … / MUST …" block (with a check-in-loop preamble and sentinel markers) for AI coding agents — see [AI Agents](/ai-agents). See [Explain Command](/explain) for use cases.
 
 ## Options
 
@@ -83,7 +86,8 @@ CLI flags override config file values. Config file overrides defaults.
 
 ## Rule Files
 
-A rule file exports an array of rule builders:
+A rule file **default-exports an array of rule builders**. `check` collects each
+builder's violations, applies baseline/diff filtering, and reports them together:
 
 ```typescript
 // arch.rules.ts
@@ -101,7 +105,70 @@ export default [
 ]
 ```
 
-The CLI calls `.check()` on each builder. Rule files use the same API as test files.
+Rule files use the same API as test files.
+
+### Severity
+
+Every rule is an **error** by default — a violation fails the run. Mark a rule as
+a non-failing **warning** with the non-terminal `.asSeverity('warn')`; it is still
+reported, but does not fail:
+
+```typescript
+export default [
+  classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')), // error
+  modules(p).that().resideInFolder('src/**').should().satisfy(noEmptyBodies()).asSeverity('warn'),
+]
+```
+
+A preset that returns an array of builders spreads straight in:
+
+```typescript
+export default [...myPreset(p)]
+```
+
+`check` exits non-zero only when there are **error**-severity violations; warnings
+are reported but never fail the run.
+
+::: warning Leave rule-file builders un-terminated
+In a rule file, entries in the `export default [...]` array must be **builders**,
+not terminal calls. Do **not** end them with `.check()` / `.warn()` / `.severity()` —
+those execute the rule immediately and return `undefined`, which the CLI silently
+skips (the rule never runs in the aggregated report). Use the non-terminal
+`.asSeverity('warn')` to mark a rule as a warning. (Test files are the opposite:
+there you _do_ call `.check()`.)
+:::
+
+## JSON output (`--format json`)
+
+`check --format json` emits a **single JSON document** for the whole run
+(all rule files and builders aggregated — not one blob per rule), suitable for
+CI dashboards, custom tooling, and AI coding agents that self-correct against
+the rules. Each violation carries its `severity`, and the summary breaks the
+count down into errors vs warnings:
+
+```jsonc
+{
+  "summary": { "total": 2, "errors": 1, "warnings": 1, "reason": null },
+  "violations": [
+    {
+      "rule": "…",
+      "ruleId": "domain/no-parse-int",
+      "severity": "error",
+      "element": "OrderService.getTotal",
+      "file": "src/domain/order.ts",
+      "line": 42,
+      "message": "…",
+      "because": "…",
+      "suggestion": "use this.extractCount()",
+      "docs": "…",
+    },
+  ],
+}
+```
+
+`because` / `suggestion` / `docs` come from the rule's `.because()` / `.rule({ … })`
+metadata when the condition does not set its own — so consumers always get the
+rule author's rationale and fix.
 
 ## Watch Mode
 

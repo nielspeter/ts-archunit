@@ -29,7 +29,8 @@ Options:
   --output <path>       Output path for baseline file (default: arch-baseline.json)
   --changed             Only report violations in changed files (git diff)
   --base <branch>       Base branch for diff (default: main)
-  --format <format>     Output format: terminal, json, github, auto (default: auto)
+  --format <format>     check: terminal, json, github, auto (default: auto)
+                        explain: json (default), markdown, agent
   --markdown            Output explain results as markdown table
   -w, --watch           Watch for changes and re-run (check command only)
   --config <path>       Path to config file
@@ -128,10 +129,29 @@ async function handleBaseline(ruleFiles: string[], output: string): Promise<void
   await runBaseline({ ruleFiles, output })
 }
 
+/** Reject a `--format` value that isn't valid for the given subcommand. */
+function isValidFormat(command: 'check' | 'explain', format: string | undefined): boolean {
+  if (format === undefined) return true
+  const allowed =
+    command === 'check' ? ['terminal', 'json', 'github', 'auto'] : ['json', 'markdown', 'agent']
+  if (!allowed.includes(format)) {
+    console.error(
+      `Error: --format '${format}' is not valid for '${command}'. Valid values: ${allowed.join(', ')}.`,
+    )
+    process.exitCode = 1
+    return false
+  }
+  return true
+}
+
 /** Handle the `explain` subcommand. */
-async function handleExplain(ruleFiles: string[], markdown: boolean | undefined): Promise<void> {
+async function handleExplain(
+  ruleFiles: string[],
+  markdown: boolean | undefined,
+  format: string | undefined,
+): Promise<void> {
   if (!requireRuleFiles(ruleFiles)) return
-  await runExplain({ ruleFiles, markdown })
+  await runExplain({ ruleFiles, markdown, format })
 }
 
 export async function run(args: string[]): Promise<void> {
@@ -169,12 +189,19 @@ export async function run(args: string[]): Promise<void> {
   const base = values.base ?? 'main'
   const changed = values.changed ?? false
 
+  if (
+    (command === 'check' && !isValidFormat('check', values.format)) ||
+    (command === 'explain' && !isValidFormat('explain', values.format))
+  ) {
+    return
+  }
+
   if (command === 'check') {
     await handleCheck(ruleFiles, values, config, format, baseline, changed, base)
   } else if (command === 'baseline') {
     await handleBaseline(ruleFiles, values.output ?? 'arch-baseline.json')
   } else if (command === 'explain') {
-    await handleExplain(ruleFiles, values.markdown)
+    await handleExplain(ruleFiles, values.markdown, values.format)
   } else {
     console.error(`Error: Unknown command "${command}". Use --help for usage.`)
     process.exitCode = 1

@@ -121,6 +121,87 @@ strictBoundaries(p, {
 
 Boundary folders are discovered dynamically from the glob pattern. `src/features/*` finds all immediate subdirectories under `src/features/`.
 
+## `recommended`
+
+A deliberately **thin, universal safety floor** for any TypeScript project — the handful of things dangerous regardless of project shape that fire ~never on healthy code. It is _not_ a full architecture; shape-specific rules (layer order, cycles, delegation) are yours to add.
+
+Like `agentGuardrails`, it **returns** severity-carrying builders (it does not throw), so spread it into the default export:
+
+```typescript
+import { project } from '@nielspeter/ts-archunit'
+import { recommended } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+export default [
+  ...recommended(p),
+  // ...your shape-specific rules
+]
+```
+
+### Generated rules
+
+| Rule ID                                      | Enforces                       | Default |
+| -------------------------------------------- | ------------------------------ | ------- |
+| `preset/recommended/no-eval`                 | No `eval()`                    | error   |
+| `preset/recommended/no-function-constructor` | No `Function` constructor      | error   |
+| `preset/recommended/no-silent-catch`         | No empty/silent `catch` blocks | warn    |
+| `preset/recommended/no-empty-bodies`         | No empty function bodies       | warn    |
+
+Two `error`, two `warn`. The warn rules have known, suppressible false positives (intentional empty catches, no-op callbacks), so they surface without failing the build.
+
+**Options.** `include` is the source glob (default `'**/src/**'`, matched against each file's absolute path). A `**/src/**` glob already covers monorepos — `packages/foo/src/**` matches at any depth — so only projects whose source lives _outside_ any `src/` folder (e.g. `lib/`) need to override it:
+
+```typescript
+export default [...recommended(p, { include: 'lib/**' })]
+```
+
+The `overrides` map (below) changes individual rule severity. Codegen, templating, or serializer libraries that legitimately build functions from strings should turn off the Function-constructor rule: `overrides: { 'preset/recommended/no-function-constructor': 'off' }`. (`eval` has no comparable legitimate use, so it stays `error`.)
+
+**Adoption.** The floor is designed to fire ~never on healthy code, so adopting it is usually a non-event. If a legacy codebase does trip the rules — an existing `eval`, or a wall of empty catches — snapshot them once with [`--baseline`](/cli#check-run-rules); the baseline captures **all four** severities, so only _new_ violations surface afterward (see [Baseline](/core-concepts#baseline-mode)).
+
+**Stability.** `recommended` is a versioned contract, not just a convenience alias: spreading `...recommended(p)` means "these four rules today, and we won't break your CI on a minor bump." New rules enter at `warn` or `off` in a minor release and are only promoted to `error` in a major. That opt-in ladder is the reason to depend on the preset rather than hand-copy the four rules.
+
+> Overlaps `agentGuardrails` on empty bodies and (if you list `'eval'` in its `noInlineLogic`) `eval`. Running both double-reports those locations under different rule ids. For agent-focused projects prefer `agentGuardrails` alone; otherwise silence the `recommended` copies — `overrides: { 'preset/recommended/no-empty-bodies': 'off' }`.
+
+## `agentGuardrails`
+
+Targets the mistakes AI coding agents make most often — inline logic, generic errors, stub comments, empty bodies, copy-paste. Where the presets above enforce _where_ code goes, `agentGuardrails` enforces _how_ it is written. See [AI Agents](/ai-agents) for the full workflow.
+
+Unlike the other presets, it **returns** severity-carrying builders (it does not throw), so you spread it into a rule file's default export:
+
+```typescript
+import { project } from '@nielspeter/ts-archunit'
+import { agentGuardrails } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+export default [
+  ...agentGuardrails(p, {
+    src: 'src/**',
+    noInlineLogic: ['parseInt', 'JSON.parse', 'eval'],
+    noGenericErrors: true,
+    noStubs: true,
+    noEmptyBodies: true,
+    noCopyPaste: true,
+  }),
+]
+```
+
+### Generated rules
+
+| Rule ID                              | Enforces                                             | Default |
+| ------------------------------------ | ---------------------------------------------------- | ------- |
+| `preset/agent/no-inline-logic/<api>` | No inline call to a banned API (one per entry)       | error   |
+| `preset/agent/no-generic-errors`     | No `throw new Error()` — use typed errors            | error   |
+| `preset/agent/no-stubs`              | No TODO/FIXME/"not implemented" stub comments        | error   |
+| `preset/agent/no-empty-bodies`       | No empty function bodies                             | error   |
+| `preset/agent/no-copy-paste`         | No near-identical function bodies (≥ 0.9 similarity) | warn    |
+
+Uses function-variant rules, so standalone functions, arrow functions, and class methods are all covered. Each rule carries `because` / `suggestion` / `imperative` metadata so the agent gets an actionable fix in `explain --format agent` and `check --format json`. Accepts the same `overrides` map as every preset (below).
+
+> `agentGuardrails` overlaps a general `recommended` floor on empty bodies and `eval`. Running both double-reports those locations (different rule ids). For agent-focused projects, prefer `agentGuardrails` alone; otherwise override the duplicated ids to `'off'` in one preset.
+
 ## Overrides
 
 Every preset accepts `overrides` to change individual rule severity:

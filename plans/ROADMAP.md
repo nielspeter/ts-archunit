@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-07-03
+**Updated:** 2026-07-13
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 46 completed + proposal 010, 0 remaining
+**Total Plans:** 51 completed + proposal 010, 4 open (see "Open Plans" below)
 
 ---
 
@@ -69,7 +69,7 @@
 
 ## What's Shipped
 
-**1910 tests across 140 files. All checks pass.**
+**1963 tests across 145 files. All checks pass.**
 
 ### Core (P0)
 
@@ -181,21 +181,25 @@
 
 ---
 
-## Next
+## Open Plans
 
-| Priority | Plan                        | Effort | Status | Depends on |
-| -------- | --------------------------- | ------ | ------ | ---------- |
-| **P0**   | AI Agent Integration (0044) | 3 days | Ready  | 0040, 0043 |
+Four plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
 
-### Plan 0044 phases
+The AI-agent delivery program — **0060 → 0044 → 0049** — shipped in **v0.13.0** (2026-07-13): the severity-aware unified `check` pipeline, the agent-facing surface (`explain --format agent`, `agentGuardrails`, `codeFrame`), and the thin `recommended()` floor. The four remaining plans were reviewed 2026-07-13 (architect + product) and their key design decisions locked — each carries a `Review` line in its Status block and a `## Review findings` section.
 
-1. **MCP Server** (1.5 days) — `check_architecture` + `explain_rules` tools for real-time agent feedback
-2. **System Prompt Generator** (0.5 day) — `ts-archunit context` outputs agent-optimized markdown
-3. **Agent Guardrails Preset** (0.5 day) — one-liner preset for common AI agent mistakes
-4. **Documentation** (0.5 day) — AI agent setup guide, MCP reference
+| Priority | Plan                                         | Effort      | State                     | Depends on       |
+| -------- | -------------------------------------------- | ----------- | ------------------------- | ---------------- |
+| **P2**   | `tsconfig()` Config-Assertion Rule (0055)    | 0.5–1 day   | Reviewed — flat API       | none             |
+| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | Reviewed — module-only    | 0046             |
+| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | Reviewed — `@deprecated`  | 0011, 0013, 0046 |
+| **P2**   | `ts-archunit init` CLI Scaffolder (0050)     | 0.5–1 day   | Reviewed — returning form | 0049, 0060       |
+
+**Remaining** (all standalone now that the agent program shipped): 0050 (`init` scaffolder — generates `arch.rules.ts` that spreads `recommended()`/`agentGuardrails()`), then the independent matchers 0055, 0047, 0048 (0048 lowest value/cost; trim 0047 to `doubleCast`).
+
+**Suggested next order** (if building everything): **0050 → 0055 → 0047 → 0048.** 0050 (`init` scaffolder) completes the onboarding chain — it generates an `arch.rules.ts` that spreads the now-shipped `recommended()` / `agentGuardrails()` returning-form presets. The three matchers (0055, 0047, 0048) are independent; design decisions for all four are locked (see each plan's `## Review findings` / design-decision sections) and they still need a scheduling/go decision.
 
 ---
 
 ## Completed
 
-43 of 43 original plans implemented + proposal 010 (JSX Element Rules) + plan 0046 (TypeScript Assertion Matchers). 1861 tests across 141 files.
+51 plans implemented + proposal 010 (JSX Element Rules). Latest: AI-agent delivery program — unified `check` pipeline (0060), agent-facing surface (0044), `recommended()` floor (0049), v0.13.0. 1963 tests across 145 files.

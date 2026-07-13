@@ -1,8 +1,9 @@
-# Plan 0055: `config.tsconfig()` Rule
+# Plan 0055: `tsconfig()` Config-Assertion Rule
 
 ## Status
 
 - **State:** DRAFT — captured for decision, not yet scheduled
+- **Review (2026-07-13):** Ship with changes — cleanest of the open plans. **API locked: flat `tsconfig(p)` (no namespace).** Remaining: 4 mechanical fixes (createViolation, STRICT_FAMILY, `as` cast, array/object compare). Plan text ready; build scheduled later. See "Review findings" below.
 - **Priority:** TBD (likely P2 once approved)
 - **Effort:** 0.5–1 day
 - **Created:** 2026-05-12
@@ -36,12 +37,11 @@ ts-archunit is a generic framework — vitest, ESLint, jest. It should not pick 
 Ship one primitive that asserts the project's resolved TypeScript compiler options match a user-supplied spec. Same fluent terminal methods as every other rule, same baseline/exclusion/format integration, no new top-level architecture.
 
 ```typescript
-import { project, config } from '@nielspeter/ts-archunit'
+import { project, tsconfig } from '@nielspeter/ts-archunit'
 
 const p = project('tsconfig.json')
 
-config
-  .tsconfig(p)
+tsconfig(p)
   .requires({ strict: true, noUncheckedIndexedAccess: true })
   .because('ADR-001 requires strict mode')
   .check()
@@ -55,21 +55,21 @@ This rule slots into the **existing** non-iterating builder pattern. It is not a
 
 ### How it joins what's already there
 
-| Existing concept                                                                                     | Where it lives                   | This plan reuses it via                                                                       |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `TerminalBuilder` (abstract base)                                                                    | `src/core/terminal-builder.ts`   | `TsconfigBuilder extends TerminalBuilder`                                                     |
-| Non-iterating builder precedent                                                                      | `SmellBuilder` (`src/smells/`)   | Same pattern — concrete subclass implements `collectViolations()`                             |
-| Namespace export precedent                                                                           | `smells.duplicateBodies(p)`      | New `config.tsconfig(p)` namespace                                                            |
-| `.because()` / `.rule()` / `.excluding()` / `.check()` / `.warn()` / `.severity()` / `.violations()` | Inherited from `TerminalBuilder` | Inherited the same way                                                                        |
-| Baseline / diff / format pipeline                                                                    | `executeCheck`, `executeWarn`    | Inherited via `TerminalBuilder.check()`                                                       |
-| `ArchProject.getSourceFiles()` pattern (public, not `_project`)                                      | `src/core/project.ts`            | Add `getCompilerOptions()` to `ArchProject` interface; builder reads via the public interface |
-| `createViolation()`                                                                                  | `src/core/violation.ts`          | Used as-is; tsconfig path becomes the violation's `file`, line `1`                            |
+| Existing concept                                                                                     | Where it lives                            | This plan reuses it via                                                                       |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `TerminalBuilder` (abstract base)                                                                    | `src/core/terminal-builder.ts`            | `TsconfigBuilder extends TerminalBuilder`                                                     |
+| Non-iterating builder precedent                                                                      | `SmellBuilder` (`src/smells/`)            | Same pattern — concrete subclass implements `collectViolations()`                             |
+| Top-level entry-point precedent                                                                      | `project(p)`, `smells.duplicateBodies(p)` | New flat `tsconfig(p)` entry point                                                            |
+| `.because()` / `.rule()` / `.excluding()` / `.check()` / `.warn()` / `.severity()` / `.violations()` | Inherited from `TerminalBuilder`          | Inherited the same way                                                                        |
+| Baseline / diff / format pipeline                                                                    | `executeCheck`, `executeWarn`             | Inherited via `TerminalBuilder.check()`                                                       |
+| `ArchProject.getSourceFiles()` pattern (public, not `_project`)                                      | `src/core/project.ts`                     | Add `getCompilerOptions()` to `ArchProject` interface; builder reads via the public interface |
+| `createViolation()`                                                                                  | `src/core/violation.ts`                   | Used as-is; tsconfig path becomes the violation's `file`, line `1`                            |
 
-No new top-level architecture. One new `TerminalBuilder` subclass; one new namespace object; one new public method on `ArchProject`. Everything else is reuse.
+No new top-level architecture. One new `TerminalBuilder` subclass; one new top-level entry point; one new public method on `ArchProject`. Everything else is reuse.
 
 ### Why not the fluent element-builder DSL
 
-The element-builder DSL (`entry(p).that().<predicate>.should().<condition>.check()`) iterates over a set of elements. A project has one resolved compiler-options object. The smell detectors hit the same situation — they don't iterate per-element either — and the codebase already answered the question: extend `TerminalBuilder`, expose via a namespace. Follow the same answer.
+The element-builder DSL (`entry(p).that().<predicate>.should().<condition>.check()`) iterates over a set of elements. A project has one resolved compiler-options object. The smell detectors hit the same situation — they don't iterate per-element either — and the codebase already answered the question: extend `TerminalBuilder`, expose as a top-level entry point (like `project` / `smells`). Follow the same answer.
 
 ### Lego bricks
 
@@ -78,10 +78,12 @@ Two bricks:
 1. **`TsconfigBuilder`** — generic shape: "for this project, the resolved compiler options must satisfy the requirements set by `.requires(...)`." Reusable. Composable with `.because()`, `.rule()`, `.excluding()`, `.check()`, `.warn()`. Same surface as every other terminal builder.
 2. **`Partial<CompilerOptions>` as the spec input** — the user's data, not an invented matcher language. Whatever ts-morph hands you, you can require. No hand-curated allowlist of flags.
 
-Future bricks (out of scope for this plan, but the namespace makes room):
+Future bricks (out of scope; no namespace reserved now — `tsconfig` is the
+only foreseen config assertion):
 
-- `config.packageJson(p)` — when a real need shows up.
-- `config.<whatever>(p)` — extensions hang off the same namespace.
+- If `packageJson(p)` / `nodeVersion(p)` assertions ever emerge, add them as
+  their own flat entry points, or introduce a (non-`config`-named) namespace
+  at that point. Don't pre-commit the grouping on speculation.
 
 The brick that does _not_ exist in this plan is "a generic project-config matcher abstraction." That would be premature. tsconfig assertions are flat key-value comparisons; package.json assertions will want semver, dep allowlists, script keys — a different shape. Solve each when its real shape is known.
 
@@ -90,39 +92,36 @@ The brick that does _not_ exist in this plan is "a generic project-config matche
 ### Public surface
 
 ```typescript
-// In src/index.ts — new exports alongside existing `smells` export.
-export { config } from './config/index.js'
-export { TsconfigBuilder } from './config/tsconfig-builder.js'
+// In src/index.ts — new exports alongside existing `project` / `smells` exports.
+export { tsconfig } from './tsconfig/index.js'
+export { TsconfigBuilder } from './tsconfig/tsconfig-builder.js'
 ```
 
-### Namespace + builder
+### Entry point + builder
 
 ```typescript
-// src/config/index.ts
+// src/tsconfig/index.ts
 import type { ArchProject } from '../core/project.js'
 import { TsconfigBuilder } from './tsconfig-builder.js'
 
 /**
- * Project-config rule entry points.
+ * Assert facts about the resolved TypeScript compiler options.
  *
- * Each method returns a builder extending TerminalBuilder, with the same
+ * Returns a builder extending TerminalBuilder, with the same
  * .because() / .rule() / .excluding() / .check() / .warn() surface as the
- * rest of the library.
- *
- * Mirrors the `smells` namespace — non-iterating rules grouped by domain.
+ * rest of the library. A flat top-level entry point like `project` / `smells`
+ * — deliberately not a `config` namespace, which would collide with the
+ * existing `defineConfig` / `CliConfig` ("configure the tool") surface.
  */
-export const config = {
-  /** Assert facts about the resolved TypeScript compiler options. */
-  tsconfig(project: ArchProject): TsconfigBuilder {
-    return new TsconfigBuilder(project)
-  },
+export function tsconfig(project: ArchProject): TsconfigBuilder {
+  return new TsconfigBuilder(project)
 }
 ```
 
 ### `.requires()`
 
 ```typescript
-// src/config/tsconfig-builder.ts (signature only)
+// src/tsconfig/tsconfig-builder.ts (signature only)
 
 import type { CompilerOptions } from 'ts-morph'
 import { TerminalBuilder } from '../core/terminal-builder.js'
@@ -148,7 +147,7 @@ export class TsconfigBuilder extends TerminalBuilder {
 `getCompilerOptions()` returns the resolved options after `extends` resolution, but **does not insert the implicit defaults** that the strict family receives from `strict: true`. tsc computes those via `getStrictOptionValue(options, flag)`; the rule mirrors that.
 
 ```typescript
-// src/config/strict-family.ts
+// src/tsconfig/strict-family.ts
 
 import type { CompilerOptions } from 'ts-morph'
 
@@ -206,7 +205,7 @@ export interface ArchProject {
 }
 ```
 
-Both `project()` and `workspace()` implement it by delegating to `tsMorphProject.getCompilerOptions()`. One-line implementation each. `workspace()` uses the alphabetically-first tsconfig's options (already documented in the existing implementation) — `tsconfigRequires()` against a workspace asserts against that primary config. The plan documents this; users with per-package strictness call `config.tsconfig(project('./packages/x/tsconfig.json'))` for that package.
+Both `project()` and `workspace()` implement it by delegating to `tsMorphProject.getCompilerOptions()`. One-line implementation each. `workspace()` uses the alphabetically-first tsconfig's options (already documented in the existing implementation) — a `tsconfig()` rule against a workspace asserts against that primary config. The plan documents this; users with per-package strictness call `tsconfig(project('./packages/x/tsconfig.json'))` for that package.
 
 ## Violation shape
 
@@ -254,14 +253,14 @@ This spike is the same pattern used to verify plan 0048's `getAliasedSymbol` sem
 ### Phase 1 — Core implementation (~2 hours)
 
 1. Add `getCompilerOptions()` to `ArchProject` interface and both `project()` / `workspace()` implementations (`src/core/project.ts`).
-2. Create `src/config/strict-family.ts` with `resolveFlag` + `isStrictFamily`.
-3. Create `src/config/tsconfig-builder.ts`:
+2. Create `src/tsconfig/strict-family.ts` with `resolveFlag` + `isStrictFamily`.
+3. Create `src/tsconfig/tsconfig-builder.ts`:
    - `class TsconfigBuilder extends TerminalBuilder`.
    - Constructor: `constructor(private readonly project: ArchProject) { super() }`.
    - `_requirements: Partial<CompilerOptions> = {}` accumulator.
    - `.requires(spec)` — merges into `_requirements`, returns `this`.
    - `protected collectViolations(): ArchViolation[]` — iterates `_requirements`, applies strict-family resolution for the strict family, emits one violation per mismatch.
-4. Create `src/config/index.ts` with the `config` namespace export.
+4. Create `src/tsconfig/index.ts` with the flat `tsconfig()` entry-point export.
 5. Wire exports into `src/index.ts`.
 
 ### Phase 2 — Tests (~2 hours)
@@ -292,8 +291,8 @@ Cache hygiene: each test calls `resetProjectCache()` or uses a unique tsconfig p
 
 ### Phase 3 — Docs (~1 hour)
 
-- New section in `docs/rules.md` (or wherever smells are documented): "Project-config rules — `config.tsconfig()`." Show one example, link to `CompilerOptions`, document strict-family resolution.
-- README — add the `config.tsconfig(p).requires({ strict: true }).check()` line near the smell-detector example, not at the top. It's a tool in the box, not the headline.
+- New section in `docs/rules.md` (or wherever smells are documented): "Project-config rules — `tsconfig()`." **Lead with strict-family resolution** — why `strict: true` implies the eight (nine, once `strictBuiltinIteratorReturn` is added) sub-flags, the thing a plain JSON-schema check can't do — then show one example, then link `CompilerOptions`.
+- README — add the `tsconfig(p).requires({ strict: true }).check()` line near the smell-detector example, not at the top. It's a tool in the box, not the headline.
 - CHANGELOG `### Added` entry.
 
 ### Phase 4 — EESS walkthrough alignment (~15 min)
@@ -301,7 +300,7 @@ Cache hygiene: each test calls `resetProjectCache()` or uses a unique tsconfig p
 The calculator walkthrough's ADR-0002 (`eess-walkthrough-calculator.md`) currently says _"all .ts files use strict mode (tsconfig.json)"_. Update the generated `arch.rules.ts` snippet in Stage 4 to compile that to:
 
 ```typescript
-config.tsconfig(p).requires({ strict: true }).check()
+tsconfig(p).requires({ strict: true }).check()
 ```
 
 That's the only doc-asset coupling.
@@ -311,10 +310,10 @@ That's the only doc-asset coupling.
 | File                                      | Change                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------- |
 | `src/core/project.ts`                     | Add `getCompilerOptions()` to interface; implement in both factories |
-| `src/config/tsconfig-builder.ts`          | New — `TsconfigBuilder extends TerminalBuilder`                      |
-| `src/config/strict-family.ts`             | New — `resolveFlag`, `isStrictFamily`, `STRICT_FAMILY` constant      |
-| `src/config/index.ts`                     | New — `config` namespace export                                      |
-| `src/index.ts`                            | Export `config` and `TsconfigBuilder`                                |
+| `src/tsconfig/tsconfig-builder.ts`        | New — `TsconfigBuilder extends TerminalBuilder`                      |
+| `src/tsconfig/strict-family.ts`           | New — `resolveFlag`, `isStrictFamily`, `STRICT_FAMILY` constant      |
+| `src/tsconfig/index.ts`                   | New — flat `tsconfig()` entry-point export                           |
+| `src/index.ts`                            | Export `tsconfig` and `TsconfigBuilder`                              |
 | `tests/config/tsconfig.test.ts`           | New — full Phase 2 inventory                                         |
 | `docs/rules.md` (or appropriate doc page) | New section                                                          |
 | `README.md`                               | One example line near non-element-builder examples                   |
@@ -332,10 +331,10 @@ No changes to `recommended()`. No new sibling rules. No new top-level concept.
 ## Out of scope
 
 - **`recommended()` integration.** Deliberately omitted — see "Goal" and framework-mindset re-read above.
-- **`config.packageJson()`, `config.nodeVersion()`, etc.** Land when there's real demand. The namespace makes room without pre-committing.
+- **`packageJson()`, `nodeVersion()`, etc.** Land when there's real demand, as their own flat entry points. `tsconfig` is the only foreseen config assertion — no namespace reserved now (a non-`config`-named namespace can be introduced later if a real cluster ever emerges).
 - **`.forbids(spec)` (assert flags are NOT set to certain values).** Future plan if demand emerges. `.requires()` covers the immediate need.
 - **`.satisfies(predicate)` for custom logic.** Future plan. The library doesn't need a tsconfig-matcher abstraction yet — flat key-value is enough.
-- **Per-file overrides** (`tsconfig.test.json`). User constructs a second `project()` and calls `config.tsconfig()` on it separately.
+- **Per-file overrides** (`tsconfig.test.json`). User constructs a second `project()` and calls `tsconfig()` on it separately.
 - **Reading raw tsconfig.json** (line numbers for the failing option, AST of the JSON, etc.). Out of scope — tsc and ts-morph resolve to a flat `CompilerOptions` object; the rule operates on that.
 - **Validating the structure of tsconfig.json** (typos, etc.). tsc does that at load time; `project()` already fails with a clear error before any rule runs.
 - **Suggesting fixes by editing tsconfig.json.** The rule reports; it does not mutate.
@@ -346,7 +345,33 @@ No changes to `recommended()`. No new sibling rules. No new top-level concept.
 Three reasons this lands cleanly:
 
 1. **It closes the obvious gap.** Plans 0047 and 0048 strengthen the code-level checks against escape hatches; this rule closes the upstream config-level hole that lets users bypass tsc itself. Together they form a coherent type-safety story.
-2. **It joins the existing architecture instead of inventing.** `TerminalBuilder` is already the home for non-iterating rules; `SmellBuilder` is the existing precedent. One more subclass, one more namespace, one more `ArchProject` method — that's the whole footprint.
-3. **It respects the framework-mindset.** `config.tsconfig(p).requires({ strict: true })` is the user declaring their own intent. The library does not opine on whether `strict: true` is good. Anyone — strict-greenfield, partial-migration, JS-mostly, monorepo-mixed — can use the same primitive to assert whatever shape they actually want.
+2. **It joins the existing architecture instead of inventing.** `TerminalBuilder` is already the home for non-iterating rules; `SmellBuilder` is the existing precedent. One more subclass, one more top-level entry point, one more `ArchProject` method — that's the whole footprint.
+3. **It respects the framework-mindset.** `tsconfig(p).requires({ strict: true })` is the user declaring their own intent. The library does not opine on whether `strict: true` is good. Anyone — strict-greenfield, partial-migration, JS-mostly, monorepo-mixed — can use the same primitive to assert whatever shape they actually want.
 
 EESS-wise, this is the rule that ADR-0002 in the calculator walkthrough already implicitly demands. The walkthrough's `## Enforcement` section says _"all .ts files use strict mode (tsconfig.json)"_ — that line now has a concrete compile target, and it's a target every kind of TypeScript project can use, not just the ones that match the library's defaults.
+
+## Review findings — 2026-07-13
+
+Reviewed via the `review-proposal` skill (architect + product lenses), grounded against `violation.ts`, `baseline.ts`, `project.ts`, `terminal-builder.ts`, and ts-morph. Existing-code survey: **no duplication** — the flat `tsconfig` entry point, `TsconfigBuilder`, `getCompilerOptions()`, `src/tsconfig/` are all new; the `TerminalBuilder`/`SmellBuilder`/`smells`-namespace precedent it reuses exists.
+
+**Verdict: Ship with changes** — the cleanest of the open plans. The primitive is textbook framework-mindset; the fixes are naming + a few factual corrections.
+
+### Blocking (fix before implementation)
+
+- **Namespace collision (product) — RESOLVED 2026-07-13: going flat `tsconfig(p)`; `tsconfig` is the only foreseen config assertion, so no namespace.** `config` clashed with the existing `defineConfig`/`CliConfig` (`src/index.ts`, `src/cli/config.ts`, "configure the tool"). The plan body now uses the flat entry point throughout; a non-`config`-named namespace can be introduced later only if a real cluster (`packageJson`, `nodeVersion`) emerges.
+- **`createViolation()` can't be reused as claimed** (lines 66, 213). It takes a ts-morph `Node` (`violation.ts:153`) and derives file/line/codeFrame from it; tsconfig isn't a `SourceFile` in the project. Construct the `ArchViolation` literal directly (set `element` = flag name, omit `codeFrame`). The architecture-fit table is factually wrong.
+- **`STRICT_FAMILY` is incomplete and self-undermining.** Missing `strictBuiltinIteratorReturn` (TS 5.6, governed by `strict`) → `.requires({ strictBuiltinIteratorReturn: true })` falsely fails on a `strict:true` project. And the hardcoded list contradicts the "new TS flags land automatically" claim (line 144) — the _input_ auto-updates; the resolution list is a manual allowlist to chase each TS release. State the tension; pin to a TS version with a guard test.
+- **ADR-005:** the plan's own sample uses `as` (line 184, `(STRICT_FAMILY as readonly string[])`) — use `.some((f) => f === key)`. And array/object-valued options (`lib`, `paths`, `types`) break flat `===` → false positives; restrict to primitive/enum keys, deep-compare, or document as unsupported.
+
+### Should-fix
+
+- Drop the "stale-baseline warning" assertions (Phase 0 item 2, test line 288) — no such warning exists in the pipeline. But the file-only baseline key **round-trips fine** (identity is `rule::element::message` per `baseline.ts:52-54`; file/line aren't matched), so Phase 0's biggest fear is unfounded — downgrade it to a 10-min confirmation.
+- Enum-backed options print numeric (`target=9`, not `ES2022`) — add a reverse-map for messages.
+- `workspace()` asserts only the alphabetically-first tsconfig → false confidence in mixed-strictness monorepos; make the docs loud and the pass-case traceable.
+- `.excluding()` repurposed to filter by flag name is a semantic stretch — document as such or no-op it.
+
+### Praise
+
+- Refusing to curate/opine (`Partial<CompilerOptions>` as the user's own data) is textbook framework-mindset. Strict-family resolution mirroring tsc's `getStrictOptionValue` is the real value a JSON-schema check can't replicate — **lead the docs with it.** `TerminalBuilder`/`SmellBuilder` is the right home (ADR-003 intact); Phase 0 spike is disciplined.
+
+**Next step:** rename to flat `tsconfig(p)`, fix the `createViolation` reuse + `STRICT_FAMILY` completeness/framing + the `as` cast + array/object comparison, drop the stale-baseline assertion. Then it's a clean 0.5–1 day.

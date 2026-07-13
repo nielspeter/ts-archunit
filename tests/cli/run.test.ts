@@ -61,4 +61,18 @@ describe('run', () => {
     await run(['baseline'])
     expect(process.exitCode).toBe(1)
   })
+
+  it('rejects a --format value not valid for check (e.g. agent)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await run(['check', 'rules.ts', '--format', 'agent'])
+    expect(process.exitCode).toBe(1)
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("not valid for 'check'"))
+  })
+
+  it('rejects a --format value not valid for explain (e.g. github)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await run(['explain', 'rules.ts', '--format', 'github'])
+    expect(process.exitCode).toBe(1)
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("not valid for 'explain'"))
+  })
 })

@@ -39,6 +39,7 @@ export default defineConfig({
           { text: 'GraphQL Rules', link: '/graphql' },
           { text: 'Standard Rules', link: '/standard-rules' },
           { text: 'Architecture Presets', link: '/presets' },
+          { text: 'AI Agents', link: '/ai-agents' },
           { text: 'Recipes', link: '/recipes' },
           { text: 'Metrics', link: '/metrics' },
           { text: 'Custom Rules', link: '/custom-rules' },

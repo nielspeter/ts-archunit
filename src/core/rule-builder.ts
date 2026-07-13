@@ -28,6 +28,7 @@ export abstract class RuleBuilder<T> {
   protected _exclusions: (string | RegExp)[] = []
   protected _silentIndices: Set<number> = new Set()
   protected _phase: 'predicate' | 'condition' = 'predicate'
+  protected _severity?: 'error' | 'warn'
 
   constructor(protected readonly project: ArchProject) {}
 
@@ -165,6 +166,7 @@ export abstract class RuleBuilder<T> {
       because: this._reason,
       suggestion: this._metadata?.suggestion,
       docs: this._metadata?.docs,
+      imperative: this._metadata?.imperative ?? this.buildImperative(),
     }
   }
 
@@ -174,12 +176,14 @@ export abstract class RuleBuilder<T> {
    */
   violations(): ArchViolation[] {
     const raw = this.evaluate()
-    return applyFilters(raw, {
+    const filtered = applyFilters(raw, {
       reason: this._reason,
       metadata: this._metadata,
       exclusions: this._exclusions,
       silentIndices: this._silentIndices,
     })
+    const sev: 'error' | 'warn' = this._severity ?? 'error'
+    return filtered.map((v) => ({ ...v, severity: sev }))
   }
 
   /**
@@ -220,6 +224,17 @@ export abstract class RuleBuilder<T> {
       },
       options,
     )
+  }
+
+  /**
+   * Set the severity this rule reports at WITHOUT executing it (non-terminal).
+   * Returns `this` so the builder can be collected into a rule array and run by
+   * the CLI pipeline; its `.violations()` stamp each result with this severity.
+   * Distinct from the terminal `.severity()` below, which executes immediately.
+   */
+  asSeverity(level: 'error' | 'warn'): this {
+    this._severity = level
+    return this
   }
 
   /**
@@ -295,6 +310,27 @@ export abstract class RuleBuilder<T> {
     if (predicateDesc) parts.push(`that ${predicateDesc}`)
     if (conditionDesc) parts.push(`should ${conditionDesc}`)
     return parts.join(' ')
+  }
+
+  /**
+   * Build an imperative "Do NOT … / MUST …" sentence for AI-agent system
+   * prompts (`explain --format agent`). Heuristic FALLBACK — a rule author's
+   * `.rule({ imperative })` overrides it.
+   */
+  private buildImperative(): string {
+    // The Do-NOT/MUST transform only reads the polarity of a single condition.
+    // For zero or multiple (`and`-joined) conditions, negating the joined string
+    // would mis-handle mixed polarity ("not X and not Y"), so fall back to the
+    // plain, always-correct rule description.
+    if (this._conditions.length !== 1) {
+      return this.buildRuleDescription() || 'Follow the architecture rule.'
+    }
+    const cond = this._conditions[0]!.description
+    const isNegative = /^(not|no)\b/i.test(cond)
+    const body = cond.replace(/^(not|no)\s+/i, '')
+    const scope = this._predicates.map((p) => p.description).join(' and ')
+    const scopeSuffix = scope ? ` (in code that ${scope})` : ''
+    return `${isNegative ? 'Do NOT' : 'MUST'} ${body}${scopeSuffix}`
   }
 
   /**

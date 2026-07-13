@@ -27,6 +27,8 @@ export interface ArchViolation {
   suggestion?: string
   /** Link to documentation — ADR, wiki, style guide */
   docs?: string
+  /** Severity of this violation. Absent means 'error' (the default). */
+  severity?: 'error' | 'warn'
 }
 
 /**

@@ -216,6 +216,161 @@ describe('RuleBuilder', () => {
     })
   })
 
+  describe('.asSeverity()', () => {
+    it('is non-terminal — sets severity, returns this, does not throw or warn', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const configured = builder.should().withCondition(alwaysFail('bad'))
+      const chained = configured.asSeverity('warn')
+      expect(chained).toBe(configured)
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+
+    it('stamps warn severity onto .violations()', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(alwaysFail('bad'))
+        .asSeverity('warn')
+        .violations()
+      expect(violations.length).toBeGreaterThan(0)
+      expect(violations.every((v) => v.severity === 'warn')).toBe(true)
+    })
+
+    it('defaults .violations() severity to error when asSeverity is not called', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder.should().withCondition(alwaysFail('bad')).violations()
+      expect(violations.length).toBeGreaterThan(0)
+      expect(violations.every((v) => v.severity === 'error')).toBe(true)
+    })
+  })
+
+  describe('rule metadata propagates to violations (agent payload)', () => {
+    it('falls back because/suggestion/docs from .because()/.rule() when the condition sets none', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(alwaysFail('bad'))
+        .because('domain must stay pure')
+        .rule({ suggestion: 'extract a helper', docs: 'https://adr/1' })
+        .violations()
+      expect(violations.length).toBeGreaterThan(0)
+      expect(violations[0]?.because).toBe('domain must stay pure')
+      expect(violations[0]?.suggestion).toBe('extract a helper')
+      expect(violations[0]?.docs).toBe('https://adr/1')
+    })
+
+    it('propagates the rule id to violations that lack their own', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(alwaysFail('bad'))
+        .rule({ id: 'domain/pure' })
+        .violations()
+      expect(violations[0]?.ruleId).toBe('domain/pure')
+    })
+
+    it('does NOT override a ruleId the condition already set', () => {
+      const condWithId = {
+        description: 'sets its own ruleId',
+        evaluate: (els: TestElement[]) =>
+          els.map((el) => ({
+            rule: 'r',
+            ruleId: 'CONDITION_ID',
+            element: el.name,
+            file: el.file,
+            line: el.line,
+            message: 'bad',
+          })),
+      }
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(condWithId)
+        .rule({ id: 'RULE_ID' })
+        .violations()
+      expect(violations[0]?.ruleId).toBe('CONDITION_ID')
+    })
+
+    it('does NOT override a suggestion the condition already set (per-violation wins)', () => {
+      const condWithSuggestion = {
+        description: 'fails with its own suggestion',
+        evaluate: (els: TestElement[]) =>
+          els.map((el) => ({
+            rule: 'r',
+            element: el.name,
+            file: el.file,
+            line: el.line,
+            message: 'bad',
+            suggestion: 'CONDITION_FIX',
+          })),
+      }
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(condWithSuggestion)
+        .rule({ suggestion: 'RULE_FIX' })
+        .violations()
+      expect(violations[0]?.suggestion).toBe('CONDITION_FIX')
+    })
+  })
+
+  describe('buildImperative (agent explain)', () => {
+    it('renders a negative condition as "Do NOT …"', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition({ description: 'not contain call to eval', evaluate: () => [] })
+        .describeRule()
+      expect(desc.imperative).toMatch(/^Do NOT contain call to eval/)
+    })
+
+    it('renders a positive condition as "MUST …"', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition({ description: 'have name matching /X/', evaluate: () => [] })
+        .describeRule()
+      expect(desc.imperative).toMatch(/^MUST have name matching/)
+    })
+
+    it('uses .rule({ imperative }) verbatim when set', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition(alwaysPass())
+        .rule({ imperative: 'Do NOT foo' })
+        .describeRule()
+      expect(desc.imperative).toBe('Do NOT foo')
+    })
+
+    it('appends the predicate scope suffix', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .should()
+        .withCondition({ description: 'not import from repositories', evaluate: () => [] })
+        .describeRule()
+      expect(desc.imperative).toContain('Do NOT import from repositories')
+      expect(desc.imperative).toContain('(in code that ')
+    })
+
+    it('falls back to the plain description for multi-condition rules (no mis-negation)', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition({ description: 'not contain X', evaluate: () => [] })
+        .andShould()
+        .withCondition({ description: 'not contain Y', evaluate: () => [] })
+        .describeRule()
+      // must NOT produce "Do NOT contain X and not contain Y"
+      expect(desc.imperative).not.toMatch(/^Do NOT/)
+      expect(desc.imperative).toContain('should')
+    })
+  })
+
   describe('predicate combination', () => {
     it('ANDs multiple predicates together', () => {
       const builder = new TestRuleBuilder(stubProject, elements)

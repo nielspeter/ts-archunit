@@ -1,11 +1,11 @@
 import type { ArchViolation } from '../core/violation.js'
-import { ArchRuleError } from '../core/errors.js'
 
 /**
  * Collect violations from rules WITHOUT throwing.
  *
- * Used to generate a baseline: run all rules, collect violations,
- * write them to a baseline file.
+ * Used to generate a baseline: run all rules via their non-throwing
+ * `.violations()` terminal (severity-stamped), and write them to a baseline
+ * file.
  *
  * @example
  * const violations = collectViolations(
@@ -14,18 +14,8 @@ import { ArchRuleError } from '../core/errors.js'
  * )
  * generateBaseline(violations, 'arch-baseline.json')
  */
-export function collectViolations(...builders: Array<{ check: () => void }>): ArchViolation[] {
-  const allViolations: ArchViolation[] = []
-
-  for (const builder of builders) {
-    try {
-      builder.check()
-    } catch (error: unknown) {
-      if (error instanceof ArchRuleError) {
-        allViolations.push(...error.violations)
-      }
-    }
-  }
-
-  return allViolations
+export function collectViolations(
+  ...builders: Array<{ violations: () => ArchViolation[] }>
+): ArchViolation[] {
+  return builders.flatMap((builder) => builder.violations())
 }

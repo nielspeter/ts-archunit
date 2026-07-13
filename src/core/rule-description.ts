@@ -8,4 +8,6 @@ export interface RuleDescription {
   because?: string
   suggestion?: string
   docs?: string
+  /** Imperative "Do NOT … / MUST …" sentence for agent system prompts. */
+  imperative?: string
 }

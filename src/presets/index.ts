@@ -9,3 +9,9 @@ export { dataLayerIsolation } from './data-layer.js'
 
 export type { StrictBoundariesOptions } from './boundaries.js'
 export { strictBoundaries } from './boundaries.js'
+
+export type { AgentGuardrailsOptions } from './agent-guardrails.js'
+export { agentGuardrails } from './agent-guardrails.js'
+
+export type { RecommendedOptions } from './recommended.js'
+export { recommended } from './recommended.js'

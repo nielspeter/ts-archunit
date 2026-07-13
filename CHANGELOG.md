@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-07-13
+
+### Added
+
+- **`recommended(p, options?)` preset** — a deliberately thin, universal safety floor for any TypeScript project: `functionNoEval` + `functionNoFunctionConstructor` (error), `functionNoSilentCatch` + `noEmptyBodies` (warn). Returns severity-carrying builders (`export default [...recommended(p)]`); ids `preset/recommended/*`; opt-in-ladder severity via `overrides`. Exported from `@nielspeter/ts-archunit/presets`. Overlaps `agentGuardrails` on empty-bodies + eval. (Plan 0049.)
+- **`agentGuardrails(p, options)` preset** — a one-liner bundling the mistakes AI coding agents make most often (inline logic, generic errors, stub comments, empty bodies, copy-paste). Returns severity-carrying builders (`export default [...agentGuardrails(p, { … })]`); each rule carries agent-facing `because` / `suggestion` / `imperative` metadata. Exported from `@nielspeter/ts-archunit/presets`. (Plan 0044.)
+- **`explain --format agent`** — emits an imperative "Do NOT … / MUST …" markdown block for AI-agent system prompts / project instructions, with a check-in-loop preamble and `<!-- ts-archunit:start/end -->` sentinel markers for idempotent updates. Backed by a new optional `imperative` field on `RuleMetadata` / `RuleDescription` (with a heuristic fallback). See the new **AI Agents** guide.
+- **`codeFrame` in `check --format json`** — each violation now includes the source snippet, so an agent can locate it without re-reading the file.
+- **Rule severity in the CLI** — `.asSeverity('error' | 'warn')`, a non-terminal builder method that marks a rule's severity _without_ executing it, so severity-carrying builders can be collected into a rule file's `export default` array. `check` reports **warn**-severity violations but they never fail the run; only **error**-severity violations set a non-zero exit. `ArchViolation` gains an optional `severity` field. (Plan 0060.)
+- **Single-document, severity-aware `check --format json`** — the JSON output is now one document for the whole run (previously one blob per rule, which was not valid JSON for multi-rule files), and it is **always emitted, even on a clean run** (`{ "summary": { "total": 0, … }, "violations": [] }`) so consumers can parse the success case. Each violation carries `severity`; the summary reports `{ total, errors, warnings, reason }`. Intended for CI tooling and AI coding agents that consume the JSON to self-correct.
+- **`check --format github` respects severity** — warn-severity violations render as `::warning` annotations (previously every violation was emitted as `::error`).
+- **`check` runs preset-returning rule files** — a rule file can `export default [...myPreset(p)]` where the preset returns severity-carrying builders. A file that instead self-executes a throwing preset at import is handled by a best-effort catch (error-severity only).
+
+### Fixed
+
+- **Rule metadata now reaches per-violation output** — `.because()` and `.rule({ because, suggestion, docs })` previously flowed only to `explain` and the error header, never to individual violations, so `check --format json` returned `suggestion: null` even when the author set one. Per-violation `because` / `suggestion` / `docs` now fall back to the rule metadata when the condition sets none (per-violation values still take precedence). This affects **all** output formats — terminal, `github`, and `json` — and in-test `.check()` / `.warn()`, not only the CLI: violation output now includes the author's `Fix:` / `Docs:` lines where it didn't before. Snapshot tests or log-parsers keyed on the old violation text may need updating.
+
+### Changed
+
+- **`check` collects `.violations()` instead of calling `.check()` per builder** — it gathers every builder's violations into one unified list, then filters / formats / exits once. Single-rule behavior is unchanged; multi-rule `--format json` is now a single valid document. `collectViolations()` (used by `baseline`) likewise switched to `.violations()`.
+
 ## [0.12.0] - 2026-07-03
 
 ### Added
