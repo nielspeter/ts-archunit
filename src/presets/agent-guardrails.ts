@@ -36,7 +36,10 @@ export interface AgentGuardrailsOptions extends PresetBaseOptions {
  * Uses function-variant rules so standalone functions, arrow functions, and
  * class methods are all covered.
  */
-export function agentGuardrails(p: ArchProject, options: AgentGuardrailsOptions): RuleBuilderLike[] {
+export function agentGuardrails(
+  p: ArchProject,
+  options: AgentGuardrailsOptions,
+): RuleBuilderLike[] {
   validateOverrides(options.overrides, collectRuleIds(options))
 
   const builders: RuleBuilderLike[] = []

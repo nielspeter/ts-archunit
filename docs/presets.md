@@ -147,13 +147,13 @@ export default [
 
 ### Generated rules
 
-| Rule ID                              | Enforces                                    | Default |
-| ------------------------------------ | ------------------------------------------- | ------- |
-| `preset/agent/no-inline-logic/<api>` | No inline call to a banned API (one per entry) | error |
-| `preset/agent/no-generic-errors`     | No `throw new Error()` — use typed errors   | error   |
-| `preset/agent/no-stubs`              | No TODO/FIXME/"not implemented" stub comments | error |
-| `preset/agent/no-empty-bodies`       | No empty function bodies                    | error   |
-| `preset/agent/no-copy-paste`         | No near-identical function bodies (≥ 0.9 similarity) | warn |
+| Rule ID                              | Enforces                                             | Default |
+| ------------------------------------ | ---------------------------------------------------- | ------- |
+| `preset/agent/no-inline-logic/<api>` | No inline call to a banned API (one per entry)       | error   |
+| `preset/agent/no-generic-errors`     | No `throw new Error()` — use typed errors            | error   |
+| `preset/agent/no-stubs`              | No TODO/FIXME/"not implemented" stub comments        | error   |
+| `preset/agent/no-empty-bodies`       | No empty function bodies                             | error   |
+| `preset/agent/no-copy-paste`         | No near-identical function bodies (≥ 0.9 similarity) | warn    |
 
 Uses function-variant rules, so standalone functions, arrow functions, and class methods are all covered. Each rule carries `because` / `suggestion` / `imperative` metadata so the agent gets an actionable fix in `explain --format agent` and `check --format json`. Accepts the same `overrides` map as every preset (below).
 

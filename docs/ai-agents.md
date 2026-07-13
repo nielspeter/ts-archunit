@@ -107,9 +107,9 @@ which emits a single JSON document the agent parses to self-correct:
       "message": "…",
       "because": "a generic Error loses the type/context callers need to handle it",
       "suggestion": "throw a domain-specific error (NotFoundError, ValidationError, …)",
-      "codeFrame": "  41 |   if (!order) {\n> 42 |     throw new Error('not found')\n  43 |   }"
-    }
-  ]
+      "codeFrame": "  41 |   if (!order) {\n> 42 |     throw new Error('not found')\n  43 |   }",
+    },
+  ],
 }
 ```
 

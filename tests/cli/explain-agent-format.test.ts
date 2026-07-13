@@ -11,9 +11,7 @@ const mockLoad = vi.mocked(loadRuleFiles)
 /** Run explain --format agent over the given rule descriptions; return stdout. */
 async function runAgent(descs: RuleDescription[]): Promise<string> {
   const spy = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-  mockLoad.mockResolvedValue(
-    descs.map((d) => ({ describeRule: () => d, violations: () => [] })),
-  )
+  mockLoad.mockResolvedValue(descs.map((d) => ({ describeRule: () => d, violations: () => [] })))
   await runExplain({ ruleFiles: ['rules.ts'], format: 'agent' })
   return spy.mock.calls.map((c) => String(c[0])).join('')
 }
