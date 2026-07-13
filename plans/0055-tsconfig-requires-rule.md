@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** DRAFT — captured for decision, not yet scheduled
+- **State:** IMPLEMENTED (2026-07-13, branch `feat/0055-tsconfig-rule`) — `tsconfig(p).requires()` builder, strict-family resolution (9 flags incl. `strictBuiltinIteratorReturn`, guarded by a size test), enum-name messages, deep array/object compare, extends + workspace-primary + baseline verified; 22 tests; docs (`config-rules.md` + api-reference + README) + CHANGELOG. **Deviation from plan:** did NOT add `getCompilerOptions()` to the `ArchProject` interface — a required method would break ~30 inline test literals; the builder reads `project._project.getCompilerOptions()` (the always-present internal ts-morph project, as other entry points do). Phase 4 (EESS walkthrough) skipped — that asset isn't in this repo.
 - **Review (2026-07-13):** Ship with changes — cleanest of the open plans. **API locked: flat `tsconfig(p)` (no namespace).** Remaining: 4 mechanical fixes (createViolation, STRICT_FAMILY, `as` cast, array/object compare). Plan text ready; build scheduled later. See "Review findings" below.
 - **Priority:** TBD (likely P2 once approved)
 - **Effort:** 0.5–1 day
