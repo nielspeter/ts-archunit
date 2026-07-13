@@ -1,4 +1,4 @@
-import { Project, type SourceFile } from 'ts-morph'
+import { Project, type SourceFile, type CompilerOptions } from 'ts-morph'
 import path from 'node:path'
 import fs from 'node:fs'
 
@@ -14,6 +14,13 @@ export interface ArchProject {
 
   /** Returns all source files included by the tsconfig. */
   getSourceFiles(): SourceFile[]
+
+  /**
+   * Resolved TypeScript compiler options (after `extends`), as `tsc` computes
+   * them. Optional so bare `ArchProject` literals (test doubles) stay valid;
+   * `project()` and `workspace()` always implement it. Used by `tsconfig()`.
+   */
+  getCompilerOptions?(): CompilerOptions
 
   /**
    * The underlying ts-morph Project.
@@ -58,6 +65,9 @@ export function project(tsConfigPath: string): ArchProject {
     _project: tsMorphProject,
     getSourceFiles() {
       return tsMorphProject.getSourceFiles()
+    },
+    getCompilerOptions() {
+      return tsMorphProject.getCompilerOptions()
     },
   }
 
@@ -147,6 +157,9 @@ export function workspace(tsConfigPaths: string[]): ArchProject {
     _project: tsMorphProject,
     getSourceFiles() {
       return tsMorphProject.getSourceFiles()
+    },
+    getCompilerOptions() {
+      return tsMorphProject.getCompilerOptions()
     },
   }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { Project, ScriptTarget, ModuleKind } from 'ts-morph'
+import { Project, ScriptTarget, ModuleKind, ModuleResolutionKind, ts } from 'ts-morph'
 import type { CompilerOptions } from 'ts-morph'
 import type { ArchProject } from '../../src/core/project.js'
 import { tsconfig } from '../../src/tsconfig/index.js'
@@ -121,8 +121,39 @@ describe('tsconfig().requires — strict-family resolution', () => {
   })
 
   it('STRICT_FAMILY tracks the tsc strict family (guard against TS drift)', () => {
-    // Bump this when a TypeScript release adds a strict-governed flag.
+    // Count is a tripwire against accidental edits; the version pin is what
+    // actually forces a re-check when a TS release could add a strict flag.
     expect(STRICT_FAMILY_SIZE).toBe(9)
+    expect(ts.version).toMatch(/^5\.9\./)
+  })
+
+  it('resolves strictBuiltinIteratorReturn through strict (behavioral anchor)', () => {
+    // The newest (TS 5.6) family member — proves it is still resolved by strict,
+    // not just present in a magic-number list.
+    expect(
+      tsconfig(mk({ strict: true }))
+        .requires({ strictBuiltinIteratorReturn: true })
+        .violations(),
+    ).toHaveLength(0)
+  })
+
+  it('renders a strict-family miss as false, not (unset), when nothing is set', () => {
+    const v = tsconfig(mk({})).requires({ strictNullChecks: true }).violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]?.message).toContain('actual false')
+    expect(v[0]?.message).not.toContain('(unset)')
+  })
+
+  it('suggests removing the override when strict is on but a sub-flag is explicitly false', () => {
+    const v = tsconfig(mk({ strict: true, strictNullChecks: false }))
+      .requires({ strictNullChecks: true })
+      .violations()
+    expect(v[0]?.suggestion).toContain('Remove the explicit "strictNullChecks": false')
+  })
+
+  it('suggests enabling strict when a sub-flag is required on a non-strict project', () => {
+    const v = tsconfig(mk({})).requires({ strictNullChecks: true }).violations()
+    expect(v[0]?.suggestion).toContain('Or enable "strict"')
   })
 })
 
@@ -236,6 +267,105 @@ describe('tsconfig() — terminal-builder integration', () => {
     generateBaseline(rule().violations(), baselinePath)
     // Re-run with the baseline — the known violation is filtered, so no throw.
     expect(() => rule().check({ baseline: withBaseline(baselinePath) })).not.toThrow()
+  })
+})
+
+describe('tsconfig() — value comparison and messages', () => {
+  it('suggests the enum NAME, not the raw number, for enum-backed options', () => {
+    const v = tsconfig(mk({ target: ScriptTarget.ES2020 }))
+      .requires({ target: ScriptTarget.ES2022 })
+      .violations()
+    // A number ("9") would be invalid tsconfig JSON.
+    expect(v[0]?.suggestion).toContain('"ES2022"')
+    expect(v[0]?.suggestion).not.toContain('9')
+  })
+
+  it('renders moduleResolution by name', () => {
+    const v = tsconfig(mk({ moduleResolution: ModuleResolutionKind.Node10 }))
+      .requires({ moduleResolution: ModuleResolutionKind.Bundler })
+      .violations()
+    expect(v[0]?.message).toContain('Bundler')
+    expect(v[0]?.message).toContain('Node10')
+  })
+
+  it('compares lib order-insensitively (tsc treats it as a set)', () => {
+    const v = tsconfig(mk({ lib: ['dom', 'es2022'] }))
+      .requires({ lib: ['es2022', 'dom'] })
+      .violations()
+    expect(v).toHaveLength(0)
+  })
+
+  it('flags a lib length mismatch', () => {
+    const v = tsconfig(mk({ lib: ['dom'] }))
+      .requires({ lib: ['dom', 'es2022'] })
+      .violations()
+    expect(v).toHaveLength(1)
+  })
+
+  it('deep-compares object-valued options (paths)', () => {
+    expect(
+      tsconfig(mk({ paths: { '@/*': ['src/*'] } }))
+        .requires({ paths: { '@/*': ['src/*'] } })
+        .violations(),
+    ).toHaveLength(0)
+    const v = tsconfig(mk({ paths: { '@/*': ['src/*'] } }))
+      .requires({ paths: { '@/*': ['lib/*'] } })
+      .violations()
+    expect(v).toHaveLength(1)
+  })
+
+  it('required false differs from unset (a false requirement is explicit)', () => {
+    // absent flag → "(unset)", which is NOT equal to an explicit false requirement
+    expect(
+      tsconfig(mk({})).requires({ noUncheckedIndexedAccess: false }).violations(),
+    ).toHaveLength(1)
+    // explicit false matches an explicit false requirement
+    expect(
+      tsconfig(mk({ declaration: false }))
+        .requires({ declaration: false })
+        .violations(),
+    ).toHaveLength(0)
+  })
+
+  it('same-key .requires() override — later wins', () => {
+    const v = tsconfig(mk({ strict: false }))
+      .requires({ strict: true })
+      .requires({ strict: false })
+      .violations()
+    expect(v).toHaveLength(0)
+  })
+
+  it('an empty spec produces no violations', () => {
+    expect(tsconfig(mk({})).requires({}).violations()).toHaveLength(0)
+    expect(tsconfig(mk({})).violations()).toHaveLength(0)
+  })
+
+  it('emits the full violation shape (file, line, rule)', () => {
+    const v = tsconfig(mk({ strict: false }))
+      .requires({ strict: true })
+      .violations()
+    expect(v[0]).toMatchObject({
+      file: '/mem/tsconfig.json',
+      line: 1,
+      element: 'strict',
+      rule: 'tsconfig compiler options must satisfy requirements',
+    })
+  })
+
+  it('.rule({ id }) propagates to the violation ruleId', () => {
+    const v = tsconfig(mk({ strict: false }))
+      .rule({ id: 'no-loose-tsconfig' })
+      .requires({ strict: true })
+      .violations()
+    expect(v[0]?.ruleId).toBe('no-loose-tsconfig')
+  })
+
+  it('.warn() reports without throwing', () => {
+    expect(() =>
+      tsconfig(mk({ strict: false }))
+        .requires({ strict: true })
+        .warn(),
+    ).not.toThrow()
   })
 })
 

@@ -8,8 +8,10 @@ import type { CompilerOptions } from 'ts-morph'
  * NOTE: this list is a manual mirror of tsc's strict family and must be updated
  * when TypeScript adds a strict-governed flag. Pinned to TypeScript ~5.9
  * (`strictBuiltinIteratorReturn` added in 5.6). The `satisfies` check below fails
- * to compile if a name here is not a real `CompilerOptions` key, and the
- * `strict-family.test.ts` guard asserts the count so a TS bump surfaces the gap.
+ * to compile if a name here is not a real `CompilerOptions` key. A count check
+ * alone can't detect a NEW TS flag this list is missing (the array length never
+ * changes on its own), so the test suite also pins the TypeScript minor version
+ * — a bump trips it and forces a manual re-check of this family.
  */
 const STRICT_FAMILY = [
   'alwaysStrict',
