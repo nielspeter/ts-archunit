@@ -30,10 +30,11 @@ interface StagedFile {
 
 /**
  * Scaffold a working ts-archunit setup in `cwd`. Returns the process exit code
- * (0 success, 1 on a recoverable error — bad `--preset`, missing tsconfig, or a
- * file conflict without `--force`). All reads, parses, and conflict checks run
- * before any file is written, so a mid-run failure never leaves a half-written
- * project.
+ * (0 success, 1 on a recoverable error — bad `--preset`, missing tsconfig, a
+ * file conflict without `--force`, or a write failure). All reads, parses, and
+ * conflict checks run before any file is written, so a validation failure never
+ * leaves a partial scaffold; a raw I/O failure mid-write is caught and reported
+ * (writes are ordered, not transactional).
  */
 export function runInit(args: InitArgs): number {
   const cwd = args.cwd ?? process.cwd()
@@ -68,6 +69,15 @@ export function runInit(args: InitArgs): number {
     staged.push(stage(cwd, 'arch-baseline.json', baselineTemplate()))
   }
 
+  // Read + parse package.json up front so a parse failure never crashes mid-write.
+  const pkgPlan = planPackageJson(cwd)
+
+  // A dry run writes nothing, so it previews regardless of existing files.
+  if (args.dryRun === true) {
+    printDryRun(staged, pkgPlan, cwd, sourceRoot)
+    return 0
+  }
+
   // Conflict detection (before any write).
   if (args.force !== true) {
     const conflicts = staged.filter((f) => fs.existsSync(f.path)).map((f) => f.name)
@@ -80,20 +90,22 @@ export function runInit(args: InitArgs): number {
     }
   }
 
-  // Read + parse package.json up front so a parse failure never crashes mid-write.
-  const pkgPlan = planPackageJson(cwd)
-
-  if (args.dryRun === true) {
-    printDryRun(staged, pkgPlan)
-    return 0
-  }
-
-  // Flush: every read/parse/validate is done, so writes can't half-complete.
-  for (const file of staged) {
-    fs.writeFileSync(file.path, file.content)
-  }
-  if (pkgPlan.action === 'write') {
-    fs.writeFileSync(pkgPlan.path, pkgPlan.content)
+  // Flush. Every read/parse/validate is already done, so a validation failure
+  // can't leave a partial scaffold; the `wx` flag (unless --force) also fails
+  // fast if a file appeared after the conflict check rather than clobbering it.
+  const writeFlag = args.force === true ? 'w' : 'wx'
+  try {
+    for (const file of staged) {
+      fs.writeFileSync(file.path, file.content, { flag: writeFlag })
+    }
+    if (pkgPlan.action === 'write') {
+      fs.writeFileSync(pkgPlan.path, pkgPlan.content)
+    }
+  } catch (err) {
+    console.error(
+      `Error: could not write files — ${err instanceof Error ? err.message : String(err)}`,
+    )
+    return 1
   }
 
   printClosing(staged, pkgPlan, cwd, sourceRoot)
@@ -101,7 +113,7 @@ export function runInit(args: InitArgs): number {
 }
 
 function isValidPreset(value: string): value is InitPreset {
-  return (VALID_PRESETS as readonly string[]).includes(value)
+  return value === 'recommended' || value === 'agent-guardrails'
 }
 
 function stage(cwd: string, name: string, content: string): StagedFile {
@@ -148,8 +160,9 @@ function rulesTemplate(preset: InitPreset, tsconfig: string, sourceRoot: string)
       ? `  // Using an AI coding agent? Add agentGuardrails — it targets the mistakes
   // agents make most (inline logic, generic errors, stubs, empty bodies,
   // copy-paste), and \`npx ts-archunit explain --format agent\` emits an
-  // imperative rules block for the agent's system prompt. See docs/ai-agents.md.
-  // Import { agentGuardrails } from '@nielspeter/ts-archunit/presets', then:
+  // imperative rules block for the agent's system prompt.
+  // See https://nielspeter.github.io/ts-archunit/ai-agents. Then, with
+  // { agentGuardrails } imported from '@nielspeter/ts-archunit/presets':
   //   ...agentGuardrails(p, { src: '${sourceRoot}/**', noGenericErrors: true })`
       : `  // Thin universal safety floor (eval, Function constructor, silent catches,
   // empty bodies). Import { recommended } from '@nielspeter/ts-archunit/presets':
@@ -172,7 +185,7 @@ ${alternateBlock}
   // (Builders default to error; append .asSeverity('warn') to warn, not fail.)
   //   classes(p).that().resideInFolder('${sourceRoot}/services/**')
   //     .should().notContain(call('parseInt')),
-  //   slices(p).matching('${sourceRoot}/feature-').should().beFreeOfCycles(),
+  //   slices(p).matching('${sourceRoot}/features/*/').should().beFreeOfCycles(),
 ]
 `
 }
@@ -293,13 +306,27 @@ function detectIndent(raw: string): string {
 
 // --- Messaging ---------------------------------------------------------------
 
-function printDryRun(staged: StagedFile[], pkg: PackageJsonPlan): void {
+function printDryRun(
+  staged: StagedFile[],
+  pkg: PackageJsonPlan,
+  cwd: string,
+  sourceRoot: string,
+): void {
   process.stdout.write('Dry run — would create:\n')
-  for (const file of staged) process.stdout.write(`  ${file.name}\n`)
+  for (const file of staged) {
+    const exists = fs.existsSync(file.path) ? ' (exists — needs --force)' : ''
+    process.stdout.write(`  ${file.name}${exists}\n`)
+  }
   if (pkg.action === 'write') {
     process.stdout.write('  package.json (add `arch` + `arch:baseline` scripts)\n')
   } else {
     process.stdout.write(`  (package.json script entry skipped — ${pkg.reason})\n`)
+  }
+  if (hasSource(cwd, sourceRoot)) {
+    process.stdout.write(
+      `\nNote: this codebase already has source under ${sourceRoot}/ — errors fail the ` +
+        `build, warnings don't. Run \`ts-archunit baseline\` before gating CI on \`arch\`.\n`,
+    )
   }
 }
 

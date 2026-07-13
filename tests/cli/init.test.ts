@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { Project } from 'ts-morph'
+import { Project, Node } from 'ts-morph'
 import { runInit } from '../../src/cli/commands/init.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { recommended } from '../../src/presets/recommended.js'
@@ -254,6 +254,138 @@ describe('runInit', () => {
     runInit({ cwd: dir })
     out.restore()
     expect(read(dir, 'package.json')).toContain('echo mine')
+  })
+
+  it('--dry-run previews over existing files instead of erroring (no conflict wall)', () => {
+    const dir = makeProject()
+    fs.writeFileSync(path.join(dir, 'arch.rules.ts'), 'pre-existing\n')
+    const out = captureStdout()
+    const code = runInit({ cwd: dir, dryRun: true })
+    const text = out.text()
+    out.restore()
+    expect(code).toBe(0)
+    expect(text).toContain('Dry run')
+    expect(text).toContain('exists — needs --force')
+    expect(read(dir, 'arch.rules.ts')).toBe('pre-existing\n') // untouched
+  })
+
+  it('threads a custom --tsconfig path into the generated files', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tsau-init-'))
+    tmpDirs.push(dir)
+    fs.mkdirSync(path.join(dir, 'config'))
+    fs.writeFileSync(
+      path.join(dir, 'config', 'tsconfig.build.json'),
+      JSON.stringify({ include: ['src'] }, null, 2),
+    )
+    const out = captureStdout()
+    const code = runInit({ cwd: dir, tsconfig: 'config/tsconfig.build.json' })
+    out.restore()
+    expect(code).toBe(0)
+    expect(read(dir, 'arch.rules.ts')).toContain("project('config/tsconfig.build.json')")
+    expect(read(dir, 'ts-archunit.config.ts')).toContain('config/tsconfig.build.json')
+  })
+
+  it('reports a write failure (target path is a directory) and returns 1', () => {
+    const dir = makeProject()
+    fs.mkdirSync(path.join(dir, 'arch-baseline.json')) // collide: a dir where a file goes
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const out = captureStdout()
+    const code = runInit({ cwd: dir, force: true }) // force skips conflict check → hits write
+    out.restore()
+    expect(code).toBe(1)
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('could not write'))
+  })
+})
+
+describe('runInit source-root detection', () => {
+  function writeRawTsconfig(raw: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tsau-init-'))
+    tmpDirs.push(dir)
+    fs.writeFileSync(path.join(dir, 'tsconfig.json'), raw)
+    return dir
+  }
+
+  it('detects the root from a JSONC tsconfig (comments + trailing comma)', () => {
+    const dir = writeRawTsconfig(`{
+      // build config
+      "compilerOptions": { "strict": true },
+      "include": ["app"], /* app sources */
+    }`)
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    out.restore()
+    expect(read(dir, 'arch.rules.ts')).toContain("include: '**/app/**'")
+  })
+
+  it('falls back to compilerOptions.rootDir when include is absent', () => {
+    const dir = writeRawTsconfig(JSON.stringify({ compilerOptions: { rootDir: 'source' } }))
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    out.restore()
+    expect(read(dir, 'arch.rules.ts')).toContain("include: '**/source/**'")
+  })
+
+  it('falls back to src when include is glob-first with no literal root', () => {
+    const dir = writeRawTsconfig(JSON.stringify({ include: ['**/*.ts'] }))
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    out.restore()
+    // src is the preset default, so the call is bare (no include option)
+    const rules = read(dir, 'arch.rules.ts')
+    expect(rules).toContain('...recommended(p),')
+    expect(rules).not.toContain('include:')
+  })
+
+  it('strips a leading ./ from the include entry', () => {
+    const dir = writeRawTsconfig(JSON.stringify({ include: ['./lib'] }))
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    out.restore()
+    expect(read(dir, 'arch.rules.ts')).toContain("include: '**/lib/**'")
+  })
+
+  it('falls back to src on an unparseable tsconfig', () => {
+    const dir = writeRawTsconfig('this is not json at all }{')
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    out.restore()
+    const rules = read(dir, 'arch.rules.ts')
+    expect(rules).toContain('...recommended(p),')
+    expect(rules).not.toContain('include:')
+  })
+})
+
+describe('generated arch.rules.ts is valid TypeScript', () => {
+  function assertValidRuleFile(dir: string): void {
+    const proj = new Project({ useInMemoryFileSystem: true })
+    const sf = proj.createSourceFile('arch.rules.ts', read(dir, 'arch.rules.ts'))
+    // Syntactic diagnostics only — unresolved '@nielspeter/...' imports are
+    // semantic and expected in this in-memory project.
+    const syntactic = proj.getProgram().compilerObject.getSyntacticDiagnostics(sf.compilerNode)
+    expect(syntactic).toHaveLength(0)
+    // The default export must be an array literal of builders.
+    const expr = sf.getExportAssignment((e) => !e.isExportEquals())?.getExpression()
+    expect(expr !== undefined && Node.isArrayLiteralExpression(expr)).toBe(true)
+  }
+
+  it('recommended preset emits a syntactically valid array-default rule file', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    out.restore()
+    assertValidRuleFile(dir)
+  })
+
+  it('agent-guardrails preset emits a syntactically valid file with the enabled flags', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    runInit({ cwd: dir, preset: 'agent-guardrails' })
+    out.restore()
+    assertValidRuleFile(dir)
+    // content-drift guard: the enabled options are actually present
+    const rules = read(dir, 'arch.rules.ts')
+    expect(rules).toContain('noGenericErrors: true')
+    expect(rules).toContain('noCopyPaste: true')
   })
 })
 
