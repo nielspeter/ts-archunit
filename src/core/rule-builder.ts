@@ -318,11 +318,17 @@ export abstract class RuleBuilder<T> {
    * `.rule({ imperative })` overrides it.
    */
   private buildImperative(): string {
+    // The Do-NOT/MUST transform only reads the polarity of a single condition.
+    // For zero or multiple (`and`-joined) conditions, negating the joined string
+    // would mis-handle mixed polarity ("not X and not Y"), so fall back to the
+    // plain, always-correct rule description.
+    if (this._conditions.length !== 1) {
+      return this.buildRuleDescription() || 'Follow the architecture rule.'
+    }
+    const cond = this._conditions[0]!.description
+    const isNegative = /^(not|no)\b/i.test(cond)
+    const body = cond.replace(/^(not|no)\s+/i, '')
     const scope = this._predicates.map((p) => p.description).join(' and ')
-    const conds = this._conditions.map((c) => c.description).join(' and ')
-    if (!conds) return this.buildRuleDescription() || 'Follow the architecture rule.'
-    const isNegative = /^(not|no)\b/i.test(conds)
-    const body = conds.replace(/^(not|no)\s+/i, '')
     const scopeSuffix = scope ? ` (in code that ${scope})` : ''
     return `${isNegative ? 'Do NOT' : 'MUST'} ${body}${scopeSuffix}`
   }

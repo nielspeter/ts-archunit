@@ -33,11 +33,12 @@ describe('explain --format agent', () => {
     )
   })
 
-  it('renders the imperative as a bullet with the because as a suffix', async () => {
+  it('renders the imperative as a bullet without the because (because lives in the check json)', async () => {
     const out = await runAgent([
       { rule: 'r', id: 'x/y', imperative: 'Do NOT throw new Error()', because: 'loses context' },
     ])
-    expect(out).toContain('- Do NOT throw new Error() — loses context')
+    expect(out).toContain('- Do NOT throw new Error()')
+    expect(out).not.toContain('loses context')
   })
 
   it('groups rules by the id namespace', async () => {

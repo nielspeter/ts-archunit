@@ -84,9 +84,9 @@ function outputAgent(descriptions: RuleDescription[]): void {
   for (const [group, rules] of groups) {
     lines.push(`### ${titleCase(group)}`, '')
     for (const d of rules) {
-      const imperative = d.imperative ?? (d.rule || 'Follow the architecture rule.')
-      const because = d.because ? ` — ${d.because}` : ''
-      lines.push(`- ${imperative}${because}`)
+      // The imperative is the self-contained rule statement; `because`/`suggestion`
+      // live in the check --format json payload, so don't double them up here.
+      lines.push(`- ${d.imperative ?? (d.rule || 'Follow the architecture rule.')}`)
     }
     lines.push('')
   }

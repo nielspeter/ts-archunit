@@ -129,6 +129,21 @@ async function handleBaseline(ruleFiles: string[], output: string): Promise<void
   await runBaseline({ ruleFiles, output })
 }
 
+/** Reject a `--format` value that isn't valid for the given subcommand. */
+function isValidFormat(command: 'check' | 'explain', format: string | undefined): boolean {
+  if (format === undefined) return true
+  const allowed =
+    command === 'check' ? ['terminal', 'json', 'github', 'auto'] : ['json', 'markdown', 'agent']
+  if (!allowed.includes(format)) {
+    console.error(
+      `Error: --format '${format}' is not valid for '${command}'. Valid values: ${allowed.join(', ')}.`,
+    )
+    process.exitCode = 1
+    return false
+  }
+  return true
+}
+
 /** Handle the `explain` subcommand. */
 async function handleExplain(
   ruleFiles: string[],
@@ -173,6 +188,13 @@ export async function run(args: string[]): Promise<void> {
   const baseline = values.baseline ?? config.baseline
   const base = values.base ?? 'main'
   const changed = values.changed ?? false
+
+  if (
+    (command === 'check' && !isValidFormat('check', values.format)) ||
+    (command === 'explain' && !isValidFormat('explain', values.format))
+  ) {
+    return
+  }
 
   if (command === 'check') {
     await handleCheck(ruleFiles, values, config, format, baseline, changed, base)

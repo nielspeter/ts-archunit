@@ -271,6 +271,28 @@ describe('RuleBuilder', () => {
       expect(violations[0]?.ruleId).toBe('domain/pure')
     })
 
+    it('does NOT override a ruleId the condition already set', () => {
+      const condWithId = {
+        description: 'sets its own ruleId',
+        evaluate: (els: TestElement[]) =>
+          els.map((el) => ({
+            rule: 'r',
+            ruleId: 'CONDITION_ID',
+            element: el.name,
+            file: el.file,
+            line: el.line,
+            message: 'bad',
+          })),
+      }
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(condWithId)
+        .rule({ id: 'RULE_ID' })
+        .violations()
+      expect(violations[0]?.ruleId).toBe('CONDITION_ID')
+    })
+
     it('does NOT override a suggestion the condition already set (per-violation wins)', () => {
       const condWithSuggestion = {
         description: 'fails with its own suggestion',
@@ -321,6 +343,31 @@ describe('RuleBuilder', () => {
         .rule({ imperative: 'Do NOT foo' })
         .describeRule()
       expect(desc.imperative).toBe('Do NOT foo')
+    })
+
+    it('appends the predicate scope suffix', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .should()
+        .withCondition({ description: 'not import from repositories', evaluate: () => [] })
+        .describeRule()
+      expect(desc.imperative).toContain('Do NOT import from repositories')
+      expect(desc.imperative).toContain('(in code that ')
+    })
+
+    it('falls back to the plain description for multi-condition rules (no mis-negation)', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const desc = builder
+        .should()
+        .withCondition({ description: 'not contain X', evaluate: () => [] })
+        .andShould()
+        .withCondition({ description: 'not contain Y', evaluate: () => [] })
+        .describeRule()
+      // must NOT produce "Do NOT contain X and not contain Y"
+      expect(desc.imperative).not.toMatch(/^Do NOT/)
+      expect(desc.imperative).toContain('should')
     })
   })
 

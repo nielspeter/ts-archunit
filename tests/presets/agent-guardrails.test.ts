@@ -76,11 +76,24 @@ describe('agentGuardrails preset', () => {
     expect(violations.every((v) => v.severity === 'warn')).toBe(true)
   })
 
-  it('rules carry agent-facing metadata (suggestion) on violations', () => {
+  it('rules carry agent-facing metadata (id/suggestion/because) on violations', () => {
     const [builder] = agentGuardrails(p, { src: SRC, noGenericErrors: true })
     const violations = builder!.violations()
+    expect(violations[0]?.ruleId).toBe('preset/agent/no-generic-errors')
     expect(violations[0]?.suggestion).toContain('domain-specific')
     expect(violations[0]?.because).toBeTruthy()
+  })
+
+  it('produces zero violations on clean code (no false positives)', () => {
+    const builders = agentGuardrails(p, {
+      src: '**/clean.ts',
+      noInlineLogic: ['parseInt', 'eval', 'JSON.parse'],
+      noGenericErrors: true,
+      noStubs: true,
+      noEmptyBodies: true,
+    })
+    const violations = builders.flatMap((b) => b.violations())
+    expect(violations).toHaveLength(0)
   })
 
   it('empty / omitted noInlineLogic generates no inline-logic rules', () => {
