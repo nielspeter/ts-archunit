@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** DRAFT — reviewed (full panel 2026-07-13), findings folded in; ready to schedule.
+- **State:** IMPLEMENTED (2026-07-13, branch `feat/0061-docs-restructure`) — all 7 phases built: run-modes reconciled (CLI default + conversion table + `running-in-tests.md`), `cli.md` intro fixed, golden-path Getting Started (forks greenfield/existing-code), new Setup & Best Practices + Troubleshooting pages, recipes merged into What to Check (+ redirect stub), landing trimmed, four-tier nav (Rule Catalog), `.check()`-in-rule-file callout on all 15 catalog pages. `docs:build` passes (dead-link gate), prettier clean. Docs-only — no version bump; deploys on merge to main.
 - **Decision locked (2026-07-13):** the **golden-path default is the CLI rule-file form** (`npx ts-archunit init` → `arch.rules.ts` with `export default [...]` → `npm run arch`). But the two forms are framed as **co-equal, pick-by-context**, not "default vs footnote" — the installed base is test-file-first and the landing page sells "it's just tests, zero extra infra" as a differentiator, so the test-file form (`.check()` in vitest/jest) keeps prominent signposting from Getting Started, Core Concepts, and index, plus its own page. (Review: a hard demotion of the established mode would alienate current users.)
 - **Priority:** P1 — docs coherence gates adoption of everything shipped in v0.13–0.15 (`init`, `recommended`, `agentGuardrails`, `tsconfig`, the severity pipeline).
 - **Effort:** ~2–3 days (revised up after review — the best-practices page is net-new authoring, the reference-page reconciliation and `cli.md` rewrite were added to scope, and the golden path forks greenfield/existing-code).
