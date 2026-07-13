@@ -12,19 +12,73 @@ import { validateOverrides } from './shared.js'
 
 export interface RecommendedOptions extends PresetBaseOptions {
   /**
-   * Source-file glob the recommendations apply to. Defaults to files under any
-   * `src/` folder — keeping `node_modules` `.d.ts`, generated files, and test
-   * fixtures out of scope. Libraries/CLIs using `lib/` or `packages/*` override.
+   * Source-file glob the rules apply to. Defaults to `'**\/src/**'`, matched
+   * against each file's absolute path (picomatch). This scopes the rules to your
+   * source tree by convention — it does NOT itself exclude `node_modules` or
+   * generated files (any `src/` segment anywhere in the path matches). Projects
+   * whose source lives outside a `src/` folder (e.g. `lib/`) should override.
+   * Note: because the match is on the absolute path, an ancestor directory named
+   * `src` (e.g. a clone under `~/src/`) widens scope — anchor with a project-root
+   * glob if that matters.
    */
   include?: string
 }
 
-const RULE_IDS = [
-  'preset/recommended/no-eval',
-  'preset/recommended/no-function-constructor',
-  'preset/recommended/no-silent-catch',
-  'preset/recommended/no-empty-bodies',
-] as const
+interface RuleSpec {
+  condition: Condition<ArchFunction>
+  meta: RuleMetadata & { id: string }
+  default: 'error' | 'warn'
+}
+
+/**
+ * Single source of truth for the floor. `RULE_IDS` (for override validation) and
+ * the builder loop both derive from this — add a rule here and nothing else
+ * needs updating.
+ */
+const SPECS: readonly RuleSpec[] = [
+  {
+    condition: functionNoEval(),
+    meta: {
+      id: 'preset/recommended/no-eval',
+      because: 'eval() executes arbitrary code — a code-injection risk',
+      suggestion: 'remove eval(); parse or dispatch explicitly',
+      imperative: 'Do NOT call eval()',
+    },
+    default: 'error',
+  },
+  {
+    condition: functionNoFunctionConstructor(),
+    meta: {
+      id: 'preset/recommended/no-function-constructor',
+      because: 'the Function constructor is eval() in disguise',
+      suggestion: 'define the function directly instead of building it from a string',
+      imperative: 'Do NOT use the Function constructor',
+    },
+    default: 'error',
+  },
+  {
+    condition: functionNoSilentCatch(),
+    meta: {
+      id: 'preset/recommended/no-silent-catch',
+      because: 'a silent catch hides failures',
+      suggestion: 'handle or rethrow the caught error (reference it in the catch)',
+      imperative: 'Do NOT swallow errors in an empty catch',
+    },
+    default: 'warn',
+  },
+  {
+    condition: noEmptyBodies(),
+    meta: {
+      id: 'preset/recommended/no-empty-bodies',
+      because: 'an empty function body is usually an unfinished stub',
+      suggestion: 'implement the body or remove the function',
+      imperative: 'Do NOT leave a function body empty',
+    },
+    default: 'warn',
+  },
+]
+
+const RULE_IDS = SPECS.map((s) => s.meta.id)
 
 /**
  * A deliberately **thin, universal safety floor** for any TypeScript project —
@@ -43,62 +97,22 @@ const RULE_IDS = [
  */
 export function recommended(p: ArchProject, options: RecommendedOptions = {}): RuleBuilderLike[] {
   const include = options.include ?? '**/src/**'
-  validateOverrides(options.overrides, [...RULE_IDS])
+  validateOverrides(options.overrides, RULE_IDS)
 
   const builders: RuleBuilderLike[] = []
-  const push = (
-    condition: Condition<ArchFunction>,
-    meta: RuleMetadata & { id: string },
-    def: 'error' | 'warn',
-  ): void => {
+  for (const { condition, meta, default: def } of SPECS) {
     const sev = options.overrides?.[meta.id] ?? def
-    if (sev !== 'off') {
-      builders.push(
-        functions(p).that().resideInFile(include).should().satisfy(condition).rule(meta).asSeverity(sev),
-      )
-    }
+    if (sev === 'off') continue
+    builders.push(
+      functions(p)
+        .that()
+        .resideInFile(include)
+        .should()
+        .satisfy(condition)
+        .rule(meta)
+        .asSeverity(sev),
+    )
   }
-
-  push(
-    functionNoEval(),
-    {
-      id: 'preset/recommended/no-eval',
-      because: 'eval() executes arbitrary code — a code-injection risk',
-      suggestion: 'remove eval(); parse or dispatch explicitly',
-      imperative: 'Do NOT call eval()',
-    },
-    'error',
-  )
-  push(
-    functionNoFunctionConstructor(),
-    {
-      id: 'preset/recommended/no-function-constructor',
-      because: 'the Function constructor is eval() in disguise',
-      suggestion: 'define the function directly instead of building it from a string',
-      imperative: 'Do NOT use the Function constructor',
-    },
-    'error',
-  )
-  push(
-    functionNoSilentCatch(),
-    {
-      id: 'preset/recommended/no-silent-catch',
-      because: 'a silent catch hides failures',
-      suggestion: 'handle or rethrow the caught error (reference it in the catch)',
-      imperative: 'Do NOT swallow errors in an empty catch',
-    },
-    'warn',
-  )
-  push(
-    noEmptyBodies(),
-    {
-      id: 'preset/recommended/no-empty-bodies',
-      because: 'an empty function body is usually an unfinished stub',
-      suggestion: 'implement the body or remove the function',
-      imperative: 'Do NOT leave a function body empty',
-    },
-    'warn',
-  )
 
   return builders
 }

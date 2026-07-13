@@ -142,15 +142,27 @@ export default [
 ### Generated rules
 
 | Rule ID                                   | Enforces                                  | Default |
-| ----------------------------------------- | ----------------------------------------- | ------- |
+| -------------------------------------------- | ------------------------------ | ------- |
 | `preset/recommended/no-eval`              | No `eval()`                               | error   |
 | `preset/recommended/no-function-constructor` | No `Function` constructor              | error   |
 | `preset/recommended/no-silent-catch`      | No empty/silent `catch` blocks            | warn    |
 | `preset/recommended/no-empty-bodies`      | No empty function bodies                  | warn    |
 
-Two `error`, two `warn`. The warn rules have known, suppressible false positives (intentional empty catches, no-op callbacks), so they surface without failing the build. Options: `include` (source glob, defaults to files under `src/`) and the shared `overrides` map (below). Adopt on an existing codebase with [`--baseline`](/cli#check-run-rules) for the warn rules.
+Two `error`, two `warn`. The warn rules have known, suppressible false positives (intentional empty catches, no-op callbacks), so they surface without failing the build.
 
-> Overlaps `agentGuardrails` on empty bodies and `eval` — for agent-focused projects prefer `agentGuardrails` alone, or override the duplicated ids to `'off'` in one preset.
+**Options.** `include` is the source glob (default `'**/src/**'`, matched against each file's absolute path). A `**/src/**` glob already covers monorepos — `packages/foo/src/**` matches at any depth — so only projects whose source lives _outside_ any `src/` folder (e.g. `lib/`) need to override it:
+
+```typescript
+export default [...recommended(p, { include: 'lib/**' })]
+```
+
+The `overrides` map (below) changes individual rule severity. Codegen, templating, or serializer libraries that legitimately build functions from strings should turn off the Function-constructor rule: `overrides: { 'preset/recommended/no-function-constructor': 'off' }`. (`eval` has no comparable legitimate use, so it stays `error`.)
+
+**Adoption.** The floor is designed to fire ~never on healthy code, so adopting it is usually a non-event. If a legacy codebase does trip the rules — an existing `eval`, or a wall of empty catches — snapshot them once with [`--baseline`](/cli#check-run-rules); the baseline captures **all four** severities, so only _new_ violations surface afterward (see [Baseline](/core-concepts#baseline-mode)).
+
+**Stability.** `recommended` is a versioned contract, not just a convenience alias: spreading `...recommended(p)` means "these four rules today, and we won't break your CI on a minor bump." New rules enter at `warn` or `off` in a minor release and are only promoted to `error` in a major. That opt-in ladder is the reason to depend on the preset rather than hand-copy the four rules.
+
+> Overlaps `agentGuardrails` on empty bodies and (if you list `'eval'` in its `noInlineLogic`) `eval`. Running both double-reports those locations under different rule ids. For agent-focused projects prefer `agentGuardrails` alone; otherwise silence the `recommended` copies — `overrides: { 'preset/recommended/no-empty-bodies': 'off' }`.
 
 ## `agentGuardrails`
 
