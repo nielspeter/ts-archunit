@@ -261,6 +261,16 @@ describe('RuleBuilder', () => {
       expect(violations[0]?.docs).toBe('https://adr/1')
     })
 
+    it('propagates the rule id to violations that lack their own', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(alwaysFail('bad'))
+        .rule({ id: 'domain/pure' })
+        .violations()
+      expect(violations[0]?.ruleId).toBe('domain/pure')
+    })
+
     it('does NOT override a suggestion the condition already set (per-violation wins)', () => {
       const condWithSuggestion = {
         description: 'fails with its own suggestion',

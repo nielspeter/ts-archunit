@@ -88,13 +88,14 @@ export function applyFilters(
   }
 
   // Enrich each violation with rule-level metadata so a rule author's
-  // `.rule({ because, suggestion, docs })` (or `.because()`) reaches per-violation
-  // output — e.g. the agent's `check --format json` payload — when the condition
-  // did not set its own. Per-violation values always take precedence.
+  // `.rule({ id, because, suggestion, docs })` (or `.because()`) reaches
+  // per-violation output — e.g. the agent's `check --format json` payload —
+  // when the condition did not set its own. Per-violation values take precedence.
   const meta = ctx.metadata
-  if (ctx.reason || meta?.because || meta?.suggestion || meta?.docs) {
+  if (ctx.reason || meta?.id || meta?.because || meta?.suggestion || meta?.docs) {
     result = result.map((v) => ({
       ...v,
+      ruleId: v.ruleId ?? meta?.id,
       because: v.because ?? ctx.reason ?? meta?.because,
       suggestion: v.suggestion ?? meta?.suggestion,
       docs: v.docs ?? meta?.docs,
