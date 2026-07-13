@@ -126,6 +126,15 @@ export default [...myPreset(p)]
 `check` exits non-zero only when there are **error**-severity violations; warnings
 are reported but never fail the run.
 
+::: warning Leave rule-file builders un-terminated
+In a rule file, entries in the `export default [...]` array must be **builders**,
+not terminal calls. Do **not** end them with `.check()` / `.warn()` / `.severity()` —
+those execute the rule immediately and return `undefined`, which the CLI silently
+skips (the rule never runs in the aggregated report). Use the non-terminal
+`.asSeverity('warn')` to mark a rule as a warning. (Test files are the opposite:
+there you _do_ call `.check()`.)
+:::
+
 ## JSON output (`--format json`)
 
 `check --format json` emits a **single JSON document** for the whole run

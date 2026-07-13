@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Rule severity in the CLI** — `.asSeverity('error' | 'warn')`, a non-terminal builder method that marks a rule's severity _without_ executing it, so severity-carrying builders can be collected into a rule file's `export default` array. `check` reports **warn**-severity violations but they never fail the run; only **error**-severity violations set a non-zero exit. `ArchViolation` gains an optional `severity` field. (Plan 0060.)
-- **Single-document, severity-aware `check --format json`** — the JSON output is now one document for the whole run (previously one blob per rule, which was not valid JSON for multi-rule files). Each violation carries `severity`; the summary reports `{ total, errors, warnings, reason }`. Intended for CI tooling and AI coding agents that consume the JSON to self-correct.
+- **Single-document, severity-aware `check --format json`** — the JSON output is now one document for the whole run (previously one blob per rule, which was not valid JSON for multi-rule files), and it is **always emitted, even on a clean run** (`{ "summary": { "total": 0, … }, "violations": [] }`) so consumers can parse the success case. Each violation carries `severity`; the summary reports `{ total, errors, warnings, reason }`. Intended for CI tooling and AI coding agents that consume the JSON to self-correct.
+- **`check --format github` respects severity** — warn-severity violations render as `::warning` annotations (previously every violation was emitted as `::error`).
 - **`check` runs preset-returning rule files** — a rule file can `export default [...myPreset(p)]` where the preset returns severity-carrying builders. A file that instead self-executes a throwing preset at import is handled by a best-effort catch (error-severity only).
 
 ### Fixed
 
-- **Rule metadata now reaches per-violation output** — `.because()` and `.rule({ because, suggestion, docs })` previously flowed only to `explain` and the error header, never to individual violations, so `check --format json` returned `suggestion: null` even when the author set one. Per-violation `because` / `suggestion` / `docs` now fall back to the rule metadata when the condition sets none (per-violation values still take precedence).
+- **Rule metadata now reaches per-violation output** — `.because()` and `.rule({ because, suggestion, docs })` previously flowed only to `explain` and the error header, never to individual violations, so `check --format json` returned `suggestion: null` even when the author set one. Per-violation `because` / `suggestion` / `docs` now fall back to the rule metadata when the condition sets none (per-violation values still take precedence). This affects **all** output formats — terminal, `github`, and `json` — and in-test `.check()` / `.warn()`, not only the CLI: violation output now includes the author's `Fix:` / `Docs:` lines where it didn't before. Snapshot tests or log-parsers keyed on the old violation text may need updating.
 
 ### Changed
 
