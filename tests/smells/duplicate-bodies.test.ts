@@ -18,6 +18,20 @@ describe('smells.duplicateBodies()', () => {
     expect(() => builder.check()).toThrow(ArchRuleError)
   })
 
+  it('.asSeverity() stamps severity on .violations() (TerminalBuilder)', () => {
+    const warned = smells
+      .duplicateBodies(p)
+      .minLines(3)
+      .withMinSimilarity(0.8)
+      .asSeverity('warn')
+      .violations()
+    expect(warned.length).toBeGreaterThan(0)
+    expect(warned.every((v) => v.severity === 'warn')).toBe(true)
+
+    const defaulted = smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8).violations()
+    expect(defaulted.every((v) => v.severity === 'error')).toBe(true)
+  })
+
   it('violation message contains similarity percentage', () => {
     const builder = smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8)
     try {

@@ -4,9 +4,7 @@ import { diffAware } from '../../helpers/diff-aware.js'
 import type { OutputFormat } from '../../core/check-options.js'
 import type { ArchViolation } from '../../core/violation.js'
 import { ArchRuleError } from '../../core/errors.js'
-import { formatViolations } from '../../core/format.js'
-import { formatViolationsJson } from '../../core/format-json.js'
-import { formatViolationsGitHub } from '../../core/format-github.js'
+import { writeReport } from '../../core/execute-rule.js'
 import { loadRuleFiles } from '../load-rules.js'
 
 export interface CheckArgs {
@@ -17,17 +15,6 @@ export interface CheckArgs {
   format: OutputFormat | 'auto'
   /** Use cache-busting imports for watch mode re-runs. */
   fresh?: boolean
-}
-
-/** Report the unified violation list in one document (JSON is a single array). */
-function reportViolations(violations: ArchViolation[], format: OutputFormat): void {
-  if (format === 'json') {
-    process.stdout.write(formatViolationsJson(violations) + '\n')
-  } else if (format === 'github') {
-    process.stdout.write(formatViolationsGitHub(violations) + '\n')
-  } else {
-    process.stderr.write(formatViolations(violations) + '\n')
-  }
 }
 
 /**
@@ -64,9 +51,9 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   if (baseline) filtered = baseline.filterNew(filtered)
   if (diff) filtered = diff.filterToChanged(filtered)
 
-  if (filtered.length > 0) {
-    reportViolations(filtered, format)
-  }
+  // writeReport handles empties: json always emits one document (so a clean run
+  // is still parseable), terminal/github emit nothing.
+  writeReport(filtered, format)
 
   // Exit code = error-severity count; warns are reported but never fail.
   return filtered.filter((v) => (v.severity ?? 'error') === 'error').length

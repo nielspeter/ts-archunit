@@ -260,6 +260,28 @@ describe('RuleBuilder', () => {
       expect(violations[0]?.suggestion).toBe('extract a helper')
       expect(violations[0]?.docs).toBe('https://adr/1')
     })
+
+    it('does NOT override a suggestion the condition already set (per-violation wins)', () => {
+      const condWithSuggestion = {
+        description: 'fails with its own suggestion',
+        evaluate: (els: TestElement[]) =>
+          els.map((el) => ({
+            rule: 'r',
+            element: el.name,
+            file: el.file,
+            line: el.line,
+            message: 'bad',
+            suggestion: 'CONDITION_FIX',
+          })),
+      }
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const violations = builder
+        .should()
+        .withCondition(condWithSuggestion)
+        .rule({ suggestion: 'RULE_FIX' })
+        .violations()
+      expect(violations[0]?.suggestion).toBe('CONDITION_FIX')
+    })
   })
 
   describe('predicate combination', () => {

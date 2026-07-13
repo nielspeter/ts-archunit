@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import type { ArchViolation } from './violation.js'
-import type { CheckOptions } from './check-options.js'
+import type { CheckOptions, OutputFormat } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import { ArchRuleError } from './errors.js'
 import { formatViolations } from './format.js'
@@ -104,6 +104,46 @@ export function applyFilters(
   return result
 }
 
+/** Stamp any un-stamped violation with a default severity (per-violation wins). */
+function stampSeverity(violations: ArchViolation[], severity: 'error' | 'warn'): ArchViolation[] {
+  return violations.map((v) => ({ ...v, severity: v.severity ?? severity }))
+}
+
+/**
+ * Write a severity-aware, single-document report for the given format.
+ *
+ * Shared by the CLI runner and the throwing `check` terminal so the three
+ * format branches live in one place:
+ * - `json` ALWAYS emits one valid document (even with zero violations) so
+ *   consumers/agents can parse a clean run.
+ * - `github` partitions by severity so warnings render as `::warning`, not
+ *   `::error`.
+ * - terminal (default) writes the rich format to stderr.
+ *
+ * Terminal/github emit nothing when there are no violations.
+ */
+export function writeReport(
+  violations: ArchViolation[],
+  format?: OutputFormat,
+  reason?: string,
+): void {
+  if (format === 'json') {
+    process.stdout.write(formatViolationsJson(violations, reason) + '\n')
+    return
+  }
+  if (violations.length === 0) return
+  if (format === 'github') {
+    const errors = violations.filter((v) => (v.severity ?? 'error') === 'error')
+    const warnings = violations.filter((v) => v.severity === 'warn')
+    const parts: string[] = []
+    if (errors.length > 0) parts.push(formatViolationsGitHub(errors, 'error'))
+    if (warnings.length > 0) parts.push(formatViolationsGitHub(warnings, 'warning'))
+    process.stdout.write(parts.join('\n') + '\n')
+  } else {
+    process.stderr.write(formatViolations(violations, reason) + '\n')
+  }
+}
+
 /**
  * Execute the terminal "check" action: apply options, format, throw on violations.
  */
@@ -122,21 +162,15 @@ export function executeCheck(
   }
 
   if (filtered.length > 0) {
-    if (options?.format === 'json') {
-      process.stdout.write(formatViolationsJson(filtered, ctx.reason) + '\n')
-    } else if (options?.format === 'github') {
-      process.stdout.write(formatViolationsGitHub(filtered, 'error') + '\n')
-    } else {
-      // Print rich format to stderr before throwing — test runners show the
-      // plain-text error message, but stderr gets the colorized Why/Fix/Docs output
-      process.stderr.write(formatViolations(filtered, ctx.reason) + '\n')
-    }
-    throw new ArchRuleError(filtered, ctx.reason)
+    const stamped = stampSeverity(filtered, 'error')
+    writeReport(stamped, options?.format, ctx.reason)
+    throw new ArchRuleError(stamped, ctx.reason)
   }
 }
 
 /**
  * Execute the terminal "warn" action: apply options, format, log to stderr.
+ * Advisory — writes to stderr (json/terminal) and never throws.
  */
 export function executeWarn(
   violations: ArchViolation[],
@@ -153,12 +187,13 @@ export function executeWarn(
   }
 
   if (filtered.length > 0) {
+    const stamped = stampSeverity(filtered, 'warn')
     if (options?.format === 'json') {
-      console.warn(formatViolationsJson(filtered, ctx.reason))
+      console.warn(formatViolationsJson(stamped, ctx.reason))
     } else if (options?.format === 'github') {
-      process.stdout.write(formatViolationsGitHub(filtered, 'warning') + '\n')
+      process.stdout.write(formatViolationsGitHub(stamped, 'warning') + '\n')
     } else {
-      console.warn(formatViolations(filtered, ctx.reason))
+      console.warn(formatViolations(stamped, ctx.reason))
     }
   }
 }
