@@ -1,14 +1,26 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-/** Presets `init` can scaffold — both are returning-form (spreadable) presets. */
-const VALID_PRESETS = ['recommended', 'agent-guardrails'] as const
+/** "Floor" presets — a universal rule set scoped to your source glob. */
+const FLOOR_PRESETS = ['recommended', 'agent-guardrails'] as const
+/** "Shape" presets — architecture patterns; scaffolded with fill-in folder globs. */
+const SHAPE_PRESETS = ['layered', 'strict-boundaries', 'data-layer'] as const
+/** Every preset `init` can scaffold — all are returning-form (spreadable). */
+const VALID_PRESETS = [...FLOOR_PRESETS, ...SHAPE_PRESETS] as const
+type FloorPreset = (typeof FLOOR_PRESETS)[number]
+type ShapePreset = (typeof SHAPE_PRESETS)[number]
 type InitPreset = (typeof VALID_PRESETS)[number]
+
+const VALID_PRESET_SET: ReadonlySet<string> = new Set(VALID_PRESETS)
 
 export interface InitArgs {
   /** Directory to scaffold into. Defaults to `process.cwd()`. */
   cwd?: string
-  /** Starter preset. One of `recommended` (default) | `agent-guardrails`. */
+  /**
+   * Starter preset. Floor: `recommended` (default) | `agent-guardrails`.
+   * Shape: `layered` | `strict-boundaries` | `data-layer` (scaffolded with
+   * fill-in folder globs, alongside the `recommended` floor).
+   */
   preset?: string
   /** tsconfig path written into the generated files. Default `tsconfig.json`. */
   tsconfig?: string
@@ -43,8 +55,7 @@ export function runInit(args: InitArgs): number {
   const preset = args.preset ?? 'recommended'
   if (!isValidPreset(preset)) {
     console.error(
-      `Error: unknown --preset '${preset}'. Valid presets: ${VALID_PRESETS.join(', ')}. ` +
-        `(Shape presets like 'layered' are not supported by init yet — add them by hand.)`,
+      `Error: unknown --preset '${preset}'. Valid presets: ${VALID_PRESETS.join(', ')}.`,
     )
     return 1
   }
@@ -108,12 +119,16 @@ export function runInit(args: InitArgs): number {
     return 1
   }
 
-  printClosing(staged, pkgPlan, cwd, sourceRoot)
+  printClosing(staged, pkgPlan, cwd, sourceRoot, preset)
   return 0
 }
 
 function isValidPreset(value: string): value is InitPreset {
-  return value === 'recommended' || value === 'agent-guardrails'
+  return VALID_PRESET_SET.has(value)
+}
+
+function isFloorPreset(preset: InitPreset): preset is FloorPreset {
+  return preset === 'recommended' || preset === 'agent-guardrails'
 }
 
 function stage(cwd: string, name: string, content: string): StagedFile {
@@ -135,8 +150,20 @@ export default defineConfig({
 }
 
 function rulesTemplate(preset: InitPreset, tsconfig: string, sourceRoot: string): string {
-  const recommendedCall =
-    sourceRoot === 'src' ? 'recommended(p)' : `recommended(p, { include: '**/${sourceRoot}/**' })`
+  return isFloorPreset(preset)
+    ? floorRulesTemplate(preset, tsconfig, sourceRoot)
+    : shapeRulesTemplate(preset, tsconfig, sourceRoot)
+}
+
+/** The `recommended` include option, sourceRoot-aware (bare when root is `src`). */
+function recommendedCallFor(sourceRoot: string): string {
+  return sourceRoot === 'src'
+    ? 'recommended(p)'
+    : `recommended(p, { include: '**/${sourceRoot}/**' })`
+}
+
+function floorRulesTemplate(preset: FloorPreset, tsconfig: string, sourceRoot: string): string {
+  const recommendedCall = recommendedCallFor(sourceRoot)
   const agentCall = `agentGuardrails(p, {
     src: '${sourceRoot}/**',
     noGenericErrors: true,
@@ -186,6 +213,86 @@ ${alternateBlock}
   //   classes(p).that().resideInFolder('${sourceRoot}/services/**')
   //     .should().notContain(call('parseInt')),
   //   slices(p).matching('${sourceRoot}/features/*/').should().beFreeOfCycles(),
+]
+`
+}
+
+/** import name, one-line description, and the fill-in call for a shape preset. */
+function shapePresetSpec(
+  preset: ShapePreset,
+  root: string,
+): {
+  importName: string
+  describe: string
+  call: string
+} {
+  switch (preset) {
+    case 'layered':
+      return {
+        importName: 'layeredArchitecture',
+        describe: 'Layered architecture: dependencies flow downward, layers stay cycle-free.',
+        call: `layeredArchitecture(p, {
+    // Example globs — point these at your real layer folders (top to bottom).
+    layers: {
+      routes: '${root}/routes/**',
+      services: '${root}/services/**',
+      repositories: '${root}/repositories/**',
+    },
+    shared: ['${root}/shared/**'],
+  })`,
+      }
+    case 'strict-boundaries':
+      return {
+        importName: 'strictBoundaries',
+        describe: 'Feature boundaries: each folder imports only from itself and shared.',
+        call: `strictBoundaries(p, {
+    // Example glob — point this at your real feature folders.
+    folders: '${root}/features/*',
+    shared: ['${root}/shared/**'],
+  })`,
+      }
+    case 'data-layer':
+      return {
+        importName: 'dataLayerIsolation',
+        describe: 'Repository pattern: repositories extend a base class and throw typed errors.',
+        call: `dataLayerIsolation(p, {
+    // Example values — point at your repository folder and its real base class.
+    repositories: '${root}/repositories/**',
+    baseClass: 'BaseRepository',
+    requireTypedErrors: true,
+  })`,
+      }
+  }
+  // No default: the switch is exhaustive over ShapePreset. Adding a preset to
+  // SHAPE_PRESETS without a case here is a compile error (missing return).
+}
+
+function shapeRulesTemplate(preset: ShapePreset, tsconfig: string, sourceRoot: string): string {
+  const { importName, describe, call } = shapePresetSpec(preset, sourceRoot)
+  const recommendedCall = recommendedCallFor(sourceRoot)
+
+  return `import { project } from '@nielspeter/ts-archunit'
+import { recommended, ${importName} } from '@nielspeter/ts-archunit/presets'
+// Uncomment the imports you need for the examples below:
+// import { classes, slices, call } from '@nielspeter/ts-archunit'
+
+const p = project('${tsconfig}')
+
+// Rules are collected into the default export; \`ts-archunit check\` runs them.
+export default [
+  // The recommended safety floor ships alongside the shape rules below.
+  ...${recommendedCall},
+
+  // ${describe}
+  // IMPORTANT: the globs below are examples. A glob that matches no files
+  // enforces NOTHING (a green run that checks nothing). Point them at your
+  // real folders before you trust the result.
+  ...${call},
+
+  // Add project-specific rules below — builders, no .check().
+  // (Builders default to error; append .asSeverity('warn') to warn, not fail.)
+  //   classes(p).that().resideInFolder('${sourceRoot}/services/**')
+  //     .should().notContain(call('parseInt')),
 ]
 `
 }
@@ -335,6 +442,7 @@ function printClosing(
   pkg: PackageJsonPlan,
   cwd: string,
   sourceRoot: string,
+  preset: InitPreset,
 ): void {
   const scriptsAdded = pkg.action === 'write'
   const runCmd = scriptsAdded ? 'npm run arch' : 'npx ts-archunit check'
@@ -343,6 +451,14 @@ function printClosing(
   process.stdout.write(`Created ${String(staged.length)} file(s).\n`)
   if (!scriptsAdded && pkg.action === 'skip') {
     process.stdout.write(`Note: package.json script entry skipped — ${pkg.reason}.\n`)
+  }
+
+  if (!isFloorPreset(preset)) {
+    process.stdout.write(
+      `\n⚠ arch.rules.ts contains EXAMPLE folder globs for the '${preset}' preset. ` +
+        `Edit them to your real folders before trusting a green run — a glob that ` +
+        `matches no files enforces nothing.\n`,
+    )
   }
 
   if (hasSource(cwd, sourceRoot)) {

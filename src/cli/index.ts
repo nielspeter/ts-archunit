@@ -28,6 +28,7 @@ Usage:
 
 Options:
   --preset <name>       init: starter preset — recommended (default) | agent-guardrails
+                        | layered | strict-boundaries | data-layer
   --tsconfig <path>     init: tsconfig path to wire in (default: tsconfig.json)
   --no-baseline         init: skip arch-baseline.json
   --force               init: overwrite existing files
