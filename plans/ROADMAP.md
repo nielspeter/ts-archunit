@@ -192,7 +192,7 @@ Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) 
 | **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | **PROPOSED** — reviewed, needs go/no-go | 0046             |
 | **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | **PROPOSED** — reviewed, needs go/no-go | 0011, 0013, 0046 |
 
-**Next step is a decision, not a build:** evaluate whether each proposal is worth promoting to a plan (0048 was self-flagged lowest value/cost). Separately, a shipped-and-ready follow-up: add the now-returning-form shape presets to `ts-archunit init` (Plan 0062, Phase 5) — that one is unblocked, not a proposal.
+**Go/no-go done (2026-07-14):** 0047 → **ship trimmed** (`doubleCast` + `anyAnnotation` only; defer `broadType`/`tsDirective`); 0048 → **defer until demand** (overlaps `@typescript-eslint/no-deprecated`; the symbol layer is speculative infra). Both stay PROPOSED. **Built since:** 0062 Phase 5 — `ts-archunit init --preset layered|strict-boundaries|data-layer` now scaffolds the shape presets (v0.17.0-pending).
 
 ---
 
