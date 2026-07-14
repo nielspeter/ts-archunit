@@ -48,4 +48,9 @@ describe('checkAll', () => {
     const baseline = { filterNew: (_: ArchViolation[]) => [] as ArchViolation[] }
     expect(() => checkAll([rule([v('a', 'error')])], { baseline })).not.toThrow()
   })
+
+  it('filters to changed files through a diff before deciding', () => {
+    const diff = { filterToChanged: (_: ArchViolation[]) => [] as ArchViolation[] }
+    expect(() => checkAll([rule([v('a', 'error')])], { diff })).not.toThrow()
+  })
 })

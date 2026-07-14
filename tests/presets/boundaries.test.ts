@@ -64,6 +64,16 @@ describe('strictBoundaries preset', () => {
       })
       expect(errors(rules)).toEqual([])
     })
+
+    it('test-isolation can be overridden to off', () => {
+      const rules = run({
+        folders: '**/src/feature-*',
+        shared: ['**/shared/**'],
+        isolateTests: true,
+        overrides: { 'preset/boundaries/test-isolation': 'off' },
+      })
+      expect(all(rules).some((v) => v.ruleId === 'preset/boundaries/test-isolation')).toBe(false)
+    })
   })
 
   describe('noCopyPaste', () => {

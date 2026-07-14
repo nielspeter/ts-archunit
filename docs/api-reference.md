@@ -546,14 +546,16 @@ Requires the optional `graphql` peer dependency.
 
 Parameterized architecture rule bundles that generate multiple coordinated rules from a single function call.
 
-| Export                | Signature                                                 | Description                                              |
-| --------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
-| `layeredArchitecture` | `layeredArchitecture(p, options): void`                   | Layer ordering, cycles, isolation, restricted packages.  |
-| `dataLayerIsolation`  | `dataLayerIsolation(p, options): void`                    | Base class extension and typed error enforcement.        |
-| `strictBoundaries`    | `strictBoundaries(p, options): void`                      | No cycles, no cross-boundary imports, shared isolation.  |
-| `dispatchRule`        | `dispatchRule(builder, ruleId, severity, overrides): V[]` | Run a single rule within a preset with severity control. |
-| `throwIfViolations`   | `throwIfViolations(violations): void`                     | Throw aggregated ArchRuleError if violations exist.      |
-| `validateOverrides`   | `validateOverrides(overrides, knownIds): void`            | Warn on unrecognized override keys.                      |
+Every preset returns `RuleBuilderLike[]` — spread it into a rule file (`export default [...]`) or run it with [`checkAll`](#running-rule-arrays) in a test.
+
+| Export                | Signature                                            | Description                                             |
+| --------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
+| `recommended`         | `recommended(p, options?): RuleBuilderLike[]`        | Thin universal safety floor (eval, Function ctor, …).   |
+| `agentGuardrails`     | `agentGuardrails(p, options): RuleBuilderLike[]`     | Guardrails for AI-agent mistakes.                       |
+| `layeredArchitecture` | `layeredArchitecture(p, options): RuleBuilderLike[]` | Layer ordering, cycles, isolation, restricted packages. |
+| `dataLayerIsolation`  | `dataLayerIsolation(p, options): RuleBuilderLike[]`  | Base class extension and typed error enforcement.       |
+| `strictBoundaries`    | `strictBoundaries(p, options): RuleBuilderLike[]`    | No cycles, no cross-boundary imports, shared isolation. |
+| `validateOverrides`   | `validateOverrides(overrides, knownIds): void`       | Warn on unrecognized override keys.                     |
 
 See [Architecture Presets](/presets) for full configuration options.
 

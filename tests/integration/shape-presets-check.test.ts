@@ -16,6 +16,7 @@ import { runBaseline } from '../../src/cli/commands/baseline.js'
 import { loadRuleFiles } from '../../src/cli/load-rules.js'
 import { recommended } from '../../src/presets/recommended.js'
 import { layeredArchitecture } from '../../src/presets/layered.js'
+import { dataLayerIsolation } from '../../src/presets/data-layer.js'
 import { withBaseline } from '../../src/helpers/baseline.js'
 import { checkAll } from '../../src/core/check-all.js'
 import { ArchRuleError } from '../../src/core/errors.js'
@@ -60,8 +61,11 @@ afterEach(() => {
 
 describe('shape presets through the check pipeline (returning form)', () => {
   it('spreading a shape preset does not throw (spread-of-void regression)', () => {
-    expect(() => buildRules()).not.toThrow()
-    expect(buildRules().length).toBeGreaterThan(1)
+    let rules: RuleBuilderLike[] = []
+    expect(() => {
+      rules = buildRules()
+    }).not.toThrow()
+    expect(rules.length).toBeGreaterThan(1)
   })
 
   it('emits ONE document; error rules from BOTH presets coexist; the layered warn is non-failing', async () => {
@@ -111,6 +115,21 @@ describe('shape presets through the check pipeline (returning form)', () => {
       expect(ids.has('preset/layered/type-imports-only')).toBe(false)
     }
   })
+
+  it('dataLayerIsolation also flows through checkAll (another migrated preset)', () => {
+    const dl = projectFor('data-layer')
+    vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+    try {
+      checkAll(
+        dataLayerIsolation(dl, { repositories: '**/repositories/**', baseClass: 'BaseRepository' }),
+      )
+      expect.fail('should have thrown')
+    } catch (e) {
+      expect(e).toBeInstanceOf(ArchRuleError)
+      const ids = new Set((e as ArchRuleError).violations.map((v) => v.ruleId))
+      expect(ids).toContain('preset/data/extend-base')
+    }
+  })
 })
 
 describe('arch:baseline with a shape preset (no longer crashes)', () => {
@@ -144,5 +163,27 @@ describe('arch:baseline with a shape preset (no longer crashes)', () => {
       runBaseline({ ruleFiles: ['arch.rules.ts'], output: out }),
     ).resolves.toBeUndefined()
     expect(fs.existsSync(out)).toBe(true)
+  })
+
+  it('per-file: a throwing file does NOT drop the other files rules from the baseline', async () => {
+    // runBaseline loops per file (parity with runCheck). File A throws at import;
+    // File B returns builders. Both files' violations must land in the baseline.
+    const vA = { rule: 'a', element: 'A', file: '/a.ts', line: 1, message: 'from throwing file' }
+    const bRule: RuleBuilderLike = {
+      violations: () => [
+        { rule: 'b', element: 'B', file: '/b.ts', line: 1, message: 'from ok file' },
+      ],
+    }
+    vi.mocked(loadRuleFiles)
+      .mockRejectedValueOnce(new ArchRuleError([vA])) // file A self-executes + throws
+      .mockResolvedValueOnce([bRule]) // file B returns builders
+    const out = path.join(os.tmpdir(), `tsau-shape-baseline-perfile-${String(process.pid)}.json`)
+    tmpFiles.push(out)
+    vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+    await runBaseline({ ruleFiles: ['a.rules.ts', 'b.rules.ts'], output: out })
+
+    const baseline = JSON.parse(fs.readFileSync(out, 'utf-8')) as { count: number }
+    expect(baseline.count).toBe(2) // neither file's violation was dropped
   })
 })
