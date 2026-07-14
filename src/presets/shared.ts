@@ -1,49 +1,39 @@
 import type { ArchViolation } from '../core/violation.js'
 import type { RuleMetadata } from '../core/rule-metadata.js'
-import { ArchRuleError } from '../core/errors.js'
-import { formatViolations } from '../core/format.js'
+import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 
 export type RuleSeverity = 'error' | 'warn' | 'off'
 
-export interface PresetBaseOptions {
-  overrides?: Record<string, RuleSeverity>
-}
-
 /**
- * Anything with `.rule()` and `.violations()` — works with both
- * RuleBuilder<T> and TerminalBuilder hierarchies.
+ * A builder a preset can configure and hand back: `.rule()` / `.asSeverity()`
+ * chain (return `this`), `.violations()` runs it. Satisfied by both the
+ * `RuleBuilder` and `TerminalBuilder` hierarchies.
  */
-interface Dispatchable {
-  rule(m: RuleMetadata): { violations(): ArchViolation[] }
+interface PresetRule {
+  rule(m: RuleMetadata): this
+  asSeverity(level: 'error' | 'warn'): this
   violations(): ArchViolation[]
 }
 
 /**
- * Dispatch a single rule within a preset.
- *
- * - 'off': skip entirely
- * - 'warn': log violations to stderr, do not collect for aggregated throw
- * - 'error': collect violations for aggregated throw
+ * Resolve a preset rule's effective severity and return it as a configured,
+ * UN-executed builder for the caller to spread into a rule array. `'off'` →
+ * empty array (spread-friendly). The returning-form replacement for the old
+ * self-executing `dispatchRule`.
  */
-export function dispatchRule(
-  builder: Dispatchable,
+export function collectRule(
+  builder: PresetRule,
   ruleId: string,
   defaultSeverity: RuleSeverity,
   overrides: Record<string, RuleSeverity> | undefined,
-): ArchViolation[] {
+): RuleBuilderLike[] {
   const effective = overrides?.[ruleId] ?? defaultSeverity
   if (effective === 'off') return []
+  return [builder.rule({ id: ruleId }).asSeverity(effective)]
+}
 
-  const violations = builder.rule({ id: ruleId }).violations()
-
-  if (effective === 'warn') {
-    if (violations.length > 0) {
-      console.warn(formatViolations(violations))
-    }
-    return []
-  }
-
-  return violations
+export interface PresetBaseOptions {
+  overrides?: Record<string, RuleSeverity>
 }
 
 /**
@@ -63,15 +53,5 @@ export function validateOverrides(
           `Available rules: ${knownIds.join(', ')}`,
       )
     }
-  }
-}
-
-/**
- * Throw a single ArchRuleError with all aggregated violations, if any.
- */
-export function throwIfViolations(violations: ArchViolation[]): void {
-  if (violations.length > 0) {
-    process.stderr.write(formatViolations(violations) + '\n')
-    throw new ArchRuleError(violations)
   }
 }

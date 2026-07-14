@@ -1,11 +1,11 @@
 import picomatch from 'picomatch'
 import type { ArchProject } from '../core/project.js'
-import type { ArchViolation } from '../core/violation.js'
+import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import { smells } from '../smells/index.js'
 import type { PresetBaseOptions } from './shared.js'
-import { dispatchRule, validateOverrides, throwIfViolations } from './shared.js'
+import { collectRule, validateOverrides } from './shared.js'
 
 export interface StrictBoundariesOptions extends PresetBaseOptions {
   /** Glob pattern for boundary folders (e.g., 'src/features/*') */
@@ -34,12 +34,12 @@ function applySharedIsolation(
   sharedGlobs: string[],
   boundaryFolders: string[],
   overrides: StrictBoundariesOptions['overrides'],
-): ArchViolation[] {
-  const violations: ArchViolation[] = []
+): RuleBuilderLike[] {
+  const builders: RuleBuilderLike[] = []
   for (const sharedGlob of sharedGlobs) {
     for (const dir of boundaryFolders) {
-      violations.push(
-        ...dispatchRule(
+      builders.push(
+        ...collectRule(
           modules(p).that().resideInFolder(sharedGlob).should().notImportFrom(`${dir}/**`),
           'preset/boundaries/shared-isolation',
           'error',
@@ -48,7 +48,7 @@ function applySharedIsolation(
       )
     }
   }
-  return violations
+  return builders
 }
 
 /**
@@ -58,8 +58,8 @@ function applyTestIsolation(
   p: ArchProject,
   boundaryFolders: string[],
   overrides: StrictBoundariesOptions['overrides'],
-): ArchViolation[] {
-  const violations: ArchViolation[] = []
+): RuleBuilderLike[] {
+  const builders: RuleBuilderLike[] = []
   for (const dir of boundaryFolders) {
     const testPattern = `${dir}/**/*.test.*`
     const otherBoundaryTests = boundaryFolders
@@ -67,8 +67,8 @@ function applyTestIsolation(
       .map((d) => `${d}/**/*.test.*`)
 
     for (const otherTestGlob of otherBoundaryTests) {
-      violations.push(
-        ...dispatchRule(
+      builders.push(
+        ...collectRule(
           modules(p).that().resideInFile(testPattern).should().notImportFrom(otherTestGlob),
           'preset/boundaries/test-isolation',
           'error',
@@ -77,19 +77,22 @@ function applyTestIsolation(
       )
     }
   }
-  return violations
+  return builders
 }
 
 /**
  * Enforce strict module boundaries: no cycles, no cross-boundary imports,
  * shared isolation, and optional copy-paste detection.
  */
-export function strictBoundaries(p: ArchProject, options: StrictBoundariesOptions): void {
+export function strictBoundaries(
+  p: ArchProject,
+  options: StrictBoundariesOptions,
+): RuleBuilderLike[] {
   const overrides = options.overrides
   validateOverrides(overrides, [...RULE_IDS])
 
   const sharedGlobs = options.shared ?? []
-  const violations: ArchViolation[] = []
+  const builders: RuleBuilderLike[] = []
 
   // Discover boundary folders from the glob pattern
   const boundaryGlob = options.folders
@@ -111,8 +114,8 @@ export function strictBoundaries(p: ArchProject, options: StrictBoundariesOption
 
   // --- No cycles between boundaries ---
   if (Object.keys(sliceDef).length > 0) {
-    violations.push(
-      ...dispatchRule(
+    builders.push(
+      ...collectRule(
         slices(p).assignedFrom(sliceDef).should().beFreeOfCycles(),
         'preset/boundaries/no-cycles',
         'error',
@@ -127,8 +130,8 @@ export function strictBoundaries(p: ArchProject, options: StrictBoundariesOption
     const boundaryPattern = `${dir}/**`
     const allowedGlobs = [boundaryPattern, ...sharedGlobs]
 
-    violations.push(
-      ...dispatchRule(
+    builders.push(
+      ...collectRule(
         modules(p)
           .that()
           .resideInFolder(boundaryPattern)
@@ -142,17 +145,17 @@ export function strictBoundaries(p: ArchProject, options: StrictBoundariesOption
   }
 
   // --- Shared isolation: shared folders don't import from boundaries ---
-  violations.push(...applySharedIsolation(p, sharedGlobs, boundaryFolders, overrides))
+  builders.push(...applySharedIsolation(p, sharedGlobs, boundaryFolders, overrides))
 
   // --- Test isolation ---
   if (options.isolateTests) {
-    violations.push(...applyTestIsolation(p, boundaryFolders, overrides))
+    builders.push(...applyTestIsolation(p, boundaryFolders, overrides))
   }
 
   // --- No copy-paste across boundaries ---
   if (options.noCopyPaste) {
-    violations.push(
-      ...dispatchRule(
+    builders.push(
+      ...collectRule(
         smells.duplicateBodies(p),
         'preset/boundaries/no-duplicate-bodies',
         'warn',
@@ -161,5 +164,5 @@ export function strictBoundaries(p: ArchProject, options: StrictBoundariesOption
     )
   }
 
-  throwIfViolations(violations)
+  return builders
 }

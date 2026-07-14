@@ -1,5 +1,5 @@
 export type { RuleSeverity, PresetBaseOptions } from './shared.js'
-export { dispatchRule, validateOverrides, throwIfViolations } from './shared.js'
+export { validateOverrides } from './shared.js'
 
 export type { LayeredArchitectureOptions } from './layered.js'
 export { layeredArchitecture } from './layered.js'

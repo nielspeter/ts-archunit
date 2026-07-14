@@ -2,8 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import type { ArchProject } from '../../src/core/project.js'
-import { ArchRuleError } from '../../src/core/errors.js'
-import { dispatchRule, validateOverrides, throwIfViolations } from '../../src/presets/shared.js'
+import { collectRule, validateOverrides } from '../../src/presets/shared.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/presets/layered')
@@ -45,100 +44,53 @@ describe('validateOverrides', () => {
   })
 })
 
-describe('dispatchRule', () => {
+describe('collectRule', () => {
   const p = loadTestProject()
 
-  it('returns empty array when severity is off', () => {
-    const builder = modules(p)
-      .that()
-      .resideInFolder('**/routes/**')
-      .should()
-      .notImportFrom('**/services/**')
+  function violatingBuilder() {
+    return modules(p).that().resideInFolder('**/routes/**').should().notImportFrom('**/services/**')
+  }
 
-    const result = dispatchRule(builder, 'test/rule', 'error', {
-      'test/rule': 'off',
-    })
+  it('returns an empty array when severity is off', () => {
+    const result = collectRule(violatingBuilder(), 'test/rule', 'error', { 'test/rule': 'off' })
     expect(result).toEqual([])
   })
 
-  it('returns violations when severity is error', () => {
-    const builder = modules(p)
-      .that()
-      .resideInFolder('**/routes/**')
-      .should()
-      .notImportFrom('**/services/**')
-
-    const result = dispatchRule(builder, 'test/rule', 'error', undefined)
-    expect(result.length).toBeGreaterThan(0)
+  it('returns one un-executed builder stamped error by default', () => {
+    const result = collectRule(violatingBuilder(), 'test/rule', 'error', undefined)
+    expect(result).toHaveLength(1)
+    const violations = result[0]!.violations()
+    expect(violations.length).toBeGreaterThan(0)
+    expect(violations.every((v) => v.severity === 'error')).toBe(true)
   })
 
-  it('logs warnings and returns empty array when severity is warn', () => {
+  it('stamps severity:warn (NOT console.warn) when severity is warn', () => {
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    const builder = modules(p)
-      .that()
-      .resideInFolder('**/routes/**')
-      .should()
-      .notImportFrom('**/services/**')
-
-    const result = dispatchRule(builder, 'test/rule', 'warn', undefined)
-    expect(result).toEqual([])
-    expect(spy).toHaveBeenCalled()
+    const result = collectRule(violatingBuilder(), 'test/rule', 'warn', undefined)
+    const violations = result[0]!.violations()
+    expect(violations.length).toBeGreaterThan(0)
+    expect(violations.every((v) => v.severity === 'warn')).toBe(true)
+    // The returning form does NOT log — severity flows through the pipeline.
+    expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
 
-  it('does not log when warn severity has no violations', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
+  it('still returns a builder for a warn rule with no violations (0 violations, not skipped)', () => {
     const builder = modules(p)
       .that()
       .resideInFolder('**/routes/**')
       .should()
       .notImportFrom('**/nonexistent/**')
-
-    const result = dispatchRule(builder, 'test/rule', 'warn', undefined)
-    expect(result).toEqual([])
-    expect(spy).not.toHaveBeenCalled()
-    spy.mockRestore()
+    const result = collectRule(builder, 'test/rule', 'warn', undefined)
+    expect(result).toHaveLength(1)
+    expect(result[0]!.violations()).toEqual([])
   })
 
-  it('uses override severity instead of default', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    const builder = modules(p)
-      .that()
-      .resideInFolder('**/routes/**')
-      .should()
-      .notImportFrom('**/services/**')
-
-    // Default is error, but override to warn
-    const result = dispatchRule(builder, 'test/rule', 'error', {
-      'test/rule': 'warn',
-    })
-    expect(result).toEqual([])
-    expect(spy).toHaveBeenCalled()
-    spy.mockRestore()
-  })
-})
-
-describe('throwIfViolations', () => {
-  it('does not throw when no violations', () => {
-    expect(() => throwIfViolations([])).not.toThrow()
-  })
-
-  it('throws ArchRuleError when violations exist', () => {
-    const violations = [
-      {
-        rule: 'test rule',
-        message: 'violation',
-        file: '/test.ts',
-        line: 1,
-        element: 'test',
-      },
-    ]
-    // Suppress stderr output during test
-    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    expect(() => throwIfViolations(violations)).toThrow(ArchRuleError)
-    spy.mockRestore()
+  it('uses the override severity instead of the default', () => {
+    // Default error, overridden to warn → violations carry severity:warn.
+    const result = collectRule(violatingBuilder(), 'test/rule', 'error', { 'test/rule': 'warn' })
+    const violations = result[0]!.violations()
+    expect(violations.length).toBeGreaterThan(0)
+    expect(violations.every((v) => v.severity === 'warn')).toBe(true)
   })
 })

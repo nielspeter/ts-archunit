@@ -1,5 +1,6 @@
 // Core — project loader
 export { project, workspace, resetProjectCache } from './core/project.js'
+export { checkAll } from './core/check-all.js'
 export type { ArchProject } from './core/project.js'
 
 // Core — predicate interface & combinators

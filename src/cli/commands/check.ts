@@ -39,6 +39,9 @@ export async function runCheck(args: CheckArgs): Promise<number> {
         collected.push(...builder.violations())
       }
     } catch (error: unknown) {
+      // Defensive: a user rule file that self-executes a throwing `.check()` at
+      // import surfaces its violations rather than crashing. (Presets no longer
+      // throw at import — they return builders.)
       if (error instanceof ArchRuleError) {
         collected.push(...error.violations)
       } else {
