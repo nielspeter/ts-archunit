@@ -28,17 +28,17 @@ It creates:
 - **`arch-baseline.json`** — an empty baseline placeholder.
 - **`package.json` scripts** — `arch` (`ts-archunit check`) and `arch:baseline` (`ts-archunit baseline`), added only if absent.
 
-| Option              | Effect                                                                      |
-| ------------------- | --------------------------------------------------------------------------- |
-| `--preset <name>`   | `recommended` (default) or `agent-guardrails`. Both are spreadable presets. |
-| `--tsconfig <path>` | tsconfig to wire in (default `tsconfig.json`).                              |
-| `--no-baseline`     | Skip `arch-baseline.json` (and omit the `baseline` config field).           |
-| `--force`           | Overwrite existing files. Without it, `init` refuses and lists conflicts.   |
-| `--dry-run`         | Print what would be created; write nothing.                                 |
+| Option              | Effect                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `--preset <name>`   | `recommended` (default), `agent-guardrails`, or a shape preset: `layered`, `strict-boundaries`, `data-layer`. |
+| `--tsconfig <path>` | tsconfig to wire in (default `tsconfig.json`).                                                                |
+| `--no-baseline`     | Skip `arch-baseline.json` (and omit the `baseline` config field).                                             |
+| `--force`           | Overwrite existing files. Without it, `init` refuses and lists conflicts.                                     |
+| `--dry-run`         | Print what would be created; write nothing.                                                                   |
 
 `init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do.
 
-Shape presets (layered / data-layer / strict-boundaries) aren't offered by `init` yet — add them by hand.
+A shape preset (`layered` / `strict-boundaries` / `data-layer`) scaffolds `arch.rules.ts` with the `recommended` floor **plus** the shape preset pre-filled with folder globs to edit for your project — then `npm run arch`.
 
 ### `check` — Run Rules
 

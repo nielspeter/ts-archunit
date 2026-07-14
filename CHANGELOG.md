@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`ts-archunit init` scaffolds the shape presets** — `--preset layered` | `strict-boundaries` | `data-layer` now generate an `arch.rules.ts` that spreads the `recommended` floor **plus** the chosen shape preset, pre-filled with folder globs (derived from your source root) and a one-line "edit these to your project" note. Unblocked by the returning-form migration (0062); completes the preset family on the `init` golden path. (Plan 0062, Phase 5.)
+
 ## [0.16.0] - 2026-07-14
 
 ### Changed

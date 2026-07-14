@@ -7,6 +7,9 @@ import { runInit } from '../../src/cli/commands/init.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { recommended } from '../../src/presets/recommended.js'
 import { agentGuardrails } from '../../src/presets/agent-guardrails.js'
+import { layeredArchitecture } from '../../src/presets/layered.js'
+import { strictBoundaries } from '../../src/presets/boundaries.js'
+import { dataLayerIsolation } from '../../src/presets/data-layer.js'
 
 const tmpDirs: string[] = []
 
@@ -94,13 +97,62 @@ describe('runInit', () => {
     expect(rules).toContain("src: 'src/**'")
   })
 
-  it('rejects an invalid --preset (shape presets not supported in v1)', () => {
+  it('rejects an unknown --preset and lists the valid ones', () => {
     const dir = makeProject()
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const code = runInit({ cwd: dir, preset: 'layered' })
+    const code = runInit({ cwd: dir, preset: 'nope' })
     expect(code).toBe(1)
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('recommended, agent-guardrails'))
+    const msg = errSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(msg).toContain('recommended')
+    expect(msg).toContain('layered')
     expect(fs.existsSync(path.join(dir, 'arch.rules.ts'))).toBe(false)
+  })
+
+  it('--preset layered scaffolds the floor + layeredArchitecture with fill-in globs', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    const code = runInit({ cwd: dir, preset: 'layered' })
+    out.restore()
+    expect(code).toBe(0)
+    const rules = read(dir, 'arch.rules.ts')
+    expect(rules).toContain(
+      "import { recommended, layeredArchitecture } from '@nielspeter/ts-archunit/presets'",
+    )
+    expect(rules).toContain('...recommended(p)') // floor still present
+    expect(rules).toContain('...layeredArchitecture(p, {')
+    expect(rules).toContain("routes: 'src/routes/**'")
+  })
+
+  it('--preset strict-boundaries scaffolds strictBoundaries', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    runInit({ cwd: dir, preset: 'strict-boundaries' })
+    out.restore()
+    const rules = read(dir, 'arch.rules.ts')
+    expect(rules).toContain(
+      "import { recommended, strictBoundaries } from '@nielspeter/ts-archunit/presets'",
+    )
+    expect(rules).toContain("folders: 'src/features/*'")
+  })
+
+  it('--preset data-layer scaffolds dataLayerIsolation', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    runInit({ cwd: dir, preset: 'data-layer' })
+    out.restore()
+    const rules = read(dir, 'arch.rules.ts')
+    expect(rules).toContain(
+      "import { recommended, dataLayerIsolation } from '@nielspeter/ts-archunit/presets'",
+    )
+    expect(rules).toContain("baseClass: 'BaseRepository'")
+  })
+
+  it('threads the source root into a shape preset scaffold', () => {
+    const dir = makeProject({ tsconfigInclude: ['lib'] })
+    const out = captureStdout()
+    runInit({ cwd: dir, preset: 'layered' })
+    out.restore()
+    expect(read(dir, 'arch.rules.ts')).toContain("routes: 'lib/routes/**'")
   })
 
   it('config omits the dead project/watchDirs fields, keeps rules/baseline/format', () => {
@@ -387,6 +439,16 @@ describe('generated arch.rules.ts is valid TypeScript', () => {
     expect(rules).toContain('noGenericErrors: true')
     expect(rules).toContain('noCopyPaste: true')
   })
+
+  for (const preset of ['layered', 'strict-boundaries', 'data-layer']) {
+    it(`${preset} preset emits a syntactically valid array-default rule file`, () => {
+      const dir = makeProject()
+      const out = captureStdout()
+      runInit({ cwd: dir, preset })
+      out.restore()
+      assertValidRuleFile(dir)
+    })
+  }
 })
 
 // Drift guard: the templates embed these exact option objects. Calling the real
@@ -414,5 +476,24 @@ describe('template option shapes stay valid against the presets', () => {
         noCopyPaste: true,
       }).length,
     ).toBeGreaterThan(0)
+  })
+
+  it('the shape presets accept the generated option objects', () => {
+    const p = loadProject()
+    // If a shape preset's options drift from the init template, this fails to typecheck.
+    layeredArchitecture(p, {
+      layers: {
+        routes: 'src/routes/**',
+        services: 'src/services/**',
+        repositories: 'src/repositories/**',
+      },
+      shared: ['src/shared/**'],
+    })
+    strictBoundaries(p, { folders: 'src/features/*', shared: ['src/shared/**'] })
+    dataLayerIsolation(p, {
+      repositories: 'src/repositories/**',
+      baseClass: 'BaseRepository',
+      requireTypedErrors: true,
+    })
   })
 })
