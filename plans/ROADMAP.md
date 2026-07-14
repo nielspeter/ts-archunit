@@ -190,7 +190,7 @@ Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) 
 | Priority | Plan                                         | Effort      | State                            | Depends on       |
 | -------- | -------------------------------------------- | ----------- | -------------------------------- | ---------------- |
 | **P1**   | Docs Restructure — Golden Path (0061)        | ~2–3 days   | Built — reviewed, ready to merge | none (docs-only) |
-| **P1**   | Shape Presets → Returning Form (0062)        | ~1 day      | Draft — breaking (v0.16.0)       | none             |
+| **P1**   | Shape Presets → Returning Form (0062)        | ~1.5 days   | Built — breaking (v0.16.0)       | none             |
 | **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | Reviewed — module-only           | 0046             |
 | **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | Reviewed — `@deprecated`         | 0011, 0013, 0046 |
 
