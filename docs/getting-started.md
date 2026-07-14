@@ -1,95 +1,92 @@
 # Getting Started
 
+From zero to enforcing architecture rules in about five minutes.
+
 ## Prerequisites
 
-- **Node.js** >= 24
+- **Node.js** ≥ 24
 - A TypeScript project with a `tsconfig.json`
-- A test runner: [vitest](https://vitest.dev/) (recommended) or [jest](https://jestjs.io/)
 
-## Installation
+That's it — no test runner required. (Already run vitest/jest and prefer your rules there? See [Running Rules in Tests](/running-in-tests). This guide uses the CLI, the default path.)
+
+## 1. Install and scaffold
 
 ```bash
 npm install -D @nielspeter/ts-archunit
-```
-
-## Fastest Start — `init`
-
-Scaffold a working setup in one command instead of hand-writing config and rule files:
-
-```bash
 npx ts-archunit init
 ```
 
-This creates `ts-archunit.config.ts`, an `arch.rules.ts` seeded with the [`recommended`](/presets#recommended) safety floor, an empty `arch-baseline.json`, and `arch` / `arch:baseline` npm scripts. Then:
+`init` generates a working setup in the current directory:
+
+- **`ts-archunit.config.ts`** — points `check` at your rules and baseline.
+- **`arch.rules.ts`** — a rule file seeded with the [`recommended`](/presets#recommended) safety floor, ready for your own rules.
+- **`arch-baseline.json`** — an empty baseline placeholder.
+- **`arch` / `arch:baseline`** npm scripts.
+
+Building with an AI coding agent? Scaffold the agent guardrails instead — `npx ts-archunit init --preset agent-guardrails` — and see the [AI Agents](/ai-agents) guide.
+
+## 2. First run
+
+The `recommended` floor is thin — its only failing rules are no `eval` and no `Function` constructor, so a healthy codebase is usually green out of the gate. But as you add shape presets and your own rules (next steps), an existing codebase _will_ surface legacy violations. Get in the habit now — it's the safe default and costs nothing:
+
+**New or small project** — just run it. You'll almost certainly be green:
 
 ```bash
 npm run arch
 ```
 
-Building with an AI coding agent? Scaffold the agent guardrails instead — `npx ts-archunit init --preset agent-guardrails` — and see the [AI Agents](/ai-agents) guide. Full flag reference: [CLI › init](/cli#init-scaffold-a-project).
-
-## Quick Start with Presets
-
-The fastest way to add architecture rules. One function call enforces an entire architecture pattern:
-
-```typescript
-import { describe, it } from 'vitest'
-import { project } from '@nielspeter/ts-archunit'
-import { layeredArchitecture } from '@nielspeter/ts-archunit/presets'
-
-const p = project('tsconfig.json')
-
-describe('Architecture', () => {
-  it('enforces layered architecture', () => {
-    layeredArchitecture(p, {
-      layers: {
-        routes: 'src/routes/**',
-        services: 'src/services/**',
-        repositories: 'src/repositories/**',
-      },
-      shared: ['src/shared/**'],
-      strict: true,
-    })
-  })
-})
-```
-
-This generates 5 coordinated rules: layer ordering, cycle detection, innermost isolation, type-import enforcement, and package restrictions. See [Architecture Presets](/presets) for the full API.
-
-## Your First Custom Rule
-
-For project-specific constraints, use the fluent API directly:
-
-```typescript
-import { describe, it } from 'vitest'
-import { project, modules } from '@nielspeter/ts-archunit'
-
-const p = project('tsconfig.json')
-
-describe('Architecture Rules', () => {
-  it('domain must not import from infrastructure', () => {
-    modules(p)
-      .that()
-      .resideInFolder('**/domain/**')
-      .should()
-      .onlyImportFrom('**/domain/**', '**/shared/**')
-      .because('Domain must be independent of infrastructure')
-      .check()
-  })
-})
-```
-
-## Running It
+**Existing codebase** — snapshot current violations first, so your first gated run isn't a wall of red for legacy code you haven't cleaned up yet:
 
 ```bash
-npx vitest run arch.test.ts
+npm run arch:baseline   # records today's violations as accepted debt
+git add arch-baseline.json && git commit -m "chore: arch baseline"
+npm run arch            # now only NEW violations fail
 ```
 
-That's it. Architecture rules are regular tests. They run alongside your unit tests.
+> **First run reported a lot of violations?** That's expected on an existing codebase — baseline them (above), then fix them down over time. See [Setup & Best Practices](/setup-best-practices) and [Troubleshooting](/troubleshooting).
 
-## What Happens When a Rule Fails
+## 3. What you just got
 
-When a module in `domain/` imports from `infrastructure/`, you see:
+The generated `arch.rules.ts` looks roughly like this (trimmed — the real file also has commented examples and an `agentGuardrails` pointer):
+
+```typescript
+import { project } from '@nielspeter/ts-archunit'
+import { recommended } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+export default [
+  ...recommended(p),
+  // add your own rules below
+]
+```
+
+`recommended` is a deliberately thin, universal safety floor (no `eval`, no `Function` constructor, no silent catches, no empty bodies) — see [Presets](/presets#recommended). It's the starting point, not the whole architecture; the rules that matter most are the ones specific to _your_ project, which you add next.
+
+## 4. Add your first rule
+
+Rules are builders spread into the default export — **no `.check()`**; the CLI runs them:
+
+```typescript
+import { project, modules } from '@nielspeter/ts-archunit'
+import { recommended } from '@nielspeter/ts-archunit/presets'
+
+const p = project('tsconfig.json')
+
+export default [
+  ...recommended(p),
+
+  // Domain code must not reach into infrastructure
+  modules(p)
+    .that()
+    .resideInFolder('**/domain/**')
+    .should()
+    .onlyImportFrom('**/domain/**', '**/shared/**')
+    .because('Domain must stay independent of infrastructure'),
+]
+```
+
+Run `npm run arch` again. When a `domain/` module imports from `infrastructure/`, you get:
 
 ```
 Architecture Violation [1 of 1]
@@ -98,177 +95,50 @@ Architecture Violation [1 of 1]
 
   src/domain/order.service.ts:3 — order.service.ts
 
-  Why: Domain must be independent of infrastructure
+  Why: Domain must stay independent of infrastructure
 
     2 | import { OrderEntity } from './order.entity'
   > 3 | import { db } from '../infrastructure/database'
     4 | import { validate } from '../shared/validation'
 ```
 
-The test fails, your CI blocks the PR, the violation is caught before code review.
+Want a rule to _warn_ instead of fail the build? Append `.asSeverity('warn')`.
 
-## Adding Rich Metadata
+## 5. Iterate locally
 
-Every rule can include context about why it exists and how to fix it:
-
-```typescript
-modules(p)
-  .that()
-  .resideInFolder('**/domain/**')
-  .should()
-  .onlyImportFrom('**/domain/**', '**/shared/**')
-  .rule({
-    id: 'layer/domain-isolation',
-    because: 'Domain must be independent of infrastructure for testability',
-    suggestion: 'Move the import to a service that bridges domain and infrastructure',
-    docs: 'https://example.com/adr/clean-architecture',
-  })
-  .check()
-```
-
-## Monorepo Setup
-
-In a monorepo with multiple workspaces, use `workspace()` instead of `project()` to unify the import graph across packages. This makes cross-workspace imports visible to `noDeadModules()`, `noUnusedExports()`, and all other conditions.
-
-```typescript
-import { describe, it } from 'vitest'
-import { workspace, modules, noUnusedExports } from '@nielspeter/ts-archunit'
-
-const ws = workspace([
-  'apps/web/tsconfig.json',
-  'apps/api/tsconfig.json',
-  'packages/shared/tsconfig.json',
-])
-
-describe('Architecture', () => {
-  it('shared package has no unused exports', () => {
-    modules(ws)
-      .that()
-      .resideInFolder('**/packages/shared/src/**')
-      .should()
-      .satisfy(noUnusedExports())
-      .check()
-  })
-})
-```
-
-`workspace()` returns a standard `ArchProject` — all existing entry points and conditions work unchanged. Paths are sorted alphabetically; the first tsconfig after sorting provides compiler options for type checking.
-
-## Organizing Rules
-
-Use `describe` blocks to group rules by concern:
-
-```typescript
-import { describe, it } from 'vitest'
-import { project, modules, classes, slices, call, newExpr } from '@nielspeter/ts-archunit'
-
-const p = project('tsconfig.json')
-
-describe('Layer Dependencies', () => {
-  it('domain must not import from infrastructure', () => {
-    /* ... */
-  })
-  it('repositories must not import from controllers', () => {
-    /* ... */
-  })
-})
-
-describe('Naming Conventions', () => {
-  it('controllers must end with Controller', () => {
-    /* ... */
-  })
-  it('services must end with Service', () => {
-    /* ... */
-  })
-})
-
-describe('Body Analysis', () => {
-  it('repositories must not call parseInt directly', () => {
-    /* ... */
-  })
-  it('services must use typed errors', () => {
-    /* ... */
-  })
-})
-
-describe('JSX Rules', () => {
-  it('no raw HTML form elements', () => {
-    jsxElements(p)
-      .that()
-      .areHtmlElements('button', 'input', 'select')
-      .should()
-      .notExist()
-      .because('use design system components')
-      .check()
-  })
-  it('images must have alt text', () => {
-    jsxElements(p).that().areHtmlElements('img').should().haveAttribute('alt').check()
-  })
-})
-```
-
-### Named Selections
-
-Save a predicate chain for reuse across multiple rules:
-
-```typescript
-const repositories = classes(p).that().extend('BaseRepository')
-
-repositories.should().notContain(call('parseInt')).check()
-repositories.should().notContain(newExpr('Error')).check()
-repositories.should().beExported().check()
-```
-
-### Multiple Rule Files
-
-Split rules across files for larger projects:
-
-```
-tests/
-├── arch/
-│   ├── layers.test.ts
-│   ├── naming.test.ts
-│   ├── body-analysis.test.ts
-│   └── type-safety.test.ts
-```
-
-## CI Integration
-
-Architecture rules are tests. If your CI already runs tests, it already runs architecture rules. No extra setup needed.
-
-```yaml
-# .github/workflows/ci.yml
-- run: npm test
-```
-
-### GitHub Actions Annotations
-
-Violations appear inline on PR diffs automatically when running in GitHub Actions:
-
-```typescript
-import { detectFormat } from '@nielspeter/ts-archunit'
-
-const format = detectFormat() // 'github' in CI, 'terminal' locally
-
-modules(p)
-  .that()
-  .resideInFolder('**/domain/**')
-  .should()
-  .onlyImportFrom('**/domain/**', '**/shared/**')
-  .check({ format })
-```
-
-## CLI
-
-ts-archunit also runs standalone without a test runner — for pre-commit hooks, CI pipelines, or one-off audits. See the [CLI documentation](/cli) for all commands, options, watch mode, and config file setup.
+Re-run on every change while you write rules or fix violations:
 
 ```bash
-npx ts-archunit check arch.rules.ts
-npx ts-archunit check arch.rules.ts --watch
+npm run arch -- --watch
 ```
 
-## Next Steps
+## 6. Run in CI
 
-- [What to Check](/what-to-check) — scan the recipe gallery to see what ts-archunit can enforce
-- [Core Concepts](/core-concepts) — understand the fluent chain and how rules work
-- [API Reference](/api-reference) — full list of every export
+A complete GitHub Actions job — the `github` format renders violations inline on the PR diff:
+
+```yaml
+# .github/workflows/arch.yml
+name: architecture
+on: [pull_request]
+jobs:
+  arch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx ts-archunit check --format github
+```
+
+Violations are now caught on the PR that introduces them — not 18 months later in a manual audit.
+
+## Where to go next
+
+- **[Setup & Best Practices](/setup-best-practices)** — the recommended adoption ladder: floor → shape presets → baseline → CI → custom rules last.
+- **[Presets](/presets)** — one-liner setups for layered architecture, feature boundaries, and the repository pattern.
+- **[What Can It Check?](/what-to-check)** — a gallery of copy-paste rules by pain point.
+- **[Custom Rules](/custom-rules)** — encode team-specific conventions with `definePredicate` / `defineCondition`.
+- **[AI Agents](/ai-agents)** — guardrails and the check-in-loop workflow for AI-generated code.
+- **[Running Rules in Tests](/running-in-tests)** — run rules inside vitest/jest instead of the CLI.

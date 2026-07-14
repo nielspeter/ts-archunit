@@ -1,5 +1,9 @@
 # Project-Config Rules — `tsconfig()`
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 Every code-level rule in ts-archunit — `noTypeAssertions`, `noNonNullAssertions`, the escape-hatch matchers — assumes the project's TypeScript strict flags are actually on. Nothing stops a teammate from flipping `strict: false` during a refactor to make `tsc` green; the build passes, the code-level rules keep passing (they inspect code `tsc` already let slide), and the drift goes unnoticed.
 
 `tsconfig()` closes that upstream hole. It asserts that the project's **resolved** compiler options match a spec you supply:

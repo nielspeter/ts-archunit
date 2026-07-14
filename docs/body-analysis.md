@@ -1,5 +1,9 @@
 # Body Analysis
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 Body analysis is the signature feature of ts-archunit. While other tools check import paths, ts-archunit inspects what happens _inside_ function and method bodies -- the actual AST of call expressions, constructor invocations, property access, and arbitrary expressions.
 
 ## What Body Analysis Is

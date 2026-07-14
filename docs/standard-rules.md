@@ -1,5 +1,9 @@
 # Standard Rules
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 Ready-to-use rules via categorized sub-path imports. Each rule is a factory function returning a typed `Condition<T>` — plug it into `.satisfy()` after `.should()`.
 
 Rules come in three flavors matching the entry point they target:

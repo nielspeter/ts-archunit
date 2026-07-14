@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] - 2026-07-14
+
+### Changed
+
+- **⚠️ ACTION REQUIRED (BREAKING) — shape presets now RETURN rules instead of throwing.** `layeredArchitecture`, `strictBoundaries`, and `dataLayerIsolation` now return `RuleBuilderLike[]` (like `recommended` / `agentGuardrails`) instead of `void`-and-throwing. **A bare `layeredArchitecture(p, {...})` call no longer fails your test — it silently enforces nothing. You must update every call.** Migrate: spread into a rule file (`export default [...layeredArchitecture(p, opts)]`), or in a test add `import { checkAll } from '@nielspeter/ts-archunit'` and wrap it: `checkAll(layeredArchitecture(p, opts))` (see [Running Rules in Tests](https://nielspeter.github.io/ts-archunit/running-in-tests)). This makes every preset composable on the CLI golden path, fixes `arch:baseline` crashing on a shape preset, and routes their `warn`-default rules (`type-imports-only`, `no-duplicate-bodies`) through the severity pipeline instead of dropping them to `console.warn`. `dispatchRule` and `throwIfViolations` are removed from `@nielspeter/ts-archunit/presets`.
+
+### Added
+
+- **`checkAll(rules, options?)`** — a test-file terminal for an array of rules (e.g. a spread preset): runs them all and throws one aggregated `ArchRuleError` on any error-severity violation; warns are reported but never fail. Exported from `@nielspeter/ts-archunit`. (Plan 0062.)
+
+### Docs
+
+- **Documentation restructured around a golden path** — one reconciled workflow (CLI rule file as the default, test files as a co-equal alternative with a conversion guide), a new Getting Started, Setup & Best Practices, Running Rules in Tests, and Troubleshooting, a four-tier IA (Introduction / Guide / Rule Catalog / Reference), and the galleries merged. (Plan 0061.)
+
 ## [0.15.0] - 2026-07-13
 
 ### Added

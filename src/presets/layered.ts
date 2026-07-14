@@ -1,12 +1,12 @@
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
-import type { ArchViolation } from '../core/violation.js'
+import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { not } from '../core/combinators.js'
 import { resideInFolder as resideInFolderPredicate } from '../predicates/identity.js'
 import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import type { PresetBaseOptions } from './shared.js'
-import { dispatchRule, validateOverrides, throwIfViolations } from './shared.js'
+import { collectRule, validateOverrides } from './shared.js'
 
 export interface LayeredArchitectureOptions extends PresetBaseOptions {
   /** Layer name → glob pattern mapping. Order = dependency direction (first depends on second, etc.) */
@@ -37,13 +37,13 @@ function applyTypeImportRules(
   typeImportsAllowed: string[],
   layerGlobs: string[],
   overrides: LayeredArchitectureOptions['overrides'],
-): ArchViolation[] {
-  const violations: ArchViolation[] = []
+): RuleBuilderLike[] {
+  const builders: RuleBuilderLike[] = []
   for (const layerGlob of typeImportsAllowed) {
     const otherLayerGlobs = layerGlobs.filter((g) => g !== layerGlob)
     if (otherLayerGlobs.length > 0) {
-      violations.push(
-        ...dispatchRule(
+      builders.push(
+        ...collectRule(
           modules(p)
             .that()
             .resideInFolder(layerGlob)
@@ -56,7 +56,7 @@ function applyTypeImportRules(
       )
     }
   }
-  return violations
+  return builders
 }
 
 /**
@@ -66,7 +66,7 @@ function applyRestrictedPackages(
   p: ArchProject,
   restrictedPackages: Record<string, string[]>,
   overrides: LayeredArchitectureOptions['overrides'],
-): ArchViolation[] {
+): RuleBuilderLike[] {
   // Invert: for each package, find which layers are allowed
   const packageToAllowed = new Map<string, string[]>()
   for (const [layerGlob, packages] of Object.entries(restrictedPackages)) {
@@ -80,7 +80,7 @@ function applyRestrictedPackages(
     }
   }
 
-  const violations: ArchViolation[] = []
+  const builders: RuleBuilderLike[] = []
   for (const [pkg, allowedLayers] of packageToAllowed) {
     // Modules NOT in any allowed layer must not import this package
     const builder = modules(p).that()
@@ -88,8 +88,8 @@ function applyRestrictedPackages(
       builder.satisfy(not(resideInFolderPredicate<SourceFile>(allowedGlob)))
     }
 
-    violations.push(
-      ...dispatchRule(
+    builders.push(
+      ...collectRule(
         builder.should().notImportFrom(pkg),
         'preset/layered/restricted-packages',
         'error',
@@ -97,21 +97,24 @@ function applyRestrictedPackages(
       ),
     )
   }
-  return violations
+  return builders
 }
 
 /**
  * Enforce a layered architecture: dependency direction, cycle freedom,
  * and optional package restrictions.
  */
-export function layeredArchitecture(p: ArchProject, options: LayeredArchitectureOptions): void {
+export function layeredArchitecture(
+  p: ArchProject,
+  options: LayeredArchitectureOptions,
+): RuleBuilderLike[] {
   const overrides = options.overrides
   validateOverrides(overrides, [...RULE_IDS])
 
   const layerNames = Object.keys(options.layers)
   const layerGlobs = Object.values(options.layers)
   const sharedGlobs = options.shared ?? []
-  const violations: ArchViolation[] = []
+  const builders: RuleBuilderLike[] = []
 
   // --- Layer order (slices) ---
   const layerDef: Record<string, string> = {}
@@ -119,8 +122,8 @@ export function layeredArchitecture(p: ArchProject, options: LayeredArchitecture
     layerDef[name] = glob
   }
 
-  violations.push(
-    ...dispatchRule(
+  builders.push(
+    ...collectRule(
       slices(p)
         .assignedFrom(layerDef)
         .should()
@@ -132,8 +135,8 @@ export function layeredArchitecture(p: ArchProject, options: LayeredArchitecture
   )
 
   // --- No cycles ---
-  violations.push(
-    ...dispatchRule(
+  builders.push(
+    ...collectRule(
       slices(p).assignedFrom(layerDef).should().beFreeOfCycles(),
       'preset/layered/no-cycles',
       'error',
@@ -148,8 +151,8 @@ export function layeredArchitecture(p: ArchProject, options: LayeredArchitecture
     if (innermostName && innermostGlob) {
       const allowedGlobs = [innermostGlob, ...sharedGlobs]
 
-      violations.push(
-        ...dispatchRule(
+      builders.push(
+        ...collectRule(
           modules(p)
             .that()
             .resideInFolder(innermostGlob)
@@ -165,13 +168,13 @@ export function layeredArchitecture(p: ArchProject, options: LayeredArchitecture
 
   // --- Type imports only for specified layers ---
   if (options.typeImportsAllowed && options.typeImportsAllowed.length > 0) {
-    violations.push(...applyTypeImportRules(p, options.typeImportsAllowed, layerGlobs, overrides))
+    builders.push(...applyTypeImportRules(p, options.typeImportsAllowed, layerGlobs, overrides))
   }
 
   // --- Restricted packages ---
   if (options.restrictedPackages) {
-    violations.push(...applyRestrictedPackages(p, options.restrictedPackages, overrides))
+    builders.push(...applyRestrictedPackages(p, options.restrictedPackages, overrides))
   }
 
-  throwIfViolations(violations)
+  return builders
 }

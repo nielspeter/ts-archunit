@@ -3,7 +3,7 @@
 **Created:** 2026-03-25
 **Updated:** 2026-07-13
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 53 completed + proposal 010, 2 open (see "Open Plans" below)
+**Total Plans:** 55 completed + proposal 010, 2 open (see "Open Plans" below)
 
 ---
 
@@ -69,7 +69,7 @@
 
 ## What's Shipped
 
-**2030 tests across 147 files. All checks pass.**
+**2042 tests across 151 files. All checks pass.**
 
 ### Core (P0)
 
@@ -185,17 +185,17 @@
 
 Two plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
 
-Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, and the **`tsconfig()` config-assertion rule (0055, v0.15.0)**: the severity-aware unified `check` pipeline, the agent-facing surface (`explain --format agent`, `agentGuardrails`, `codeFrame`), the thin `recommended()` floor, one-command onboarding, and strict-config drift protection. The two remaining plans are independent matchers, reviewed 2026-07-13 (architect + product) with design decisions locked — each carries a `Review` line in its Status block and a `## Review findings` section.
+Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, the **`tsconfig()` config-assertion rule (0055, v0.15.0)**, and **v0.16.0** — the **docs restructure (0061)** (golden path, one reconciled workflow, four-tier IA) plus **shape presets → returning form (0062)** (the whole preset family now composes uniformly; `arch:baseline` no longer crashes; warn rules flow through the pipeline). The two remaining plans are independent matchers, reviewed 2026-07-13 with design decisions locked.
 
 | Priority | Plan                                         | Effort      | State                    | Depends on       |
 | -------- | -------------------------------------------- | ----------- | ------------------------ | ---------------- |
 | **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | Reviewed — module-only   | 0046             |
 | **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | Reviewed — `@deprecated` | 0011, 0013, 0046 |
 
-**Suggested next order** (if building everything): **0047 → 0048.** Both are standalone matchers; design decisions are locked (see each plan's `## Review findings` / design-decision sections) and they still need a scheduling/go decision. 0048 is lowest value/cost; trim 0047 to `doubleCast`.
+**Suggested next order:** the standalone matchers **0047 → 0048** (0048 lowest value/cost; trim 0047 to `doubleCast`). A follow-up also exists to add the (now returning-form) shape presets to `ts-archunit init` (Plan 0062, Phase 5).
 
 ---
 
 ## Completed
 
-53 plans implemented + proposal 010 (JSX Element Rules). Latest: `tsconfig()` config-assertion rule (0055, v0.15.0) and the `ts-archunit init` scaffolder (0050, v0.14.0), on top of the AI-agent delivery program — unified `check` pipeline (0060), agent-facing surface (0044), `recommended()` floor (0049), v0.13.0. 2030 tests across 147 files.
+55 plans implemented + proposal 010 (JSX Element Rules). Latest (v0.16.0): docs restructure — golden path (0061) + shape presets → returning form (0062), so the whole preset family composes uniformly. On top of `tsconfig()` (0055, v0.15.0), the `init` scaffolder (0050, v0.14.0), and the AI-agent delivery program (0060/0044/0049, v0.13.0). 2042 tests across 151 files.

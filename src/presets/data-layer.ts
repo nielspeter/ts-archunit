@@ -1,9 +1,9 @@
 import type { ArchProject } from '../core/project.js'
-import type { ArchViolation } from '../core/violation.js'
+import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { classes } from '../builders/class-rule-builder.js'
 import { newExpr } from '../helpers/matchers.js'
 import type { PresetBaseOptions } from './shared.js'
-import { dispatchRule, validateOverrides, throwIfViolations } from './shared.js'
+import { collectRule, validateOverrides } from './shared.js'
 
 export interface DataLayerIsolationOptions extends PresetBaseOptions {
   /** Glob pattern for repository files */
@@ -23,16 +23,19 @@ const RULE_IDS = ['preset/data/extend-base', 'preset/data/typed-errors'] as cons
  * Does NOT duplicate layer ordering or import direction — those
  * are `layeredArchitecture`'s job.
  */
-export function dataLayerIsolation(p: ArchProject, options: DataLayerIsolationOptions): void {
+export function dataLayerIsolation(
+  p: ArchProject,
+  options: DataLayerIsolationOptions,
+): RuleBuilderLike[] {
   const overrides = options.overrides
   validateOverrides(overrides, [...RULE_IDS])
 
-  const violations: ArchViolation[] = []
+  const builders: RuleBuilderLike[] = []
 
   // --- Base class enforcement ---
   if (options.baseClass) {
-    violations.push(
-      ...dispatchRule(
+    builders.push(
+      ...collectRule(
         classes(p).that().resideInFolder(options.repositories).should().extend(options.baseClass),
         'preset/data/extend-base',
         'error',
@@ -43,8 +46,8 @@ export function dataLayerIsolation(p: ArchProject, options: DataLayerIsolationOp
 
   // --- Typed errors ---
   if (options.requireTypedErrors) {
-    violations.push(
-      ...dispatchRule(
+    builders.push(
+      ...collectRule(
         classes(p)
           .that()
           .resideInFolder(options.repositories)
@@ -57,5 +60,5 @@ export function dataLayerIsolation(p: ArchProject, options: DataLayerIsolationOp
     )
   }
 
-  throwIfViolations(violations)
+  return builders
 }

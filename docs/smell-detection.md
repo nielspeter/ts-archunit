@@ -1,5 +1,9 @@
 # Smell Detection
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 The `smells` entry point detects code smells -- patterns that are not necessarily wrong but indicate potential design problems. Unlike hard architectural rules, smells are advisory by default and typically use `.warn()` instead of `.check()`.
 
 ## What Smells Are

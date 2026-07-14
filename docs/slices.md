@@ -1,5 +1,9 @@
 # Slices & Layers
 
+::: tip Rule file or test file?
+Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
+:::
+
 The `slices()` entry point groups source files into logical slices and checks relationships between them. Use it for cycle detection, layer ordering, and slice isolation.
 
 ## What Slices Are
