@@ -4,7 +4,7 @@
 
 - **State:** DRAFT — reviewed (architect + product + testing, 2026-07-14); findings folded in.
 - **Priority:** P1 — the gap breaks rung 2 of the documented adoption ladder (plan 0061 routes around it with a caveat; this plan removes the cause).
-- **Effort:** ~2 days (revised up after review — the migration is NOT mechanical: `checkAll` helper + codemod pulled into scope to make the break loud, `shared.test.ts` migration and a real-loader fixture added, the `baseline.ts` symmetric catch, and tightened test assertions).
+- **Effort:** ~1.5 days (revised after review — the migration is NOT mechanical: `checkAll` helper (in scope) makes the break ergonomic, `shared.test.ts` migration and a real-loader fixture added, the `baseline.ts` symmetric catch, tightened assertions; the codemod was right-sized OUT — deferred until adoption warrants it).
 - **Created:** 2026-07-13
 - **Depends on:** Nothing new — the returning-form infrastructure (`RuleBuilderLike`, `.asSeverity()`, the severity-aware `check` pipeline) shipped in v0.13.0 (plans 0060/0049/0044). This plan applies it to the three presets that predate it.
 - **Breaking:** Yes — see "Compatibility & versioning". Recommended: ship as **v0.16.0** with a prominent `### Changed (breaking)` CHANGELOG entry and a one-line migration (pre-1.0 semver; a 1.0.0 bump is the alternative if we want to pin the preset contract as stable).
@@ -140,10 +140,9 @@ checkAll([...recommended(p), ...layeredArchitecture(p, opts)]) // whole family, 
 **The migration must be LOUD — this is the review's central concern.** Today a bare `layeredArchitecture(p, {...})` statement _throws_ on violation. After the change it _returns an array_. A user who upgrades and doesn't touch their test gets code that compiles, runs, and **passes while enforcing nothing** — the exact "manufactured false confidence" this product exists to prevent, and neither TypeScript nor ESLint (`no-unused-expressions` doesn't fire on a call) catches an ignored return. Worse, every shape-preset example in today's `docs/presets.md` is a bare statement, so the _dominant documented pattern_ is the one that silently passes. A CHANGELOG note alone is inadequate mitigation. The migration ships with three things:
 
 1. **`checkAll()`** (above) — the ergonomic, hard-to-misuse target. `layeredArchitecture(p, opts)` → `checkAll(layeredArchitecture(p, opts))`. One token added, aggregation + severity preserved, no incantation.
-2. **A codemod** — `npx ts-archunit migrate-presets` (or a documented `scripts/` recipe; ts-morph is already in-tree). It finds bare-statement calls to the three shape presets and wraps them in `checkAll(...)`. This turns a silent trap into a mechanical, reviewable diff. This is what makes the break loud rather than invisible.
-3. **CHANGELOG leads with ACTION REQUIRED**, not a neutral "returning form": _"⚠️ Breaking: `layeredArchitecture` / `strictBoundaries` / `dataLayerIsolation` now RETURN rules instead of throwing. A bare `layeredArchitecture(p, {...})` call no longer fails your test — wrap it in `checkAll(...)` or run `npx ts-archunit migrate-presets`. Un-migrated calls silently enforce nothing."_
+2. **CHANGELOG leads with ACTION REQUIRED**, not a neutral "returning form": _"⚠️ Breaking: `layeredArchitecture` / `strictBoundaries` / `dataLayerIsolation` now RETURN rules instead of throwing. A bare `layeredArchitecture(p, {...})` call no longer fails your test — wrap it in `checkAll(...)`. Un-migrated calls silently enforce nothing."_
 
-Considered and rejected: a one-release transitional "created-but-never-consumed" runtime warning. It's the most on-brand idea but needs global builder-tracking + a process-exit hook (stateful, ESM-unfriendly), and for a pre-1.0 library days old the codemod + `checkAll` + loud CHANGELOG cover the same risk at far lower complexity. If real adoption data later shows silent-pass in the wild, revisit.
+**Codemod — deferred (right-sized 2026-07-14).** The review argued for a `migrate-presets` codemod to make the break mechanical. Sound in principle, but the package shipped v0.15 _this week_ — external adoption is ~zero, and the "existing usage" it would protect is our own docs/tests, which Phase 4 rewrites anyway. Building + testing a codemod for a phantom audience is over-engineering (lego-bricks). `checkAll` (permanent value) + the loud CHANGELOG cover the real risk now; **add `migrate-presets` only if real adoption on ≤0.15 shows up** — it's purely additive. Considered and also rejected: a transitional "created-but-never-consumed" runtime warning (stateful process-exit tracking, not worth it at this adoption).
 
 Manual migration (for anyone not running the codemod):
 
@@ -193,9 +192,9 @@ Delete `dispatchRule` + `throwIfViolations` + their public exports. Update `src/
 - `docs/getting-started.md` / `docs/api-reference.md` (new `checkAll` export) / `docs/cli.md` (the "best-effort catch" note): align.
 - `CHANGELOG.md`: `### Changed (breaking)` **leading with the ⚠️ ACTION REQUIRED** framing (Compatibility section) + the `checkAll`/codemod migration + the removed helpers.
 
-### Phase 4b — The migration codemod (~2 hours)
+### Phase 4b — Codemod (DEFERRED)
 
-`ts-archunit migrate-presets` (or `scripts/migrate-presets.mjs` documented in the CHANGELOG). Using the in-tree ts-morph: find call expressions to `layeredArchitecture` / `strictBoundaries` / `dataLayerIsolation` that are **bare `ExpressionStatement`s** (the silently-broken pattern) and wrap them in `checkAll(...)`; leave already-spread/consumed calls alone. Ship with a handful of fixture-based tests (bare statement → wrapped; spread → untouched; already-in-`checkAll` → untouched). This is the mechanism that makes the break loud rather than invisible — see Compatibility.
+Not built now — see "Codemod — deferred" under Compatibility. `checkAll` + the loud CHANGELOG cover the migration at current (≈zero) adoption; ship a `migrate-presets` codemod only if real ≤0.15 usage appears.
 
 ### Phase 5 — Release note for `init` (out of scope, unblocked)
 
@@ -212,8 +211,7 @@ Plan 0050 gated `--preset layered|data-layer|strict-boundaries` out of `init` be
 | `src/index.ts`                                                                              | Export `checkAll`                                                       |
 | `src/cli/commands/check.ts`                                                                 | Comment-only: fallback catch is defensive, not a preset mechanism       |
 | `src/cli/commands/baseline.ts`                                                              | Add the symmetric `ArchRuleError` catch (parity with `check`)           |
-| `scripts/migrate-presets.mjs` (+ tests)                                                     | New — codemod wrapping bare shape-preset calls in `checkAll`            |
-| `package.json`                                                                              | Version → 0.16.0; codemod bin/script entry                              |
+| `package.json`                                                                              | Version → 0.16.0                                                        |
 | `tests/presets/shared.test.ts`                                                              | Migrate `dispatchRule`→`collectRule`; delete `throwIfViolations` tests  |
 | `tests/presets/{layered,boundaries,data-layer}.test.ts`                                     | Rewrite throwing/spy assertions → severity-stamped violations           |
 | `tests/core/check-all.test.ts`                                                              | New — pass / error-throws-aggregated / warn-non-failing                 |
