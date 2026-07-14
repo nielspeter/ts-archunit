@@ -120,7 +120,10 @@ describe('runInit', () => {
     )
     expect(rules).toContain('...recommended(p)') // floor still present
     expect(rules).toContain('...layeredArchitecture(p, {')
-    expect(rules).toContain("routes: 'src/routes/**'")
+    // Full option-key set — a renamed key in the template fails here (drift guard).
+    for (const key of ['layers:', 'routes:', 'services:', 'repositories:', 'shared:']) {
+      expect(rules).toContain(key)
+    }
   })
 
   it('--preset strict-boundaries scaffolds strictBoundaries', () => {
@@ -132,7 +135,9 @@ describe('runInit', () => {
     expect(rules).toContain(
       "import { recommended, strictBoundaries } from '@nielspeter/ts-archunit/presets'",
     )
-    expect(rules).toContain("folders: 'src/features/*'")
+    for (const key of ["folders: 'src/features/*'", 'shared:']) {
+      expect(rules).toContain(key)
+    }
   })
 
   it('--preset data-layer scaffolds dataLayerIsolation', () => {
@@ -144,7 +149,35 @@ describe('runInit', () => {
     expect(rules).toContain(
       "import { recommended, dataLayerIsolation } from '@nielspeter/ts-archunit/presets'",
     )
-    expect(rules).toContain("baseClass: 'BaseRepository'")
+    for (const key of [
+      'repositories:',
+      "baseClass: 'BaseRepository'",
+      'requireTypedErrors: true',
+    ]) {
+      expect(rules).toContain(key)
+    }
+  })
+
+  it('warns that a shape preset scaffolds EXAMPLE globs (false-green guard)', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    runInit({ cwd: dir, preset: 'layered' })
+    const text = out.text()
+    out.restore()
+    // Closing message must flag the placeholder globs...
+    expect(text.toLowerCase()).toContain('example')
+    expect(text).toContain('enforces nothing')
+    // ...and the generated file must too.
+    expect(read(dir, 'arch.rules.ts')).toContain('enforces NOTHING')
+  })
+
+  it('floor presets do NOT emit the example-globs warning', () => {
+    const dir = makeProject()
+    const out = captureStdout()
+    runInit({ cwd: dir })
+    const text = out.text()
+    out.restore()
+    expect(text).not.toContain('enforces nothing')
   })
 
   it('threads the source root into a shape preset scaffold', () => {

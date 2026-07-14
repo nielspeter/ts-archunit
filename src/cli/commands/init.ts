@@ -119,7 +119,7 @@ export function runInit(args: InitArgs): number {
     return 1
   }
 
-  printClosing(staged, pkgPlan, cwd, sourceRoot)
+  printClosing(staged, pkgPlan, cwd, sourceRoot, preset)
   return 0
 }
 
@@ -226,12 +226,13 @@ function shapePresetSpec(
   describe: string
   call: string
 } {
-  if (preset === 'layered') {
-    return {
-      importName: 'layeredArchitecture',
-      describe: 'Layered architecture: dependencies flow downward, layers stay cycle-free.',
-      call: `layeredArchitecture(p, {
-    // Adjust these globs to your layer folders (top to bottom).
+  switch (preset) {
+    case 'layered':
+      return {
+        importName: 'layeredArchitecture',
+        describe: 'Layered architecture: dependencies flow downward, layers stay cycle-free.',
+        call: `layeredArchitecture(p, {
+    // Example globs — point these at your real layer folders (top to bottom).
     layers: {
       routes: '${root}/routes/**',
       services: '${root}/services/**',
@@ -239,28 +240,31 @@ function shapePresetSpec(
     },
     shared: ['${root}/shared/**'],
   })`,
-    }
-  }
-  if (preset === 'strict-boundaries') {
-    return {
-      importName: 'strictBoundaries',
-      describe: 'Feature boundaries: each folder imports only from itself and shared.',
-      call: `strictBoundaries(p, {
-    // Each folder matching this glob is an isolated boundary.
+      }
+    case 'strict-boundaries':
+      return {
+        importName: 'strictBoundaries',
+        describe: 'Feature boundaries: each folder imports only from itself and shared.',
+        call: `strictBoundaries(p, {
+    // Example glob — point this at your real feature folders.
     folders: '${root}/features/*',
     shared: ['${root}/shared/**'],
   })`,
-    }
-  }
-  return {
-    importName: 'dataLayerIsolation',
-    describe: 'Repository pattern: repositories extend a base class and throw typed errors.',
-    call: `dataLayerIsolation(p, {
+      }
+    case 'data-layer':
+      return {
+        importName: 'dataLayerIsolation',
+        describe: 'Repository pattern: repositories extend a base class and throw typed errors.',
+        call: `dataLayerIsolation(p, {
+    // Example values — point at your repository folder and its real base class.
     repositories: '${root}/repositories/**',
     baseClass: 'BaseRepository',
     requireTypedErrors: true,
   })`,
+      }
   }
+  // No default: the switch is exhaustive over ShapePreset. Adding a preset to
+  // SHAPE_PRESETS without a case here is a compile error (missing return).
 }
 
 function shapeRulesTemplate(preset: ShapePreset, tsconfig: string, sourceRoot: string): string {
@@ -276,11 +280,13 @@ const p = project('${tsconfig}')
 
 // Rules are collected into the default export; \`ts-archunit check\` runs them.
 export default [
-  // Thin universal safety floor.
+  // The recommended safety floor ships alongside the shape rules below.
   ...${recommendedCall},
 
   // ${describe}
-  // Edit the globs below to match your project, then \`npm run arch\`.
+  // IMPORTANT: the globs below are examples. A glob that matches no files
+  // enforces NOTHING (a green run that checks nothing). Point them at your
+  // real folders before you trust the result.
   ...${call},
 
   // Add project-specific rules below — builders, no .check().
@@ -436,6 +442,7 @@ function printClosing(
   pkg: PackageJsonPlan,
   cwd: string,
   sourceRoot: string,
+  preset: InitPreset,
 ): void {
   const scriptsAdded = pkg.action === 'write'
   const runCmd = scriptsAdded ? 'npm run arch' : 'npx ts-archunit check'
@@ -444,6 +451,14 @@ function printClosing(
   process.stdout.write(`Created ${String(staged.length)} file(s).\n`)
   if (!scriptsAdded && pkg.action === 'skip') {
     process.stdout.write(`Note: package.json script entry skipped — ${pkg.reason}.\n`)
+  }
+
+  if (!isFloorPreset(preset)) {
+    process.stdout.write(
+      `\n⚠ arch.rules.ts contains EXAMPLE folder globs for the '${preset}' preset. ` +
+        `Edit them to your real folders before trusting a green run — a glob that ` +
+        `matches no files enforces nothing.\n`,
+    )
   }
 
   if (hasSource(cwd, sourceRoot)) {

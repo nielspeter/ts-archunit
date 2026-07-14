@@ -38,7 +38,13 @@ It creates:
 
 `init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do.
 
-A shape preset (`layered` / `strict-boundaries` / `data-layer`) scaffolds `arch.rules.ts` with the `recommended` floor **plus** the shape preset pre-filled with folder globs to edit for your project — then `npm run arch`.
+A shape preset scaffolds `arch.rules.ts` with the `recommended` floor **plus** the chosen architecture preset, pre-filled with example folder globs. Pick by your architecture:
+
+- **`layered`** — classic N-tier: dependencies flow downward, layers stay cycle-free.
+- **`strict-boundaries`** — feature modules: each folder imports only from itself and shared.
+- **`data-layer`** — repository pattern: repositories extend a base class and throw typed errors.
+
+The scaffolded globs are **examples** — edit them to your real folders before you trust a green run (a glob that matches no files enforces nothing). Then `npm run arch`.
 
 ### `check` — Run Rules
 
