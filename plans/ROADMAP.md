@@ -183,16 +183,16 @@
 
 ## Open Plans
 
-Two plans are authored but not yet completed. All plan files live in `plans/` (completed plans move to `plans/completed/`).
+Two items remain — both **PROPOSED**, not scheduled. Their design was reviewed 2026-07-13 (decisions locked), but **neither has a go/no-go decision to build.** They are independent matchers; the open question is whether each earns a place in the API, not how to implement it.
 
-Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, the **`tsconfig()` config-assertion rule (0055, v0.15.0)**, and **v0.16.0** — the **docs restructure (0061)** (golden path, one reconciled workflow, four-tier IA) plus **shape presets → returning form (0062)** (the whole preset family now composes uniformly; `arch:baseline` no longer crashes; warn rules flow through the pipeline). The two remaining plans are independent matchers, reviewed 2026-07-13 with design decisions locked.
+Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, the **`tsconfig()` config-assertion rule (0055, v0.15.0)**, and **v0.16.0** — the **docs restructure (0061)** (golden path, one reconciled workflow, four-tier IA) plus **shape presets → returning form (0062)** (the whole preset family now composes uniformly; `arch:baseline` no longer crashes; warn rules flow through the pipeline).
 
-| Priority | Plan                                         | Effort      | State                    | Depends on       |
-| -------- | -------------------------------------------- | ----------- | ------------------------ | ---------------- |
-| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | Reviewed — module-only   | 0046             |
-| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | Reviewed — `@deprecated` | 0011, 0013, 0046 |
+| Priority | Plan                                         | Effort      | State                                   | Depends on       |
+| -------- | -------------------------------------------- | ----------- | --------------------------------------- | ---------------- |
+| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | **PROPOSED** — reviewed, needs go/no-go | 0046             |
+| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | **PROPOSED** — reviewed, needs go/no-go | 0011, 0013, 0046 |
 
-**Suggested next order:** the standalone matchers **0047 → 0048** (0048 lowest value/cost; trim 0047 to `doubleCast`). A follow-up also exists to add the (now returning-form) shape presets to `ts-archunit init` (Plan 0062, Phase 5).
+**Next step is a decision, not a build:** evaluate whether each proposal is worth promoting to a plan (0048 was self-flagged lowest value/cost). Separately, a shipped-and-ready follow-up: add the now-returning-form shape presets to `ts-archunit init` (Plan 0062, Phase 5) — that one is unblocked, not a proposal.
 
 ---
 
