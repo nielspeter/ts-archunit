@@ -28,6 +28,7 @@ export default defineConfig({
         text: 'Guide',
         items: [
           { text: 'Core Concepts', link: '/core-concepts' },
+          { text: 'How It Fits', link: '/how-it-fits' },
           { text: 'Setup & Best Practices', link: '/setup-best-practices' },
           { text: 'Running Rules in Tests', link: '/running-in-tests' },
           { text: 'Architecture Presets', link: '/presets' },

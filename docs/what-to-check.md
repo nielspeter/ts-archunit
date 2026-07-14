@@ -88,6 +88,10 @@ slices(p).matching('src/features/*/').should().notDependOn('legacy', 'deprecated
 
 Enforce consistent naming patterns so classes, services, and functions are discoverable by convention.
 
+::: tip Filenames vs code names
+These rules match **code element names**. For **filename** rules, the split matters: pure casing (kebab-case, no `.spec.ts`) belongs in your linter (eslint or Biome), while filename↔element _correspondence_ (a `Controller` must live in `*-controller.ts`) is ts-archunit's — see [How It Fits](/how-it-fits#filename-conventions-a-worked-example).
+:::
+
 ```typescript
 // Controllers end with Controller
 classes(p)
