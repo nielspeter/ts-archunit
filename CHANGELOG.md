@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **⚠️ BREAKING — shape presets now RETURN rules instead of throwing.** `layeredArchitecture`, `strictBoundaries`, and `dataLayerIsolation` now return `RuleBuilderLike[]` (like `recommended` / `agentGuardrails`) instead of `void`-and-throwing. **A bare `layeredArchitecture(p, {...})` call no longer fails your test — it silently enforces nothing.** Migrate: spread into a rule file (`export default [...layeredArchitecture(p, opts)]`) or wrap in `checkAll(...)` in a test. This makes every preset composable on the CLI golden path, fixes `arch:baseline` crashing on a shape preset, and routes their `warn`-default rules (`type-imports-only`, `no-duplicate-bodies`) through the severity pipeline instead of dropping them to `console.warn`. `dispatchRule` and `throwIfViolations` are removed from `@nielspeter/ts-archunit/presets`.
+
+### Added
+
+- **`checkAll(rules, options?)`** — a test-file terminal for an array of rules (e.g. a spread preset): runs them all and throws one aggregated `ArchRuleError` on any error-severity violation; warns are reported but never fail. Exported from `@nielspeter/ts-archunit`. (Plan 0062.)
+
 ## [0.15.0] - 2026-07-13
 
 ### Added

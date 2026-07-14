@@ -1,6 +1,6 @@
 # Architecture Presets
 
-Presets are parameterized architecture rule bundles. One function call generates multiple coordinated rules with aggregated error reporting. Use presets as the starting point for new projects — they encode proven patterns from real production codebases.
+Presets are parameterized architecture rule bundles. One function call generates multiple coordinated rules. Use presets as the starting point for new projects — they encode proven patterns from real production codebases.
 
 ```typescript
 import {
@@ -9,6 +9,18 @@ import {
   dataLayerIsolation,
 } from '@nielspeter/ts-archunit/presets'
 ```
+
+**Every preset returns an array of rules** (`RuleBuilderLike[]`) — one uniform model. Spread it into a CLI [rule file](/cli), or run it in a [test](/running-in-tests) with `checkAll`:
+
+```typescript
+// arch.rules.ts (CLI)
+export default [...layeredArchitecture(p, { layers }), ...recommended(p)]
+
+// or in a vitest/jest test
+checkAll(layeredArchitecture(p, { layers }))
+```
+
+The examples below show each preset's options; wire the call in with one of those two forms.
 
 ## `layeredArchitecture`
 
@@ -125,7 +137,7 @@ Boundary folders are discovered dynamically from the glob pattern. `src/features
 
 A deliberately **thin, universal safety floor** for any TypeScript project — the handful of things dangerous regardless of project shape that fire ~never on healthy code. It is _not_ a full architecture; shape-specific rules (layer order, cycles, delegation) are yours to add.
 
-Like `agentGuardrails`, it **returns** severity-carrying builders (it does not throw), so spread it into the default export:
+Like every preset, it returns severity-carrying builders, so spread it into the default export:
 
 ```typescript
 import { project } from '@nielspeter/ts-archunit'
@@ -168,7 +180,7 @@ The `overrides` map (below) changes individual rule severity. Codegen, templatin
 
 Targets the mistakes AI coding agents make most often — inline logic, generic errors, stub comments, empty bodies, copy-paste. Where the presets above enforce _where_ code goes, `agentGuardrails` enforces _how_ it is written. See [AI Agents](/ai-agents) for the full workflow.
 
-Unlike the other presets, it **returns** severity-carrying builders (it does not throw), so you spread it into a rule file's default export:
+Like every preset, it returns severity-carrying builders, so you spread it into a rule file's default export:
 
 ```typescript
 import { project } from '@nielspeter/ts-archunit'
@@ -216,26 +228,26 @@ layeredArchitecture(p, {
 })
 ```
 
-Three severity levels: `'error'` (throws), `'warn'` (logs to stderr), `'off'` (skipped entirely). Unrecognized override keys emit a warning — catches typos.
+Three severity levels: `'error'` (fails the run), `'warn'` (reported but never fails — surfaces in terminal / JSON / GitHub output and is baseline-filterable), `'off'` (skipped entirely). Unrecognized override keys emit a warning — catches typos.
 
 ## Aggregated errors
 
-Presets collect violations from ALL rules before throwing. You see every violation in one error, not just the first failing rule. This makes fixing violations much faster — you see the full picture on every run.
+A preset's rules all flow through the same runner (`check`, or `checkAll` in a test), so you see **every** violation across every rule in one report — not just the first failing rule. This makes fixing violations much faster: the full picture on every run.
 
 ## When to use presets vs. custom rules
 
 Use presets when your project follows a recognized pattern (layered architecture, feature modules, repository pattern). Use custom rules when you need project-specific constraints that presets don't cover.
 
-Presets and custom rules compose freely — run both in the same test file:
+Presets and custom rules compose freely — spread them into the same rule file:
 
 ```typescript
-// Presets handle the structural rules
-layeredArchitecture(p, { layers: { ... } })
-strictBoundaries(p, { folders: 'src/features/*' })
+// arch.rules.ts
+export default [
+  // Presets handle the structural rules
+  ...layeredArchitecture(p, { layers: { ... } }),
+  ...strictBoundaries(p, { folders: 'src/features/*' }),
 
-// Custom rules handle project-specific concerns
-functions(p)
-  .that().resideInFolder('**/services/**')
-  .should().satisfy(mustCall(/Repository/))
-  .check()
+  // Custom rules handle project-specific concerns (builders, no .check())
+  functions(p).that().resideInFolder('**/services/**').should().satisfy(mustCall(/Repository/)),
+]
 ```

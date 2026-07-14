@@ -47,17 +47,21 @@ npx vitest run arch.test.ts
 
 A violation throws an `ArchRuleError` with the same rich message (why + fix + code frame) you get from the CLI — it just surfaces as a failing test.
 
-### Presets and warnings in a test file
+### Presets in a test file — `checkAll`
 
-Presets return builders, so call `.check()` (or `.warn()`) on each, or iterate:
+Presets return an array of rules. `checkAll` is the test-file terminal: it runs the whole array and throws one aggregated error if any **error**-severity violation is found (warns are reported but never fail):
 
 ```typescript
+import { checkAll } from '@nielspeter/ts-archunit'
 import { recommended } from '@nielspeter/ts-archunit/presets'
+import { layeredArchitecture } from '@nielspeter/ts-archunit/presets'
 
-it('recommended floor holds', () => {
-  for (const rule of recommended(p)) rule.check()
+it('architecture holds', () => {
+  checkAll([...recommended(p), ...layeredArchitecture(p, { layers })])
 })
 ```
+
+`checkAll` also takes `{ baseline, diff, format }` — the same options as `.check()`.
 
 For a non-failing warning, use the terminal `.warn()` (logs, does not throw):
 

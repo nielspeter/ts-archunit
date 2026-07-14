@@ -50,6 +50,12 @@ Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`)
 | `.violations()`   | `.violations(): ArchViolation[]`                                   | Execute rule, return violations without throwing (severity-stamped). For programmatic access and presets.                                                                                                                                                                                                                                 |
 | `.describeRule()` | `.describeRule(): RuleDescription`                                 | Return rule metadata without executing. Used by `explain` command.                                                                                                                                                                                                                                                                        |
 
+## Running Rule Arrays
+
+| Export     | Signature                                                          | Description                                                                                                                                                                                                   |
+| ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checkAll` | `checkAll(rules: RuleBuilderLike[], options?: CheckOptions): void` | Run an array of rules (e.g. a spread preset) and throw one aggregated `ArchRuleError` on any **error**-severity violation; warns are reported but never throw. The test-file terminal for the returning form. |
+
 ## Exclusion Comments
 
 | Export                   | Signature                                                                              | Description                                               |
