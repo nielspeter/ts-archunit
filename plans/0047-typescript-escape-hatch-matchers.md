@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** PROPOSED
+- **State:** PROPOSED — **go/no-go 2026-07-14: SHIP TRIMMED.** Full-panel proposal review (architect + product) says ship only the differentiated core: **`doubleCast`** (all 3 scopes — the centerpiece, inexpressible in the lint layer) + **`anyAnnotation`** (matcher + `moduleNoAnyAnnotations`, framed for dependency/inheritance-shaped cuts, NOT as a `no-explicit-any` clone). **Defer `broadType` and `tsDirective`** — both duplicate author-time eslint rules with a worse (CI-time) feedback loop; `broadType` has a fuzzy name + a default that flags legit `<T extends {}>`; `tsDirective`'s message/line-number wins don't materialize through thin delegation. Before building: document that the raw `anyAnnotation`/`broadType` primitives silently miss type positions at class/function scope (only the rule wrappers are scope-guarded). Not yet scheduled.
 - **Review (2026-07-13):** Ship with changes. **Decisions applied 2026-07-13:** (1) scope — `anyAnnotation`/`broadType`/`tsDirective` ship module-only, `doubleCast` all 3 scopes (Option A, no signature-aware traversal); (2) `tsDirective` kept with a shared `matchCommentRanges()` helper + `{ allow: [...] }` shape; (3) added the "Position relative to typescript-eslint" section. Plan text ready; build scheduled later. See "Review findings" below.
 - **Priority:** P2 — extends the existing `rules/typescript` family; no blockers
 - **Effort:** ~1 day (module-only scope; no signature-aware traversal)
