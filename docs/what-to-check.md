@@ -31,7 +31,7 @@ modules(p)
   .that()
   .resideInFolder('**/controllers/**')
   .should()
-  .notImportFromCondition('**/repositories/**')
+  .notImportFrom('**/repositories/**')
   .check()
 
 // Shared package must not depend on app code
@@ -39,7 +39,7 @@ modules(p)
   .that()
   .resideInFolder('**/shared/**')
   .should()
-  .notImportFromCondition('**/controllers/**', '**/services/**')
+  .notImportFrom('**/controllers/**', '**/services/**')
   .check()
 
 // Server must depend on security middleware (import { dependOn } from '@nielspeter/ts-archunit')
