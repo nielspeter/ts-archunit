@@ -98,7 +98,7 @@ classes(p)
   .that()
   .resideInFolder('**/controllers/**')
   .should()
-  .conditionHaveNameMatching(/Controller$/)
+  .haveNameMatching(/Controller$/)
   .check()
 
 // Services must be exported
@@ -158,11 +158,11 @@ classes(p)
   .and()
   .resideInFolder('**/repositories/**')
   .should()
-  .shouldExtend('BaseRepository')
+  .extend('BaseRepository')
   .check()
 
 // Services must have a findById method
-classes(p).that().extend('BaseService').should().shouldHaveMethodNamed('findById').check()
+classes(p).that().extend('BaseService').should().haveMethodNamed('findById').check()
 ```
 
 ## Containment
@@ -175,7 +175,7 @@ classes(p)
   .that()
   .haveNameEndingWith('Controller')
   .should()
-  .shouldResideInFile('**/controllers/**')
+  .resideInFile('**/controllers/**')
   .check()
 
 // DTOs must reside in dto folder
@@ -183,7 +183,7 @@ classes(p)
   .that()
   .haveNameMatching(/Request$|Response$|DTO$/)
   .should()
-  .shouldResideInFile('**/dto/**')
+  .resideInFile('**/dto/**')
   .check()
 ```
 
@@ -197,7 +197,7 @@ classes(p)
   .that()
   .extend('BaseRepository')
   .should()
-  .conditionHaveNameMatching(/Repository$/)
+  .haveNameMatching(/Repository$/)
   .check()
 
 // Classes implementing EventHandler must end with Handler
@@ -205,7 +205,7 @@ classes(p)
   .that()
   .implement('EventHandler')
   .should()
-  .conditionHaveNameMatching(/Handler$/)
+  .haveNameMatching(/Handler$/)
   .check()
 ```
 
@@ -215,12 +215,7 @@ Constrain where decorated classes may live and which combinations of decorators 
 
 ```typescript
 // @Controller classes must be in controllers folder
-classes(p)
-  .that()
-  .haveDecorator('Controller')
-  .should()
-  .shouldResideInFile('**/controllers/**')
-  .check()
+classes(p).that().haveDecorator('Controller').should().resideInFile('**/controllers/**').check()
 
 // Abstract classes must not have @Controller
 classes(p).that().areAbstract().and().haveDecorator('Controller').should().notExist().check()
