@@ -77,9 +77,9 @@ only per-violation identity left.
 The same shape blocks `describe("auth", …)`-keyed test policies,
 `bus.on("payment.captured", …)`-keyed event policies, etc.
 
-## Evidence (case study: Cmless PKG-02)
+## Evidence (case study: PKG-02)
 
-This came out of a real remediation — the Cmless project's June 2026
+This came out of a real remediation — the originating project's June 2026
 full-system architecture review, finding PKG-02. The
 `route/prehandler-required` rule (R11) and two schema-quality rules
 (`schema/no-bare-object`, `schema/no-additional-properties-true`) each

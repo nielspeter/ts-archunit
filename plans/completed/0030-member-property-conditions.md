@@ -13,7 +13,7 @@
 Checking that interface/type/class properties meet naming, pattern, or quality rules requires a custom `defineCondition` with manual AST traversal. This is one of the most common architectural enforcement patterns across TypeScript projects:
 
 ```typescript
-// From cmless: apps/api/tests/unit/architecture/code-standards.test.ts
+// From the originating project: apps/api/tests/unit/architecture/code-standards.test.ts
 const noForbiddenPaginationParams = defineCondition(
   'no forbidden pagination param names',
   (elements: any[], context: ConditionContext): ArchViolation[] => {
@@ -645,7 +645,7 @@ export type { PropertyBearingNode } from './conditions/members.js'
 
 Full fluent chains proving end-to-end wiring through the builders:
 
-25. **types(p).that().resideInFolder(...).should().notHavePropertyNamed('offset', 'pageSize', 'page', 'size').check()** — the cmless pagination rule from bug 0002
+25. **types(p).that().resideInFolder(...).should().notHavePropertyNamed('offset', 'pageSize', 'page', 'size').check()** — the pagination rule from bug 0002
 26. **types(p).that().haveNameMatching(/Config$/).should().havePropertyNamed('version').check()** — required property enforcement
 27. **types(p).should().maxProperties(5).check()** — god object detection (LargeInterface fails)
 28. **types(p).that().areInterfaces().should().haveOnlyReadonlyProperties().check()** — immutability enforcement

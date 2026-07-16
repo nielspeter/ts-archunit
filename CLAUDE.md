@@ -8,7 +8,7 @@ ts-archunit is an architecture testing library for TypeScript, inspired by Java'
 
 **Spec:** `ts-archunit-spec.md` is the design specification. All implementation must align with it.
 
-**Origin:** This project was motivated by real architecture rot in the cmless headless CMS project, documented in `cmless/plans/0212-sdk-list-endpoint-standardization.md`. The spec's Section 1.1 code examples are based on real cmless patterns (copy-pasted parsers, inconsistent pagination, inline parseInt, untyped orderBy).
+**Origin:** This project was motivated by real architecture rot in the originating project (a headless CMS), documented in that project's plan 0212 (SDK list-endpoint standardization). The spec's Section 1.1 code examples are based on real patterns from that project (copy-pasted parsers, inconsistent pagination, inline parseInt, untyped orderBy).
 
 ## Architecture Decision Records (ADRs)
 

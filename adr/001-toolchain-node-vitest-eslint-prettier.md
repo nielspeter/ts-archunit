@@ -178,7 +178,7 @@ TypeScript strict mode with type checking in CI:
 ## Notes
 
 - ts-archunit ships as an npm package with `"type": "module"` (ESM)
-- Node.js >= 24 (LTS, consistent with cmless project)
+- Node.js >= 24 (LTS, consistent with the originating project)
 - The library has two peer dependencies: vitest or jest (users choose)
 - TypeScript ~5.9 (pinned to ts-morph compatibility) with `strict: true` + `noUncheckedIndexedAccess: true` from day one
 - ESLint 10 flat config (`eslint.config.ts`) with `typescript-eslint` v8 unified package and `recommendedTypeChecked`

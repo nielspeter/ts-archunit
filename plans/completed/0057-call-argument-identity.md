@@ -3,7 +3,7 @@
 ## Status
 
 - **State:** COMPLETED 2026-06-13
-- **Priority:** P1 — closes a security-shaped exclusion gap (cmless PKG-02); generic primitive serving 7+ string-keyed registration patterns
+- **Priority:** P1 — closes a security-shaped exclusion gap (PKG-02); generic primitive serving 7+ string-keyed registration patterns
 - **Effort:** ~1 day
 - **Created:** 2026-06-11
 - **Implemented:** 2026-06-13 on branch `feat/call-argument-identity`, released as v0.11.0
@@ -23,7 +23,7 @@ shape, generality (8 string-keyed patterns: HTTP routes, test discovery,
 PubSub, command routers, validator registries, feature flags, DI
 containers, DB migrations), and rationale in full. Read it first.
 
-**Concrete consequence (cmless PKG-02):** the `route/prehandler-required`
+**Concrete consequence (PKG-02):** the `route/prehandler-required`
 rule and two schema-quality rules each exclude **nine whole route files**
 because individual routes can't be named. A new authenticated route
 added to those files ships **CI-exempt** — the exact highest-risk case.
@@ -318,11 +318,11 @@ bump. Migration cost is local to the rule that adopts the feature.
 
 Three reasons this earns a slot now:
 
-1. **Real-world demand with security framing.** Cmless PKG-02
+1. **Real-world demand with security framing.** PKG-02
    demonstrates the gap concretely; the proposer has branched and is
    ready to TDD-implement. Not speculative.
 2. **Generic primitive serving 7+ patterns.** The 8-case table in the
-   proposal makes clear this is not "HTTP routes for cmless" — it's
+   proposal makes clear this is not "HTTP routes for one project" — it's
    "registration identity for any string-keyed call." Same posture as
    `jsxText()` in plan 0056: bring the registration shape, the
    framework handles the identity mechanic.

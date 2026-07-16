@@ -6,9 +6,9 @@
 
 ## Problem
 
-Checking that methods matching a naming pattern return a specific type requires ~30 lines of custom `defineCondition` per check. Three near-identical conditions exist in cmless for list/create/delete method conventions.
+Checking that methods matching a naming pattern return a specific type requires ~30 lines of custom `defineCondition` per check. Three near-identical conditions exist in the originating project for list/create/delete method conventions.
 
-From cmless (`packages/sdk/tests/unit/architecture/sdk-patterns.test.ts`):
+From the originating project (`packages/sdk/tests/unit/architecture/sdk-patterns.test.ts`):
 
 ```typescript
 // 30 lines of boilerplate — repeated 3x for list/create/delete

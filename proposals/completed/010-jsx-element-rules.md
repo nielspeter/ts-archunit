@@ -601,7 +601,7 @@ context, suspense boundaries), those go in a separate package per ADR-006.
 - **`useInsteadOf` for JSX** — structured "use `<Button>` instead of `<button>`"
   condition producing actionable violation messages with both the bad element
   and its replacement. Valuable for design system enforcement. Planned for
-  Phase 2; for now, use `.because('use <Button> from @cmless/ui')`.
+  Phase 2; for now, use `.because('use <Button> from @acme/ui')`.
 - **Component prop type validation** — needs type checker integration, not just AST
 - **Hook rules** — separate concern, separate proposal
 - **CSS class validation** — checking that Tailwind classes are valid (tooling exists)

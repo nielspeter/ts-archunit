@@ -1,7 +1,7 @@
 # BUG-0001: `.excluding()` can't match `defineCondition` violations by file path
 
 **Severity:** High — prevents flipping rules with intentional exceptions to `.check()`
-**Found by:** cmless dogfooding (Plan 0214, rule `route/prehandler-required`)
+**Found by:** dogfooding on the originating project (Plan 0214, rule `route/prehandler-required`)
 **Date:** 2026-03-26
 **Status:** Fixed 2026-03-26
 **Fix:** `src/core/execute-rule.ts` — `.excluding()` now matches against `element`, `file`, and `message`
@@ -72,7 +72,7 @@ Now works:
 
 ## Impact
 
-Unblocks in cmless:
+Unblocks in the originating project:
 
 - `route/prehandler-required` — 2 intentional exceptions, now enforceable
 - `route/schema-required` — 17 intentional exceptions, now enforceable
