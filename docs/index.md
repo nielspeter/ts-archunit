@@ -54,6 +54,8 @@ slices(p).matching('src/features/*/').should().beFreeOfCycles()
 | Baseline (gradual adoption)                         | ✅          | ❌                 | ❌                       |
 | GitHub PR annotations                               | ✅          | ❌                 | ❌                       |
 
+ts-archunit **complements** your linter — it doesn't replace it. For the honest breakdown of where it overlaps eslint, Biome, and dependency-cruiser (and where it doesn't), see **[How It Fits](/how-it-fits)**.
+
 ## A violation tells you why and how to fix it
 
 ```
