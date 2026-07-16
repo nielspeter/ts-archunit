@@ -64,7 +64,7 @@ Conditions define what matched functions must satisfy. They go after `.should()`
 | `notExist()`                        | No functions should match the predicates      | `.should().notExist()`                                           |
 | `beExported()`                      | Function must be exported                     | `.should().beExported()`                                         |
 | `beAsync()`                         | Function must be async                        | `.should().beAsync()`                                            |
-| `conditionHaveNameMatching(re)`     | Function name must match the regex            | `.should().conditionHaveNameMatching(/^handle/)`                 |
+| `haveNameMatching(re)`              | Function name must match the regex            | `.should().haveNameMatching(/^handle/)`                          |
 | `contain(matcher)`                  | Function body must contain the expression     | `.should().contain(call('validate'))`                            |
 | `notContain(matcher)`               | Function body must not contain the expression | `.should().notContain(call('eval'))`                             |
 | `useInsteadOf(ban, alt)`            | Replace banned expression with an alternative | `.should().useInsteadOf(call('parseInt'), ...)`                  |
