@@ -19,7 +19,7 @@ Part of the **member inspection conditions** capability layer (see plan 0030). B
 Enforcing "services must not access the database directly" requires fragile body string matching:
 
 ```typescript
-// From cmless — brittle, matches this.dbToApiTeam as false positive
+// From the originating project — brittle, matches this.dbToApiTeam as false positive
 classes(p)
   .that()
   .haveNameEndingWith('Service')

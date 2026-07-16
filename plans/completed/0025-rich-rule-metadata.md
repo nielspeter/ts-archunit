@@ -44,7 +44,7 @@ classes(p)
     because: 'Generic Error loses context and prevents consistent error handling across the API',
     suggestion:
       'Replace `new Error(msg)` with `new NotFoundError(entity, id)` or `new ValidationError(msg)`',
-    docs: 'https://docs.cmless.io/adr/011#error-handling',
+    docs: 'https://docs.example.com/adr/011#error-handling',
   })
   .check()
 ```
@@ -100,13 +100,13 @@ Architecture Violation [repo/typed-errors]
 
   Why: Generic Error loses context and prevents consistent error handling
   Fix: Replace `new Error(msg)` with `new NotFoundError(entity, id)`
-  Docs: https://docs.cmless.io/adr/011#error-handling
+  Docs: https://docs.example.com/adr/011#error-handling
 ```
 
 GitHub annotation:
 
 ```
-::error file=src/repositories/webhook.repository.ts,line=42,title=repo/typed-errors::Generic Error loses context. Fix: Replace new Error(msg) with new NotFoundError(entity, id). Docs: https://docs.cmless.io/adr/011
+::error file=src/repositories/webhook.repository.ts,line=42,title=repo/typed-errors::Generic Error loses context. Fix: Replace new Error(msg) with new NotFoundError(entity, id). Docs: https://docs.example.com/adr/011
 ```
 
 JSON:
@@ -122,7 +122,7 @@ JSON:
       "message": "WebhookRepository.findById contains new 'Error' at line 42",
       "because": "Generic Error loses context and prevents consistent error handling",
       "suggestion": "Replace `new Error(msg)` with `new NotFoundError(entity, id)`",
-      "docs": "https://docs.cmless.io/adr/011#error-handling"
+      "docs": "https://docs.example.com/adr/011#error-handling"
     }
   ]
 }

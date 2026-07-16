@@ -66,7 +66,7 @@ npm init -y
 **Notes:**
 
 - `"type": "module"` per ADR-004 (ESM-only)
-- `"node": ">=24.0.0"` — Node 24 LTS (consistent with cmless project)
+- `"node": ">=24.0.0"` — Node 24 LTS (consistent with the originating project)
 
 ## Phase 2: Dependencies
 

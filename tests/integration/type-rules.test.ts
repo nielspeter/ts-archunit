@@ -12,7 +12,7 @@ const p = project(tsconfigPath)
 
 describe('types() integration', () => {
   it('enforces no bare string on sortBy property', () => {
-    // This is THE motivating use case from cmless plan 0212
+    // This is THE motivating use case from the originating project's plan 0212
     expect(() => {
       types(p)
         .that()
@@ -131,7 +131,7 @@ describe('types() integration', () => {
 
 describe('types() member property conditions integration', () => {
   it('enforces no forbidden pagination property names', () => {
-    // The cmless pagination rule from bug 0002
+    // The pagination rule from bug 0002
     expect(() => {
       types(p)
         .that()

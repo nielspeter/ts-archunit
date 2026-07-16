@@ -43,21 +43,21 @@ All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, et
 
 Conditions define what the matched modules must (or must not) do. These go in the `.should()` clause and are checked against every module that passed the predicate filter. Use them to enforce import boundaries, restrict allowed dependencies, and require type-only imports where runtime coupling is undesirable.
 
-| Condition                          | Description                                                       | Example                                                 |
-| ---------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
-| `onlyImportFrom(...globs)`         | Module may only import from the listed paths                      | `.should().onlyImportFrom('**/domain/**')`              |
-| `notImportFromCondition(...globs)` | Module must not import from the listed paths                      | `.should().notImportFromCondition('**/controllers/**')` |
-| `dependOn(...globs)`               | Module must import from at least one path matching a glob         | `.should().satisfy(dependOn('**/logging/**'))`          |
-| `onlyHaveTypeImportsFrom(glob)`    | Imports from matching paths must use `import type`                | `.should().onlyHaveTypeImportsFrom('**/models/**')`     |
-| `notHaveAliasedImports()`          | No named import may use an alias (`import { x as y }`)            | `.should().notHaveAliasedImports()`                     |
-| `notHaveDefaultExport()`           | Module must not have a default export                             | `.should().notHaveDefaultExport()`                      |
-| `haveDefaultExport()`              | Module must have a default export                                 | `.should().haveDefaultExport()`                         |
-| `haveMaxExports(n)`                | Module must have at most n named exports                          | `.should().haveMaxExports(10)`                          |
-| `onlyBeImportedVia(...globs)`      | All importers must match at least one glob (barrel enforcement)   | `.should().onlyBeImportedVia('**/index.ts')`            |
-| `beImported()`                     | Module must be imported by at least one other file                | `.should().beImported()`                                |
-| `haveNoUnusedExports()`            | Every named export must be referenced elsewhere                   | `.should().haveNoUnusedExports()`                       |
-| `contain(matcher, options?)`       | Module must contain at least one match for the expression matcher | `.should().contain(call('validate'))`                   |
-| `notContain(matcher, options?)`    | Module must not contain any match for the expression matcher      | `.should().notContain(call('eval'))`                    |
+| Condition                       | Description                                                       | Example                                             |
+| ------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------- |
+| `onlyImportFrom(...globs)`      | Module may only import from the listed paths                      | `.should().onlyImportFrom('**/domain/**')`          |
+| `notImportFrom(...globs)`       | Module must not import from the listed paths                      | `.should().notImportFrom('**/controllers/**')`      |
+| `dependOn(...globs)`            | Module must import from at least one path matching a glob         | `.should().satisfy(dependOn('**/logging/**'))`      |
+| `onlyHaveTypeImportsFrom(glob)` | Imports from matching paths must use `import type`                | `.should().onlyHaveTypeImportsFrom('**/models/**')` |
+| `notHaveAliasedImports()`       | No named import may use an alias (`import { x as y }`)            | `.should().notHaveAliasedImports()`                 |
+| `notHaveDefaultExport()`        | Module must not have a default export                             | `.should().notHaveDefaultExport()`                  |
+| `haveDefaultExport()`           | Module must have a default export                                 | `.should().haveDefaultExport()`                     |
+| `haveMaxExports(n)`             | Module must have at most n named exports                          | `.should().haveMaxExports(10)`                      |
+| `onlyBeImportedVia(...globs)`   | All importers must match at least one glob (barrel enforcement)   | `.should().onlyBeImportedVia('**/index.ts')`        |
+| `beImported()`                  | Module must be imported by at least one other file                | `.should().beImported()`                            |
+| `haveNoUnusedExports()`         | Every named export must be referenced elsewhere                   | `.should().haveNoUnusedExports()`                   |
+| `contain(matcher, options?)`    | Module must contain at least one match for the expression matcher | `.should().contain(call('validate'))`               |
+| `notContain(matcher, options?)` | Module must not contain any match for the expression matcher      | `.should().notContain(call('eval'))`                |
 
 ## Real-World Examples
 
@@ -84,7 +84,7 @@ modules(p)
   .that()
   .resideInFolder('**/domain/**')
   .should()
-  .notImportFromCondition('**/node_modules/express/**')
+  .notImportFrom('**/node_modules/express/**')
   .because('domain entities must be framework-independent')
   .check()
 ```
@@ -99,7 +99,7 @@ modules(p)
   .that()
   .resideInFolder('**/domain/**')
   .should()
-  .notImportFromConditionWithOptions(['**/infra/**'], { ignoreTypeImports: true })
+  .notImportFromWithOptions(['**/infra/**'], { ignoreTypeImports: true })
   .because('domain may reference infra types for DI, but not runtime code')
   .check()
 ```
@@ -107,7 +107,7 @@ modules(p)
 **Relationship with `onlyHaveTypeImportsFrom`:**
 
 - `onlyHaveTypeImportsFrom('**/infra/**')` — imports from infra MUST use `import type`
-- `notImportFromConditionWithOptions(['**/infra/**'], { ignoreTypeImports: true })` — no runtime imports from infra (type imports allowed)
+- `notImportFromWithOptions(['**/infra/**'], { ignoreTypeImports: true })` — no runtime imports from infra (type imports allowed)
 
 ### Application Layer Depends Only on Domain
 
@@ -128,7 +128,7 @@ modules(p)
   .that()
   .resideInFolder('**/repositories/**')
   .should()
-  .notImportFromCondition('**/controllers/**')
+  .notImportFrom('**/controllers/**')
   .rule({
     id: 'layer/repo-no-controllers',
     because: 'Repositories are inner layer -- they must not depend on the HTTP layer',

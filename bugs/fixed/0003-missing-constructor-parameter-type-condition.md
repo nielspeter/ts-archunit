@@ -30,7 +30,7 @@ classes(p).that().haveNameEndingWith('Repository').should().acceptParameterOfTyp
 ## Current workaround
 
 ```typescript
-// From cmless: apps/identity-gateway/tests/unit/architecture/db-patterns.test.ts
+// From the originating project: apps/identity-gateway/tests/unit/architecture/db-patterns.test.ts
 // Fragile — matches this.dbToApiTeam as a false positive
 classes(p)
   .that()

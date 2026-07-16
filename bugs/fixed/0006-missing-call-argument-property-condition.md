@@ -5,9 +5,9 @@
 
 ## Problem
 
-Checking that function call expressions include specific properties in their object literal arguments requires ~40 lines of custom AST traversal with `defineCondition`. This is used in cmless to enforce that Fastify route registrations include `schema` and `preHandler` properties.
+Checking that function call expressions include specific properties in their object literal arguments requires ~40 lines of custom AST traversal with `defineCondition`. This is used in the originating project to enforce that Fastify route registrations include `schema` and `preHandler` properties.
 
-From cmless (`apps/api/tests/unit/architecture/fastify-rules.test.ts`):
+From the originating project (`apps/api/tests/unit/architecture/fastify-rules.test.ts`):
 
 ```typescript
 // 40 lines of manual AST walking — walks descendants, finds CallExpressions,

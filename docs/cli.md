@@ -137,11 +137,7 @@ const p = project('tsconfig.json')
 
 export default [
   classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')),
-  modules(p)
-    .that()
-    .resideInFolder('src/domain/**')
-    .should()
-    .notImportFromCondition('src/repositories/**'),
+  modules(p).that().resideInFolder('src/domain/**').should().notImportFrom('src/repositories/**'),
 ]
 ```
 

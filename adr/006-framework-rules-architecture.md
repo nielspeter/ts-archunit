@@ -90,5 +90,5 @@ A preset runs a curated set of rules. Users override individual rule severity vi
 ## Notes
 
 - Standard rules in `ts-archunit/rules/*` follow the same pattern — they're just framework-agnostic
-- The cmless project is the first real-world validation ground for Fastify-specific rules
+- The originating project is the first real-world validation ground for Fastify-specific rules
 - Framework packages declare their framework as a peer dependency

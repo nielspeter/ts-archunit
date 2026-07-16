@@ -107,7 +107,7 @@ export interface RoleQueryOptions {
 throw new Error(`Webhook '${webhookId}' not found`)
 
 // Repository B — typed domain error (correct)
-throw new NotFoundError('Role', cmlessId)
+throw new NotFoundError('Role', roleId)
 
 // Repository C — generic Error
 throw new Error(`Tag '${tagId}' not found`)

@@ -12,7 +12,7 @@
 
 Implement the `types(p)` entry point that operates on both `InterfaceDeclaration` and `TypeAliasDeclaration`. This plan delivers the type-level conditions that distinguish ts-archunit from other architecture testing tools — the ability to enforce constraints on property types using semantic matchers that understand the TypeScript type system.
 
-The motivating use case from the PoC (plan 0001, cmless plan 0212): enforcing that `sortBy` properties must never be bare `string` but always a union of string literals. This catches real bugs where untyped sort columns bypass compile-time safety and only fail at runtime.
+The motivating use case from the PoC (plan 0001, the originating project's plan 0212): enforcing that `sortBy` properties must never be bare `string` but always a union of string literals. This catches real bugs where untyped sort columns bypass compile-time safety and only fail at runtime.
 
 ```typescript
 // The rule this plan enables:
@@ -1144,7 +1144,7 @@ const p = project(tsconfigPath)
 
 describe('types() integration', () => {
   it('enforces no bare string on sortBy property', () => {
-    // This is THE motivating use case from cmless plan 0212
+    // This is THE motivating use case from the originating project's plan 0212
     expect(() => {
       types(p)
         .that()

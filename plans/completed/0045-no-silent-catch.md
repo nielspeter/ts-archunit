@@ -11,7 +11,7 @@
 
 ## Context
 
-Catch blocks that discard the error without logging or rethrowing are a common source of hidden production bugs. The error disappears silently — no log entry, no stack trace, no alert. Found in real production code: cmless `SocialService.fetchUserProfile` — Google OAuth login failed silently for weeks because the catch block threw a generic `UnauthorizedError` without logging the original error.
+Catch blocks that discard the error without logging or rethrowing are a common source of hidden production bugs. The error disappears silently — no log entry, no stack trace, no alert. Found in real production code: `SocialService.fetchUserProfile` — Google OAuth login failed silently for weeks because the catch block threw a generic `UnauthorizedError` without logging the original error.
 
 This is not project-specific — every codebase has this problem. No linter catches it because it requires inspecting the _structure_ of catch blocks, not just their presence. It belongs alongside `noGenericErrors` in `rules/errors.ts`.
 

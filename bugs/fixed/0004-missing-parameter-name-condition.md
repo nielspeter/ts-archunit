@@ -8,7 +8,7 @@
 
 Enforcing "repository methods must accept a tenancy parameter" currently requires ~70 lines of custom `defineCondition` code with manual AST traversal, exempt lists, delegation chain detection, and string matching on method bodies.
 
-From cmless (`apps/identity-gateway/tests/unit/architecture/db-patterns.test.ts`):
+From the originating project (`apps/identity-gateway/tests/unit/architecture/db-patterns.test.ts`):
 
 ```typescript
 // 70 lines of fragile heuristics:

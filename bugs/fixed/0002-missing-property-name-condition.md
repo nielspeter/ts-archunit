@@ -8,7 +8,7 @@
 Checking that interface/type properties don't use certain names requires a custom `defineCondition` with manual AST traversal:
 
 ```typescript
-// From cmless: apps/api/tests/unit/architecture/code-standards.test.ts
+// From the originating project: apps/api/tests/unit/architecture/code-standards.test.ts
 const noForbiddenPaginationParams = defineCondition(
   'no forbidden pagination param names',
   (elements: any[], context: ConditionContext): ArchViolation[] => {

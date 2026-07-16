@@ -379,7 +379,7 @@ An MCP (Model Context Protocol) server exposing `check_architecture` + `explain_
 
 **Cost avoided by deferring:** the `@modelcontextprotocol/sdk` peer dependency; `src/mcp/` (server + two tools + entry point); the `mcp` subcommand; and all MCP-only machinery (two-phase import/execute model, `refresh` cache invalidation, path validation, stdio JSON-RPC safety, cold-start handling) plus ~21 tests.
 
-**Revisit when:** cold-start latency on a real target project (cmless-scale) is measured and shown to hurt the agent edit loop. At that point, evaluate a CLI daemon first, and only reach for MCP if a typed tool schema proves worth the dependency + per-client config. Track as a separate plan if pursued.
+**Revisit when:** cold-start latency on a real target project (production-scale) is measured and shown to hurt the agent edit loop. At that point, evaluate a CLI daemon first, and only reach for MCP if a typed tool schema proves worth the dependency + per-client config. Track as a separate plan if pursued.
 
 Also still out of scope:
 

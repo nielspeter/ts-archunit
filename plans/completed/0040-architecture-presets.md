@@ -13,7 +13,7 @@
 
 ts-archunit has 28 standard code-level rules (noAny, noTypeAssertions, maxCyclomaticComplexity) — all duplicated by JetBrains/SonarQube. The library's unique value is architecture enforcement, but users must assemble every architecture rule from scratch using low-level primitives.
 
-**Validated by real usage:** The cmless project (2 apps, 4 packages) has 50+ arch rules. 70% are framework-agnostic. The patterns repeat identically across both apps — proving they're generic, not app-specific.
+**Validated by real usage:** The originating project (2 apps, 4 packages) has 50+ arch rules. 70% are framework-agnostic. The patterns repeat identically across both apps — proving they're generic, not app-specific.
 
 **Goal:** Three parameterized architecture presets extracted from real production patterns. Only rules no other tool can enforce.
 
@@ -22,7 +22,7 @@ ts-archunit has 28 standard code-level rules (noAny, noTypeAssertions, maxCyclom
 The original draft had four presets. `apiArchitecture` was removed after architectural review:
 
 - `route-schema-pairing` assumes a 1:1 file convention (many projects use inline schemas, co-located schemas, or auto-generated schemas)
-- `response-pattern` with `{ items: T[], total: number }` is a cmless convention, not universal
+- `response-pattern` with `{ items: T[], total: number }` is a project-specific convention, not universal
 - The generic parts (forbidden calls, forbidden imports) are already expressible as one-liners via `layeredArchitecture` options
 - Per ADR-006, REST-specific rules belong in `@ts-archunit/rest`, not core
 
@@ -32,7 +32,7 @@ The original draft had four presets. `apiArchitecture` was removed after archite
 
 ### 1. `layeredArchitecture(p, options)` — Layer direction and isolation
 
-The most universal pattern. Both cmless apps enforce identical layer rules (ADR-011).
+The most universal pattern. Both of its apps enforce identical layer rules (ADR-011).
 
 ```ts
 import { layeredArchitecture } from '@nielspeter/ts-archunit/presets'
@@ -217,15 +217,15 @@ Each preset calls `dispatchRule()` for each of its rules, collects all error-lev
 
 ## Why these three (validated by real usage)
 
-From cmless's 50+ arch rules:
+From the originating project's 50+ arch rules:
 
-| Preset                | cmless rules it replaces             | Generic?                            |
+| Preset                | Project rules it replaces            | Generic?                            |
 | --------------------- | ------------------------------------ | ----------------------------------- |
 | `layeredArchitecture` | 6 layer rules + 5 DB isolation rules | Any layered project                 |
 | `dataLayerIsolation`  | 2 repository pattern rules           | Any project with repository pattern |
 | `strictBoundaries`    | 10 package isolation rules           | Any project with modules/features   |
 
-Total: ~23 of 50+ cmless rules replaced by 3 preset calls. The remaining rules are either Fastify-specific, GraphQL-specific (those belong in framework packages per ADR-006), or one-off project rules.
+Total: ~23 of its 50+ rules replaced by 3 preset calls. The remaining rules are either Fastify-specific, GraphQL-specific (those belong in framework packages per ADR-006), or one-off project rules.
 
 ## Files
 
