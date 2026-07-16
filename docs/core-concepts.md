@@ -169,13 +169,23 @@ Conditions assert what must be true about the filtered elements. They go between
 
 ### Structural Conditions
 
-| Condition                       | Description                                  |
-| ------------------------------- | -------------------------------------------- |
-| `notExist()`                    | No elements should match the predicates      |
-| `beExported()`                  | All matched elements should be exported      |
-| `conditionHaveNameMatching(re)` | All matched elements should match the regex  |
-| `shouldResideInFolder(glob)`    | All matched elements should be in the folder |
-| `shouldResideInFile(glob)`      | All matched elements should be in the file   |
+| Condition              | Description                                  |
+| ---------------------- | -------------------------------------------- |
+| `notExist()`           | No elements should match the predicates      |
+| `beExported()`         | All matched elements should be exported      |
+| `haveNameMatching(re)` | All matched elements should match the regex  |
+| `resideInFolder(glob)` | All matched elements should be in the folder |
+| `resideInFile(glob)`   | All matched elements should be in the file   |
+
+These names are **dual-use** — the same method is a predicate after `.that()` (filter) and a condition after `.should()` (assert), so they appear in both tables above. Position in the chain decides which:
+
+```typescript
+// resideInFolder as a predicate: "of the classes in repositories/ …"
+classes(p).that().resideInFolder('**/repositories/**').should().beExported().check()
+
+// resideInFolder as a condition: "… must live in repositories/"
+classes(p).that().extend('BaseRepository').should().resideInFolder('**/repositories/**').check()
+```
 
 ### Chaining Conditions
 

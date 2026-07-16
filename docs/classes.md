@@ -49,11 +49,13 @@ Conditions define what the matched classes must satisfy. They go after `.should(
 
 Structural conditions apply to any declaration type and cover basic concerns like export visibility and naming.
 
-| Condition                       | Description                            |
-| ------------------------------- | -------------------------------------- |
-| `beExported()`                  | Class must be exported                 |
-| `notExist()`                    | No classes should match the predicates |
-| `conditionHaveNameMatching(re)` | Class name must match the regex        |
+| Condition              | Description                            |
+| ---------------------- | -------------------------------------- |
+| `beExported()`         | Class must be exported                 |
+| `notExist()`           | No classes should match the predicates |
+| `haveNameMatching(re)` | Class name must match the regex        |
+| `resideInFile(glob)`   | Class must reside in a matching file   |
+| `resideInFolder(glob)` | Class must reside in a matching folder |
 
 ### Class-Specific Conditions
 
@@ -61,9 +63,9 @@ These conditions assert on class structure -- inheritance, methods, properties, 
 
 | Condition                              | Description                                | Example                                                          |
 | -------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
-| `shouldExtend(name)`                   | Class must extend the named base class     | `.should().shouldExtend('BaseRepository')`                       |
-| `shouldImplement(name)`                | Class must implement the named interface   | `.should().shouldImplement('Disposable')`                        |
-| `shouldHaveMethodNamed(name)`          | Class must have a method with the name     | `.should().shouldHaveMethodNamed('dispose')`                     |
+| `extend(name)`                         | Class must extend the named base class     | `.should().extend('BaseRepository')`                             |
+| `implement(name)`                      | Class must implement the named interface   | `.should().implement('Disposable')`                              |
+| `haveMethodNamed(name)`                | Class must have a method with the name     | `.should().haveMethodNamed('dispose')`                           |
 | `shouldNotHaveMethodMatching(re)`      | Class must not have methods matching regex | `.should().shouldNotHaveMethodMatching(/^_/)`                    |
 | `shouldHavePropertyNamed(...names)`    | All named properties must exist            | `.should().shouldHavePropertyNamed('logger')`                    |
 | `shouldNotHavePropertyNamed(...names)` | None of the named properties may exist     | `.should().shouldNotHavePropertyNamed('offset')`                 |
@@ -97,7 +99,7 @@ classes(p)
   .and()
   .resideInFolder('**/repositories/**')
   .should()
-  .shouldExtend('BaseRepository')
+  .extend('BaseRepository')
   .rule({
     id: 'repo/extend-base',
     because: 'BaseRepository provides transaction support and shared query helpers',
@@ -113,7 +115,7 @@ classes(p)
   .that()
   .resideInFolder('**/controllers/**')
   .should()
-  .conditionHaveNameMatching(/Controller$/)
+  .haveNameMatching(/Controller$/)
   .rule({
     id: 'naming/controller-suffix',
     because: 'Consistent naming makes the codebase navigable',
