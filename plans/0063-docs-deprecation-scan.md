@@ -45,6 +45,8 @@ Three consequences, all binding:
 1. **Anything actionable must FAIL, never warn.** A warning in a CI log is invisible to an agent — it sees a green build and moves on. Every finding here is a test failure, and no part of this check emits a warning. (This is also why decision 2 below gates `docs.yml`: an ungated deploy publishes rotted docs and _nothing fails_, so nothing reacts.)
 2. **Every failure must carry its own sanctioned remedy.** An agent that hits a red build with no stated fix **invents one** — deletes the test, adds a suppression, or rewrites the prose until it goes green. All three are worse than the rot. The remedy must be in the message, because the agent will never read this plan. We get it for free: the `@deprecated` tag already contains the replacement, sourced from `src/`, so it cannot drift.
 3. **Where there is deliberately no escape hatch, the message must say so — and say what to do instead.** Silence is the same as inviting the agent to improvise.
+4. **No snapshot assertions, anywhere in this plan.** `toMatchInlineSnapshot()` is the worst pin for an agent-consumed test: `vitest -u` regenerates it, and an agent reaches for `-u` before it reaches for thought. A pin an agent can erase by running a flag is not a pin. Use explicit assertions with messages that name the design decision.
+5. **This applies to the plan's own tests, not just the guard's output.** The completeness cross-check is the most important test here, and a bare `expected 10 to be 11` invites an agent to edit the number or narrow the glob — silently restoring the blind spot the test exists to prevent. Every assertion that protects a derivation carries its own "do NOT do the obvious thing" message.
 
 This matches the project's existing agent surface: `.rule({ imperative: 'Do NOT …' })` and `explain --format agent`. The failure text below is written in the same register.
 
@@ -199,7 +201,17 @@ it('no @deprecated tag in src/ escapes the scanner', () => {
   )
   // Both sides derived. Fails the moment a deprecation lands on a shape the walk
   // misses (an exported const, a VariableStatement's JSDoc), forcing a decision.
-  expect(recovered).toBe(raw)
+  //
+  // The message is the point: a bare `expected 10 to be 11` invites an agent to
+  // "fix" it by editing the number or narrowing the glob — either of which
+  // silently restores the blind spot this test exists to prevent.
+  expect(
+    recovered,
+    'A @deprecated tag in src/ is NOT being collected by readDeprecatedSymbols. ' +
+      'Do NOT change this expectation and do NOT narrow sourceGlob — either would ' +
+      'silently reintroduce the blind spot this test exists to prevent. ' +
+      'FIX: widen the walk to cover the new declaration shape.',
+  ).toBe(raw)
 })
 ```
 
@@ -318,11 +330,36 @@ tests/fixtures/docs-deprecation/corpus-8ddd33e/
 ```typescript
 it('finds 25 of 27 on the frozen pre-sweep corpus, with no false positives', () => {
   const hits = scanMarkdown(readCorpus('corpus-8ddd33e'), FROZEN_SYMBOLS)
-  expect(hits.map(format)).toMatchInlineSnapshot() // 25 entries — reviewable, no magic number
+
+  // NOT toMatchInlineSnapshot(). A snapshot is the worst possible pin for an
+  // agent-consumed test: `vitest -u` rewrites it, and an agent reaches for -u
+  // before it reaches for thought. The pin would erase itself, silently.
+  const PIN =
+    'The corpus and its symbols are FROZEN, so this can only move if the scanner ' +
+    'changed. Do NOT edit this expectation to go green, and do NOT run vitest -u. ' +
+    'If matching genuinely improved, that is a deliberate design change: update ' +
+    'the Known-limit section of plan 0063 and this test together, in one PR.'
+
+  expect(hits.length, `Recall on the frozen corpus changed. ${PIN}`).toBe(25)
+  expect(
+    hits.filter((h) => h.file.endsWith('api-reference.md')),
+    `The scan now fires on api-reference.md, which correctly documents live exports. ${PIN}`,
+  ).toEqual([])
+
+  // The 2 documented misses stay missed — pinned explicitly, not implied by a blob.
+  for (const [file, line] of [
+    ['core-concepts.md', 176],
+    ['classes.md', 56],
+  ] as const) {
+    expect(
+      hits.find((h) => h.file.endsWith(file) && h.line === line),
+      `${file}:${line} is a documented known-limit miss and is now being caught. ${PIN}`,
+    ).toBeUndefined()
+  }
 })
 ```
 
-The snapshot **is** the pin for the 2 known misses: `core-concepts.md:176` and `classes.md:56` are visibly absent, so any future change that catches them shows as a diff and forces a deliberate decision.
+Those three assertions **are** the pin for the 2 known misses. Any future change that catches them fails with a message naming the design decision — rather than a snapshot diff that an agent resolves by regenerating it.
 
 ### The guard — and proof it can fail
 
