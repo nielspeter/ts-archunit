@@ -1,7 +1,11 @@
 # Proposal 013 — Docs Deprecation Scan
 
-**Status:** Open — proposed (**draft 3**; see "Draft history" — draft 1 proposed a compile
-harness; draft 2's matching rule measured blind to its own headline evidence)
+**Status:** **Approved — graduated to `plans/0063-docs-deprecation-scan.md`** (draft 3;
+architect + product reviewed). Note the plan **corrects one thing in this document**: the
+acceptance test below pins the corpus to a git SHA, which is unbuildable — CI checks out with
+`actions/checkout@v6` and no `fetch-depth`, i.e. a **shallow clone**, so the commit does not
+exist there. The plan uses committed fixtures instead; the 25/27 measurement stands as a
+one-time validation already performed.
 **Priority:** Medium — the docs are at **zero** deprecated usages today. This is purely
 preventive, and that is precisely why now is the cheapest it will ever be.
 **Affects:** `tests/` only — no `src/`, no public API, no new dependency. Uses ts-morph (ADR-002) + vitest (ADR-001).

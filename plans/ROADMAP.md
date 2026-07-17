@@ -1,9 +1,9 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-07-13
+**Updated:** 2026-07-17
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 55 completed + proposal 010, 2 open (see "Open Plans" below)
+**Total Plans:** 55 completed + proposal 010, 3 open (see "Open Plans" below)
 
 ---
 
@@ -183,16 +183,23 @@
 
 ## Open Plans
 
-Two items remain — both **PROPOSED**, not scheduled. Their design was reviewed 2026-07-13 (decisions locked), but **neither has a go/no-go decision to build.** They are independent matchers; the open question is whether each earns a place in the API, not how to implement it.
+Three items remain. **0063 is ready to build**; 0047/0048 are **PROPOSED** — their design was reviewed 2026-07-13 (decisions locked), but **neither has a go/no-go decision to build.** They are independent matchers; the open question is whether each earns a place in the API, not how to implement it.
 
 Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, the **`tsconfig()` config-assertion rule (0055, v0.15.0)**, and **v0.16.0** — the **docs restructure (0061)** (golden path, one reconciled workflow, four-tier IA) plus **shape presets → returning form (0062)** (the whole preset family now composes uniformly; `arch:baseline` no longer crashes; warn rules flow through the pipeline).
 
 | Priority | Plan                                         | Effort      | State                                   | Depends on       |
 | -------- | -------------------------------------------- | ----------- | --------------------------------------- | ---------------- |
 | **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | **PROPOSED** — reviewed, needs go/no-go | 0046             |
+| **P2**   | Docs Deprecation Scan (0063)                 | ~2–3 hours  | **READY TO BUILD** — reviewed 3 drafts  | none             |
 | **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | **PROPOSED** — reviewed, needs go/no-go | 0011, 0013, 0046 |
 
-**Go/no-go done (2026-07-14):** 0047 → **ship trimmed** (`doubleCast` + `anyAnnotation` only; defer `broadType`/`tsDirective`); 0048 → **defer until demand** (overlaps `@typescript-eslint/no-deprecated`; the symbol layer is speculative infra). Both stay PROPOSED. **Built since:** 0062 Phase 5 — `ts-archunit init --preset layered|strict-boundaries|data-layer` now scaffolds the shape presets (v0.17.0-pending).
+**Go/no-go done (2026-07-14):** 0047 → **ship trimmed** (`doubleCast` + `anyAnnotation` only; defer `broadType`/`tsDirective`); 0048 → **defer until demand** (overlaps `@typescript-eslint/no-deprecated`; the symbol layer is speculative infra). Both stay PROPOSED.
+
+**0063 (2026-07-17)** graduated from proposal 013 after three drafts. `tests/`-only, no API, no new deps — a scan that fails the build if any doc teaches deprecated API, with everything (names, replacement text, and the disambiguation rule) derived from `src/` so no hand-maintained list can rot. Reviews found real rot **twice**: a manual sweep missed 9 of 27 usages, then draft 2's hand-coded matching rule was measured blind to its own headline evidence. **Sequencing:** 0047 is user-facing and already decided — a 2-hour task does not displace it.
+
+**Closed (2026-07-17):** proposal 012 (workspace config-coverage) → **rejected as core**; the root fix is a package-manager flag, and the disease is structurally absent on pnpm/Turborepo/Nx. One win extracted: **reasoned exclusions on `RuleBuilder`** (`deferred(pattern, reason)` beside the existing `silent()`) — generic, serves every builder, needs its own proposal.
+
+**Built since:** 0062 Phase 5 — `ts-archunit init --preset layered|strict-boundaries|data-layer` now scaffolds the shape presets (v0.17.0).
 
 ---
 
