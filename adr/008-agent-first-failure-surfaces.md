@@ -38,11 +38,11 @@ Five rules, all binding.
 
 ### Rule 1 — Actionable findings fail; they never warn
 
-If a human or agent should do something about it, it **fails the build**. No `console.warn` as the primary signal for an actionable finding.
+**A finding whose remedy is not optional must fail the build.** No `console.warn` as the primary signal for such a finding.
 
-This does not ban warn-severity rules: `.asSeverity('warn')` is a deliberate user-facing choice about _their_ rules, and the `recommended` preset ships two warn-level rules on purpose. The rule binds **our own guards** and any finding whose remedy is not optional.
+The discriminator is **whether the remedy is optional**, not whose check it is. This is what keeps the rule consistent with [ADR-003](./003-fluent-builder-dsl.md), which makes `.warn()` a first-class terminal, and with our own `recommended` preset, which ships two warn-level rules **deliberately** — `no-silent-catch` and `no-empty-bodies` have known, suppressible false positives, so the user must judge each one. A finding the reader is expected to judge has an optional remedy and **should** warn; failing the build on it would train them to suppress the rule. A finding with one correct answer must fail.
 
-Corollary: an artifact that ships without the check having run is the same as a warning. If a workflow publishes something, the check gates that workflow — not merely a sibling job that reports later.
+Corollary — and note the distinction, because it is easy to overreach here: **an artifact that can ship while no check ever fails is a false green**, and that is what this rule forbids. It is _not_ the same as an artifact that ships before a check reports. If a later gate reliably reds, the exposure window is a **cost to weigh** (how long is the artifact wrong, how expensive is gating earlier), not a violation. Conflating the two produces gates that cost more than the exposure they close — see plan 0063 decision 2, where gating the publishing workflow would have cost 4.5x on every deploy to close a ~2-minute window that a sibling job already reds.
 
 ### Rule 2 — Every failure carries its own sanctioned remedy
 
@@ -81,6 +81,8 @@ Deriving a value from source and then "protecting" it with a check drawn from th
 - A value returned as data with nothing comparing it to anything: silent by construction.
 
 What independence looks like: ts-morph **static analysis** vs the **runtime ES module namespace** (`expect(sym.collides).toBe(sym.name in publicApi)`). Two mechanisms that cannot fail the same way. That test catches the flag being wrong; the same-derivation version does not.
+
+**Independence is not a licence to add an engine.** [ADR-002](./002-ts-morph-ast-engine.md) stands: ts-morph remains our sole AST and type-checking engine, and "cross-check it with a second parser" is **not** an available answer. Independence is cheap and comes from a _different kind_ of evidence, not a competing implementation of the same kind — the runtime namespace above is an import, not an AST engine. Reach for: runtime behaviour vs static analysis; the module system vs the compiler; a file's existence vs a file's contents; identity vs cardinality. If the only independence you can find is a second engine, you do not have a guard — you have a gap, and rule 5's honest answer is to **say so** (see Consequences).
 
 Corollaries:
 
