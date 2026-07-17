@@ -7,7 +7,7 @@
 - **Effort:** **~4–5 hours** (was ~2–3h). The scan itself is ~60 lines and was reproduced by reviewers in minutes; the completeness cross-check, frozen corpus, synthetic symbol set, tracker entries, and the three undefined helpers are the real cost.
 - **Created:** 2026-07-17
 - **Depends on:** Nothing. ts-morph (ADR-002), vitest (ADR-001), and picomatch are already core deps.
-- **Breaking:** No. `tests/` only — no `src/`, no public API, no new dependency, no workflow change.
+- **Breaking:** No. No `src/`, no public API, no new dependency. **One workflow change**: `docs.yml` gains `- run: npm test` (decision 2 — an ungated docs deploy publishes rotted docs while nothing fails, which is the exact false-green this plan exists to kill).
 
 ## Problem
 
@@ -33,6 +33,34 @@ A hand-maintained artifact has failed at this job **six times**, three of them d
 > **A glob is a hand-written list with better syntax.**
 >
 > Every part of this check derives from `src/` — the names, the replacement text, the disambiguation rule, the **scope**, and the tests' own expectations. Where derivation is impossible, the gap is **pinned by a test**, never trusted.
+
+## The governing constraint: this fires at an AI agent
+
+ts-archunit's primary consumer is an AI coding agent, and that dictates the whole shape of this check:
+
+> **An agent does not read warnings. It reacts to failures.**
+
+Three consequences, all binding:
+
+1. **Anything actionable must FAIL, never warn.** A warning in a CI log is invisible to an agent — it sees a green build and moves on. Every finding here is a test failure, and no part of this check emits a warning. (This is also why decision 2 below gates `docs.yml`: an ungated deploy publishes rotted docs and _nothing fails_, so nothing reacts.)
+2. **Every failure must carry its own sanctioned remedy.** An agent that hits a red build with no stated fix **invents one** — deletes the test, adds a suppression, or rewrites the prose until it goes green. All three are worse than the rot. The remedy must be in the message, because the agent will never read this plan. We get it for free: the `@deprecated` tag already contains the replacement, sourced from `src/`, so it cannot drift.
+3. **Where there is deliberately no escape hatch, the message must say so — and say what to do instead.** Silence is the same as inviting the agent to improvise.
+
+This matches the project's existing agent surface: `.rule({ imperative: 'Do NOT …' })` and `explain --format agent`. The failure text below is written in the same register.
+
+**Message contract** — every hit emits all four:
+
+```
+docs/x.md:12 — `.shouldExtend()` is deprecated.
+  FIX: Use `extend()` after `.should()` instead.
+  This is the builder method (src/builders/class-rule-builder.ts:221) — NOT the
+  `shouldExtend` condition export, which is current and correctly documented.
+  Do NOT suppress this check, add an exception, or delete the test. If this page
+  must name deprecated API on purpose (e.g. a migration guide), that is a design
+  decision — stop and ask a human.
+```
+
+The last line is load-bearing. Without it the first agent to write a page that legitimately names a deprecated symbol will delete the guard, and nobody will notice — a false-green produced _by_ the false-green detector.
 
 ## Design
 
@@ -334,33 +362,77 @@ The reviewed draft said "file as a tracked issue." **That venue does not exist**
 
 (Next free number is 0009 — `bugs/fixed/` contains two `0007-` files.)
 
-**Files changed:** `bugs/0009-*.md`, `bugs/0010-*.md` (new).
+**Gate the docs deploy** (decision 2) — two lines, and it is what makes the guard's verdict reach the published artifact:
+
+```yaml
+# .github/workflows/docs.yml
+- run: npm ci
+- run: npm test # ~15s: docs teaching deprecated API must not deploy
+- run: npm run docs:build
+```
+
+**Document the deprecation workflow** (decision 3) — deprecating a method requires a same-PR docs update; the migration narrative goes in `CHANGELOG.md`, not `docs/`. Put it wherever the contributor guidance lives (`CLAUDE.md` is the current home for repo conventions).
+
+**Files changed:** `bugs/0009-*.md`, `bugs/0010-*.md` (new), `.github/workflows/docs.yml`, `CLAUDE.md`.
 
 ## Test inventory
 
-| Test                                            | Asserts                                                                                              |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `deprecated-symbols` — **completeness**         | Scanner enumeration == an independent raw `@deprecated` count over `src/**/*.ts`                     |
-| `deprecated-symbols` — multi-line normalisation | `notImportFromCondition`'s replacement contains **no newline** (the 2/8 case `normalise` exists for) |
-| `deprecated-symbols` — replacement text         | Recovered and normalised (**not** "verbatim" — 2 of 8 wrap)                                          |
-| `deprecated-symbols` — dedupe                   | `conditionHaveNameMatching` collapses across three builders                                          |
-| `deprecated-symbols` — conflict path            | Divergent text on a **synthetic project** (via the glob params) lands in `conflicts`                 |
-| `deprecated-symbols` — collision **property**   | For every derived symbol: dotted always hits; bare hits iff `!collides`                              |
-| `deprecated-symbols` — anchor                   | `toContain('shouldExtend')` as documentation — **never** `toEqual([...4 names])`                     |
-| `scan` — matching algebra (synthetic, 7 cases)  | dot/bare × collides, right-boundary, one-hit-per-line, link target, clean                            |
-| `scan` — reporting                              | Message carries `file:line`, replacement, **and the declaration site**                               |
-| `corpus` — frozen `8ddd33e`                     | 25 hits via inline snapshot; 0 in `api-reference.md`; the 2 known misses visibly absent              |
-| `deprecation` — **the guard**                   | Living docs produce zero hits                                                                        |
-| `deprecation` — vacuity                         | Glob matched >25 files, includes `api-reference.md`, symbol set non-empty                            |
-| `deprecation` — **can fail**                    | Seeded rot (derived from the live symbol set) produces exactly one hit                               |
+| Test                                             | Asserts                                                                                                                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deprecated-symbols` — **completeness**          | Scanner enumeration == an independent raw `@deprecated` count over `src/**/*.ts`                                                                                                                                                                              |
+| `deprecated-symbols` — multi-line normalisation  | `notImportFromCondition`'s replacement contains **no newline** (the 2/8 case `normalise` exists for)                                                                                                                                                          |
+| `deprecated-symbols` — replacement text          | Recovered and normalised (**not** "verbatim" — 2 of 8 wrap)                                                                                                                                                                                                   |
+| `deprecated-symbols` — dedupe                    | `conditionHaveNameMatching` collapses across three builders                                                                                                                                                                                                   |
+| `deprecated-symbols` — conflict path             | Divergent text on a **synthetic project** (via the glob params) lands in `conflicts`                                                                                                                                                                          |
+| `deprecated-symbols` — conflicts on **real src** | `conflicts` is empty for the real `src/`. Returning conflicts as data rather than throwing makes them **silent unless something asserts them** — this is that assertion, and without it the reader could disagree with itself forever and nothing would fail. |
+| `deprecated-symbols` — collision **property**    | For every derived symbol: dotted always hits; bare hits iff `!collides`                                                                                                                                                                                       |
+| `deprecated-symbols` — anchor                    | `toContain('shouldExtend')` as documentation — **never** `toEqual([...4 names])`                                                                                                                                                                              |
+| `scan` — matching algebra (synthetic, 7 cases)   | dot/bare × collides, right-boundary, one-hit-per-line, link target, clean                                                                                                                                                                                     |
+| `scan` — reporting                               | Message carries `file:line`, replacement, **and the declaration site**                                                                                                                                                                                        |
+| `corpus` — frozen `8ddd33e`                      | 25 hits via inline snapshot; 0 in `api-reference.md`; the 2 known misses visibly absent                                                                                                                                                                       |
+| `deprecation` — **the guard**                    | Living docs produce zero hits                                                                                                                                                                                                                                 |
+| `deprecation` — vacuity                          | Glob matched >25 files, includes `api-reference.md`, symbol set non-empty                                                                                                                                                                                     |
+| `deprecation` — **can fail**                     | Seeded rot (derived from the live symbol set) produces exactly one hit                                                                                                                                                                                        |
 
 **Deleted from the reviewed draft:** _"Nothing is asserted against a literal array of names"_ — that was a wish, not a test, and it was contradicted by the two rows above it. Replaced with the honest rule: **the production path derives; tests may pin, and pinned values are expected to change when a deprecation lands — that is the point of a test.**
 
-## Open decisions (need a call before build)
+## Decisions (resolved 2026-07-17)
 
-1. **The 1.0 migration guide is currently unwritable.** This plan defers the compile harness to the 1.0 removal milestone. At 1.0 someone writes `docs/migration.md` — _"replace `.shouldResideInFile()` with `.resideInFile()`"_ — and **the guard fires on it.** It is the one page whose job is to name deprecated API, and there is no escape hatch by design. Under release pressure the outs are deleting the guard or mangling the prose. Decide **structurally**, not with an ignore list: e.g. front-matter `deprecation-guide: true`, greppable and self-documenting. Same issue for a heading like `### shouldResideInFile (deprecated)`.
-2. **Should `docs.yml` be gated on `npm test`?** It triggers on push to `main` (`paths: ['docs/**']`) and **deploys in ~39s while CI takes ~2m27s** — so on a direct push, deprecated docs publish ~1m50s before the guard reports. The PR path is covered. Adding `- run: npm test` costs ~15s (`npm ci` already paid). Consistency vs. speed — a real call, not an oversight.
-3. **`publish.yml:27` runs `npm test`,** so this guard silently becomes a **release gate**: a markdown table cell can block `npm publish`, and adding `@deprecated` to a method in `src/` turns docs red **without touching docs**. That is the design working — but it means deprecating a method now requires a same-PR docs sweep. Accept and document, or exclude.
+### 1. The migration-guide collision — the window is NOW, not 1.0. Do not build a hatch; make the message carry the answer.
+
+The earlier framing was **wrong**. The scanner derives its names from `@deprecated` tags in `src/`. **At 1.0 the methods are deleted, the tags vanish, the symbol list empties, and the guard matches nothing** — a 1.0 migration guide sails straight through. The collision window is _the deprecation window_: today through 0.x, while the tags exist.
+
+**Why it has not bitten:** `CHANGELOG.md` already carries exactly this content — it names 7 deprecated symbols in one line — and is out of scope **by construction** because it lives at the repo root. Exclusion-by-construction paying off a second time.
+
+**Decision: no escape hatch is built.** The sanctioned path is: fix the doc to use the replacement, and let `CHANGELOG.md` carry the migration narrative. Building a front-matter opt-out (`deprecation-guide: true`) before there is a single caller ships an untested escape hatch — and for an **agent** consumer that is actively dangerous: hitting a red build, an agent will stamp the marker on any page to go green, which is _worse_ than deleting the guard because it is silent.
+
+**What makes this safe is the message, not the mechanism.** Per the governing constraint above, the failure text explicitly says: do not suppress, do not add an exception, do not delete the test — and if a page must name deprecated API on purpose, **stop and ask a human**. That is the sanctioned action for the one case the check cannot decide.
+
+If a migration guide inside `docs/` is ever genuinely wanted, front-matter is the mechanism to build **then** — declared in the document, greppable, and self-re-arming (remove the front-matter, the guard fires again). Not an ignore list.
+
+> **Scheduled, intentional failure:** the vacuity guard `expect(symbols.length).toBeGreaterThan(0)` **fails at 1.0** when the tags disappear. That is the design telling you the guard has gone vacuous, loudly, instead of passing silently forever. Delete or re-purpose it then — deliberately.
+
+### 2. Gate `docs.yml` on `npm test` — **yes**.
+
+`docs.yml` runs `npm ci` → `docs:build` → deploy in **~39s**; CI takes **~2m27s**. On a direct push to `main`, docs publish **~1m50s before the guard reports** — and **nothing un-deploys them**. Rotted docs are not live "for two minutes"; they are live **until someone pushes a fix**. The delay is only when you find out.
+
+Decisive under the governing constraint: an ungated deploy means the artifact ships and **nothing fails**, so no agent ever reacts. That is precisely the false-green this plan exists to kill, reproduced in our own pipeline.
+
+`npm ci` is already paid, so the cost is **~15s on a 39s job**. Add `- run: npm test` before `docs:build`.
+
+**This makes 0063 touch a workflow** — the Status line's "no workflow change" is corrected accordingly.
+
+### 3. The release gate (`publish.yml:27`) — accept and document.
+
+`publish.yml` runs `npm test` before the version check and `npm publish`, so this guard **is** a release gate: a markdown table cell can block a publish.
+
+**That is correct, not a defect**, for two reasons: it fails **before** publish, so nothing is ever half-released; and the consequence that reads as a bug is a feature — **adding `@deprecated` to a method in `src/` turns docs red without touching docs**, which makes deprecation and documentation **atomic**. You cannot deprecate `foo()` and leave the docs teaching it.
+
+**Deprecation workflow (document this):**
+
+> Deprecating a method requires updating the docs **in the same PR**. The docs scan will fail otherwise, including at release time. This is intended — do not bypass it. Put the migration narrative in `CHANGELOG.md` (out of scope by construction), not in `docs/`.
+
+**How 1 and 3 compound** (neither reviewer connected these): under 3, deprecating `foo()` reds the docs until they are updated; under 1, you also cannot write _"foo() is deprecated, use bar()"_ anywhere inside `docs/`. The coherent path is: **update `docs/` to teach `bar()`, and let `CHANGELOG.md` carry the narrative** — which is exactly where it lives today. This only breaks if a migration guide is ever wanted _inside_ the docs site, which is when the front-matter mechanism gets built.
 
 ## Out of Scope
 
