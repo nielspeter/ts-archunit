@@ -187,11 +187,11 @@ Three items remain. **0063 is ready to build**; 0047/0048 are **PROPOSED** — t
 
 Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, the **`tsconfig()` config-assertion rule (0055, v0.15.0)**, and **v0.16.0** — the **docs restructure (0061)** (golden path, one reconciled workflow, four-tier IA) plus **shape presets → returning form (0062)** (the whole preset family now composes uniformly; `arch:baseline` no longer crashes; warn rules flow through the pipeline).
 
-| Priority | Plan                                         | Effort      | State                                            | Depends on       |
-| -------- | -------------------------------------------- | ----------- | ------------------------------------------------ | ---------------- |
-| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day      | **PROPOSED** — reviewed, needs go/no-go          | 0046             |
-| **P2**   | Docs Deprecation Scan (0063)                 | ~4–5 hours  | **READY TO BUILD** — 3 drafts + 5-persona review | none             |
-| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days | **PROPOSED** — reviewed, needs go/no-go          | 0011, 0013, 0046 |
+| Priority | Plan                                         | Effort       | State                                           | Depends on       |
+| -------- | -------------------------------------------- | ------------ | ----------------------------------------------- | ---------------- |
+| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day       | **PROPOSED** — reviewed, needs go/no-go         | 0046             |
+| **P2**   | Docs Deprecation Scan (0063)                 | ~2.5–3 hours | **READY TO BUILD** — 3 drafts + 2 review rounds | ADR-008          |
+| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days  | **PROPOSED** — reviewed, needs go/no-go         | 0011, 0013, 0046 |
 
 **Go/no-go done (2026-07-14):** 0047 → **ship trimmed** (`doubleCast` + `anyAnnotation` only; defer `broadType`/`tsDirective`); 0048 → **defer until demand** (overlaps `@typescript-eslint/no-deprecated`; the symbol layer is speculative infra). Both stay PROPOSED.
 

@@ -14,20 +14,23 @@ ts-archunit is an architecture testing library for TypeScript, inspired by Java'
 
 **CRITICAL:** All architectural decisions are documented in `/adr/`. These decisions are **binding** and must be followed in all plans and code. Read relevant ADRs before implementing features.
 
-| ADR                                                       | Title           | Key Takeaway                                                                                       |
-| --------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------- |
-| [001](./adr/001-toolchain-node-vitest-eslint-prettier.md) | Toolchain       | Node 24 + TS ~5.9 (pinned to ts-morph) + Vitest 4 + ESLint 10 + Prettier 3.8. No Bun.              |
-| [002](./adr/002-ts-morph-ast-engine.md)                   | AST Engine      | ts-morph 27 for all AST and type checking. No tree-sitter/SWC/raw TS API.                          |
-| [003](./adr/003-fluent-builder-dsl.md)                    | DSL Pattern     | Fluent builder with method chaining. `entry(p).that().<predicate>.should().<condition>.check()`    |
-| [004](./adr/004-esm-only-package.md)                      | Module Format   | ESM only. `"type": "module"`, Node.js >=24. No dual CJS/ESM.                                       |
-| [005](./adr/005-no-any-no-type-assertions.md)             | Type Safety     | No `any`, no `as` casts. Use ts-morph type guards. Only `eslint-disable` at JS interop boundaries. |
-| [006](./adr/006-framework-rules-architecture.md)          | Framework Rules | Rules are code, not config. Separate npm packages per framework. Presets are functions.            |
+| ADR                                                       | Title           | Key Takeaway                                                                                                                                                            |
+| --------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [001](./adr/001-toolchain-node-vitest-eslint-prettier.md) | Toolchain       | Node 24 + TS ~5.9 (pinned to ts-morph) + Vitest 4 + ESLint 10 + Prettier 3.8. No Bun.                                                                                   |
+| [002](./adr/002-ts-morph-ast-engine.md)                   | AST Engine      | ts-morph 27 for all AST and type checking. No tree-sitter/SWC/raw TS API.                                                                                               |
+| [003](./adr/003-fluent-builder-dsl.md)                    | DSL Pattern     | Fluent builder with method chaining. `entry(p).that().<predicate>.should().<condition>.check()`                                                                         |
+| [004](./adr/004-esm-only-package.md)                      | Module Format   | ESM only. `"type": "module"`, Node.js >=24. No dual CJS/ESM.                                                                                                            |
+| [005](./adr/005-no-any-no-type-assertions.md)             | Type Safety     | No `any`, no `as` casts. Use ts-morph type guards. Only `eslint-disable` at JS interop boundaries.                                                                      |
+| [006](./adr/006-framework-rules-architecture.md)          | Framework Rules | Rules are code, not config. Separate npm packages per framework. Presets are functions.                                                                                 |
+| [007](./adr/007-isolate-ast-engine-boundary.md)           | Engine Boundary | _Proposed._ Confine ts-morph behind `src/core/engine/`; talk to the engine in batches, not per-node.                                                                    |
+| [008](./adr/008-agent-first-failure-surfaces.md)          | Agent-First     | _Proposed._ Checks FAIL (never warn), carry their own remedy, no snapshot pins — and **a derivation is unguarded until a differently-derived value disagrees with it**. |
 
 ## IMPORTANT: ADR Compliance
 
 **Before writing ANY code or plan, check the ADRs.** Every ADR is binding. Specifically:
 
 - **ADR-005 (Type Safety):** Never use `any`. Never use `as` type assertions. Use ts-morph `Node.isClassDeclaration()` etc. for type narrowing. Use explicit type annotations instead of `as` on literals. Only `eslint-disable` at unavoidable JS interop boundaries (with explanation).
+- **ADR-008 (Agent-First):** Our primary consumer is an AI agent — it does not read warnings, and it invents a remedy when none is stated. Actionable findings must **fail**, every failure must carry its sanctioned fix, and before shipping any guard ask the one question that matters: **"what would this test do if the thing it guards were completely broken?"** If the answer is "pass", the derivations are not independent.
 - Reference ADRs by number when making design decisions in plans or code comments.
 
 ## Plans
