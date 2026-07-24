@@ -10,7 +10,12 @@ import {
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { calls } from '../../src/builders/call-rule-builder.js'
 import type { ArchProject } from '../../src/core/project.js'
-import { type TestElement, TestRuleBuilder, stubProject, nameMatches } from '../support/test-rule-builder.js'
+import {
+  type TestElement,
+  TestRuleBuilder,
+  stubProject,
+  nameMatches,
+} from '../support/test-rule-builder.js'
 
 function inMemoryProject(files: Record<string, string>): ArchProject {
   const project = new Project({ useInMemoryFileSystem: true })
@@ -270,7 +275,13 @@ describe('correspondence()', () => {
         'src/limits.ts': 'export class Limits { a = 1; b = 2; c = 3 }\n',
       })
       const v = correspondence(p)
-        .side('fields', classes(p).that().haveNameMatching(/Limits/), byPropertyNames())
+        .side(
+          'fields',
+          classes(p)
+            .that()
+            .haveNameMatching(/Limits/),
+          byPropertyNames(),
+        )
         .side('enforced', ['a', 'b']) // 'c' has no enforcement
         .beComplete()
         .violations()

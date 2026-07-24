@@ -26,7 +26,7 @@ Migration: a mis-globbed layer/boundary/slice that was silently green will now g
 
 ### Fixed
 
-- `docs/functions.md` overclaimed "every function shape"; corrected to "every *named* function shape" (a live zero-subject false-green for object-literal handler maps).
+- `docs/functions.md` overclaimed "every function shape"; corrected to "every _named_ function shape" (a live zero-subject false-green for object-literal handler maps).
 
 ## [0.17.0] - 2026-07-14
 

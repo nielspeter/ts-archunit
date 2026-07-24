@@ -8,7 +8,7 @@
 
 ## Problem
 
-`functions()` collected only three *named* shapes (declarations, arrow variables, class methods). Object-literal function values (`{ GET: () => {} }`, `{ GET(){} }`) — the handler-map idiom — were unreachable as subjects, so per-handler rules could not be written and a rule pointed at a handler-only file passed vacuously on zero subjects. (The docs also overclaimed "every function shape"; corrected separately to "every *named* function shape".)
+`functions()` collected only three _named_ shapes (declarations, arrow variables, class methods). Object-literal function values (`{ GET: () => {} }`, `{ GET(){} }`) — the handler-map idiom — were unreachable as subjects, so per-handler rules could not be written and a rule pointed at a handler-only file passed vacuously on zero subjects. (The docs also overclaimed "every function shape"; corrected separately to "every _named_ function shape".)
 
 ## Design
 
@@ -30,16 +30,16 @@ ADR-005: no `any`/`as` — traversal and factory use `Node.is*` guards. ADR-006:
 
 ## Files changed
 
-| File | Change |
-| --- | --- |
-| `src/helpers/object-literal-functions.ts` | New — F3 traversal. |
-| `src/helpers/callback-extractor.ts` | `extractFromObjectLiteral` re-expressed on F3; `MAX_OBJECT_DEPTH` moved into F3. |
-| `src/models/arch-function.ts` | `FunctionCollectionOptions`, `fromObjectLiteralFunction`, pattern 4 in `collectFunctions`. |
-| `src/builders/function-rule-builder.ts` | Constructor + `functions(p, options)` threading; `getElements` passes options. |
-| `src/index.ts` | Export options type, `fromObjectLiteralFunction`, `collectObjectLiteralFunctions`, `ObjectLiteralFunction`. |
-| `docs/functions.md` | Documented the opt-in flag. |
-| `tests/helpers/object-literal-functions.test.ts` | 6 F3 tests. |
-| `tests/builders/function-rule-builder-object-literal.test.ts` | 4 tests (OFF/ON, ADR-008 identity, fork). |
+| File                                                          | Change                                                                                                      |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/helpers/object-literal-functions.ts`                     | New — F3 traversal.                                                                                         |
+| `src/helpers/callback-extractor.ts`                           | `extractFromObjectLiteral` re-expressed on F3; `MAX_OBJECT_DEPTH` moved into F3.                            |
+| `src/models/arch-function.ts`                                 | `FunctionCollectionOptions`, `fromObjectLiteralFunction`, pattern 4 in `collectFunctions`.                  |
+| `src/builders/function-rule-builder.ts`                       | Constructor + `functions(p, options)` threading; `getElements` passes options.                              |
+| `src/index.ts`                                                | Export options type, `fromObjectLiteralFunction`, `collectObjectLiteralFunctions`, `ObjectLiteralFunction`. |
+| `docs/functions.md`                                           | Documented the opt-in flag.                                                                                 |
+| `tests/helpers/object-literal-functions.test.ts`              | 6 F3 tests.                                                                                                 |
+| `tests/builders/function-rule-builder-object-literal.test.ts` | 4 tests (OFF/ON, ADR-008 identity, fork).                                                                   |
 
 Full suite: **2096 passing**, typecheck + lint clean. `within()`/callback tests unchanged (regression-free).
 

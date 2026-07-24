@@ -22,27 +22,27 @@ Built on `subjects()` (F1): an empty selector under `.expectNonEmpty()` fails wi
 
 ### D — Discovery non-vacuity for slices + presets ✅
 
-`SliceRuleBuilder.collectViolations` fails when discovery resolved **no slices or slices with no files** (the `assignedFrom` empty-*files* case, arch-014 I1) — replacing the silent `return []`, and closing a direct `slices().matching('typo')` too. `assertDiscovered()` (in `presets/shared.ts`) guards a preset's upstream bespoke discovery; wired into `strictBoundaries` (`boundaries.ts`), replacing the `if (Object.keys(sliceDef).length > 0)` skip that hid the observed miss #1. `layeredArchitecture` is covered transitively (it discovers via `slices().assignedFrom`). All discovery findings bypass diff/baseline (A).
+`SliceRuleBuilder.collectViolations` fails when discovery resolved **no slices or slices with no files** (the `assignedFrom` empty-_files_ case, arch-014 I1) — replacing the silent `return []`, and closing a direct `slices().matching('typo')` too. `assertDiscovered()` (in `presets/shared.ts`) guards a preset's upstream bespoke discovery; wired into `strictBoundaries` (`boundaries.ts`), replacing the `if (Object.keys(sliceDef).length > 0)` skip that hid the observed miss #1. `layeredArchitecture` is covered transitively (it discovers via `slices().assignedFrom`). All discovery findings bypass diff/baseline (A).
 
 ### C — Path-glob auto-fail on every builder ⛔ DEFERRED
 
-The full re-cut (prod-014 C2): mark `resideInFolder`/`resideInFile`/`havePathMatching` predicates with their globs; in `evaluate()`, fail (default, no opt-in) when a path glob matches **zero project files** — checked at the **file** level (element-type-independent) so a valid-but-classless folder does not false-fire. This closes the hand-written miss #2 *for the agent* without opt-in.
+The full re-cut (prod-014 C2): mark `resideInFolder`/`resideInFile`/`havePathMatching` predicates with their globs; in `evaluate()`, fail (default, no opt-in) when a path glob matches **zero project files** — checked at the **file** level (element-type-independent) so a valid-but-classless folder does not false-fire. This closes the hand-written miss #2 _for the agent_ without opt-in.
 
-Deferred because it is the one genuinely **breaking** change (every rule with a mis-globbed path predicate starts failing) and warrants a deliberate version-bump decision + suite-wide + downstream validation, not a rushed landing. `.expectNonEmpty()` (B) already gives users the explicit tool for this case in the meantime. Design is settled (above); the remaining work is the predicate marker, the file-level glob check in `evaluate()`, co-sequenced path-normalization (so `src/*` *works* rather than just failing loudly — the root cause), and the preset-docs sweep (examples must not be copy-paste-red). File as a follow-up.
+Deferred because it is the one genuinely **breaking** change (every rule with a mis-globbed path predicate starts failing) and warrants a deliberate version-bump decision + suite-wide + downstream validation, not a rushed landing. `.expectNonEmpty()` (B) already gives users the explicit tool for this case in the meantime. Design is settled (above); the remaining work is the predicate marker, the file-level glob check in `evaluate()`, co-sequenced path-normalization (so `src/*` _works_ rather than just failing loudly — the root cause), and the preset-docs sweep (examples must not be copy-paste-red). File as a follow-up.
 
 ## Files changed (A/B/D)
 
-| File | Change |
-| --- | --- |
-| `src/core/violation.ts` | `bypassFilters` on `ArchViolation`. |
-| `src/helpers/diff-aware.ts`, `src/helpers/baseline.ts` | Honor `bypassFilters`. |
-| `src/core/rule-builder.ts` | `_requireNonEmpty`, `.expectNonEmpty()`, `emptySelectionViolation()`, evaluate hook. |
-| `src/builders/slice-rule-builder.ts` | Discovery non-vacuity guard + `emptyDiscoveryViolation()`. |
-| `src/presets/shared.ts` | `assertDiscovered()` helper. |
-| `src/presets/boundaries.ts` | Discovery guard replaces the silent skip. |
-| tests | `rule-builder`, `diff-aware`, `slice-rule-builder`, `boundaries` (the false-green test now asserts the fix). |
+| File                                                   | Change                                                                                                       |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `src/core/violation.ts`                                | `bypassFilters` on `ArchViolation`.                                                                          |
+| `src/helpers/diff-aware.ts`, `src/helpers/baseline.ts` | Honor `bypassFilters`.                                                                                       |
+| `src/core/rule-builder.ts`                             | `_requireNonEmpty`, `.expectNonEmpty()`, `emptySelectionViolation()`, evaluate hook.                         |
+| `src/builders/slice-rule-builder.ts`                   | Discovery non-vacuity guard + `emptyDiscoveryViolation()`.                                                   |
+| `src/presets/shared.ts`                                | `assertDiscovered()` helper.                                                                                 |
+| `src/presets/boundaries.ts`                            | Discovery guard replaces the silent skip.                                                                    |
+| tests                                                  | `rule-builder`, `diff-aware`, `slice-rule-builder`, `boundaries` (the false-green test now asserts the fix). |
 
-Full suite: **2103 passing**, typecheck + lint clean. Only one prior test changed — the boundaries test that *encoded* the false-green.
+Full suite: **2103 passing**, typecheck + lint clean. Only one prior test changed — the boundaries test that _encoded_ the false-green.
 
 ## Out of scope
 

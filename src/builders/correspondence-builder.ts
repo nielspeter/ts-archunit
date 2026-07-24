@@ -355,7 +355,11 @@ export function byArg<T extends { getArguments(): { getText(): string }[] }>(
 /** Strip a single pair of matching surrounding quotes/backticks, if present. */
 function unquote(text: string): string {
   const first = text[0]
-  if ((first === '"' || first === "'" || first === '`') && text.length >= 2 && text.endsWith(first)) {
+  if (
+    (first === '"' || first === "'" || first === '`') &&
+    text.length >= 2 &&
+    text.endsWith(first)
+  ) {
     return text.slice(1, -1)
   }
   return text

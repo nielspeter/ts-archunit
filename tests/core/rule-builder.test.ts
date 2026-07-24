@@ -395,7 +395,10 @@ describe('RuleBuilder', () => {
   describe('.subjects() (F1 — filtered-subject materialization)', () => {
     it('returns the elements narrowed by the predicate chain, by identity', () => {
       const builder = new TestRuleBuilder(stubProject, elements)
-      const subjects = builder.that().withPredicate(nameMatches(/Service$/)).subjects()
+      const subjects = builder
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .subjects()
       expect(subjects.map((e) => e.name)).toEqual(['UserService', 'OrderService'])
     })
 
@@ -418,7 +421,10 @@ describe('RuleBuilder', () => {
     it('returns empty when nothing matches — and does NOT warn about missing conditions', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const builder = new TestRuleBuilder(stubProject, elements)
-      const subjects = builder.that().withPredicate(nameMatches(/^Nope$/)).subjects()
+      const subjects = builder
+        .that()
+        .withPredicate(nameMatches(/^Nope$/))
+        .subjects()
       expect(subjects).toEqual([])
       // subjects() materializes; it does not execute, so the condition-phase warning must not fire.
       expect(warnSpy).not.toHaveBeenCalled()

@@ -30,7 +30,9 @@ const tuple = (fn: ArchFunction): string =>
 describe('functions({ includeObjectLiteralFunctions }) (proposal 016)', () => {
   it('default (OFF) does not collect object-literal functions', () => {
     const p = inMemoryProject(FIXTURE)
-    const names = functions(p).subjects().map((f) => f.getName())
+    const names = functions(p)
+      .subjects()
+      .map((f) => f.getName())
     expect(names).toEqual(['named'])
   })
 

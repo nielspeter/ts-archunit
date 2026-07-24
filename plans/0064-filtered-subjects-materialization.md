@@ -13,7 +13,7 @@ Two draft proposals need the same capability that does not exist: **materialize 
 - 017 `correspondence().side(name, selection, keyFn)` must map each of a selection's filtered subjects to a key.
 - 014 `.expectNonEmpty()` must know whether the filtered subject set is empty.
 
-Before this change, predicate filtering happened only inside the **private** `evaluate()` (`src/core/rule-builder.ts`): it called `getElements()` (the *pre-filter* population, `protected abstract`), applied `_predicates.every(...)`, computed `filtered`, and either returned `[]` or ran conditions. `filtered` was never exposed. `getElements()` is the wrong surface (unfiltered), and `evaluate()` returns `ArchViolation[]`, not subjects. So there was **no method, public or protected, returning the post-`.that()` subjects.** Both proposals had wrongly assumed this "reuses existing machinery."
+Before this change, predicate filtering happened only inside the **private** `evaluate()` (`src/core/rule-builder.ts`): it called `getElements()` (the _pre-filter_ population, `protected abstract`), applied `_predicates.every(...)`, computed `filtered`, and either returned `[]` or ran conditions. `filtered` was never exposed. `getElements()` is the wrong surface (unfiltered), and `evaluate()` returns `ArchViolation[]`, not subjects. So there was **no method, public or protected, returning the post-`.that()` subjects.** Both proposals had wrongly assumed this "reuses existing machinery."
 
 ## Design
 
@@ -57,16 +57,17 @@ subjects(): readonly T[] {
 
 ## Files changed
 
-| File | Change |
-| --- | --- |
-| `src/core/rule-builder.ts` | Add `filterElements()` (protected) + `subjects()` (public); `evaluate()` uses `filterElements()`. No behavior change to existing rules. |
-| `tests/core/rule-builder.test.ts` | New `.subjects()` describe block (6 tests). |
+| File                              | Change                                                                                                                                  |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/rule-builder.ts`        | Add `filterElements()` (protected) + `subjects()` (public); `evaluate()` uses `filterElements()`. No behavior change to existing rules. |
+| `tests/core/rule-builder.test.ts` | New `.subjects()` describe block (6 tests).                                                                                             |
 
 No `src/index.ts` change — `subjects()` is inherited by every entry-point builder that already extends `RuleBuilder`.
 
 ## Test inventory
 
 `tests/core/rule-builder.test.ts` → `.subjects() (F1 …)`:
+
 1. returns the predicate-narrowed set, by identity (name list)
 2. ANDs multiple predicates
 3. returns the full population when no predicate is set

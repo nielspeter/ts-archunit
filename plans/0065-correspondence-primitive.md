@@ -24,11 +24,12 @@ Extends `TerminalBuilder` (inherits `.rule`/`.excluding`/`.check`/`.warn`/`.viol
 
 ```typescript
 correspondence(p)
-  .side('routes', calls(p).that().onObject('app'), byArg(0))   // selection + keyFn
-  .side('matrix', Object.keys(ROUTE_PERMISSIONS))              // pre-derived keys
+  .side('routes', calls(p).that().onObject('app'), byArg(0)) // selection + keyFn
+  .side('matrix', Object.keys(ROUTE_PERMISSIONS)) // pre-derived keys
   .should()
-  .beComplete()          // A ⊆ B — else FAIL naming the uncovered A keys
-  .andShould().haveNoOrphans()   // B ⊆ A   (.beBijective() = both)
+  .beComplete() // A ⊆ B — else FAIL naming the uncovered A keys
+  .andShould()
+  .haveNoOrphans() // B ⊆ A   (.beBijective() = both)
   .rule({ id, because, suggestion })
   .check()
 ```
@@ -50,15 +51,15 @@ ADR-005: no `any`/`as` — the location adapter uses `Node.isNode` + a `getNode`
 
 ## Files changed
 
-| File | Change |
-| --- | --- |
-| `src/core/correspondence-core.ts` | New — `setCorrespondence()` (F2). |
-| `src/builders/correspondence-builder.ts` | New — `correspondence()`, `CorrespondenceBuilder`, `byName`/`byArg`/`byPropertyNames`. |
-| `src/conditions/cross-layer.ts` | `haveMatchingCounterpart` reconciled onto F2 + non-vacuity. |
-| `src/index.ts` | Export `correspondence`, builder, vocabulary, `setCorrespondence`, types. |
-| `tests/core/correspondence-core.test.ts` | 7 tests. |
+| File                                            | Change                                                                                               |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `src/core/correspondence-core.ts`               | New — `setCorrespondence()` (F2).                                                                    |
+| `src/builders/correspondence-builder.ts`        | New — `correspondence()`, `CorrespondenceBuilder`, `byName`/`byArg`/`byPropertyNames`.               |
+| `src/conditions/cross-layer.ts`                 | `haveMatchingCounterpart` reconciled onto F2 + non-vacuity.                                          |
+| `src/index.ts`                                  | Export `correspondence`, builder, vocabulary, `setCorrespondence`, types.                            |
+| `tests/core/correspondence-core.test.ts`        | 7 tests.                                                                                             |
 | `tests/builders/correspondence-builder.test.ts` | 20 tests (logic, non-vacuity, collision, warn, errors, metadata, vocabulary, real-project location). |
-| `tests/builders/cross-layer-builder.test.ts` | +1 test — empty left layer now fails. |
+| `tests/builders/cross-layer-builder.test.ts`    | +1 test — empty left layer now fails.                                                                |
 
 Full suite: **2086 passing**, typecheck + lint clean.
 
