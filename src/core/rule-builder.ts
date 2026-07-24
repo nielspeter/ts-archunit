@@ -29,6 +29,7 @@ export abstract class RuleBuilder<T> {
   protected _silentIndices: Set<number> = new Set()
   protected _phase: 'predicate' | 'condition' = 'predicate'
   protected _severity?: 'error' | 'warn'
+  protected _requireNonEmpty = false
 
   constructor(protected readonly project: ArchProject) {}
 
@@ -150,6 +151,19 @@ export abstract class RuleBuilder<T> {
         this._exclusions.push(p)
       }
     }
+    return this
+  }
+
+  /**
+   * Assert that the predicate chain matches at least one subject. If the
+   * filtered subject set is empty, the rule FAILS with a config-level
+   * meta-finding instead of passing vacuously — the "0 === 0" false-green
+   * ADR-008 forbids. Opt-in: legitimately-empty selections (e.g. "no
+   * repositories yet") stay green without it. Built on the materialized
+   * subject set (plan 0064); the finding bypasses diff/baseline (plan 0067).
+   */
+  expectNonEmpty(): this {
+    this._requireNonEmpty = true
     return this
   }
 
@@ -367,6 +381,29 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
+   * Build the config-level meta-finding for an empty selector under
+   * `.expectNonEmpty()`. A typed literal (no `createViolation` — there is no
+   * Node), ADR-005-clean, flagged `bypassFilters` so diff/baseline keep it.
+   */
+  private emptySelectionViolation(): ArchViolation {
+    const description = this.buildRuleDescription() || 'selector'
+    return {
+      rule: description,
+      ruleId: this._metadata?.id,
+      element: this._metadata?.id ?? description,
+      file: '',
+      line: 0,
+      message:
+        'Selector matched 0 subjects, but .expectNonEmpty() requires at least one — ' +
+        'likely a wrong glob or filter. If an empty match is valid here, remove .expectNonEmpty().',
+      because: this._reason,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+      bypassFilters: true,
+    }
+  }
+
+  /**
    * Execute the full pipeline: filter elements with predicates,
    * evaluate conditions, return violations.
    */
@@ -374,8 +411,14 @@ export abstract class RuleBuilder<T> {
     // Step 1+2: Get elements and narrow by predicates (see filterElements).
     const filtered = this.filterElements()
 
-    // Step 3: If no elements match predicates, no violations
+    // Step 3: No elements match the predicate chain.
     if (filtered.length === 0) {
+      // Opt-in non-vacuity guard (plan 0067): a selector the author asserted
+      // must match is a config error when empty, not a pass. Meta-finding —
+      // bypasses diff/baseline so it survives the standard CI mode (ADR-008).
+      if (this._requireNonEmpty) {
+        return [this.emptySelectionViolation()]
+      }
       return []
     }
 

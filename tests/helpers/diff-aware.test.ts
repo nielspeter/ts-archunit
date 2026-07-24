@@ -37,4 +37,17 @@ describe('DiffFilter', () => {
     const filter = new DiffFilter(new Set(['/project/src/a.ts', '/project/src/b.ts']))
     expect(filter.size).toBe(2)
   })
+
+  it('keeps bypassFilters meta-findings even when their file did not change', () => {
+    const filter = new DiffFilter(new Set(['/project/src/changed.ts']))
+    const meta = makeViolation({
+      element: 'selector',
+      file: '',
+      message: 'empty selector',
+      bypassFilters: true,
+    })
+    const normalUnchanged = mv('/project/src/other.ts', 'Other')
+    const result = filter.filterToChanged([meta, normalUnchanged])
+    expect(result).toEqual([meta]) // meta kept; normal violation in an unchanged file dropped
+  })
 })

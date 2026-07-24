@@ -29,6 +29,14 @@ export interface ArchViolation {
   docs?: string
   /** Severity of this violation. Absent means 'error' (the default). */
   severity?: 'error' | 'warn'
+  /**
+   * When true, this is a meta-finding about rule *configuration* (e.g. an empty
+   * selector or empty discovery), not about a source file. It has no changed
+   * file to attribute to, so the diff-aware and baseline filters must NOT drop
+   * it — otherwise the guard silently re-greens under the standard CI mode
+   * (ADR-008; plan 0067).
+   */
+  bypassFilters?: boolean
 }
 
 /**

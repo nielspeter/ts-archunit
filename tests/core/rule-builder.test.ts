@@ -459,4 +459,50 @@ describe('RuleBuilder', () => {
       expect(() => services.should().withCondition(alwaysPass()).check()).not.toThrow()
     })
   })
+
+  describe('.expectNonEmpty() (F4 / plan 0067 — non-vacuity opt-in)', () => {
+    it('fails with a bypass-flagged meta-finding when the selector matches nothing', () => {
+      const v = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+        .expectNonEmpty()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.bypassFilters).toBe(true)
+      expect(v[0]!.message).toMatch(/expectNonEmpty|0 subjects/)
+    })
+
+    it('stays green when the selector matches at least one subject', () => {
+      const v = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .expectNonEmpty()
+        .should()
+        .withCondition(alwaysPass())
+        .violations()
+      expect(v).toEqual([])
+    })
+
+    it('is opt-in — an empty selector WITHOUT it stays green (default unchanged)', () => {
+      const v = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+        .should()
+        .withCondition(alwaysFail('unreachable'))
+        .violations()
+      expect(v).toEqual([])
+    })
+
+    it('survives a .should() fork', () => {
+      const v = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+        .expectNonEmpty()
+        .should()
+        .withCondition(alwaysPass())
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.bypassFilters).toBe(true)
+    })
+  })
 })

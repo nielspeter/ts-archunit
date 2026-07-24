@@ -143,9 +143,12 @@ export class Baseline {
 
   /**
    * Filter out known violations, returning only new ones.
+   *
+   * Config-level meta-findings (empty selector/discovery) are never baselined
+   * away — a regenerated baseline must not silence them (ADR-008; plan 0067).
    */
   filterNew(violations: ArchViolation[]): ArchViolation[] {
-    return violations.filter((v) => !this.isKnown(v))
+    return violations.filter((v) => v.bypassFilters === true || !this.isKnown(v))
   }
 
   /** Number of known violations in the baseline */
