@@ -524,7 +524,7 @@ describe('template option shapes stay valid against the presets', () => {
     })
     strictBoundaries(p, { folders: '**/src/features/*', shared: ['**/src/shared/**'] })
     dataLayerIsolation(p, {
-      repositories: 'src/repositories/**',
+      repositories: '**/src/repositories/**',
       baseClass: 'BaseRepository',
       requireTypedErrors: true,
     })

@@ -79,7 +79,7 @@ import {
   maxFunctionParameters,
 } from '@nielspeter/ts-archunit/rules/metrics'
 
-functions(p).that().resideInFolder('src/**').should().satisfy(maxFunctionComplexity(15)).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(maxFunctionComplexity(15)).check()
 
 functions(p).should().satisfy(maxFunctionLines(40)).warn()
 

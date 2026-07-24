@@ -25,9 +25,22 @@ type DiscoverySource =
       readonly entries: readonly { readonly name: string; readonly glob: string }[]
     }
 
-/** Anchored globs already match absolute paths — a `**\/` hint would be a no-op. */
+/**
+ * Whether a glob can already match an absolute path, so the `**\/` hint would be
+ * a no-op (or worse). Covers POSIX-absolute and Windows drive-absolute globs as
+ * well as an explicit globstar.
+ */
 function isAnchored(glob: string): boolean {
-  return glob.startsWith('**/') || glob.startsWith('/')
+  return glob.startsWith('**/') || glob.startsWith('/') || /^[A-Za-z]:\//.test(glob)
+}
+
+/**
+ * A leading `./` makes a glob unmatchable against absolute paths, and prefixing
+ * it (`**\/./src/**`) does not help — so it needs its own remedy rather than the
+ * generic anchor advice.
+ */
+function hasDotSlashPrefix(glob: string): boolean {
+  return glob.startsWith('./')
 }
 
 /**
@@ -233,18 +246,37 @@ export class SliceRuleBuilder extends TerminalBuilder {
       )
     }
 
-    const unanchored = entries.filter((entry) => !isAnchored(entry.glob))
     const shown = (list: readonly { name: string; glob: string }[]): string => {
       const head = list.slice(0, 5).map((e) => `${e.name}: ${JSON.stringify(e.glob)}`)
       const rest = list.length - head.length
       return head.join(', ') + (rest > 0 ? `, and ${String(rest)} more` : '')
     }
 
+    // './src/**' cannot match an absolute path AND cannot be fixed by prefixing,
+    // so it gets its own remedy rather than the generic anchor advice.
+    const dotSlash = entries.filter((entry) => hasDotSlashPrefix(entry.glob))
+    if (dotSlash.length > 0) {
+      return (
+        'Every slice in assignedFrom(...) is empty. A leading "./" never occurs in an ' +
+        'absolute file path — drop it and anchor instead ("./src/x/**" -> "**/src/x/**"): ' +
+        `${shown(dotSlash)}. ${tail}`
+      )
+    }
+
+    const unanchored = entries.filter((entry) => !isAnchored(entry.glob))
     if (unanchored.length > 0) {
+      const anchored = entries.filter((entry) => isAnchored(entry.glob))
+      // Every slice is empty, so anchored-but-missing entries are at fault too —
+      // naming only the unanchored ones would take the caller through a second
+      // failing run to discover the rest.
+      const also =
+        anchored.length > 0
+          ? ` These are anchored but matched nothing, so check they exist: ${shown(anchored)}.`
+          : ''
       return (
         'Every slice in assignedFrom(...) is empty. These globs are matched against ' +
         `ABSOLUTE file paths, so a project-relative glob matches nothing — prefix these ` +
-        `with "**/": ${shown(unanchored)}. ${tail}`
+        `with "**/": ${shown(unanchored)}.${also} ${tail}`
       )
     }
 

@@ -184,12 +184,16 @@ describe('SliceRuleBuilder discovery non-vacuity (plan 0067)', () => {
 
   it('does NOT trip discovery-vacuity when at least one slice has files (every-guard)', () => {
     // 'real' matches the fixture; 'ghost' is empty. every(empty) must be false.
+    // Assert on the FLAG, not on message prose: this test previously matched
+    // /matched no files/, and when that phrase was reworded out of existence the
+    // assertion silently became tautological — the `every` vs `some` boundary
+    // went unguarded. bypassFilters is only set by the discovery meta-finding.
     const v = slices(p)
       .assignedFrom({ real: '**/*.ts', ghost: '**/does-not-exist/**' })
       .should()
       .beFreeOfCycles()
       .violations()
-    expect(v.every((x) => !/matched no files/.test(x.message))).toBe(true)
+    expect(v.some((x) => x.bypassFilters === true)).toBe(false)
   })
 })
 
@@ -254,5 +258,55 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
     // check that the transformation the message recommends actually works.
     expect(resolveByDefinition(p, { x: 'src/domain/**' })[0]!.files).toHaveLength(0)
     expect(resolveByDefinition(p, { x: '**/src/domain/**' })[0]!.files.length).toBeGreaterThan(0)
+  })
+
+  it('a mixed definition names BOTH the unanchored and the anchored-but-missing', () => {
+    // Naming only the unanchored subset sends the caller through a second failing
+    // run to discover the rest — every slice is empty, so all of them are at fault.
+    const message = discoveryMessage((b) =>
+      b.assignedFrom({ bad: 'src/nope/**', alsoBad: '**/does-not-exist/**' }),
+    )
+    expect(message).toContain('bad: "src/nope/**"')
+    expect(message).toContain('alsoBad: "**/does-not-exist/**"')
+    expect(message).toContain(ANCHOR_ADVICE)
+  })
+
+  it('an absolute glob is not told to add an anchor', () => {
+    const message = discoveryMessage((b) => b.assignedFrom({ ghost: '/abs/missing/**' }))
+    expect(message).toContain('anchored correctly')
+    expect(message).not.toContain(ANCHOR_ADVICE)
+  })
+
+  it('a "./" prefix gets its own remedy (prefixing it would not help)', () => {
+    const message = discoveryMessage((b) => b.assignedFrom({ ghost: './src/domain/**' }))
+    expect(message).toContain('leading "./"')
+    expect(message).not.toContain(ANCHOR_ADVICE)
+  })
+
+  it('truncates a long glob list but says how many were hidden', () => {
+    const many: Record<string, string> = {}
+    for (let i = 0; i < 8; i++) many[`layer${String(i)}`] = `src/nope-${String(i)}/**`
+    const message = discoveryMessage((b) => b.assignedFrom(many))
+    expect(message).toContain('layer0:')
+    expect(message).toContain('layer4:')
+    expect(message).not.toContain('layer7:') // beyond the shown window
+    expect(message).toContain('and 3 more')
+  })
+
+  it('blames the tsconfig, not the glob, when the project loaded no files', () => {
+    const emptyProject: ArchProject = (() => {
+      const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+      return {
+        tsConfigPath: '/repo/tsconfig.json',
+        _project: tsMorphProject,
+        getSourceFiles: () => tsMorphProject.getSourceFiles(),
+      }
+    })()
+    const message =
+      slices(emptyProject).matching('src/features/*').should().beFreeOfCycles().violations()[0]
+        ?.message ?? ''
+    expect(message).toContain('0 source files')
+    expect(message).toContain('/repo/tsconfig.json')
+    expect(message).not.toContain(PREFIX_ADVICE) // the glob is not the problem
   })
 })

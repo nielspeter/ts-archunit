@@ -258,7 +258,7 @@ import {
 ```typescript
 modules(p)
   .that()
-  .resideInFolder('src/**')
+  .resideInFolder('**/src/**')
   .should()
   .satisfy(noDeadModules())
   .excluding('index.ts', 'main.ts', 'config.ts')
@@ -274,7 +274,7 @@ modules(p)
 `noUnusedExports()` checks each named export for external references using ts-morph's language service. More expensive than file-level checks — scope with predicates:
 
 ```typescript
-modules(p).that().resideInFolder('src/**').should().satisfy(noUnusedExports()).check()
+modules(p).that().resideInFolder('**/src/**').should().satisfy(noUnusedExports()).check()
 ```
 
 ### Stub detection
@@ -283,12 +283,12 @@ modules(p).that().resideInFolder('src/**').should().satisfy(noUnusedExports()).c
 
 ```typescript
 // Default — catches all common markers
-functions(p).that().resideInFolder('src/**').should().satisfy(noStubComments()).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(noStubComments()).check()
 
 // Custom — only catch TODO and FIXME
 functions(p)
   .that()
-  .resideInFolder('src/**')
+  .resideInFolder('**/src/**')
   .should()
   .satisfy(noStubComments(/\b(TODO|FIXME)\b/i))
   .check()
@@ -301,7 +301,7 @@ Note: comments _above_ a function (leading trivia) are not checked — only comm
 `noEmptyBodies()` catches functions with zero statements. Expression-bodied arrows (`() => expr`) always pass — they have content by definition:
 
 ```typescript
-functions(p).that().resideInFolder('src/**').should().satisfy(noEmptyBodies()).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(noEmptyBodies()).check()
 ```
 
 ## Naming (`ts-archunit/rules/naming`)

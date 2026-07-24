@@ -124,7 +124,7 @@ _where_ code goes. They compose in one file:
 
 ```typescript
 export default [
-  ...agentGuardrails(p, { src: 'src/**', noGenericErrors: true }),
+  ...agentGuardrails(p, { src: '**/src/**', noGenericErrors: true }),
   // + layered/boundary rules as builders
 ]
 ```

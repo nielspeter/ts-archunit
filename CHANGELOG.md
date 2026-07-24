@@ -20,9 +20,16 @@ them, found by adopting 0.18.0 on a real codebase. See [bug 0009](./bugs/fixed/0
 
 ### Upgrading
 
-Upgrading from **0.18.0**: no rule that passed can start failing — the globs fixed here resolved 0 slices, which 0.18.0 already failed on.
+**Anchor your globs.** The single instruction that matters: every file-path glob needs `**/` (`'**/src/services/**'`, not `'src/services/**'`). That applies to `assignedFrom()`, the preset options (`layers`, `folders`, `shared`, `src`), and predicates like `resideInFolder()` — and it is easy to fix `layers` while forgetting `shared`, which with `strict: true` turns a silent no-op into a **false positive** on legitimate imports. `matching()` is the exception; it accepts either spelling. See [Glob conventions](https://nielspeter.github.io/ts-archunit/slices).
 
-Upgrading from **0.17.x or earlier**: a mis-anchored slice rule used to pass _vacuously_. It will now either fail with the discovery guard (naming the glob) or — if this release makes its glob resolve — start reporting **real** cycle/layer violations it never checked before. That is the intended outcome, but budget for it: run `npx ts-archunit baseline` before gating CI.
+From **0.18.0**, two things can change a build's colour:
+
+- Red → green: `matching()` globs that resolve for the first time now produce real slices. A rule whose glob had been mis-parsed may now legitimately pass.
+- Green → red: an `.excluding()` that happened to match a discovery finding's text used to silence it and no longer can. The accompanying "Unused exclusion … may be stale" warning is misleading in that case — the exclusion is not stale, it is no longer permitted on a meta-finding.
+
+From **0.17.x or earlier**, a mis-anchored slice rule used to pass _vacuously_. It will now either fail with the discovery guard (naming the glob at fault) or — if this release makes its glob resolve — start reporting **real** cycle/layer violations it never checked before. That is the intended outcome, but budget for it.
+
+Note when baselining: discovery/empty-selector findings are deliberately **not** baselineable (they report that a rule enforces nothing), so `ts-archunit baseline` will not silence them — fix the glob instead. `ts-archunit baseline` currently reports the pre-filter count, so the number it prints can exceed what it wrote.
 
 ## [0.18.0] - 2026-07-24
 

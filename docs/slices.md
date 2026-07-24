@@ -20,13 +20,22 @@ Slices can represent:
 
 ## Glob conventions (read this first)
 
-Every glob in ts-archunit is matched against the **absolute** file path, so a
-project-relative glob like `'src/services/**'` matches nothing. The rule of thumb:
+**File-path** globs are matched against the **absolute** path, so a
+project-relative glob like `'src/services/**'` matches nothing:
 
-::: tip Anchor your globs with `**/`
+::: tip Anchor file-path globs with `**/`
 Write `'**/src/services/**'`, not `'src/services/**'`. This applies to
 `assignedFrom()`, the preset options (`layers`, `folders`, `shared`, `src`), and
-predicates like `resideInFolder()`.
+path predicates like `resideInFolder()` / `resideInFile()`.
+
+Two things this does **not** apply to: **import** globs
+(`importFrom` / `notImportFrom` / `onlyImportFrom` / `dependOn`) also match the raw
+specifier, so `importFrom('fastify')` is correct as written; and `.excluding()`,
+which takes an exact string or a `RegExp`, not a glob.
+
+Watch `shared` in particular — anchoring `layers` but leaving `shared` relative
+turns a silent no-op into a false positive, because with `strict: true` `shared`
+is the innermost layer's import allow-list.
 :::
 
 `matching()` is the one exception, because its glob does double duty — the literal

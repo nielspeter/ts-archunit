@@ -38,8 +38,14 @@ slices(p).assignedFrom({ services: '**/src/services/**' }) // ✅
 ```
 
 The same applies to preset options (`layers`, `folders`, `shared`, `src`) and to
-predicates like `resideInFolder()`. `matching()` is the exception — it accepts
-`'src/features/*'`, `'src/features/*/'` or `'**/src/features/*'` interchangeably.
+path predicates like `resideInFolder()`. Anchoring `layers` but forgetting
+`shared` is the common half-fix: with `strict: true` that turns the no-op into a
+_false positive_ on imports your config actually permits.
+
+`matching()` is the exception — `'src/features/*'`, `'src/features/*/'` and
+`'**/src/features/*'` are interchangeable. **Import** globs are also exempt
+(`importFrom('fastify')` matches the specifier), and `.excluding()` is not a glob
+at all — it takes an exact string or a `RegExp`.
 
 Since v0.18 this **fails** instead of passing silently, and the failure names the
 glob at fault: a rule that discovers nothing enforces nothing. If a rule reports

@@ -124,3 +124,31 @@ describe('formatViolations', () => {
     expect(result).not.toContain(codeFrame)
   })
 })
+
+describe('formatViolations for location-less config-level findings', () => {
+  const REMEDY = 'prefix these with "**/": services: "src/services/**"'
+
+  /**
+   * A meta-finding (empty selector / empty discovery) carries its whole remedy in
+   * `message` and has no source location. The rich formatter used to print only
+   * the location line, so the remedy was invisible on the default surface — the
+   * one place the agent consumer reads it (ADR-008). "A message is only a remedy
+   * if it is printed."
+   */
+  it('prints the message, so the remedy is not invisible', () => {
+    const result = formatViolations([mv({ file: '', line: 0, message: REMEDY })])
+    expect(result).toContain(REMEDY)
+  })
+
+  it('does not render a bogus :0 location or the cwd', () => {
+    const result = formatViolations([mv({ file: '', line: 0, message: REMEDY })])
+    expect(result).not.toContain(':0')
+    expect(result).not.toContain(process.cwd())
+  })
+
+  it('still renders location and element for findings that have a file', () => {
+    const result = formatViolations([mv({ file: '/project/src/a.ts', line: 7 })])
+    expect(result).toContain('MyService.getTotal')
+    expect(result).toContain(':7')
+  })
+})

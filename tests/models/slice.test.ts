@@ -96,6 +96,79 @@ describe('resolveByMatching glob spellings (bug 0009)', () => {
   })
 })
 
+/**
+ * Shapes the shared fixture cannot express: an interior wildcard (monorepo) and a
+ * nested feature tree. Built in memory so the fixture stays small and these tests
+ * do not couple to files other suites share.
+ */
+describe('resolveByMatching on shapes the fixture cannot express', () => {
+  function inMemory(files: Record<string, string>): ArchProject {
+    const project = new Project({ useInMemoryFileSystem: true })
+    for (const [filePath, contents] of Object.entries(files)) {
+      project.createSourceFile(filePath, contents)
+    }
+    return {
+      tsConfigPath: '/repo/tsconfig.json',
+      _project: project,
+      getSourceFiles: () => project.getSourceFiles(),
+    }
+  }
+
+  const monorepo = () =>
+    inMemory({
+      '/repo/packages/app-a/src/mod/x.ts': 'export const x = 1',
+      '/repo/packages/app-b/src/mod/y.ts': 'export const y = 1',
+    })
+
+  const features = () =>
+    inMemory({
+      '/repo/src/features/billing/order.ts': "import '../auth/user.js'\nexport const o = 1",
+      '/repo/src/features/auth/user.ts': "import '../billing/order.js'\nexport const u = 1",
+    })
+
+  it('cuts baseDir at the FIRST wildcard, not the last slash (interior wildcard)', () => {
+    // Deriving baseDir up to the last '/' yields 'packages/*/src/' — a literal
+    // '*' that occurs in no path — so every file is discarded and the rule
+    // silently discovers nothing.
+    expect(
+      resolveByMatching(monorepo(), 'packages/*/src/*')
+        .map((s) => s.name)
+        .sort(),
+    ).toEqual(['app-a', 'app-b'])
+  })
+
+  it('a wildcard-free trailing slash means "the directories inside", not one slice', () => {
+    // Regression guard: stripping the trailing '/' unconditionally collapsed this
+    // into a single slice named 'features'. One mega-slice makes beFreeOfCycles
+    // structurally unable to fail (intra-slice edges are dropped), so a real
+    // cycle went from red to green.
+    expect(
+      resolveByMatching(features(), 'src/features/')
+        .map((s) => s.name)
+        .sort(),
+    ).toEqual(['auth', 'billing'])
+  })
+
+  it('agrees with the wildcard spellings of the same intent', () => {
+    const p2 = features()
+    const names = (glob: string) =>
+      resolveByMatching(p2, glob)
+        .map((s) => s.name)
+        .sort()
+    expect(names('src/features/')).toEqual(names('src/features/*'))
+    expect(names('src/features/*/')).toEqual(names('src/features/*'))
+  })
+
+  it('fails loudly rather than minting one slice per drive root', () => {
+    // ts-morph reports Windows paths as 'C:/...'; an empty baseDir would make
+    // indexOf('') return 0 and name the slice 'C:', holding every file.
+    const windows = inMemory({ 'C:/repo/src/a.ts': 'export const a = 1' })
+    for (const glob of ['*', '**', 'src']) {
+      expect(resolveByMatching(windows, glob), `glob: ${glob}`).toEqual([])
+    }
+  })
+})
+
 describe('resolveByDefinition', () => {
   const p = loadTestProject()
 

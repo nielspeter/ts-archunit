@@ -238,4 +238,39 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
       expect(result[0]!.file).toBe('/src/routes/users.ts')
     })
   })
+
+  describe('bypassFilters meta-findings are not excludable', () => {
+    /**
+     * A config-level meta-finding reports that the rule checks NOTHING, so
+     * silencing it silences the guard itself (ADR-008). Baseline and diff-aware
+     * already honor the flag; `.excluding()` must too — and this became reachable
+     * once meta-messages started quoting the caller's own globs and paths, which
+     * an unrelated path exclusion can incidentally match.
+     */
+    it('survives an exclusion that matches its message', () => {
+      const meta = makeViolation({
+        element: 'slices',
+        file: '',
+        message: 'every slice in assignedFrom(...) is empty (globs: "src/services/**")',
+        bypassFilters: true,
+      })
+      const result = applyFilters([meta], { exclusions: [/src\/services/] })
+      expect(result).toHaveLength(1)
+    })
+
+    it('survives an exclusion that matches its element exactly', () => {
+      const meta = makeViolation({ element: 'slices', file: '', bypassFilters: true })
+      expect(applyFilters([meta], { exclusions: ['slices'] })).toHaveLength(1)
+    })
+
+    it('still excludes an ordinary violation with the same message text', () => {
+      // Proves the guard is scoped to the flag, not a blanket "never exclude".
+      const normal = makeViolation({
+        element: 'X',
+        file: '/src/services/a.ts',
+        message: 'every slice in assignedFrom(...) is empty (globs: "src/services/**")',
+      })
+      expect(applyFilters([normal], { exclusions: [/src\/services/] })).toHaveLength(0)
+    })
+  })
 })

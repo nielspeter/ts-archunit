@@ -79,7 +79,7 @@ functions(p)
   .check()
 
 // "No eval anywhere in production code"
-modules(p).that().resideInFolder('src/**').should().satisfy(moduleNoEval()).check()
+modules(p).that().resideInFolder('**/src/**').should().satisfy(moduleNoEval()).check()
 
 // "Route handlers must validate input"
 functions(p)
@@ -136,7 +136,7 @@ layeredArchitecture(p, {
     services: '**/src/services/**',
     repositories: '**/src/repositories/**',
   },
-  shared: ['src/shared/**'],
+  shared: ['**/src/shared/**'],
   strict: true,
 })
 ```
@@ -258,9 +258,9 @@ import { functionNoGenericErrors } from '@nielspeter/ts-archunit/rules/errors'
 import { mustCall } from '@nielspeter/ts-archunit/rules/architecture'
 import { noDeadModules, noStubComments, noEmptyBodies } from '@nielspeter/ts-archunit/rules/hygiene'
 
-functions(p).that().resideInFolder('src/**').should().satisfy(functionNoEval()).check()
-functions(p).that().resideInFolder('src/**').should().satisfy(noEmptyBodies()).check()
-functions(p).that().resideInFolder('src/**').should().satisfy(noStubComments()).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(functionNoEval()).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(noEmptyBodies()).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(noStubComments()).check()
 ```
 
 Categories: `rules/typescript`, `rules/security`, `rules/errors`, `rules/naming`, `rules/dependencies`, `rules/code-quality`, `rules/metrics`, `rules/architecture`, `rules/hygiene`.
@@ -289,11 +289,11 @@ classes(p).should().notContain(call('eval')).check({ format: detectFormat() })
 Find code drift — duplicate function bodies and inconsistent patterns:
 
 ```typescript
-smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).warn()
+smells.duplicateBodies(p).inFolder('**/src/routes/**').withMinSimilarity(0.9).warn()
 
 smells
   .inconsistentSiblings(p)
-  .inFolder('src/repositories/**')
+  .inFolder('**/src/repositories/**')
   .forPattern(call('this.extractCount'))
   .warn()
 ```

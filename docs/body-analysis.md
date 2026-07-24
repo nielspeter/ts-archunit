@@ -126,7 +126,7 @@ import { jsxText } from '@nielspeter/ts-archunit'
 // Components must route user-facing text through t()
 modules(p)
   .that()
-  .resideInFolder('src/components/**')
+  .resideInFolder('**/src/components/**')
   .should()
   .notContain(jsxText())
   .because('User-facing text must go through t()')

@@ -30,13 +30,16 @@ export type SliceDefinition = Record<string, string>
 const GLOB_META = /[*?[\]{}!]/
 
 /**
- * The two things a `matching()` glob has to yield, derived from **one** parse.
+ * The two things a `matching()` glob has to yield, derived from **one**
+ * normalization of the input.
  *
- * Deriving them separately is what made bug 0009 possible: the picomatch pattern
- * accepted spellings whose `baseDir` could never be found in a path, so files
- * matched and were then silently discarded during slice-name extraction. Parsing
- * once means "the pattern's base and the extracted base are the same string" is
- * true by construction.
+ * Deriving them from differently-normalized inputs is what made bug 0009
+ * possible: the picomatch pattern accepted spellings whose `baseDir` could never
+ * be found in a path, so files matched and were then silently discarded during
+ * slice-name extraction. Both now come from the same `normalized` string, which
+ * removes that divergence class — though they remain distinct derivations (for
+ * `'src/features'` the pattern's base is `src/features` while `baseDir` is
+ * `src/`, by design: the final segment is a name filter, not a directory).
  */
 interface MatchingGlob {
   /** Absolute-path pattern handed to picomatch. */
@@ -55,8 +58,24 @@ interface MatchingGlob {
  */
 function parseMatchingGlob(glob: string): MatchingGlob {
   let normalized = glob
+  // A leading './' is what people copy out of tsconfig `include`; it never occurs
+  // in an absolute path, so leaving it in made the whole glob unmatchable while
+  // every stated remedy ("check the prefix", "add '**/'") was false.
+  while (normalized.startsWith('./')) normalized = normalized.slice(2)
   while (normalized.startsWith('**/')) normalized = normalized.slice(3)
-  if (normalized.endsWith('/')) normalized = normalized.slice(0, -1)
+
+  // Strip a trailing '/' ONLY when the final segment is a wildcard. For
+  // 'src/features/*/' the slash is redundant, but for a wildcard-free
+  // 'src/features/' it is the whole meaning: "the directories inside features",
+  // not "paths starting with features". Stripping it unconditionally collapsed
+  // the latter into a single slice named 'features' — and one mega-slice makes
+  // beFreeOfCycles structurally unable to fail, because intra-slice edges are
+  // dropped. That turned a real cycle from red to green.
+  if (normalized.endsWith('/')) {
+    const withoutSlash = normalized.slice(0, -1)
+    const finalSegment = withoutSlash.slice(withoutSlash.lastIndexOf('/') + 1)
+    if (GLOB_META.test(finalSegment)) normalized = withoutSlash
+  }
 
   // Prepend ** unless already absolute, so the pattern matches anywhere in an
   // absolute path. Append */** to match the slice segment + anything inside it.
@@ -97,6 +116,14 @@ function parseMatchingGlob(glob: string): MatchingGlob {
  */
 export function resolveByMatching(project: ArchProject, glob: string): Slice[] {
   const { fullGlob, baseDir } = parseMatchingGlob(glob)
+
+  // No literal directory prefix (e.g. '*', '**', 'src' with no '/'). Bail rather
+  // than search for '' in the path: `indexOf('')` is 0, so the "slice name" would
+  // be the path's first segment — empty on POSIX (harmless by accident) but the
+  // drive letter on Windows, which would mint ONE slice holding every file and
+  // silently pass every inter-slice condition. Returning no slices makes the
+  // discovery guard fire instead (ADR-008).
+  if (baseDir === '') return []
   const isMatch = picomatch(fullGlob)
   const sourceFiles = project.getSourceFiles()
   const sliceMap = new Map<string, SourceFile[]>()
