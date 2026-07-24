@@ -1,9 +1,10 @@
 # ts-archunit Development Roadmap
 
 **Created:** 2026-03-25
-**Updated:** 2026-07-17
+**Updated:** 2026-07-24
 **Spec:** `ts-archunit-spec.md`
-**Total Plans:** 55 completed + proposal 010, 3 open (see "Open Plans" below)
+**Direction:** `plans/ai-era-product-direction.md` (the AI-era program, below)
+**Total Plans:** 55 completed + the AI-era program (0064–0067, merged 2026-07-24) + proposal 010
 
 ---
 
@@ -69,7 +70,7 @@
 
 ## What's Shipped
 
-**2042 tests across 151 files. All checks pass.**
+**2108 tests across 153 files. All checks pass.** (2042 → 2108 with the AI-era program.)
 
 ### Core (P0)
 
@@ -178,6 +179,31 @@
 - VitePress: `docs/presets.md`, `docs/recipes.md`, `docs/explain.md` — 3 new pages
 - Updated: `docs/standard-rules.md`, `docs/getting-started.md`, `docs/cli.md`
 - Explanatory descriptions added to all 45+ sections across 18 documentation files
+
+---
+
+## AI-era program — merged 2026-07-24 (PR #2)
+
+Turned the "architecture governance for the AI era" positioning into shipped code. Positioning: `docs/why-ts-archunit.md` + README; the sequenced, review-validated roadmap: `plans/ai-era-product-direction.md`. Motivated by the cmless audit (its two largest recurring bug classes — route↔permission-matrix drift and phantom limits — plus an empty-selector false-green the tool committed twice on a real app).
+
+**Foundations + features (merged, 2108 tests green, 3-persona code-reviewed):**
+
+| Plan | What                                                                                                                                                | Public API                                                                                                                                                                |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0064 | **F1** — filtered-subject materialization (the keystone the others build on)                                                                        | `RuleBuilder.subjects()`                                                                                                                                                  |
+| 0065 | **F2 + proposal 017** — coverage/relation primitive; `crossLayer`'s existence check reconciled onto the shared core (empty-layer false-green fixed) | `correspondence(p).side().beComplete()/.haveNoOrphans()/.beBijective()` (+ `.allowEmpty()`, `.distinctKeysOn()`); `byName`/`byArg`/`byPropertyNames`; `setCorrespondence` |
+| 0066 | **F3 + proposal 016** — object-literal function collection                                                                                          | `functions(p, { includeObjectLiteralFunctions })`; `collectObjectLiteralFunctions`                                                                                        |
+| 0067 | **F4 + proposal 014 (A/B/D)** — empty-selector safety                                                                                               | `ArchViolation.bypassFilters`; `.expectNonEmpty()`; slice/preset discovery non-vacuity                                                                                    |
+
+Proposals 014–017 revised to draft 2 (architect + product reviewed) also merged.
+
+⚠️ **Breaking:** empty discovery now **fails** instead of passing vacuously — `slices().matching()`/`.assignedFrom()`, `crossLayer` empty layer, and `strictBoundaries` with no matching boundaries. See CHANGELOG `[Unreleased]`; **needs a version number** (not yet released).
+
+**Deferred (documented, not yet built):**
+
+- **014-C** — path-glob auto-fail on every builder + path-normalization (the broadest breaking re-cut; needs a version decision).
+- **discovery-surface → fail-grade** (promote the `smells` detectors to `.check()` + a baseline/ratchet — the "moat") and **runtimeIsolation** — proposals unwritten.
+- **015 (Bun)** — decision adopted (no core preset; tier-3 `@ts-archunit/bun` gated on a second app); nothing to build in core.
 
 ---
 
