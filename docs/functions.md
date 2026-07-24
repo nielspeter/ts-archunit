@@ -4,7 +4,7 @@
 Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
 :::
 
-The `functions()` entry point operates on functions, arrow functions, and class methods. ts-archunit wraps all of these in a unified `ArchFunction` model.
+The `functions()` entry point operates on named functions, arrow function variables, and class methods. ts-archunit wraps these named shapes in a unified `ArchFunction` model. Anonymous shapes — object-literal arrows (`{ GET: () => {} }`) and inline callbacks (`arr.map(x => …)`) — are not collected by `functions()`; reach callbacks via [`within()`](#scoped-rules-with-within).
 
 ## When to Use
 
@@ -16,7 +16,7 @@ The `functions()` entry point operates on functions, arrow functions, and class 
 
 ## ArchFunction
 
-Unlike most linters that treat function declarations, arrow functions, and class methods as separate constructs, ts-archunit collects all three into a single `ArchFunction` type. This lets you write one rule that covers every function shape in your codebase.
+Unlike most linters that treat function declarations, arrow functions, and class methods as separate constructs, ts-archunit collects all three into a single `ArchFunction` type. This lets you write one rule that covers every named function shape in your codebase.
 
 1. **Function declarations** -- `function handleRequest() { ... }`
 2. **Arrow function variables** -- `const handleRequest = () => { ... }`
