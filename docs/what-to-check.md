@@ -62,10 +62,10 @@ Enforce that dependencies between architectural layers only flow in one directio
 // Dependencies flow inward
 slices(p)
   .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
-    domain: 'src/domain/**',
+    controllers: '**/src/controllers/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
+    domain: '**/src/domain/**',
   })
   .should()
   .respectLayerOrder('controllers', 'services', 'repositories', 'domain')

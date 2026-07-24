@@ -27,6 +27,25 @@ export default [
 
 Leave rule-file builders un-terminated; use `.asSeverity('warn')` for warnings. And note the sharp edge: if a stray `.check()` in the array _fails_, it throws mid-load and drops **every other rule in that file** — so a green run can mean nothing ran. See the [conversion guide](/running-in-tests#converting-between-the-two-forms). (In a _test file_ the opposite is true — you _do_ call `.check()`.)
 
+## "Slice discovery matched no files" / a rule selects nothing
+
+Almost always an **unanchored glob**. Globs are matched against the _absolute_ file
+path, so `'src/services/**'` matches nothing — write `'**/src/services/**'`:
+
+```typescript
+slices(p).assignedFrom({ services: 'src/services/**' }) // ❌ 0 files
+slices(p).assignedFrom({ services: '**/src/services/**' }) // ✅
+```
+
+The same applies to preset options (`layers`, `folders`, `shared`, `src`) and to
+predicates like `resideInFolder()`. `matching()` is the exception — it accepts
+`'src/features/*'`, `'src/features/*/'` or `'**/src/features/*'` interchangeably.
+
+Since v0.18 this **fails** instead of passing silently, and the failure names the
+glob at fault: a rule that discovers nothing enforces nothing. If a rule reports
+no violations and you expected some, check the glob before concluding the codebase
+is clean — see [Glob conventions](/slices#glob-conventions-read-this-first).
+
 ## `init` refuses because a file already exists
 
 `init` is non-destructive by default — it won't overwrite your config or rules. Preview what it would do, or overwrite deliberately:

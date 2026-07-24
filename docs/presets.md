@@ -31,9 +31,9 @@ The most universal architecture pattern. Nearly every backend project has layers
 ```typescript
 layeredArchitecture(p, {
   layers: {
-    routes: 'src/routes/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
+    routes: '**/src/routes/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
   },
   shared: ['src/shared/**', 'src/utils/**'],
   strict: true,
@@ -93,7 +93,7 @@ Companion to `layeredArchitecture`. Enforces repository pattern conventions that
 
 ```typescript
 dataLayerIsolation(p, {
-  repositories: 'src/repositories/**',
+  repositories: '**/src/repositories/**',
   baseClass: 'BaseRepository',
   requireTypedErrors: true,
 })
@@ -114,7 +114,7 @@ For projects with distinct feature areas (modules, bounded contexts, packages). 
 
 ```typescript
 strictBoundaries(p, {
-  folders: 'src/features/*',
+  folders: '**/src/features/*',
   shared: ['src/shared/**', 'src/lib/**'],
   isolateTests: true,
   noCopyPaste: true,
@@ -190,7 +190,7 @@ const p = project('tsconfig.json')
 
 export default [
   ...agentGuardrails(p, {
-    src: 'src/**',
+    src: '**/src/**',
     noInlineLogic: ['parseInt', 'JSON.parse', 'eval'],
     noGenericErrors: true,
     noStubs: true,

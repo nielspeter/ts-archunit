@@ -132,9 +132,9 @@ const p = project('tsconfig.json')
 
 layeredArchitecture(p, {
   layers: {
-    routes: 'src/routes/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
+    routes: '**/src/routes/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
   },
   shared: ['src/shared/**'],
   strict: true,
@@ -216,9 +216,9 @@ functions(p).that().resideInFolder('**/domain/**').should().satisfy(functionNoPr
 ```typescript
 slices(p)
   .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
+    controllers: '**/src/controllers/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
   })
   .should()
   .respectLayerOrder('controllers', 'services', 'repositories')

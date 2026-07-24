@@ -31,7 +31,7 @@ const p = project('tsconfig.json')
 
 export default [
   ...agentGuardrails(p, {
-    src: 'src/**',
+    src: '**/src/**',
     noInlineLogic: ['parseInt', 'JSON.parse', 'eval'],
     noGenericErrors: true,
     noStubs: true,
