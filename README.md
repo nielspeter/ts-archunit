@@ -107,6 +107,19 @@ functions(p)
 | Inline exclusion comments                          | Yes         | No                                                                   | Via ESLint                                                                         | Yes                          | No                                            |
 | GitHub PR annotations                              | Yes         | No                                                                   | Via ESLint                                                                         | No                           | No                                            |
 
+## Why Deterministic Rules — and Why Now
+
+AI agents don't just make mistakes; they make the _same_ mistakes at volume, and they produce "dark code that passes tests but undermines implicit architectural constraints" ([Katie Roberts, NearForm](https://nielspeter.github.io/ts-archunit/why-ts-archunit)). The field's numbers agree: AI's productivity gains dissipate in **~3 months** as architectural debt accrues (Carnegie Mellon, via Sonar), while commits rose 25% as review comments fell 27% and **31% more PRs now merge with no review at all** (GitHub / Faros, via eBay's _ReviewDebt_). Review is the bottleneck — so the architecture dimension of review has to be settled mechanically.
+
+Two kinds of tool are converging on that job. ts-archunit is the one that stays **deterministic**:
+
+- **SonarQube and other scanners** are computational but verify a _fixed_ catalog — generic quality, security, complexity. They can't be taught _your_ invariants ("repositories extend `BaseRepository`", "every route has a permission-matrix entry").
+- **LLM review agents** can judge intent, but non-deterministically — "you don't want the green/red state of your pipeline to depend on an LLM's semantic interpretation" (Birgitta Böckeler, ThoughtWorks); the same PR scores differently as the model changes (eBay).
+
+ts-archunit is the **deterministic, computational gate for your team's own architecture** — the cell neither of the above fills. A rule is defensible in a review, and unlike a prompt or a `CLAUDE.md` convention (half-life: weeks), it doesn't rot when the model changes.
+
+→ Full argument and sources: **[Why ts-archunit](./docs/why-ts-archunit.md)**
+
 ## Quick Start with Presets
 
 One function call enforces an entire architecture pattern — layer ordering, cycles, import direction, package restrictions:

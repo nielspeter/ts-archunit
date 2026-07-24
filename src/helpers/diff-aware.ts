@@ -25,7 +25,9 @@ export class DiffFilter {
   filterToChanged(violations: ArchViolation[]): ArchViolation[] {
     const files = this.changedFiles
     if (files === null) return violations
-    return violations.filter((v) => files.has(v.file))
+    // Config-level meta-findings (empty selector/discovery) have no changed
+    // file to attribute to — never filter them out (ADR-008; plan 0067).
+    return violations.filter((v) => v.bypassFilters === true || files.has(v.file))
   }
 
   /** Number of changed files detected, or -1 if diff unavailable */

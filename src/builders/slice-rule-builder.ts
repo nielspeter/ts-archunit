@@ -104,8 +104,14 @@ export class SliceRuleBuilder extends TerminalBuilder {
   }
 
   protected collectViolations(): ArchViolation[] {
-    if (this._slices.length === 0) {
-      return []
+    // Discovery non-vacuity (ADR-008 / plan 0067): a slice selection that
+    // resolved to no slices — or slices that matched no files — discovered
+    // nothing, so it enforces nothing. Fail with a config-level meta-finding
+    // (bypasses diff/baseline) rather than passing vacuously. `assignedFrom()`
+    // returns one slice per key regardless of matches, so the empty case is
+    // "every slice has no files", not "no slices" (arch-014 I1).
+    if (this._slices.length === 0 || this._slices.every((slice) => slice.files.length === 0)) {
+      return [this.emptyDiscoveryViolation()]
     }
 
     if (this._conditions.length === 0) {
@@ -137,6 +143,26 @@ export class SliceRuleBuilder extends TerminalBuilder {
     const sliceDesc = this._slices.map((s) => s.name).join(', ')
     const conditionDesc = this._conditions.map((c) => c.description).join(' and ')
     return `slices [${sliceDesc}] should ${conditionDesc}`
+  }
+
+  /** Config-level meta-finding for empty slice discovery (plan 0067). */
+  private emptyDiscoveryViolation(): ArchViolation {
+    const id = this._metadata?.id ?? 'slices'
+    return {
+      rule: id,
+      ruleId: this._metadata?.id,
+      element: id,
+      file: '',
+      line: 0,
+      message:
+        'Slice discovery matched no files. Globs match absolute file paths, so a ' +
+        'project-relative glob (e.g. "src/*") matches nothing — use "**/src/*". A slice ' +
+        'rule that discovers nothing enforces nothing.',
+      because: this._reason,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+      bypassFilters: true,
+    }
   }
 }
 

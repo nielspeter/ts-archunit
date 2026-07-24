@@ -29,6 +29,7 @@ export abstract class RuleBuilder<T> {
   protected _silentIndices: Set<number> = new Set()
   protected _phase: 'predicate' | 'condition' = 'predicate'
   protected _severity?: 'error' | 'warn'
+  protected _requireNonEmpty = false
 
   constructor(protected readonly project: ArchProject) {}
 
@@ -153,6 +154,19 @@ export abstract class RuleBuilder<T> {
     return this
   }
 
+  /**
+   * Assert that the predicate chain matches at least one subject. If the
+   * filtered subject set is empty, the rule FAILS with a config-level
+   * meta-finding instead of passing vacuously — the "0 === 0" false-green
+   * ADR-008 forbids. Opt-in: legitimately-empty selections (e.g. "no
+   * repositories yet") stay green without it. Built on the materialized
+   * subject set (plan 0064); the finding bypasses diff/baseline (plan 0067).
+   */
+  expectNonEmpty(): this {
+    this._requireNonEmpty = true
+    return this
+  }
+
   // --- Terminal methods ---
 
   /**
@@ -184,6 +198,26 @@ export abstract class RuleBuilder<T> {
     })
     const sev: 'error' | 'warn' = this._severity ?? 'error'
     return filtered.map((v) => ({ ...v, severity: sev }))
+  }
+
+  /**
+   * Return the subject set this rule would evaluate: the elements matched by
+   * the predicate chain (`.that()...`), before any condition runs. Executes the
+   * predicate filter and returns the materialized set.
+   *
+   * Distinct from the abstract `getElements()`, which is the *pre-filter*
+   * population. This is the materialization contract (F1, plan 0064) that
+   * composable primitives build on — `correspondence().side(selection, keyFn)`
+   * keys each subject, and `.expectNonEmpty()` (plan 0064+) asserts the set is
+   * non-empty. It does not evaluate conditions and never warns about their
+   * absence, so it is safe to call on a bare `.that()` selection.
+   *
+   * Note (ADR-007): the returned `T` is the builder's element type (e.g. a
+   * ts-morph `ClassDeclaration` for `classes()`), so this is an acknowledged
+   * raw-node seam for callers that derive keys from subjects.
+   */
+  subjects(): readonly T[] {
+    return this.filterElements()
   }
 
   /**
@@ -280,7 +314,10 @@ export abstract class RuleBuilder<T> {
    * Create a fork of this builder with the same predicates but empty conditions.
    * Used by `.should()` to support named selections without mutation.
    *
-   * Subclasses with additional constructor args MUST override this method.
+   * `Object.assign(fork, this)` copies plain param-property fields (e.g.
+   * `FunctionRuleBuilder._collectionOptions`), so those need no override.
+   * Override only when a field needs a deep copy, or the constructor performs
+   * validation/derivation that a shallow copy would skip.
    */
   protected fork(): this {
     // Object.create/getPrototypeOf return untyped — casts unavoidable at JS interop boundary
@@ -334,20 +371,59 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
+   * Materialize the subject set: all elements narrowed by the predicate chain
+   * (the post-`.that()` set), before any condition runs. Shared by the
+   * `RuleBuilder` execution pipeline (`evaluate`) and the public `subjects()`
+   * accessor so those two cannot diverge (F1). Note: a few builders keep their
+   * own separate materialization for other paths (e.g. `CallRuleBuilder`'s
+   * `within()` matcher) — those are not routed through here.
+   */
+  protected filterElements(): T[] {
+    // AND semantics — every predicate must match.
+    return this.getElements().filter((element) =>
+      this._predicates.every((predicate) => predicate.test(element)),
+    )
+  }
+
+  /**
+   * Build the config-level meta-finding for an empty selector under
+   * `.expectNonEmpty()`. A typed literal (no `createViolation` — there is no
+   * Node), ADR-005-clean, flagged `bypassFilters` so diff/baseline keep it.
+   */
+  private emptySelectionViolation(): ArchViolation {
+    const description = this.buildRuleDescription() || 'selector'
+    return {
+      rule: description,
+      ruleId: this._metadata?.id,
+      element: this._metadata?.id ?? description,
+      file: '',
+      line: 0,
+      message:
+        'Selector matched 0 subjects, but .expectNonEmpty() requires at least one — ' +
+        'likely a wrong glob or filter. If an empty match is valid here, remove .expectNonEmpty().',
+      because: this._reason,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+      bypassFilters: true,
+    }
+  }
+
+  /**
    * Execute the full pipeline: filter elements with predicates,
    * evaluate conditions, return violations.
    */
   private evaluate(): ArchViolation[] {
-    // Step 1: Get all elements from the concrete builder
-    const allElements = this.getElements()
+    // Step 1+2: Get elements and narrow by predicates (see filterElements).
+    const filtered = this.filterElements()
 
-    // Step 2: Filter with predicates (AND — all predicates must match)
-    const filtered = allElements.filter((element) =>
-      this._predicates.every((predicate) => predicate.test(element)),
-    )
-
-    // Step 3: If no elements match predicates, no violations
+    // Step 3: No elements match the predicate chain.
     if (filtered.length === 0) {
+      // Opt-in non-vacuity guard (plan 0067): a selector the author asserted
+      // must match is a config error when empty, not a pass. Meta-finding —
+      // bypasses diff/baseline so it survives the standard CI mode (ADR-008).
+      if (this._requireNonEmpty) {
+        return [this.emptySelectionViolation()]
+      }
       return []
     }
 

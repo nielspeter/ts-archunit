@@ -152,3 +152,40 @@ describe('SliceRuleBuilder chain methods', () => {
     }).not.toThrow()
   })
 })
+
+describe('SliceRuleBuilder discovery non-vacuity (plan 0067)', () => {
+  const p = loadTestProject()
+
+  it('fails when matching() resolves no slices (was a vacuous green)', () => {
+    const v = slices(p)
+      .matching('src/does-not-exist/**')
+      .should()
+      .beFreeOfCycles()
+      .rule({ id: 'test/slice-discovery' })
+      .violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]!.ruleId).toBe('test/slice-discovery')
+    expect(v[0]!.bypassFilters).toBe(true)
+    expect(v[0]!.message).toMatch(/matched no files/)
+  })
+
+  it('fails when assignedFrom() resolves slices with no files (empty-files case)', () => {
+    const v = slices(p)
+      .assignedFrom({ ghost: '**/does-not-exist/**' })
+      .should()
+      .beFreeOfCycles()
+      .violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]!.bypassFilters).toBe(true)
+  })
+
+  it('does NOT trip discovery-vacuity when at least one slice has files (every-guard)', () => {
+    // 'real' matches the fixture; 'ghost' is empty. every(empty) must be false.
+    const v = slices(p)
+      .assignedFrom({ real: '**/*.ts', ghost: '**/does-not-exist/**' })
+      .should()
+      .beFreeOfCycles()
+      .violations()
+    expect(v.every((x) => !/matched no files/.test(x.message))).toBe(true)
+  })
+})

@@ -354,6 +354,17 @@ describe('empty layer', () => {
         .check()
     }).not.toThrow()
   })
+
+  it('haveMatchingCounterpart fails when the left layer matched zero files (was a vacuous green)', () => {
+    const layers: Layer[] = [
+      { name: 'empty', pattern: '**/does-not-exist/**', files: [] },
+      { name: 'schemas', pattern: '**/schemas/**', files: [] },
+    ]
+    const violations = haveMatchingCounterpart(layers).evaluate([], { rule: 'test' })
+    expect(violations).toHaveLength(1)
+    expect(violations[0]!.element).toBe('empty')
+    expect(violations[0]!.message).toMatch(/matched 0 files/)
+  })
 })
 
 describe('haveConsistentExports', () => {

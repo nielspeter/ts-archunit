@@ -10,6 +10,7 @@ import {
   Scope,
   SyntaxKind,
 } from 'ts-morph'
+import { collectObjectLiteralFunctions } from '../helpers/object-literal-functions.js'
 
 /**
  * Unified representation of a TypeScript function.
@@ -150,21 +151,41 @@ export function fromMethodDeclaration(method: MethodDeclaration): ArchFunction {
 }
 
 /**
- * Scan a source file for all functions.
+ * Options for {@link collectFunctions} / the `functions()` entry point.
+ */
+export interface FunctionCollectionOptions {
+  /** Include class methods (pattern 3). Default: `true`. */
+  includeMethods?: boolean
+  /**
+   * Include object-literal function property values — arrows, function
+   * expressions, and method shorthand (`{ GET: () => {} }`, `{ GET(){} }`).
+   * Default: `false`. Opt-in because it widens the "named unit" default set
+   * (proposal 016). Each is named by its qualified property-key path.
+   */
+  includeObjectLiteralFunctions?: boolean
+}
+
+/**
+ * Scan a source file for functions.
  *
- * Returns ArchFunction wrappers for:
+ * Returns ArchFunction wrappers for these *named* shapes by default:
  * 1. FunctionDeclarations — `function foo() {}`
  * 2. VariableDeclarations with ArrowFunction initializer — `const foo = () => {}`
  * 3. Class MethodDeclarations — `class Foo { bar() {} }` (when includeMethods is true)
  *
+ * Plus, when `includeObjectLiteralFunctions` is set (default off):
+ * 4. Object-literal function property values (arrows / function expressions /
+ *    method shorthand), named by their qualified property-key path.
+ *
  * @param sourceFile - The source file to scan
- * @param options - Set `includeMethods: true` to include class methods (default: true)
+ * @param options - {@link FunctionCollectionOptions}
  */
 export function collectFunctions(
   sourceFile: SourceFile,
-  options?: { includeMethods?: boolean },
+  options?: FunctionCollectionOptions,
 ): ArchFunction[] {
   const includeMethods = options?.includeMethods ?? true
+  const includeObjectLiteralFunctions = options?.includeObjectLiteralFunctions ?? false
   const functions: ArchFunction[] = []
 
   // Pattern 1: FunctionDeclarations
@@ -188,5 +209,73 @@ export function collectFunctions(
     }
   }
 
+  // Pattern 4: object-literal function property values (opt-in, proposal 016).
+  // Collect from top-level object literals only; the shared traversal recurses
+  // into nested ones, so each function is collected exactly once.
+  if (includeObjectLiteralFunctions) {
+    const roots = sourceFile
+      .getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression)
+      .filter((objectLiteral) => !isNestedInObjectLiteral(objectLiteral))
+    for (const root of roots) {
+      for (const found of collectObjectLiteralFunctions(root)) {
+        const fn = fromObjectLiteralFunction(found.node, found.keyPath)
+        if (fn) functions.push(fn)
+      }
+    }
+  }
+
   return functions
+}
+
+/** True if `node` is nested inside another object literal (so a root walk covers it). */
+function isNestedInObjectLiteral(node: Node): boolean {
+  let current = node.getParent()
+  while (current) {
+    if (NodeClass.isObjectLiteralExpression(current)) return true
+    current = current.getParent()
+  }
+  return false
+}
+
+/**
+ * Build an ArchFunction for an object-literal function value (arrow / function
+ * expression / method shorthand), named by its qualified property-key path
+ * (e.g. `routes["/x"].GET`) so violations identify the subject uniquely.
+ */
+export function fromObjectLiteralFunction(
+  node: Node,
+  keyPath: readonly string[],
+): ArchFunction | undefined {
+  const name = qualifiedName(keyPath)
+  if (
+    NodeClass.isArrowFunction(node) ||
+    NodeClass.isFunctionExpression(node) ||
+    NodeClass.isMethodDeclaration(node)
+  ) {
+    return {
+      getName: () => name,
+      getSourceFile: () => node.getSourceFile(),
+      isExported: () => false,
+      isAsync: () => node.isAsync(),
+      getParameters: () => node.getParameters(),
+      getReturnType: () => node.getReturnType(),
+      getBody: () => node.getBody(),
+      getNode: () => node,
+      getStartLineNumber: () => node.getStartLineNumber(),
+      getScope: () => 'public',
+    }
+  }
+  return undefined
+}
+
+/** Render a property-key path: `a.b`, bracketing non-identifier keys (`a["/x"].c`). */
+function qualifiedName(keyPath: readonly string[]): string {
+  if (keyPath.length === 0) return '<anonymous>'
+  return keyPath
+    .map((key, index) => {
+      const isIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
+      if (index === 0) return key
+      return isIdentifier ? `.${key}` : `[${JSON.stringify(key)}]`
+    })
+    .join('')
 }

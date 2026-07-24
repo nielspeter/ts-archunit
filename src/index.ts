@@ -109,7 +109,12 @@ export {
   fromFunctionDeclaration,
   fromArrowVariableDeclaration,
   fromMethodDeclaration,
+  fromObjectLiteralFunction,
 } from './models/arch-function.js'
+export type { FunctionCollectionOptions } from './models/arch-function.js'
+// Shared object-literal function traversal (proposal 016 / F3)
+export { collectObjectLiteralFunctions } from './helpers/object-literal-functions.js'
+export type { ObjectLiteralFunction } from './helpers/object-literal-functions.js'
 
 // Function predicates
 export {
@@ -315,6 +320,18 @@ export {
   haveConsistentExports,
   satisfyPairCondition,
 } from './conditions/cross-layer.js'
+
+// Correspondence / coverage primitive (proposal 017)
+export {
+  correspondence,
+  CorrespondenceBuilder,
+  byName,
+  byArg,
+  byPropertyNames,
+} from './builders/correspondence-builder.js'
+export type { KeyFn, KeysSource } from './builders/correspondence-builder.js'
+export { setCorrespondence } from './core/correspondence-core.js'
+export type { CorrespondenceResult } from './core/correspondence-core.js'
 
 // Metric predicates (plan 0028)
 export {

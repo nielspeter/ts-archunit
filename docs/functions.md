@@ -4,7 +4,7 @@
 Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
 :::
 
-The `functions()` entry point operates on functions, arrow functions, and class methods. ts-archunit wraps all of these in a unified `ArchFunction` model.
+The `functions()` entry point operates on named functions, arrow function variables, and class methods. ts-archunit wraps these named shapes in a unified `ArchFunction` model. Anonymous shapes — object-literal arrows (`{ GET: () => {} }`) and inline callbacks (`arr.map(x => …)`) — are not collected by `functions()`; reach callbacks via [`within()`](#scoped-rules-with-within).
 
 ## When to Use
 
@@ -16,13 +16,28 @@ The `functions()` entry point operates on functions, arrow functions, and class 
 
 ## ArchFunction
 
-Unlike most linters that treat function declarations, arrow functions, and class methods as separate constructs, ts-archunit collects all three into a single `ArchFunction` type. This lets you write one rule that covers every function shape in your codebase.
+Unlike most linters that treat function declarations, arrow functions, and class methods as separate constructs, ts-archunit collects all three into a single `ArchFunction` type. This lets you write one rule that covers every named function shape in your codebase.
 
 1. **Function declarations** -- `function handleRequest() { ... }`
 2. **Arrow function variables** -- `const handleRequest = () => { ... }`
 3. **Class methods** -- `class OrderService { handleRequest() { ... } }`
 
 All three support the same predicates and conditions, so you write one rule and it applies everywhere.
+
+### Object-literal functions (opt-in)
+
+Handler-map idioms — `Bun.serve({ routes: { "/x": { GET: () => {} } } })`, Hono/Elysia route maps, reducer maps — put functions as **values inside object literals**, which the three named shapes above do not cover. Opt in to collect them:
+
+```typescript
+functions(p, { includeObjectLiteralFunctions: true })
+  .that()
+  .resideInFolder('**/routes/**')
+  .should()
+  .beAsync()
+  .check()
+```
+
+This collects arrow, function-expression, and method-shorthand property values (recursively, depth-limited), each named by its qualified property-key path (e.g. `routes["/owners/:id"].GET`). It is **off by default** — turning it on would flood existing rules with every inline callback and break the "named unit" contract. `{ includeMethods: false }` is available on the same options object to exclude class methods.
 
 ## Basic Usage
 

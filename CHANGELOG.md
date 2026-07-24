@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Roadmap foundations F1–F4 and proposals 017/016/014 (see `plans/ai-era-product-direction.md`). All new/changed public API is additive except the ⚠️ breaking behavior changes noted below.
+
+### Added
+
+- **`correspondence(p)`** — a coverage/relation primitive: `.side(name, selection, keyFn)` | `.side(name, keys)`, then `.beComplete()` / `.haveNoOrphans()` / `.beBijective()` (+ `.allowEmpty()`, `.distinctKeysOn()`). Compares two independently-derived key sets by identity (never count); an empty side fails (ADR-008). keyFn vocabulary `byName` / `byArg` / `byPropertyNames`; low-level `setCorrespondence()` core. (Proposal 017, plans 0064/0065.)
+- **`RuleBuilder.subjects()`** — materialize the post-`.that()` filtered subject set (F1); **`.expectNonEmpty()`** — opt-in non-vacuity guard: an empty selector fails instead of passing vacuously. (Plans 0064/0067.)
+- **`functions(p, { includeObjectLiteralFunctions })`** — opt-in (default off) collection of object-literal function values (`{ GET: () => {} }`), named by qualified key path; shared `collectObjectLiteralFunctions` traversal. First options object on `functions()`. (Proposal 016, plan 0066.)
+- **`ArchViolation.bypassFilters`** — config-level meta-findings (empty selector/discovery) now survive diff-aware and baseline filtering. (Plan 0067.)
+
+### Changed (⚠️ BREAKING — empty discovery now fails instead of passing)
+
+- **`slices().matching()` / `.assignedFrom()`** that resolve to no slices (or slices with no files) now **fail** with a discovery meta-finding, where they previously passed vacuously. Fix the glob (globs match absolute paths — use `**/src/*`, not `src/*`).
+- **`crossLayer` `haveMatchingCounterpart`** now **fails** when the left layer matched zero files (was a vacuous pass). Reconciled onto the shared `setCorrespondence` core; non-empty behavior is unchanged.
+- **`strictBoundaries`** now emits a `preset/boundaries/discovery` failure when the `folders` glob matches no boundaries, instead of silently generating zero rules.
+
+Migration: a mis-globbed layer/boundary/slice that was silently green will now go red — correct the glob (usually add the `**/` prefix). These findings bypass diff/baseline, so they surface even in PR-only CI.
+
+### Fixed
+
+- `docs/functions.md` overclaimed "every function shape"; corrected to "every _named_ function shape" (a live zero-subject false-green for object-literal handler maps).
+
 ## [0.17.0] - 2026-07-14
 
 ### Added

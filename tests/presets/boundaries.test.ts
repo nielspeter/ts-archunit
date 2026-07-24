@@ -45,8 +45,12 @@ describe('strictBoundaries preset', () => {
     expect(errors(rules)).toEqual([])
   })
 
-  it('emits no rules when no boundary folders match the glob', () => {
-    expect(run({ folders: '**/src/nonexistent-*' })).toEqual([])
+  it('fails discovery (not silently) when no boundary folders match the glob', () => {
+    // Previously returned [] — the exact false green ADR-008 forbids.
+    const found = all(run({ folders: '**/src/nonexistent-*' }))
+    const discovery = found.find((v) => v.ruleId === 'preset/boundaries/discovery')
+    expect(discovery).toBeDefined()
+    expect(discovery!.bypassFilters).toBe(true) // config-level meta-finding, survives diff/baseline
   })
 
   it('detects cross-boundary imports when shared is not specified', () => {
