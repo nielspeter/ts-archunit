@@ -32,6 +32,32 @@ export function collectRule(
   return [builder.rule({ id: ruleId }).asSeverity(effective)]
 }
 
+/**
+ * Guard a preset's *discovery* step (ADR-008 / plan 0067): if a glob discovered
+ * no subjects, return a failing rule carrying a config-level meta-finding rather
+ * than silently generating no rules — the false green a boundaries/layers preset
+ * must never produce. The finding bypasses diff/baseline so it survives the
+ * standard CI mode.
+ */
+export function assertDiscovered(
+  discovered: readonly unknown[],
+  finding: { id: string; glob: string; remedy: string },
+): RuleBuilderLike[] {
+  if (discovered.length > 0) return []
+  const violation: ArchViolation = {
+    rule: finding.id,
+    ruleId: finding.id,
+    element: finding.id,
+    file: '',
+    line: 0,
+    message: `Discovery matched 0 subjects for glob '${finding.glob}'. ${finding.remedy}`,
+    suggestion: finding.remedy,
+    severity: 'error',
+    bypassFilters: true,
+  }
+  return [{ violations: () => [violation] }]
+}
+
 export interface PresetBaseOptions {
   overrides?: Record<string, RuleSeverity>
 }

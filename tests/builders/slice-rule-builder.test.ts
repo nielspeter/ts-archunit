@@ -152,3 +152,30 @@ describe('SliceRuleBuilder chain methods', () => {
     }).not.toThrow()
   })
 })
+
+describe('SliceRuleBuilder discovery non-vacuity (plan 0067)', () => {
+  const p = loadTestProject()
+
+  it('fails when matching() resolves no slices (was a vacuous green)', () => {
+    const v = slices(p)
+      .matching('src/does-not-exist/**')
+      .should()
+      .beFreeOfCycles()
+      .rule({ id: 'test/slice-discovery' })
+      .violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]!.ruleId).toBe('test/slice-discovery')
+    expect(v[0]!.bypassFilters).toBe(true)
+    expect(v[0]!.message).toMatch(/matched no files/)
+  })
+
+  it('fails when assignedFrom() resolves slices with no files (empty-files case)', () => {
+    const v = slices(p)
+      .assignedFrom({ ghost: '**/does-not-exist/**' })
+      .should()
+      .beFreeOfCycles()
+      .violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]!.bypassFilters).toBe(true)
+  })
+})

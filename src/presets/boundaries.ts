@@ -5,7 +5,7 @@ import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import { smells } from '../smells/index.js'
 import type { PresetBaseOptions } from './shared.js'
-import { collectRule, validateOverrides } from './shared.js'
+import { collectRule, validateOverrides, assertDiscovered } from './shared.js'
 
 export interface StrictBoundariesOptions extends PresetBaseOptions {
   /** Glob pattern for boundary folders (e.g., 'src/features/*') */
@@ -111,6 +111,21 @@ export function strictBoundaries(
     const name = dir.split('/').pop() ?? dir
     sliceDef[name] = `${dir}/**`
   }
+
+  // --- Discovery guard: a boundaries preset that finds no boundaries is
+  //     misconfigured (globs match absolute paths — a project-relative glob
+  //     matches nothing). Fail loudly instead of generating zero rules
+  //     (the exact false green of ADR-008 / plan 0067), rather than the old
+  //     silent skip. ---
+  builders.push(
+    ...assertDiscovered(boundaryFolders, {
+      id: 'preset/boundaries/discovery',
+      glob: boundaryGlob,
+      remedy:
+        `Boundary discovery matches absolute file paths, so '${boundaryGlob}' matched nothing. ` +
+        `Use a '**/'-prefixed glob (e.g. '**/${boundaryGlob.replace(/^[./]+/, '')}') or the absolute project path.`,
+    }),
+  )
 
   // --- No cycles between boundaries ---
   if (Object.keys(sliceDef).length > 0) {
