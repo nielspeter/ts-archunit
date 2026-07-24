@@ -3,12 +3,20 @@ import type { PairCondition } from '../core/pair-condition.js'
 import type { ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { LayerPair, Layer } from '../models/cross-layer.js'
+import { setCorrespondence } from '../core/correspondence-core.js'
 
 /**
  * Every element in the left layer must have at least one match in the right layer.
  *
  * Produces a violation for each left-layer file that has no matching pair.
  * "Match" is determined by the mapping function provided via `.mapping()`.
+ *
+ * This is an existence/coverage check, so it shares the set-difference +
+ * non-vacuity core (`setCorrespondence`, F2) with `correspondence()` — the two
+ * "every X has a matching Y" engines cannot drift, and neither can silently
+ * green on an empty side: a left layer that matched **zero** files is a
+ * mis-globbed layer that enforces nothing, so it now fails (ADR-008) rather
+ * than passing vacuously.
  *
  * @param layers - The resolved layers, needed to identify unmatched left files
  */
@@ -26,6 +34,23 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
         const rightLayer = layers[i + 1]
         if (!leftLayer || !rightLayer) continue
 
+        // Non-vacuity (ADR-008): a left layer that matched no files enforces
+        // nothing. Report the mis-globbed layer instead of passing vacuously.
+        if (leftLayer.files.length === 0) {
+          violations.push({
+            rule: context.rule,
+            element: leftLayer.name,
+            file: '',
+            line: 1,
+            message: `Layer "${leftLayer.name}" matched 0 files — a correspondence over an empty layer enforces nothing. Fix the layer glob.`,
+            because: context.because,
+            ruleId: context.ruleId,
+            suggestion: context.suggestion,
+            docs: context.docs,
+          })
+          continue
+        }
+
         // Collect all left files that appear in at least one pair
         const matchedLeftFiles = new Set<string>()
         for (const pair of pairs) {
@@ -34,21 +59,25 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
           }
         }
 
-        // Find unmatched left files
+        // Find unmatched left files via the shared set-difference core (F2).
+        const { missing } = setCorrespondence(
+          leftLayer.files.map((file) => file.getFilePath()),
+          matchedLeftFiles,
+        )
+        const missingPaths = new Set(missing)
         for (const file of leftLayer.files) {
-          if (!matchedLeftFiles.has(file.getFilePath())) {
-            violations.push({
-              rule: context.rule,
-              element: file.getBaseName(),
-              file: file.getFilePath(),
-              line: 1,
-              message: `File "${file.getBaseName()}" in layer "${leftLayer.name}" has no matching counterpart in layer "${rightLayer.name}"`,
-              because: context.because,
-              ruleId: context.ruleId,
-              suggestion: context.suggestion,
-              docs: context.docs,
-            })
-          }
+          if (!missingPaths.has(file.getFilePath())) continue
+          violations.push({
+            rule: context.rule,
+            element: file.getBaseName(),
+            file: file.getFilePath(),
+            line: 1,
+            message: `File "${file.getBaseName()}" in layer "${leftLayer.name}" has no matching counterpart in layer "${rightLayer.name}"`,
+            because: context.because,
+            ruleId: context.ruleId,
+            suggestion: context.suggestion,
+            docs: context.docs,
+          })
         }
       }
 

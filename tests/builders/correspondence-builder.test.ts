@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { Project } from 'ts-morph'
 import { ArchRuleError } from '../../src/core/errors.js'
 import {
   correspondence,
@@ -6,7 +7,19 @@ import {
   byArg,
   byPropertyNames,
 } from '../../src/builders/correspondence-builder.js'
+import { classes } from '../../src/builders/class-rule-builder.js'
+import type { ArchProject } from '../../src/core/project.js'
 import { type TestElement, TestRuleBuilder, stubProject, nameMatches } from '../support/test-rule-builder.js'
+
+function inMemoryProject(files: Record<string, string>): ArchProject {
+  const project = new Project({ useInMemoryFileSystem: true })
+  for (const [name, code] of Object.entries(files)) project.createSourceFile(name, code)
+  return {
+    tsConfigPath: 'in-memory',
+    _project: project,
+    getSourceFiles: () => project.getSourceFiles(),
+  }
+}
 
 const elements: TestElement[] = [
   { name: 'UserService', file: 'src/services/user.ts', line: 5, exported: true },
@@ -219,6 +232,24 @@ describe('correspondence()', () => {
     it('byPropertyNames() keys a type by each property name (one subject → many keys)', () => {
       const iface = { getProperties: () => [{ getName: () => 'a' }, { getName: () => 'b' }] }
       expect(byPropertyNames<typeof iface>()(iface)).toEqual(['a', 'b'])
+    })
+  })
+
+  describe('on a real project (location adapter)', () => {
+    it('attaches real file:line from a ts-morph subject to the violation', () => {
+      const p = inMemoryProject({
+        'src/a.ts': 'export class Alpha {}\n',
+        'src/b.ts': 'export class Beta {}\n',
+      })
+      const v = correspondence(p)
+        .side('classes', classes(p).that(), byName())
+        .side('registry', ['Alpha']) // Beta is missing
+        .beComplete()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.element).toBe('Beta')
+      expect(v[0]!.file).toMatch(/b\.ts$/)
+      expect(v[0]!.line).toBe(1)
     })
   })
 })
