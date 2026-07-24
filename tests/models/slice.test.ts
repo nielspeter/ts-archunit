@@ -64,10 +64,23 @@ describe('resolveByMatching glob spellings (bug 0009)', () => {
     expect(names.length).toBeGreaterThan(1)
   })
 
-  it('treats all four spellings of one intent as identical', () => {
+  it('treats every spelling of one intent as identical', () => {
     const canonical = sliceSet('src/*')
     expect(canonical.length).toBeGreaterThan(1) // non-vacuity anchor
-    for (const spelling of ['src/*/', '**/src/*', '**/src/*/']) {
+    // A slice holding more than one file pins the FILE dimension too: comparing
+    // only names let a mutant that drops files from slices pass the whole suite.
+    expect(canonical).toContainEqual({ name: 'domain', files: ['entity.ts', 'value-object.ts'] })
+    // './' and repeated '**/' are redundant spellings people really write (the
+    // former comes straight out of tsconfig `include`).
+    for (const spelling of [
+      'src/*/',
+      '**/src/*',
+      '**/src/*/',
+      './src/*',
+      './src/*/',
+      '**/./src/*',
+      '**/**/src/*',
+    ]) {
       expect(sliceSet(spelling), `spelling: ${spelling}`).toEqual(canonical)
     }
   })
@@ -157,6 +170,46 @@ describe('resolveByMatching on shapes the fixture cannot express', () => {
         .sort()
     expect(names('src/features/')).toEqual(names('src/features/*'))
     expect(names('src/features/*/')).toEqual(names('src/features/*'))
+  })
+
+  it('cuts baseDir before a PARTIAL wildcard segment too', () => {
+    // 'src/feature-*/x/*': keeping the 'feature-*' segment would put a '*' inside
+    // baseDir, which no real path contains, so every file was discarded.
+    const partial = inMemory({
+      '/repo/src/feature-a/x/1.ts': 'export const a = 1',
+      '/repo/src/feature-b/x/2.ts': 'export const b = 1',
+    })
+    expect(
+      resolveByMatching(partial, 'src/feature-*/x/*')
+        .map((s) => s.name)
+        .sort(),
+    ).toEqual(['feature-a', 'feature-b'])
+  })
+
+  it('treats a directory whose NAME contains glob metacharacters as literal', () => {
+    // Next.js/Remix/SvelteKit dynamic routes: '[slug]', '(marketing)', '[...rest]'
+    // are real directory names. Treating "segment contains a metacharacter" as
+    // "segment is a wildcard" truncated baseDir mid-path, which merged the real
+    // siblings into one slice and pulled in unrelated dirs (a '[slug]' character
+    // class matches 's', 'l', 'u', 'g') — dropping the intra-slice edges
+    // beFreeOfCycles needs and turning a real cycle green.
+    const routes = inMemory({
+      '/repo/src/app/[slug]/a/x.ts': "import '../b/y.js'\nexport const x = 1",
+      '/repo/src/app/[slug]/b/y.ts': "import '../a/x.js'\nexport const y = 1",
+      '/repo/src/app/settings/s.ts': 'export const s = 1',
+      '/repo/src/app/login/l.ts': 'export const l = 1',
+    })
+    const names = (glob: string) =>
+      resolveByMatching(routes, glob)
+        .map((s) => s.name)
+        .sort()
+
+    // The slices are the directories INSIDE '[slug]', and nothing else.
+    expect(names('src/app/[slug]/')).toEqual(['a', 'b'])
+    expect(names('src/app/[slug]/*')).toEqual(['a', 'b'])
+    // Sibling directories must not be dragged in by character-class matching.
+    expect(names('src/app/[slug]/')).not.toContain('settings')
+    expect(names('src/app/[slug]/')).not.toContain('login')
   })
 
   it('fails loudly rather than minting one slice per drive root', () => {

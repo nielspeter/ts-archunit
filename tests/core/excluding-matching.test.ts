@@ -263,6 +263,16 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
       expect(applyFilters([meta], { exclusions: ['slices'] })).toHaveLength(1)
     })
 
+    it('warns that the exclusion was REFUSED, not that it is stale', () => {
+      // "may be stale after a rename" is false here and points at the wrong fix.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const meta = makeViolation({ element: 'slices', file: '', bypassFilters: true })
+      applyFilters([meta], { exclusions: ['slices'], metadata: { id: 'x/y' } })
+      const text = warn.mock.calls.map((call) => String(call[0])).join('\n')
+      expect(text).toContain('cannot be excluded')
+      expect(text).not.toContain('stale after a rename')
+    })
+
     it('still excludes an ordinary violation with the same message text', () => {
       // Proves the guard is scoped to the flag, not a blanket "never exclude".
       const normal = makeViolation({

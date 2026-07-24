@@ -141,7 +141,7 @@ export default [
     .that()
     .resideInFolder('**/src/domain/**')
     .should()
-    .notImportFrom('src/repositories/**'),
+    .notImportFrom('**/src/repositories/**'),
 ]
 ```
 

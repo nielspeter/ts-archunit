@@ -28,10 +28,15 @@ Write `'**/src/services/**'`, not `'src/services/**'`. This applies to
 `assignedFrom()`, the preset options (`layers`, `folders`, `shared`, `src`), and
 path predicates like `resideInFolder()` / `resideInFile()`.
 
-Two things this does **not** apply to: **import** globs
-(`importFrom` / `notImportFrom` / `onlyImportFrom` / `dependOn`) also match the raw
-specifier, so `importFrom('fastify')` is correct as written; and `.excluding()`,
-which takes an exact string or a `RegExp`, not a glob.
+**Import** globs need the anchor too, with one exception. They are matched against
+the _resolved_ absolute path, falling back to the raw specifier only when the import
+does not resolve — so a bare package name works as written
+(`importFrom('fastify')`), while anything path-shaped must be anchored
+(`notImportFrom('**/src/repositories/**')`).
+
+Genuinely exempt: `.excluding()`, which takes an exact string or a `RegExp` rather
+than a glob; and the GraphQL entry points `schema()` / `resolvers()`, whose globs
+are matched against paths relative to the tsconfig directory.
 
 Watch `shared` in particular — anchoring `layers` but leaving `shared` relative
 turns a silent no-op into a false positive, because with `strict: true` `shared`

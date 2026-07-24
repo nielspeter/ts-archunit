@@ -42,10 +42,14 @@ path predicates like `resideInFolder()`. Anchoring `layers` but forgetting
 `shared` is the common half-fix: with `strict: true` that turns the no-op into a
 _false positive_ on imports your config actually permits.
 
-`matching()` is the exception — `'src/features/*'`, `'src/features/*/'` and
-`'**/src/features/*'` are interchangeable. **Import** globs are also exempt
-(`importFrom('fastify')` matches the specifier), and `.excluding()` is not a glob
-at all — it takes an exact string or a `RegExp`.
+Import globs need it too: they match the _resolved_ absolute path and only fall back
+to the raw specifier for unresolvable imports, so `importFrom('fastify')` is fine but
+`notImportFrom('**/src/repositories/**')` needs the anchor.
+
+Three real exceptions: `matching()`, where `'src/features/*'`, `'src/features/*/'`
+and `'**/src/features/*'` are interchangeable; `.excluding()`, which takes an exact
+string or `RegExp`, not a glob; and GraphQL's `schema()` / `resolvers()`, whose globs
+are relative to the tsconfig directory.
 
 Since v0.18 this **fails** instead of passing silently, and the failure names the
 glob at fault: a rule that discovers nothing enforces nothing. If a rule reports

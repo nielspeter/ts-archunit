@@ -35,10 +35,25 @@ describe('SliceRuleBuilder with matching()', () => {
     }).toThrow(ArchRuleError)
   })
 
-  it('passes beFreeOfCycles when slices are acyclic', () => {
+  it('passes beFreeOfCycles when several acyclic slices are compared', () => {
+    // Needs >= 2 populated slices: with one slice there is nothing to compare, and
+    // that now fails rather than passing vacuously (see the single-slice test below).
+    expect(() => {
+      slices(p)
+        .assignedFrom({ domain: '**/domain/**', services: '**/services/**' })
+        .should()
+        .beFreeOfCycles()
+        .check()
+    }).not.toThrow()
+  })
+
+  it('FAILS when discovery yields a single slice (nothing to compare)', () => {
     expect(() => {
       slices(p).matching('src/feature-c').should().beFreeOfCycles().check()
-    }).not.toThrow()
+    }).toThrow(ArchRuleError)
+    const v = slices(p).matching('src/feature-c').should().beFreeOfCycles().violations()
+    expect(v[0]!.message).toContain('exactly one non-empty slice')
+    expect(v[0]!.bypassFilters).toBe(true)
   })
 })
 
@@ -182,18 +197,24 @@ describe('SliceRuleBuilder discovery non-vacuity (plan 0067)', () => {
     expect(v[0]!.bypassFilters).toBe(true)
   })
 
-  it('does NOT trip discovery-vacuity when at least one slice has files (every-guard)', () => {
-    // 'real' matches the fixture; 'ghost' is empty. every(empty) must be false.
-    // Assert on the FLAG, not on message prose: this test previously matched
-    // /matched no files/, and when that phrase was reworded out of existence the
-    // assertion silently became tautological — the `every` vs `some` boundary
-    // went unguarded. bypassFilters is only set by the discovery meta-finding.
-    const v = slices(p)
-      .assignedFrom({ real: '**/*.ts', ghost: '**/does-not-exist/**' })
-      .should()
-      .beFreeOfCycles()
-      .violations()
-    expect(v.some((x) => x.bypassFilters === true)).toBe(false)
+  it('distinguishes ALL-empty from PARTIALLY-empty (the every-guard boundary)', () => {
+    // The `every` vs `some` boundary: all-empty is a glob-convention problem, while
+    // partially-empty means some globs worked and the empty ones are silently
+    // unchecked. Both fail, but with different remedies — so assert on WHICH.
+    // (This test previously matched a prose phrase; when that phrase was reworded
+    // out of existence the assertion became tautological and the boundary went
+    // unguarded. Coupling to the distinguishing content keeps it honest.)
+    const message = (definition: Record<string, string>) =>
+      slices(p).assignedFrom(definition).should().beFreeOfCycles().violations()[0]?.message ?? ''
+
+    const allEmpty = message({ ghostA: '**/nope-a/**', ghostB: '**/nope-b/**' })
+    expect(allEmpty).toContain('Every slice in assignedFrom(...) is empty')
+
+    const partial = message({ real: '**/domain/**', ghost: '**/does-not-exist/**' })
+    expect(partial).toContain('These slices matched no files')
+    expect(partial).toContain('"ghost"') // names the one to fix
+    expect(partial).not.toContain('"real"')
+    expect(partial).not.toContain('Every slice in assignedFrom(...) is empty')
   })
 })
 
@@ -214,15 +235,26 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
    * the sentences are worded.
    */
   const ANCHOR_ADVICE = 'prefix these with "**/"'
-  const PREFIX_ADVICE = 'literal prefix (everything before the first wildcard)'
+  const PREFIX_ADVICE = 'was not found in any of this'
 
-  it('matching(): explains the literal prefix, never the "**/" anchor advice', () => {
+  it('matching(): names the prefix it looked for, never the "**/" anchor advice', () => {
     const message = discoveryMessage((b) => b.matching('src/does-not-exist/*'))
     expect(message).toContain('matching("src/does-not-exist/*")') // names the glob
+    expect(message).toContain('"src/does-not-exist/"') // names the prefix actually searched
     expect(message).toContain(PREFIX_ADVICE)
     expect(message).not.toContain(ANCHOR_ADVICE)
     // The old false remedy, in any wording, must not reappear on this path.
     expect(message).not.toMatch(/use "\*\*\//)
+  })
+
+  it('matching(): a glob with no directory prefix says SO, not "check the prefix"', () => {
+    // 'src' has no directory prefix to look for, so telling the caller to compare a
+    // prefix against their paths would send them to inspect something that does not
+    // exist — the false-remedy shape this guard kept relapsing into.
+    const message = discoveryMessage((b) => b.matching('src'))
+    expect(message).toContain('no literal directory prefix')
+    expect(message).not.toContain(PREFIX_ADVICE)
+    expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
   it('assignedFrom(): anchor advice only when a glob actually lacks the anchor', () => {
@@ -236,7 +268,16 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
     // The false-remedy class one level down: '**/'-prefixed globs that simply
     // point at a missing directory.
     const message = discoveryMessage((b) => b.assignedFrom({ ghost: '**/does-not-exist/**' }))
-    expect(message).toContain('anchored correctly')
+    expect(message).toContain('do not exist in this project')
+    expect(message).not.toContain(ANCHOR_ADVICE)
+  })
+
+  it('assignedFrom(): a directory-shaped glob is told to append "/**"', () => {
+    // '**/src/domain' is anchored and its directory EXISTS — it just matches the
+    // directory entry, not the files under it. "Check they exist" would be false.
+    const message = discoveryMessage((b) => b.assignedFrom({ ghost: '**/src/domain' }))
+    expect(message).toContain('append "/**"')
+    expect(message).not.toContain('do not exist in this project')
     expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
@@ -273,24 +314,182 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
 
   it('an absolute glob is not told to add an anchor', () => {
     const message = discoveryMessage((b) => b.assignedFrom({ ghost: '/abs/missing/**' }))
-    expect(message).toContain('anchored correctly')
+    expect(message).toContain('do not exist in this project')
     expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
-  it('a "./" prefix gets its own remedy (prefixing it would not help)', () => {
-    const message = discoveryMessage((b) => b.assignedFrom({ ghost: './src/domain/**' }))
-    expect(message).toContain('leading "./"')
+  it('a Windows drive-absolute glob is not told to add an anchor', () => {
+    // '**/C:/...' would be worse than the original, so the anchor advice is false here.
+    const message = discoveryMessage((b) => b.assignedFrom({ ghost: 'C:/repo/missing/**' }))
+    expect(message).toContain('do not exist in this project')
     expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
-  it('truncates a long glob list but says how many were hidden', () => {
-    const many: Record<string, string> = {}
+  it('a "./" segment gets its own remedy, wherever it appears', () => {
+    // Both a leading './' and an interior one ('**/./src') are unmatchable AND
+    // unfixable by prefixing, so neither may receive the anchor advice.
+    for (const glob of ['./src/domain/**', '**/./src/domain/**']) {
+      const message = discoveryMessage((b) => b.assignedFrom({ ghost: glob }))
+      expect(message, glob).toContain('"./" segment')
+      expect(message, glob).not.toContain(ANCHOR_ADVICE)
+      expect(message, glob).not.toContain('do not exist in this project')
+    }
+  })
+
+  it('every fault in a mixed definition is named with its OWN remedy', () => {
+    // The failure mode this replaces: reporting one group and stopping, so the
+    // caller fixes what was named, gets a green build, and never learns the rest
+    // were also broken.
+    const message = discoveryMessage((b) =>
+      b.assignedFrom({
+        unanchored: 'src/nope/**',
+        missing: '**/does-not-exist/**',
+        dotted: './src/x/**',
+        dirOnly: '**/src/domain',
+      }),
+    )
+    for (const key of ['unanchored:', 'missing:', 'dotted:', 'dirOnly:']) {
+      expect(message, key).toContain(key)
+    }
+    expect(message).toContain(ANCHOR_ADVICE)
+    expect(message).toContain('"./" segment')
+    expect(message).toContain('append "/**"')
+    expect(message).toContain('do not exist in this project')
+  })
+
+  it('truncates within a fault group but never hides a whole group', () => {
+    const many: Record<string, string> = { shared: 'src/shared/**' }
     for (let i = 0; i < 8; i++) many[`layer${String(i)}`] = `src/nope-${String(i)}/**`
+    many.missing = '**/does-not-exist/**' // a second fault group
     const message = discoveryMessage((b) => b.assignedFrom(many))
-    expect(message).toContain('layer0:')
-    expect(message).toContain('layer4:')
-    expect(message).not.toContain('layer7:') // beyond the shown window
-    expect(message).toContain('and 3 more')
+    expect(message).toContain('shared:') // error-prone key is always kept
+    expect(message).toContain('and 5 more')
+    expect(message).toContain('missing:') // the other group survives truncation
+  })
+
+  it('EVERY remedy is true: applying what each message says fixes the rule', () => {
+    // The generalization of "the anchor remedy is TRUE", and the guard that this
+    // family of bugs kept evading. Three rounds of fixes each shipped a new
+    // confidently-worded sentence that was false on a reachable path, because only
+    // one branch had a test that executed its own advice. This table executes all
+    // of them: fire the branch, apply the transformation it recommends, and assert
+    // discovery recovers. A future branch cannot ship a false remedy and stay green.
+    const nested = (): ArchProject => {
+      const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+      tsMorphProject.createSourceFile('/repo/src/features/auth/user.ts', 'export const u = 1')
+      tsMorphProject.createSourceFile('/repo/src/features/billing/order.ts', 'export const o = 1')
+      return {
+        tsConfigPath: '/repo/tsconfig.json',
+        _project: tsMorphProject,
+        getSourceFiles: () => tsMorphProject.getSourceFiles(),
+      }
+    }
+
+    type Case = {
+      readonly branch: string
+      readonly marker: string
+      readonly broken: (b: SliceRuleBuilder) => SliceRuleBuilder
+      readonly remedy: (b: SliceRuleBuilder) => SliceRuleBuilder
+    }
+
+    const cases: readonly Case[] = [
+      {
+        branch: 'no slice source',
+        marker: 'No slice source',
+        broken: (b) => b,
+        remedy: (b) => b.matching('src/features/*'),
+      },
+      {
+        branch: 'matching: no directory prefix',
+        marker: 'no literal directory prefix',
+        broken: (b) => b.matching('src'),
+        remedy: (b) => b.matching('src/features/*'),
+      },
+      {
+        branch: 'matching: prefix not found',
+        marker: 'was not found in any of this',
+        broken: (b) => b.matching('src/nope/*'),
+        remedy: (b) => b.matching('src/features/*'),
+      },
+      {
+        branch: 'matching: single slice',
+        marker: 'exactly one non-empty slice',
+        broken: (b) => b.matching('src/features'),
+        remedy: (b) => b.matching('src/features/*'),
+      },
+      {
+        branch: 'assignedFrom: no entries',
+        marker: 'no entries',
+        broken: (b) => b.assignedFrom({}),
+        remedy: (b) => b.assignedFrom({ a: '**/auth/**', b: '**/billing/**' }),
+      },
+      {
+        branch: 'assignedFrom: unanchored',
+        marker: 'prefix these with "**/"',
+        broken: (b) => b.assignedFrom({ a: 'src/features/auth/**', b: 'src/features/billing/**' }),
+        remedy: (b) =>
+          b.assignedFrom({ a: '**/src/features/auth/**', b: '**/src/features/billing/**' }),
+      },
+      {
+        branch: 'assignedFrom: "./" segment',
+        marker: '"./" segment',
+        broken: (b) =>
+          b.assignedFrom({ a: './src/features/auth/**', b: './src/features/billing/**' }),
+        remedy: (b) =>
+          b.assignedFrom({ a: '**/src/features/auth/**', b: '**/src/features/billing/**' }),
+      },
+      {
+        branch: 'assignedFrom: directory-only',
+        marker: 'append "/**"',
+        broken: (b) => b.assignedFrom({ a: '**/src/features/auth', b: '**/src/features/billing' }),
+        remedy: (b) =>
+          b.assignedFrom({ a: '**/src/features/auth/**', b: '**/src/features/billing/**' }),
+      },
+      {
+        branch: 'assignedFrom: partially empty',
+        marker: 'These slices matched no files',
+        broken: (b) => b.assignedFrom({ a: '**/auth/**', b: '**/billing/**', ghost: '**/nope/**' }),
+        remedy: (b) => b.assignedFrom({ a: '**/auth/**', b: '**/billing/**' }),
+      },
+    ]
+
+    for (const testCase of cases) {
+      const before = testCase
+        .broken(slices(nested()))
+        .should()
+        .beFreeOfCycles()
+        .violations()
+        .filter((v) => v.bypassFilters === true)
+      expect(before, `${testCase.branch}: should report a config finding`).toHaveLength(1)
+      expect(before[0]!.message, `${testCase.branch}: message identifies the branch`).toContain(
+        testCase.marker,
+      )
+
+      const after = testCase
+        .remedy(slices(nested()))
+        .should()
+        .beFreeOfCycles()
+        .violations()
+        .filter((v) => v.bypassFilters === true)
+      expect(
+        after,
+        `${testCase.branch}: the remedy this message states must actually fix it — got: ${after[0]?.message ?? ''}`,
+      ).toEqual([])
+    }
+  })
+
+  it('cannot be downgraded to a warning', () => {
+    // Exclusions and baselining already refuse meta-findings; `.asSeverity('warn')`
+    // was the remaining way to make a rule that enforces nothing look green, and a
+    // warning is invisible to the agent consumer (ADR-008).
+    const v = slices(p)
+      .matching('src/does-not-exist/*')
+      .should()
+      .beFreeOfCycles()
+      .asSeverity('warn')
+      .violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]!.severity).toBe('error')
   })
 
   it('blames the tsconfig, not the glob, when the project loaded no files', () => {

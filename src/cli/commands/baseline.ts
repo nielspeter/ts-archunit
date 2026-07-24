@@ -34,6 +34,23 @@ export async function runBaseline(args: BaselineArgs): Promise<void> {
 
   generateBaseline(violations, args.output)
 
-  process.stdout.write(`Baseline generated: ${String(violations.length)} violations recorded\n`)
+  // Report what was actually WRITTEN, not what was collected. Config-level findings
+  // are deliberately not baselineable (they report that a rule enforces nothing), so
+  // printing the pre-filter count told users they had accepted findings that CI would
+  // still fail on, with no hint why.
+  const refused = violations.filter((v) => v.bypassFilters === true)
+  const recorded = violations.length - refused.length
+
+  process.stdout.write(`Baseline generated: ${String(recorded)} violations recorded\n`)
   process.stdout.write(`Written to: ${args.output}\n`)
+
+  if (refused.length > 0) {
+    process.stdout.write(
+      `\n${String(refused.length)} finding(s) could NOT be baselined — each reports a rule ` +
+        `that currently enforces nothing, so accepting it would hide the gap. Fix these:\n`,
+    )
+    for (const violation of refused) {
+      process.stdout.write(`  - ${violation.rule}: ${violation.message}\n`)
+    }
+  }
 }

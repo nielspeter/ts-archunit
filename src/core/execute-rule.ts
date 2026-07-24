@@ -37,6 +37,8 @@ export function applyFilters(
   const exclusions = ctx.exclusions ?? []
   if (exclusions.length > 0) {
     const matchedPatterns = new Set<number>()
+    /** Patterns that matched a meta-finding, which cannot be excluded. */
+    const refusedPatterns = new Set<number>()
     result = result.filter((v) => {
       // Config-level meta-findings (empty selector / empty discovery) are never
       // excludable: they report that the rule checks NOTHING, so silencing one
@@ -45,7 +47,18 @@ export function applyFilters(
       // made green — the exact false-green ADR-008 exists to prevent. This
       // matters more now that meta-messages quote the user's own globs/paths,
       // which an unrelated path exclusion can incidentally match.
-      if (v.bypassFilters) return true
+      if (v.bypassFilters) {
+        // Record a pattern that WOULD have matched, so the "unused exclusion" warning
+        // below doesn't tell the caller their exclusion is stale after a rename. It
+        // isn't stale — it is refused, which is a different instruction.
+        const wouldMatch = exclusions.findIndex((pattern) =>
+          typeof pattern === 'string'
+            ? [v.element, v.file, v.message].includes(pattern)
+            : [v.element, v.file, v.message].some((target) => pattern.test(target)),
+        )
+        if (wouldMatch >= 0) refusedPatterns.add(wouldMatch)
+        return true
+      }
 
       // Match against element, file, or message — so that custom conditions
       // using createViolation() can be excluded by file path or message content,
@@ -66,7 +79,13 @@ export function applyFilters(
     const ruleId = ctx.metadata?.id ?? 'unnamed'
     const silentIndices = ctx.silentIndices ?? new Set()
     exclusions.forEach((pattern, index) => {
-      if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
+      if (refusedPatterns.has(index)) {
+        console.warn(
+          `[ts-archunit] Exclusion '${String(pattern)}' in rule '${ruleId}' matched a ` +
+            `configuration finding, which cannot be excluded — that finding reports the ` +
+            `rule enforces nothing. Fix the rule's selector instead.`,
+        )
+      } else if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
         console.warn(
           `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
             `It matched zero violations — it may be stale after a rename.`,
@@ -114,9 +133,21 @@ export function applyFilters(
   return result
 }
 
-/** Stamp any un-stamped violation with a default severity (per-violation wins). */
+/**
+ * Stamp any un-stamped violation with a default severity (per-violation wins).
+ *
+ * Config-level meta-findings are always `error`. They report that the rule checks
+ * NOTHING — downgrading one to a warning is the same false green as excluding or
+ * baselining it, which are both already refused, and ADR-008 is explicit that an
+ * actionable finding must fail rather than warn (the agent consumer does not read
+ * warnings). `.asSeverity('warn')` remains honoured for real violations of the same
+ * rule; it just cannot switch off the check that the rule is wired up at all.
+ */
 function stampSeverity(violations: ArchViolation[], severity: 'error' | 'warn'): ArchViolation[] {
-  return violations.map((v) => ({ ...v, severity: v.severity ?? severity }))
+  return violations.map((v) => ({
+    ...v,
+    severity: v.bypassFilters ? 'error' : (v.severity ?? severity),
+  }))
 }
 
 /**
