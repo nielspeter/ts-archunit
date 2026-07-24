@@ -4,19 +4,20 @@ All public exports from `ts-archunit`, organized by category.
 
 ## Entry Points
 
-| Export        | Signature                                         | Description                                                      |
-| ------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
-| `project`     | `project(tsConfigPath: string): ArchProject`      | Load a TypeScript project. Cached per path.                      |
-| `workspace`   | `workspace(tsConfigPaths: string[]): ArchProject` | Load multiple tsconfigs into a unified project for monorepo use. |
-| `modules`     | `modules(p: ArchProject): ModuleRuleBuilder`      | Rule builder for source files (imports/dependencies).            |
-| `classes`     | `classes(p: ArchProject): ClassRuleBuilder`       | Rule builder for class declarations.                             |
-| `functions`   | `functions(p: ArchProject): FunctionRuleBuilder`  | Rule builder for functions, arrow functions, class methods.      |
-| `types`       | `types(p: ArchProject): TypeRuleBuilder`          | Rule builder for interfaces and type aliases.                    |
-| `slices`      | `slices(p: ArchProject): SliceRuleBuilder`        | Rule builder for file groupings (cycles, layers).                |
-| `calls`       | `calls(p: ArchProject): CallRuleBuilder`          | Rule builder for call expressions.                               |
-| `jsxElements` | `jsxElements(p: ArchProject): JsxRuleBuilder`     | Rule builder for JSX elements in .tsx/.jsx files.                |
-| `within`      | `within(sel: CallRuleBuilder): ScopedContext`     | Scoped rule builder for callback functions inside matched calls. |
-| `tsconfig`    | `tsconfig(p: ArchProject): TsconfigBuilder`       | Assert the project's resolved TypeScript compiler options.       |
+| Export           | Signature                                                                             | Description                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `project`        | `project(tsConfigPath: string): ArchProject`                                          | Load a TypeScript project. Cached per path.                                                                                                                     |
+| `workspace`      | `workspace(tsConfigPaths: string[]): ArchProject`                                     | Load multiple tsconfigs into a unified project for monorepo use.                                                                                                |
+| `modules`        | `modules(p: ArchProject): ModuleRuleBuilder`                                          | Rule builder for source files (imports/dependencies).                                                                                                           |
+| `classes`        | `classes(p: ArchProject): ClassRuleBuilder`                                           | Rule builder for class declarations.                                                                                                                            |
+| `functions`      | `functions(p: ArchProject, options?: FunctionCollectionOptions): FunctionRuleBuilder` | Rule builder for functions, arrow functions, class methods. `options.includeObjectLiteralFunctions` (default off) also collects object-literal function values. |
+| `types`          | `types(p: ArchProject): TypeRuleBuilder`                                              | Rule builder for interfaces and type aliases.                                                                                                                   |
+| `slices`         | `slices(p: ArchProject): SliceRuleBuilder`                                            | Rule builder for file groupings (cycles, layers).                                                                                                               |
+| `calls`          | `calls(p: ArchProject): CallRuleBuilder`                                              | Rule builder for call expressions.                                                                                                                              |
+| `jsxElements`    | `jsxElements(p: ArchProject): JsxRuleBuilder`                                         | Rule builder for JSX elements in .tsx/.jsx files.                                                                                                               |
+| `within`         | `within(sel: CallRuleBuilder): ScopedContext`                                         | Scoped rule builder for callback functions inside matched calls.                                                                                                |
+| `tsconfig`       | `tsconfig(p: ArchProject): TsconfigBuilder`                                           | Assert the project's resolved TypeScript compiler options.                                                                                                      |
+| `correspondence` | `correspondence(p: ArchProject): CorrespondenceBuilder`                               | Assert two independently-derived key sets correspond ("every X has a matching Y").                                                                              |
 
 ## Rule Builders
 
@@ -33,22 +34,25 @@ All public exports from `ts-archunit`, organized by category.
 | `CallRuleBuilder`           | Builder returned by `calls()`.                             |
 | `JsxRuleBuilder`            | Builder returned by `jsxElements()`.                       |
 | `ScopedFunctionRuleBuilder` | Builder returned by `within().functions()`.                |
+| `CorrespondenceBuilder`     | Builder returned by `correspondence()`.                    |
 
 ## Rule Builder Methods
 
 Chain methods available on all rule builders (`RuleBuilder`, `SliceRuleBuilder`).
 
-| Method            | Signature                                                          | Description                                                                                                                                                                                                                                                                                                                               |
-| ----------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.excluding()`    | `.excluding(...patterns: (string \| RegExp \| SilentExclusion)[])` | Permanently suppress violations matching element name (e.g., `'MyService.doWork'`), file path, or message. Strings use exact match; regex uses `.test()`. Warns on unused patterns. Wrap with `silent()` to suppress the warning.                                                                                                         |
-| `.because()`      | `.because(reason: string)`                                         | Attach a human-readable rationale to the rule.                                                                                                                                                                                                                                                                                            |
-| `.rule()`         | `.rule(metadata: RuleMetadata)`                                    | Attach rich metadata (id, because, suggestion, docs).                                                                                                                                                                                                                                                                                     |
-| `.check()`        | `.check(options?: CheckOptions)`                                   | Execute rule; throw on violations.                                                                                                                                                                                                                                                                                                        |
-| `.warn()`         | `.warn(options?: CheckOptions)`                                    | Execute rule; log violations without throwing.                                                                                                                                                                                                                                                                                            |
-| `.severity()`     | `.severity(level: 'error' \| 'warn')`                              | **Terminal** — execute immediately with the given severity (`'error'` ≡ `.check()`, `'warn'` ≡ `.warn()`). Returns `void`.                                                                                                                                                                                                                |
-| `.asSeverity()`   | `.asSeverity(level: 'error' \| 'warn'): this`                      | **Non-terminal** — mark the rule's severity WITHOUT executing, and return `this`. Use in a rule file's `export default [...]` array so the CLI runs it; `.violations()` stamps each result with this severity. `'error'` is the default, so `.asSeverity('warn')` is the meaningful call. Do NOT confuse with the terminal `.severity()`. |
-| `.violations()`   | `.violations(): ArchViolation[]`                                   | Execute rule, return violations without throwing (severity-stamped). For programmatic access and presets.                                                                                                                                                                                                                                 |
-| `.describeRule()` | `.describeRule(): RuleDescription`                                 | Return rule metadata without executing. Used by `explain` command.                                                                                                                                                                                                                                                                        |
+| Method              | Signature                                                          | Description                                                                                                                                                                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.excluding()`      | `.excluding(...patterns: (string \| RegExp \| SilentExclusion)[])` | Permanently suppress violations matching element name (e.g., `'MyService.doWork'`), file path, or message. Strings use exact match; regex uses `.test()`. Warns on unused patterns. Wrap with `silent()` to suppress the warning.                                                                                                         |
+| `.because()`        | `.because(reason: string)`                                         | Attach a human-readable rationale to the rule.                                                                                                                                                                                                                                                                                            |
+| `.rule()`           | `.rule(metadata: RuleMetadata)`                                    | Attach rich metadata (id, because, suggestion, docs).                                                                                                                                                                                                                                                                                     |
+| `.check()`          | `.check(options?: CheckOptions)`                                   | Execute rule; throw on violations.                                                                                                                                                                                                                                                                                                        |
+| `.warn()`           | `.warn(options?: CheckOptions)`                                    | Execute rule; log violations without throwing.                                                                                                                                                                                                                                                                                            |
+| `.severity()`       | `.severity(level: 'error' \| 'warn')`                              | **Terminal** — execute immediately with the given severity (`'error'` ≡ `.check()`, `'warn'` ≡ `.warn()`). Returns `void`.                                                                                                                                                                                                                |
+| `.asSeverity()`     | `.asSeverity(level: 'error' \| 'warn'): this`                      | **Non-terminal** — mark the rule's severity WITHOUT executing, and return `this`. Use in a rule file's `export default [...]` array so the CLI runs it; `.violations()` stamps each result with this severity. `'error'` is the default, so `.asSeverity('warn')` is the meaningful call. Do NOT confuse with the terminal `.severity()`. |
+| `.violations()`     | `.violations(): ArchViolation[]`                                   | Execute rule, return violations without throwing (severity-stamped). For programmatic access and presets.                                                                                                                                                                                                                                 |
+| `.subjects()`       | `.subjects(): readonly T[]`                                        | The elements matched by the predicate chain (post-`.that()`, before any condition). Powers `correspondence().side()` and `.expectNonEmpty()`.                                                                                                                                                                                             |
+| `.expectNonEmpty()` | `.expectNonEmpty(): this`                                          | Fail — instead of passing vacuously — if the selector matches zero subjects (opt-in non-vacuity guard). The finding bypasses diff-aware/baseline.                                                                                                                                                                                         |
+| `.describeRule()`   | `.describeRule(): RuleDescription`                                 | Return rule metadata without executing. Used by `explain` command.                                                                                                                                                                                                                                                                        |
 
 ## Running Rule Arrays
 
@@ -347,18 +351,61 @@ See [Smell Detection](/smell-detection) for usage examples.
 
 ## Cross-Layer Validation
 
-| Export                    | Signature                                                                                       | Description                                                              |
-| ------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `crossLayer`              | `crossLayer(p: ArchProject): CrossLayerBuilder`                                                 | Entry point for cross-layer consistency rules.                           |
-| `CrossLayerBuilder`       | class                                                                                           | Builder: `.layer(name, glob)` (2+ required) then `.mapping(fn)`.         |
-| `MappedCrossLayerBuilder` | class                                                                                           | After `.mapping()`: provides `.forEachPair()`.                           |
-| `PairConditionBuilder`    | class                                                                                           | After `.forEachPair()`: provides `.should(condition)`.                   |
-| `PairFinalBuilder`        | class                                                                                           | Terminal: `.because()`, `.rule()`, `.check()`, `.warn()`, `.severity()`. |
-| `haveMatchingCounterpart` | `haveMatchingCounterpart(layers: Layer[]): PairCondition`                                       | Every left-layer file must have a counterpart in the right layer.        |
-| `haveConsistentExports`   | `haveConsistentExports(extractLeft, extractRight): PairCondition`                               | Every exported symbol in left file must appear in right file.            |
-| `satisfyPairCondition`    | `satisfyPairCondition(desc: string, fn: (pair: LayerPair) => Violation \| null): PairCondition` | Custom inline pair condition.                                            |
+| Export                    | Signature                                                                                       | Description                                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `crossLayer`              | `crossLayer(p: ArchProject): CrossLayerBuilder`                                                 | Entry point for cross-layer consistency rules.                                                            |
+| `CrossLayerBuilder`       | class                                                                                           | Builder: `.layer(name, glob)` (2+ required) then `.mapping(fn)`.                                          |
+| `MappedCrossLayerBuilder` | class                                                                                           | After `.mapping()`: provides `.forEachPair()`.                                                            |
+| `PairConditionBuilder`    | class                                                                                           | After `.forEachPair()`: provides `.should(condition)`.                                                    |
+| `PairFinalBuilder`        | class                                                                                           | Terminal: `.because()`, `.rule()`, `.check()`, `.warn()`, `.severity()`.                                  |
+| `haveMatchingCounterpart` | `haveMatchingCounterpart(layers: Layer[]): PairCondition`                                       | Every left-layer file must have a counterpart in the right layer. Fails on an empty left layer (v0.18.0). |
+| `haveConsistentExports`   | `haveConsistentExports(extractLeft, extractRight): PairCondition`                               | Every exported symbol in left file must appear in right file.                                             |
+| `satisfyPairCondition`    | `satisfyPairCondition(desc: string, fn: (pair: LayerPair) => Violation \| null): PairCondition` | Custom inline pair condition.                                                                             |
 
 See [Cross-Layer Validation](/cross-layer) for usage examples.
+
+## Correspondence
+
+`correspondence(p)` asserts that two independently-derived key sets correspond — "every X has a matching Y" (ADR-008 Rule 5 as a primitive). Compares by **identity, never count**; an empty side **fails** (non-vacuity). Call `.side()` twice, then an assertion.
+
+| Method              | Signature                                                                                                                 | Description                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `.side()`           | `.side(name, selection: RuleBuilder<T>, keyFn: KeyFn<T>)` · `.side(name, keys: readonly string[] \| ReadonlySet<string>)` | Add a side — a selection keyed by `keyFn`, or a pre-derived key set. Call twice. |
+| `.beComplete()`     | `.beComplete(): this`                                                                                                     | Every key of the first side has a match in the second (A ⊆ B).                   |
+| `.haveNoOrphans()`  | `.haveNoOrphans(): this`                                                                                                  | Every key of the second side has a source in the first (B ⊆ A).                  |
+| `.beBijective()`    | `.beBijective(): this`                                                                                                    | Both directions — the key sets are identical.                                    |
+| `.allowEmpty()`     | `.allowEmpty(sideName: string): this`                                                                                     | Opt a named side out of the non-vacuity guard.                                   |
+| `.distinctKeysOn()` | `.distinctKeysOn(sideName: string): this`                                                                                 | Fail if a side maps two distinct subjects to one key (over-normalization).       |
+
+Extends `TerminalBuilder`, so `.rule()` / `.excluding()` / `.check()` / `.warn()` / `.violations()` also apply.
+
+| Export              | Signature                                               | Description                                                                                 |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `byName`            | `byName<T>(): KeyFn<T>`                                 | Key a subject by `getName()` (`<anonymous>` fallback).                                      |
+| `byArg`             | `byArg<T>(index: number): KeyFn<T>`                     | Key a call-like subject by its argument at `index` (string/template literals are unquoted). |
+| `byPropertyNames`   | `byPropertyNames<T>(): KeyFn<T>`                        | Key a subject by each of its property names (one subject → many keys).                      |
+| `setCorrespondence` | `setCorrespondence(aKeys, bKeys): CorrespondenceResult` | Pure identity set-difference + emptiness core (also backs `crossLayer`'s existence check).  |
+
+```typescript
+import { correspondence, calls, byArg } from '@nielspeter/ts-archunit'
+import { ROUTE_PERMISSIONS } from '../src/config/route-permissions.js'
+
+correspondence(p)
+  .side(
+    'routes',
+    calls(p)
+      .that()
+      .onObject('app')
+      .and()
+      .withMethod(/^(get|post)$/),
+    byArg(0),
+  )
+  .side('matrix', Object.keys(ROUTE_PERMISSIONS))
+  .should()
+  .beBijective()
+  .rule({ id: 'auth/route-matrix', suggestion: 'Add the route to ROUTE_PERMISSIONS.' })
+  .check()
+```
 
 ## Extension API
 
@@ -443,42 +490,47 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 ## Types (TypeScript)
 
-| Export                | Kind | Description                                                         |
-| --------------------- | ---- | ------------------------------------------------------------------- |
-| `ArchProject`         | type | Loaded TypeScript project.                                          |
-| `Predicate`           | type | Predicate interface.                                                |
-| `Condition`           | type | Condition interface.                                                |
-| `ConditionContext`    | type | Context passed to condition evaluators.                             |
-| `ArchViolation`       | type | Violation model.                                                    |
-| `RuleMetadata`        | type | Rule metadata (`id`, `because`, `suggestion`, `docs`).              |
-| `RuleDescription`     | type | Structured rule description returned by `.describeRule()`.          |
-| `CheckOptions`        | type | Options for `.check()`.                                             |
-| `OutputFormat`        | type | Output format (`'terminal' \| 'github' \| 'json'`).                 |
-| `FormatOptions`       | type | Options for formatting functions.                                   |
-| `CodeFrameOptions`    | type | Options for `generateCodeFrame()`.                                  |
-| `ExpressionMatcher`   | type | Matcher returned by `call()`, `newExpr()`, etc.                     |
-| `TypeMatcher`         | type | Matcher used with `havePropertyType()`.                             |
-| `TypeDeclaration`     | type | Union of interface and type alias declarations.                     |
-| `ArchFunction`        | type | Unified function/arrow/method model.                                |
-| `ArchCall`            | type | Model for matched call expressions.                                 |
-| `Slice`               | type | A named group of source files.                                      |
-| `SliceDefinition`     | type | Input to `assignedFrom()`.                                          |
-| `Named`               | type | Element with a name.                                                |
-| `Located`             | type | Element with a file location.                                       |
-| `Exportable`          | type | Element that can be exported.                                       |
-| `BaselineEntry`       | type | Single entry in a baseline file.                                    |
-| `BaselineFile`        | type | Structure of the baseline JSON file.                                |
-| `Layer`               | type | Layer definition for cross-layer validation.                        |
-| `LayerPair`           | type | Pair of elements from two layers.                                   |
-| `PairCondition`       | type | Condition for cross-layer pairs.                                    |
-| `ArchPattern`         | type | Pattern template definition.                                        |
-| `PropertyConstraint`  | type | Property type constraint in a pattern.                              |
-| `Fingerprint`         | type | AST fingerprint for similarity detection.                           |
-| `ScopedContext`       | type | Context returned by `within()`.                                     |
-| `ExtractedCallback`   | type | Callback extracted from a call expression.                          |
-| `PropertyBearingNode` | type | Union of interface, type alias, and class declarations.             |
-| `ImportOptions`       | type | Options for import conditions/predicates (`{ ignoreTypeImports }`). |
-| `CliConfig`           | type | CLI configuration object.                                           |
+| Export                      | Kind | Description                                                                                       |
+| --------------------------- | ---- | ------------------------------------------------------------------------------------------------- |
+| `ArchProject`               | type | Loaded TypeScript project.                                                                        |
+| `Predicate`                 | type | Predicate interface.                                                                              |
+| `Condition`                 | type | Condition interface.                                                                              |
+| `ConditionContext`          | type | Context passed to condition evaluators.                                                           |
+| `ArchViolation`             | type | Violation model.                                                                                  |
+| `RuleMetadata`              | type | Rule metadata (`id`, `because`, `suggestion`, `docs`).                                            |
+| `RuleDescription`           | type | Structured rule description returned by `.describeRule()`.                                        |
+| `CheckOptions`              | type | Options for `.check()`.                                                                           |
+| `OutputFormat`              | type | Output format (`'terminal' \| 'github' \| 'json'`).                                               |
+| `FormatOptions`             | type | Options for formatting functions.                                                                 |
+| `CodeFrameOptions`          | type | Options for `generateCodeFrame()`.                                                                |
+| `ExpressionMatcher`         | type | Matcher returned by `call()`, `newExpr()`, etc.                                                   |
+| `TypeMatcher`               | type | Matcher used with `havePropertyType()`.                                                           |
+| `TypeDeclaration`           | type | Union of interface and type alias declarations.                                                   |
+| `ArchFunction`              | type | Unified function/arrow/method model.                                                              |
+| `ArchCall`                  | type | Model for matched call expressions.                                                               |
+| `FunctionCollectionOptions` | type | Options for `functions()` (`includeMethods`, `includeObjectLiteralFunctions`).                    |
+| `KeyFn`                     | type | `correspondence().side()` key extractor: `(subject: T) => string \| readonly string[]`.           |
+| `KeysSource`                | type | A pre-derived key set: `readonly string[] \| ReadonlySet<string>`.                                |
+| `CorrespondenceResult`      | type | Result of `setCorrespondence()` (`missing`, `orphans`, `aEmpty`, `bEmpty`).                       |
+| `ObjectLiteralFunction`     | type | A function found in an object literal (`node`, `keyPath`) from `collectObjectLiteralFunctions()`. |
+| `Slice`                     | type | A named group of source files.                                                                    |
+| `SliceDefinition`           | type | Input to `assignedFrom()`.                                                                        |
+| `Named`                     | type | Element with a name.                                                                              |
+| `Located`                   | type | Element with a file location.                                                                     |
+| `Exportable`                | type | Element that can be exported.                                                                     |
+| `BaselineEntry`             | type | Single entry in a baseline file.                                                                  |
+| `BaselineFile`              | type | Structure of the baseline JSON file.                                                              |
+| `Layer`                     | type | Layer definition for cross-layer validation.                                                      |
+| `LayerPair`                 | type | Pair of elements from two layers.                                                                 |
+| `PairCondition`             | type | Condition for cross-layer pairs.                                                                  |
+| `ArchPattern`               | type | Pattern template definition.                                                                      |
+| `PropertyConstraint`        | type | Property type constraint in a pattern.                                                            |
+| `Fingerprint`               | type | AST fingerprint for similarity detection.                                                         |
+| `ScopedContext`             | type | Context returned by `within()`.                                                                   |
+| `ExtractedCallback`         | type | Callback extracted from a call expression.                                                        |
+| `PropertyBearingNode`       | type | Union of interface, type alias, and class declarations.                                           |
+| `ImportOptions`             | type | Options for import conditions/predicates (`{ ignoreTypeImports }`).                               |
+| `CliConfig`                 | type | CLI configuration object.                                                                         |
 
 ## GraphQL Extension (`ts-archunit/graphql`)
 
