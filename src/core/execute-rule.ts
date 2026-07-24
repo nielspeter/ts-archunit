@@ -38,6 +38,15 @@ export function applyFilters(
   if (exclusions.length > 0) {
     const matchedPatterns = new Set<number>()
     result = result.filter((v) => {
+      // Config-level meta-findings (empty selector / empty discovery) are never
+      // excludable: they report that the rule checks NOTHING, so silencing one
+      // silences the guard itself. Baseline and diff-aware already honor this
+      // flag; `.excluding()` must too, or a rule that enforces nothing can be
+      // made green — the exact false-green ADR-008 exists to prevent. This
+      // matters more now that meta-messages quote the user's own globs/paths,
+      // which an unrelated path exclusion can incidentally match.
+      if (v.bypassFilters) return true
+
       // Match against element, file, or message — so that custom conditions
       // using createViolation() can be excluded by file path or message content,
       // not just by element name (which may be a generic AST node kind).
