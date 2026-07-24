@@ -41,6 +41,61 @@ describe('resolveByMatching', () => {
   })
 })
 
+describe('resolveByMatching glob spellings (bug 0009)', () => {
+  const p = loadTestProject()
+
+  /**
+   * Compare the full slice SET, not a projection of it. Asserting only on
+   * downstream cycle messages let a mutant that silently drops a slice pass the
+   * entire suite — `beFreeOfCycles` never mentions acyclic slices.
+   */
+  function sliceSet(glob: string) {
+    return resolveByMatching(p, glob)
+      .map((s) => ({ name: s.name, files: s.files.map((f) => f.getBaseName()).sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  it('resolves the documented directory-level form (was 0 slices)', () => {
+    // 'src/*/' is the spelling used across README/docs/examples; a trailing '/'
+    // put the wildcard inside baseDir, which no absolute path ever contains.
+    const names = sliceSet('src/*/').map((s) => s.name)
+    expect(names).toContain('feature-a')
+    expect(names).toContain('domain')
+    expect(names.length).toBeGreaterThan(1)
+  })
+
+  it('treats all four spellings of one intent as identical', () => {
+    const canonical = sliceSet('src/*')
+    expect(canonical.length).toBeGreaterThan(1) // non-vacuity anchor
+    for (const spelling of ['src/*/', '**/src/*', '**/src/*/']) {
+      expect(sliceSet(spelling), `spelling: ${spelling}`).toEqual(canonical)
+    }
+  })
+
+  it('names one slice per FILE when files sit directly in the prefix dir', () => {
+    // The shape from the bug report (56 flat service files -> 56 slices). The
+    // message must not promise "directories".
+    expect(sliceSet('src/domain/*').map((s) => s.name)).toEqual(['entity.ts', 'value-object.ts'])
+    expect(sliceSet('**/src/domain/*')).toEqual(sliceSet('src/domain/*'))
+  })
+
+  it('keeps the literal-prefix form working', () => {
+    expect(sliceSet('src/feature-').map((s) => s.name)).toEqual([
+      'feature-a',
+      'feature-b',
+      'feature-c',
+    ])
+    expect(sliceSet('**/src/feature-')).toEqual(sliceSet('src/feature-'))
+  })
+
+  it('resolves nothing for globs with no literal prefix (stays a loud failure)', () => {
+    // These must not accidentally yield a slice named '' or a drive root.
+    for (const glob of ['**', '**/', '*', '']) {
+      expect(resolveByMatching(p, glob), `glob: ${glob}`).toEqual([])
+    }
+  })
+})
+
 describe('resolveByDefinition', () => {
   const p = loadTestProject()
 
