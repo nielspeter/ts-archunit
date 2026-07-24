@@ -178,4 +178,14 @@ describe('SliceRuleBuilder discovery non-vacuity (plan 0067)', () => {
     expect(v).toHaveLength(1)
     expect(v[0]!.bypassFilters).toBe(true)
   })
+
+  it('does NOT trip discovery-vacuity when at least one slice has files (every-guard)', () => {
+    // 'real' matches the fixture; 'ghost' is empty. every(empty) must be false.
+    const v = slices(p)
+      .assignedFrom({ real: '**/*.ts', ghost: '**/does-not-exist/**' })
+      .should()
+      .beFreeOfCycles()
+      .violations()
+    expect(v.every((x) => !/matched no files/.test(x.message))).toBe(true)
+  })
 })

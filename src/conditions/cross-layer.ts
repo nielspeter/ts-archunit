@@ -47,6 +47,9 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
             ruleId: context.ruleId,
             suggestion: context.suggestion,
             docs: context.docs,
+            // Config-level meta-finding: no source file, so it must survive
+            // diff-aware/baseline or the guard re-greens under standard CI.
+            bypassFilters: true,
           })
           continue
         }

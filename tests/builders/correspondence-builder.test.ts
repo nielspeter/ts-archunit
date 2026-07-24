@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { ArchRuleError } from '../../src/core/errors.js'
 import {
@@ -8,6 +8,7 @@ import {
   byPropertyNames,
 } from '../../src/builders/correspondence-builder.js'
 import { classes } from '../../src/builders/class-rule-builder.js'
+import { calls } from '../../src/builders/call-rule-builder.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { type TestElement, TestRuleBuilder, stubProject, nameMatches } from '../support/test-rule-builder.js'
 
@@ -88,6 +89,7 @@ describe('correspondence()', () => {
         .side('registry', ['UserService', 'Ghost'])
         .beBijective()
         .violations()
+      expect(v).toHaveLength(2) // exactly the missing + the orphan, nothing spurious
       const msgs = v.map((x) => x.message)
       expect(msgs).toContain('services "OrderService" has no matching registry')
       expect(msgs).toContain('registry "Ghost" has no matching services')
@@ -135,41 +137,31 @@ describe('correspondence()', () => {
   })
 
   describe('.distinctKeysOn() — over-normalization guard', () => {
-    it('fails when a side maps distinct subjects to one key', () => {
-      const collapsed = new TestRuleBuilder(stubProject, elements).that()
-      const v = correspondence(stubProject)
-        .side('a', collapsed, () => 'same')
-        .side('b', ['same'])
-        .beComplete()
-        .distinctKeysOn('a')
-        .violations()
-      expect(v.length).toBeGreaterThan(0)
-      expect(v.every((x) => /over-normalization/.test(x.message))).toBe(true)
+    it('fails per collapsed subject when a side maps distinct subjects to one key', () => {
+      const base = () =>
+        correspondence(stubProject)
+          .side('a', new TestRuleBuilder(stubProject, elements).that(), () => 'same')
+          .side('b', ['same'])
+          .beComplete()
+      const withGuard = base().distinctKeysOn('a').violations()
+      // every element collapsed to the single key "same" → one finding each
+      expect(withGuard).toHaveLength(elements.length)
+      expect(withGuard.every((x) => /over-normalization/.test(x.message))).toBe(true)
+      // opt-in: without .distinctKeysOn() the collapse is not flagged (beComplete passes)
+      expect(base().violations()).toEqual([])
     })
   })
 
-  describe('literal ↔ literal independence footgun', () => {
-    it('warns when both sides are literal key lists', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      correspondence(stubProject)
-        .side('a', ['x'])
-        .side('b', ['x'])
-        .beComplete()
+  describe('multi-key / empty keyFn', () => {
+    it('a keyFn returning [] contributes no keys (subject deliberately vanishes)', () => {
+      const v = correspondence(stubProject)
+        .side('a', services(), () => [])
+        .side('b', ['UserService'])
+        .allowEmpty('a') // a produced no keys — permitted here
+        .haveNoOrphans()
         .violations()
-      expect(warnSpy).toHaveBeenCalledOnce()
-      expect(warnSpy.mock.calls[0]?.[0]).toMatch(/independently derived/)
-      warnSpy.mockRestore()
-    })
-
-    it('does not warn when one side is a selection', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      correspondence(stubProject)
-        .side('services', services(), byNameKey)
-        .side('registry', ['UserService', 'OrderService'])
-        .beComplete()
-        .violations()
-      expect(warnSpy).not.toHaveBeenCalled()
-      warnSpy.mockRestore()
+      // a is empty; b's only key has no source in a → one orphan
+      expect(v.map((x) => x.element)).toEqual(['UserService'])
     })
   })
 
@@ -223,9 +215,12 @@ describe('correspondence()', () => {
       )
     })
 
-    it('byArg(i) keys by the argument source text', () => {
-      const call = { getArguments: () => [{ getText: () => '"/users/:id"' }] }
-      expect(byArg<typeof call>(0)(call)).toBe('"/users/:id"')
+    it('byArg(i) keys by the argument, unquoting string/template literals', () => {
+      const call = {
+        getArguments: () => [{ getText: () => '"/users/:id"' }, { getText: () => 'handler' }],
+      }
+      expect(byArg<typeof call>(0)(call)).toBe('/users/:id') // surrounding quotes stripped
+      expect(byArg<typeof call>(1)(call)).toBe('handler') // non-literal left as-is
       expect(byArg<typeof call>(9)(call)).toBe('<no-arg>')
     })
 
@@ -250,6 +245,38 @@ describe('correspondence()', () => {
       expect(v[0]!.element).toBe('Beta')
       expect(v[0]!.file).toMatch(/b\.ts$/)
       expect(v[0]!.line).toBe(1)
+    })
+
+    it('attaches file:line via a model-wrapper subject (ArchCall.getNode) + unquoted byArg', () => {
+      const p = inMemoryProject({
+        'src/routes.ts':
+          'declare const app: { get(p: string, h: () => void): void }\n' +
+          'app.get("/a", () => {})\n' +
+          'app.get("/b", () => {})\n',
+      })
+      const v = correspondence(p)
+        .side('routes', calls(p).that().onObject('app').and().withMethod('get'), byArg(0))
+        .side('registry', ['/a']) // '/b' missing — byArg unquotes, so keys are '/a','/b'
+        .beComplete()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.message).toContain('/b')
+      expect(v[0]!.file).toMatch(/routes\.ts$/)
+      expect(v[0]!.line).toBe(3) // the app.get("/b") call — not '' / 0 (would mean the adapter failed)
+    })
+
+    it('fans out one subject to many keys via byPropertyNames (multi-key keyFn)', () => {
+      const p = inMemoryProject({
+        'src/limits.ts': 'export class Limits { a = 1; b = 2; c = 3 }\n',
+      })
+      const v = correspondence(p)
+        .side('fields', classes(p).that().haveNameMatching(/Limits/), byPropertyNames())
+        .side('enforced', ['a', 'b']) // 'c' has no enforcement
+        .beComplete()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.message).toBe('fields "c" has no matching enforced')
+      expect(v[0]!.file).toMatch(/limits\.ts$/)
     })
   })
 })

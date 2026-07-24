@@ -61,6 +61,16 @@ describe('functions({ includeObjectLiteralFunctions }) (proposal 016)', () => {
     expect(added.some((t) => t.startsWith('routes["/owners/:id"].POST@'))).toBe(true)
   })
 
+  it('names a computed-key handler <computed> (no invented remedy)', () => {
+    const p = inMemoryProject({
+      'src/r.ts': 'const k = "x"\nexport const routes = { [k]: () => {} }\n',
+    })
+    const names = functions(p, { includeObjectLiteralFunctions: true })
+      .subjects()
+      .map((f) => f.getName())
+    expect(names).toContain('<computed>')
+  })
+
   it('the flag survives a .should() fork (named selection)', () => {
     const p = inMemoryProject(FIXTURE)
     const seen: string[] = []

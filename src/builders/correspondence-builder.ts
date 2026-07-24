@@ -29,8 +29,6 @@ interface ViolationMeta {
 
 interface Side {
   readonly name: string
-  /** True for a plain key list — used to warn on the literal↔literal footgun. */
-  readonly isLiteral: boolean
   /** Lazily build key → subjects (subjects is empty for a literal side). */
   readonly materialize: () => Map<string, unknown[]>
 }
@@ -125,13 +123,9 @@ export class CorrespondenceBuilder extends TerminalBuilder {
           `correspondence side '${name}' from a selection requires a keyFn (subject -> key).`,
         )
       }
-      this._sides.push({
-        name,
-        isLiteral: false,
-        materialize: () => keyedFromSelection(source, keyFn),
-      })
+      this._sides.push({ name, materialize: () => keyedFromSelection(source, keyFn) })
     } else {
-      this._sides.push({ name, isLiteral: true, materialize: () => keyedFromKeys(source) })
+      this._sides.push({ name, materialize: () => keyedFromKeys(source) })
     }
     return this
   }
@@ -256,15 +250,11 @@ export class CorrespondenceBuilder extends TerminalBuilder {
       }
     }
 
-    // Independence footgun (ADR-008): two literal lists compared to each other
-    // are not a guard — the check only bites when the sides derive differently.
-    if (sideA.isLiteral && sideB.isLiteral) {
-      console.warn(
-        `[ts-archunit] ${meta.rule}: both sides are literal key lists. A correspondence ` +
-          `only guards when its two sides are independently derived (e.g. AST vs a runtime ` +
-          `object). Two hand-written lists compared to each other detect nothing.`,
-      )
-    }
+    // NOTE: independence of the two sides is a *requirement* stated in the docs,
+    // not something the builder can mechanically enforce — two literal lists can
+    // be legitimately independent (e.g. Object.keys of two different runtime
+    // objects), so a "both sides literal" heuristic would false-positive, and a
+    // console.warn is invisible to the agent consumer (ADR-008). Left to review.
 
     return violations
   }
@@ -296,15 +286,20 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   }
 
   private emptyViolation(sideName: string, meta: ViolationMeta): ArchViolation {
-    return this.baseViolation(
-      sideName,
-      '',
-      0,
-      `correspondence side '${sideName}' matched 0 subjects — a correspondence over an ` +
-        `empty side certifies nothing. Fix the selector, or call .allowEmpty('${sideName}') ` +
-        `if an empty side is valid here.`,
-      meta,
-    )
+    return {
+      ...this.baseViolation(
+        sideName,
+        '',
+        0,
+        `correspondence side '${sideName}' matched 0 subjects — a correspondence over an ` +
+          `empty side certifies nothing. Fix the selector, or call .allowEmpty('${sideName}') ` +
+          `if an empty side is valid here.`,
+        meta,
+      ),
+      // Config-level meta-finding: no source file to attribute to, so it must
+      // survive diff-aware/baseline or the guard re-greens under standard CI.
+      bypassFilters: true,
+    }
   }
 
   private baseViolation(
@@ -343,14 +338,27 @@ export function byName<T extends { getName(): string | undefined }>(): KeyFn<T> 
   return (subject) => subject.getName() ?? '<anonymous>'
 }
 
-/** Key a call-like subject by the source text of its argument at `index`. */
+/**
+ * Key a call-like subject by its argument at `index`. String/template literal
+ * arguments are unquoted so keys match plain sides (e.g. `Object.keys(map)`) —
+ * `app.get("/x", …)` keys as `/x`, not `"/x"`. Non-literal args key by raw text.
+ */
 export function byArg<T extends { getArguments(): { getText(): string }[] }>(
   index: number,
 ): KeyFn<T> {
   return (subject) => {
     const arg = subject.getArguments()[index]
-    return arg ? arg.getText() : '<no-arg>'
+    return arg ? unquote(arg.getText()) : '<no-arg>'
   }
+}
+
+/** Strip a single pair of matching surrounding quotes/backticks, if present. */
+function unquote(text: string): string {
+  const first = text[0]
+  if ((first === '"' || first === "'" || first === '`') && text.length >= 2 && text.endsWith(first)) {
+    return text.slice(1, -1)
+  }
+  return text
 }
 
 /** Key a type-like subject by each of its property names (one subject → many keys). */

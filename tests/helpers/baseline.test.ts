@@ -141,3 +141,29 @@ describe('Baseline', () => {
     expect(result).toHaveLength(2)
   })
 })
+
+describe('bypassFilters meta-findings (plan 0067)', () => {
+  it('never baselines away a bypassFilters finding, even when its hash is known (ADR-008)', () => {
+    const outputPath = path.join(createTmpDir(), 'baseline.json')
+    // Seed with a NON-bypass finding; hash is rule::element::message (excludes
+    // bypassFilters), so a same-shaped bypass finding hashes identically.
+    const seed = mv({ element: 'selector', message: 'empty selector' })
+    generateBaseline([seed], outputPath)
+    const baseline = withBaseline(outputPath)
+    // Vacuity guard: the non-bypass finding IS known → correctly dropped.
+    expect(baseline.filterNew([seed])).toEqual([])
+    // The same finding flagged bypassFilters survives despite being "known".
+    const meta = mv({ element: 'selector', message: 'empty selector', bypassFilters: true })
+    expect(baseline.filterNew([meta])).toEqual([meta])
+  })
+
+  it('generateBaseline does not write bypassFilters findings into the file', () => {
+    const outputPath = path.join(createTmpDir(), 'baseline.json')
+    const meta = mv({ rule: 'empty-selector', message: 'empty selector', bypassFilters: true })
+    const normal = mv({ element: 'A' })
+    generateBaseline([meta, normal], outputPath)
+    const written = JSON.parse(fs.readFileSync(outputPath, 'utf-8')) as BaselineFile
+    expect(written.count).toBe(1)
+    expect(written.violations.some((e) => e.rule === 'empty-selector')).toBe(false)
+  })
+})

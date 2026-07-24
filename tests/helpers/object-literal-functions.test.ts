@@ -36,6 +36,10 @@ describe('collectObjectLiteralFunctions (F3 — shared object-literal traversal)
     // ...but a shallower nesting is collected.
     const ol2 = firstObjectLiteral('const x = { a: { GET: () => {} } }')
     expect(collectObjectLiteralFunctions(ol2).map((f) => f.keyPath)).toEqual([['a', 'GET']])
+    // ...and the deepest ALLOWED level (3rd object, depth 2) is still collected —
+    // pins the exact boundary so a silent 3→2 tightening would be caught.
+    const ol3 = firstObjectLiteral('const x = { a: { b: { GET: () => {} } } }')
+    expect(collectObjectLiteralFunctions(ol3).map((f) => f.keyPath)).toEqual([['a', 'b', 'GET']])
   })
 
   it('degrades a computed key to <computed>', () => {

@@ -107,12 +107,17 @@ export function generateBaseline(violations: ArchViolation[], outputPath: string
   const resolved = path.resolve(outputPath)
   const baselineDir = path.dirname(resolved)
 
-  const entries: BaselineEntry[] = violations.map((v) => ({
-    rule: v.rule,
-    file: toRelativePath(v.file, baselineDir),
-    line: v.line,
-    hash: hashViolation(v),
-  }))
+  // Config-level meta-findings (empty selector/discovery) must never be
+  // baselined away — they carry bypassFilters and are re-kept by filterNew
+  // regardless, so writing them in only pollutes the file (plan 0067).
+  const entries: BaselineEntry[] = violations
+    .filter((v) => v.bypassFilters !== true)
+    .map((v) => ({
+      rule: v.rule,
+      file: toRelativePath(v.file, baselineDir),
+      line: v.line,
+      hash: hashViolation(v),
+    }))
 
   const baseline: BaselineFile = {
     generatedAt: new Date().toISOString(),

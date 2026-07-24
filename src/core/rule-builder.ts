@@ -314,7 +314,10 @@ export abstract class RuleBuilder<T> {
    * Create a fork of this builder with the same predicates but empty conditions.
    * Used by `.should()` to support named selections without mutation.
    *
-   * Subclasses with additional constructor args MUST override this method.
+   * `Object.assign(fork, this)` copies plain param-property fields (e.g.
+   * `FunctionRuleBuilder._collectionOptions`), so those need no override.
+   * Override only when a field needs a deep copy, or the constructor performs
+   * validation/derivation that a shallow copy would skip.
    */
   protected fork(): this {
     // Object.create/getPrototypeOf return untyped — casts unavoidable at JS interop boundary
@@ -369,9 +372,11 @@ export abstract class RuleBuilder<T> {
 
   /**
    * Materialize the subject set: all elements narrowed by the predicate chain
-   * (the post-`.that()` set), before any condition runs. The single place
-   * predicate filtering happens — shared by the execution engine (`evaluate`)
-   * and the public `subjects()` accessor so the two can never diverge (F1).
+   * (the post-`.that()` set), before any condition runs. Shared by the
+   * `RuleBuilder` execution pipeline (`evaluate`) and the public `subjects()`
+   * accessor so those two cannot diverge (F1). Note: a few builders keep their
+   * own separate materialization for other paths (e.g. `CallRuleBuilder`'s
+   * `within()` matcher) — those are not routed through here.
    */
   protected filterElements(): T[] {
     // AND semantics — every predicate must match.
