@@ -24,6 +24,21 @@ Unlike most linters that treat function declarations, arrow functions, and class
 
 All three support the same predicates and conditions, so you write one rule and it applies everywhere.
 
+### Object-literal functions (opt-in)
+
+Handler-map idioms — `Bun.serve({ routes: { "/x": { GET: () => {} } } })`, Hono/Elysia route maps, reducer maps — put functions as **values inside object literals**, which the three named shapes above do not cover. Opt in to collect them:
+
+```typescript
+functions(p, { includeObjectLiteralFunctions: true })
+  .that()
+  .resideInFolder('**/routes/**')
+  .should()
+  .beAsync()
+  .check()
+```
+
+This collects arrow, function-expression, and method-shorthand property values (recursively, depth-limited), each named by its qualified property-key path (e.g. `routes["/owners/:id"].GET`). It is **off by default** — turning it on would flood existing rules with every inline callback and break the "named unit" contract. `{ includeMethods: false }` is available on the same options object to exclude class methods.
+
 ## Basic Usage
 
 ```typescript

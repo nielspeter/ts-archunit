@@ -9,7 +9,7 @@ import {
   functionNotHaveEmptyBody,
 } from '../conditions/body-analysis-function.js'
 import type { ArchFunction } from '../models/arch-function.js'
-import { collectFunctions } from '../models/arch-function.js'
+import { collectFunctions, type FunctionCollectionOptions } from '../models/arch-function.js'
 import { followPattern as followPatternCondition } from '../conditions/pattern.js'
 import type { ArchPattern } from '../helpers/pattern.js'
 import {
@@ -81,8 +81,19 @@ import {
  * ```
  */
 export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
+  constructor(
+    project: ArchProject,
+    private readonly _collectionOptions?: FunctionCollectionOptions,
+  ) {
+    super(project)
+  }
+
   protected getElements(): ArchFunction[] {
-    return this.project.getSourceFiles().flatMap((sf) => collectFunctions(sf))
+    // _collectionOptions survives `.should()` forks via RuleBuilder.fork()'s
+    // Object.assign(fork, this) — verified by the named-selection test.
+    return this.project
+      .getSourceFiles()
+      .flatMap((sf) => collectFunctions(sf, this._collectionOptions))
   }
 
   // --- Identity predicates (delegated to plan 0003 generics) ---
@@ -340,6 +351,9 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
  *   .check()
  * ```
  */
-export function functions(p: ArchProject): FunctionRuleBuilder {
-  return new FunctionRuleBuilder(p)
+export function functions(
+  p: ArchProject,
+  options?: FunctionCollectionOptions,
+): FunctionRuleBuilder {
+  return new FunctionRuleBuilder(p, options)
 }

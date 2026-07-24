@@ -1,5 +1,6 @@
-import { type CallExpression, type Node, Node as NodeUtils, SyntaxKind } from 'ts-morph'
+import { type CallExpression, Node, SyntaxKind } from 'ts-morph'
 import type { ArchFunction } from '../models/arch-function.js'
+import { collectObjectLiteralFunctions } from './object-literal-functions.js'
 
 /**
  * Represents a callback function extracted from a call expression argument.
@@ -38,7 +39,7 @@ export function extractCallbacks(callExpr: CallExpression): ExtractedCallback[] 
       callbacks.push(fn)
     } else {
       // Search object literal arguments for function-valued properties
-      callbacks.push(...extractFromObjectLiteral(arg, callExpr, i, 0))
+      callbacks.push(...extractFromObjectLiteral(arg, callExpr, i))
     }
   }
 
@@ -46,54 +47,29 @@ export function extractCallbacks(callExpr: CallExpression): ExtractedCallback[] 
 }
 
 /**
- * Maximum depth to recurse into nested object literals.
- * Prevents extracting unintended callbacks from deep config/schema structures.
- */
-const MAX_OBJECT_DEPTH = 3
-
-/**
- * Recursively search an ObjectLiteralExpression for function-like property values.
- *
- * Handles:
- * - Arrow function properties: `{ handler: (req) => { ... } }`
- * - Function expression properties: `{ handler: function(req) { ... } }`
- * - Method shorthand: `{ handler(req) { ... } }`
- * - Nested object literals: `{ hooks: { onRequest: (req) => { ... } } }`
- *
- * Stops at MAX_OBJECT_DEPTH to avoid false positives from schema defaults.
+ * Extract function-valued properties from an object-literal argument as
+ * callbacks, using the shared object-literal traversal (F3). Handles arrows,
+ * function expressions, method shorthand, and nested object literals
+ * (depth-limited). Callback names stay context-derived (arrows anonymous),
+ * exactly as before — F3 supplies the traversal, not the naming.
  */
 function extractFromObjectLiteral(
   arg: Node,
   callSite: CallExpression,
   argIndex: number,
-  depth: number,
 ): ExtractedCallback[] {
-  if (!NodeUtils.isObjectLiteralExpression(arg)) return []
-  if (depth >= MAX_OBJECT_DEPTH) return []
-  const results: ExtractedCallback[] = []
-  for (const prop of arg.getProperties()) {
-    // Method shorthand: { handler(req, res) { ... } }
-    if (NodeUtils.isMethodDeclaration(prop)) {
-      results.push({
-        fn: fromMethodDeclaration(prop),
-        callSite,
-        argIndex,
-      })
-      continue
-    }
-    if (!NodeUtils.isPropertyAssignment(prop)) continue
-    const init = prop.getInitializer()
-    if (!init) continue
-    // Direct function property
-    const direct = extractInlineFunction(init, callSite, argIndex)
-    if (direct) {
-      results.push(direct)
-      continue
-    }
-    // Recurse into nested object literals (depth-limited)
-    results.push(...extractFromObjectLiteral(init, callSite, argIndex, depth + 1))
-  }
-  return results
+  return collectObjectLiteralFunctions(arg).map((olf) => ({
+    fn: callbackArchFunction(olf.node),
+    callSite,
+    argIndex,
+  }))
+}
+
+/** Wrap an object-literal function node as an ArchFunction for the callback path. */
+function callbackArchFunction(node: Node): ArchFunction {
+  if (Node.isArrowFunction(node)) return fromArrowExpression(node)
+  if (Node.isFunctionExpression(node)) return fromFunctionExpression(node)
+  return fromMethodDeclaration(node)
 }
 
 /**
