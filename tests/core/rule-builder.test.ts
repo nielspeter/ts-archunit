@@ -391,4 +391,72 @@ describe('RuleBuilder', () => {
       }
     })
   })
+
+  describe('.subjects() (F1 — filtered-subject materialization)', () => {
+    it('returns the elements narrowed by the predicate chain, by identity', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const subjects = builder.that().withPredicate(nameMatches(/Service$/)).subjects()
+      expect(subjects.map((e) => e.name)).toEqual(['UserService', 'OrderService'])
+    })
+
+    it('ANDs multiple predicates', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const subjects = builder
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .and()
+        .withPredicate(isExported())
+        .subjects()
+      expect(subjects.map((e) => e.name)).toEqual(['UserService', 'OrderService'])
+    })
+
+    it('returns the full population when no predicate is set', () => {
+      const builder = new TestRuleBuilder(stubProject, elements)
+      expect(builder.subjects().map((e) => e.name)).toEqual(elements.map((e) => e.name))
+    })
+
+    it('returns empty when nothing matches — and does NOT warn about missing conditions', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const builder = new TestRuleBuilder(stubProject, elements)
+      const subjects = builder.that().withPredicate(nameMatches(/^Nope$/)).subjects()
+      expect(subjects).toEqual([])
+      // subjects() materializes; it does not execute, so the condition-phase warning must not fire.
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+
+    it('feeds conditions from the same filter — subjects() equals the condition input (F1 single source)', () => {
+      const seenByCondition: string[] = []
+      new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .should()
+        .withCondition({
+          description: 'record subjects',
+          evaluate: (els: TestElement[]) => {
+            for (const el of els) seenByCondition.push(el.name)
+            return []
+          },
+        })
+        .check()
+      const viaSubjects = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+        .subjects()
+        .map((e) => e.name)
+      // vacuity guard on the guard: the set is non-empty
+      expect(viaSubjects.length).toBeGreaterThan(0)
+      // identity, both directions — subjects() and the condition input cannot drift
+      expect(new Set(viaSubjects)).toEqual(new Set(seenByCondition))
+    })
+
+    it('reflects a named selection without needing .should(), and does not mutate it', () => {
+      const services = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/Service$/))
+      expect(services.subjects().map((e) => e.name)).toEqual(['UserService', 'OrderService'])
+      // still usable as a rule afterwards
+      expect(() => services.should().withCondition(alwaysPass()).check()).not.toThrow()
+    })
+  })
 })

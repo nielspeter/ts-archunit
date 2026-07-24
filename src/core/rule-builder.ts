@@ -187,6 +187,26 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
+   * Return the subject set this rule would evaluate: the elements matched by
+   * the predicate chain (`.that()...`), before any condition runs. Executes the
+   * predicate filter and returns the materialized set.
+   *
+   * Distinct from the abstract `getElements()`, which is the *pre-filter*
+   * population. This is the materialization contract (F1, plan 0064) that
+   * composable primitives build on — `correspondence().side(selection, keyFn)`
+   * keys each subject, and `.expectNonEmpty()` (plan 0064+) asserts the set is
+   * non-empty. It does not evaluate conditions and never warns about their
+   * absence, so it is safe to call on a bare `.that()` selection.
+   *
+   * Note (ADR-007): the returned `T` is the builder's element type (e.g. a
+   * ts-morph `ClassDeclaration` for `classes()`), so this is an acknowledged
+   * raw-node seam for callers that derive keys from subjects.
+   */
+  subjects(): readonly T[] {
+    return this.filterElements()
+  }
+
+  /**
    * Execute the rule and throw `ArchRuleError` if any violations are found.
    * This is the primary terminal method — use in test assertions.
    *
@@ -334,17 +354,25 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
+   * Materialize the subject set: all elements narrowed by the predicate chain
+   * (the post-`.that()` set), before any condition runs. The single place
+   * predicate filtering happens — shared by the execution engine (`evaluate`)
+   * and the public `subjects()` accessor so the two can never diverge (F1).
+   */
+  protected filterElements(): T[] {
+    // AND semantics — every predicate must match.
+    return this.getElements().filter((element) =>
+      this._predicates.every((predicate) => predicate.test(element)),
+    )
+  }
+
+  /**
    * Execute the full pipeline: filter elements with predicates,
    * evaluate conditions, return violations.
    */
   private evaluate(): ArchViolation[] {
-    // Step 1: Get all elements from the concrete builder
-    const allElements = this.getElements()
-
-    // Step 2: Filter with predicates (AND — all predicates must match)
-    const filtered = allElements.filter((element) =>
-      this._predicates.every((predicate) => predicate.test(element)),
-    )
+    // Step 1+2: Get elements and narrow by predicates (see filterElements).
+    const filtered = this.filterElements()
 
     // Step 3: If no elements match predicates, no violations
     if (filtered.length === 0) {
