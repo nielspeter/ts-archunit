@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Fixes a family of glob defects in `slices()` and the agent-facing messages around
+them, found by adopting 0.18.0 on a real codebase. See [bug 0009](./bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md).
+
+### Fixed
+
+- **`slices().matching()` now resolves every spelling of the same intent.** Its glob was parsed twice, inconsistently: the picomatch pattern accepted a leading `**/`, while the slice-name step took everything up to the _last_ `/` and located it with a literal `indexOf`. Any glob with a leading globstar or a trailing/interior wildcard therefore matched files and then silently discarded all of them — 0 slices. `'src/features/*'`, `'src/features/*/'`, `'**/src/features/*'` and `'**/src/features/*/'` are now equivalent, from a single parse. **This makes the form used throughout the docs, the examples and `ts-archunit init` (`matching('src/features/*/')`) work for the first time.**
+- **Empty-discovery remedies are derived from the actual globs, not one hardcoded string (ADR-008).** 0.18.0 told every caller to _"use `**/src/*`"_ — right for `assignedFrom()`, wrong for `matching()`, where following it turned a working rule into a silently empty one. Each cause now gets a remedy that is true on its own path: an unanchored `assignedFrom()` glob (named individually, with its slice key), globs that are _already_ anchored (so the directory is simply missing), an empty `assignedFrom({})`, a project that loaded 0 source files, and calling neither source at all.
+- **Config-level meta-findings are now visible in the default output.** The rich formatter never printed `violation.message`, so an empty-selector/discovery failure rendered as `:0 — <ruleId>` with the entire remedy invisible unless you used `--format json`. Findings with no source location now show their message in the location's place (and no misleading `:0`).
+- **`.excluding()` can no longer silence a meta-finding.** Exclusions match against the violation message, which now quotes the user's own globs — so an unrelated path exclusion could incidentally suppress the guard that reports a rule enforcing nothing. `applyFilters` now honors `bypassFilters`, consistent with baseline and diff-aware.
+- **Docs, examples and `init` templates now anchor their globs.** Every `assignedFrom()` / `layers` / `folders` / `shared` / `src` example used the project-relative form that matches nothing (`'src/services/**'`), including the code `ts-archunit init` scaffolds. New [Glob conventions](https://nielspeter.github.io/ts-archunit/slices) section and a troubleshooting entry for "Slice discovery matched no files"; `matching()`'s doc now states that the captured segment may be a **file** (a flat folder yields one slice per file, not one slice for the folder).
+
+### Upgrading
+
+Upgrading from **0.18.0**: no rule that passed can start failing — the globs fixed here resolved 0 slices, which 0.18.0 already failed on.
+
+Upgrading from **0.17.x or earlier**: a mis-anchored slice rule used to pass _vacuously_. It will now either fail with the discovery guard (naming the glob) or — if this release makes its glob resolve — start reporting **real** cycle/layer violations it never checked before. That is the intended outcome, but budget for it: run `npx ts-archunit baseline` before gating CI.
+
 ## [0.18.0] - 2026-07-24
 
 Roadmap foundations F1–F4 and proposals 017/016/014 (see `plans/ai-era-product-direction.md`). All new/changed public API is additive except the ⚠️ breaking behavior changes noted below. Pre-1.0, so these ship in a minor.
