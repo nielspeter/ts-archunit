@@ -78,10 +78,18 @@ The mechanical core of rule 1. A `collectViolations()` implementation that write
 `console.warn` is reporting a finding on a channel the consumer cannot read, and
 (every time so far) returning a pass.
 
+**Spiked 2026-07-25 against real `src/`** — the formulation below is measured, not
+guessed. See "What the spike caught" for why the obvious version is wrong.
+
 ```typescript
 functions(p)
   .that()
-  .haveNameMatching(/^collectViolations$/)
+  // NOT /^collectViolations$/ — methods are collected under their QUALIFIED name
+  // (`SliceRuleBuilder.collectViolations`), so an anchored regex matches only the
+  // one standalone function and the rule passes green over four real defects.
+  // `evaluate` is required too: rule-builder.ts's finding lives there, not in
+  // collectViolations. Measured: 11 subjects, 4 hits, 0 false positives.
+  .haveNameMatching(/(collectViolations|evaluate)$/)
   .should()
   .notContain(call('console.warn'))
   .rule({
@@ -105,6 +113,28 @@ _code under test_, and `diff-aware.ts` fails safe by design.
 fail. A fixture function named `collectViolations` containing `console.warn` must be
 flagged; the same function without it must not. Without both halves this is the
 ADR-007 mistake — an enforced rule nobody has watched fail.
+
+### What the spike caught — read this before writing the other rules
+
+The first draft of this plan specified `/^collectViolations$/`. Measured against
+`src/`:
+
+| Formulation                          | Subjects | Real defects caught |
+| ------------------------------------ | -------- | ------------------- |
+| `/^collectViolations$/` (as drafted) | **1**    | **0 of 4**          |
+| `/collectViolations$/`               | 9        | 3 of 4              |
+| `/(collectViolations\|evaluate)$/`   | 11       | **4 of 4**, 0 FP    |
+
+Two independent reasons the drafted rule was near-vacuous: methods are collected
+under a **qualified** name (`SliceRuleBuilder.collectViolations`), so `^` excluded
+every method; and one of the four findings lives in `evaluate()`
+(`src/core/rule-builder.ts:415`), not `collectViolations` at all.
+
+It would have shipped **green over the exact four defects it was written to catch** —
+a rule that cannot fail, added by the plan whose purpose is to stop rules that cannot
+fail. Apply the ADR-008 rule-5 question to **every** rule below before landing it:
+run it against real `src/`, count the subjects, and confirm it currently reds on a
+known defect or a fixture. A subject count of 1 where you expected 10 is the tell.
 
 ## Phase 2 — Rule: an agent-directed imperative may not ship at `warn`
 
