@@ -31,11 +31,11 @@ The most universal architecture pattern. Nearly every backend project has layers
 ```typescript
 layeredArchitecture(p, {
   layers: {
-    routes: 'src/routes/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
+    routes: '**/src/routes/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
   },
-  shared: ['src/shared/**', 'src/utils/**'],
+  shared: ['**/src/shared/**', '**/src/utils/**'],
   strict: true,
 })
 ```
@@ -65,7 +65,7 @@ Some layers need to reference types from other layers without taking a runtime d
 ```typescript
 layeredArchitecture(p, {
   layers: { ... },
-  typeImportsAllowed: ['src/services/**'],
+  typeImportsAllowed: ['**/src/services/**'],
   // Services can `import type { User } from '../repositories/user-repo.js'`
   // but not `import { findUser } from '../repositories/user-repo.js'`
 })
@@ -79,8 +79,8 @@ Enforce that certain npm packages are only imported by specific layers. The key 
 layeredArchitecture(p, {
   layers: { ... },
   restrictedPackages: {
-    'src/repositories/**': ['knex', 'prisma'],
-    'src/infra/**': ['@aws-sdk/*'],
+    '**/src/repositories/**': ['knex', 'prisma'],
+    '**/src/infra/**': ['@aws-sdk/*'],
   },
 })
 ```
@@ -93,7 +93,7 @@ Companion to `layeredArchitecture`. Enforces repository pattern conventions that
 
 ```typescript
 dataLayerIsolation(p, {
-  repositories: 'src/repositories/**',
+  repositories: '**/src/repositories/**',
   baseClass: 'BaseRepository',
   requireTypedErrors: true,
 })
@@ -114,8 +114,8 @@ For projects with distinct feature areas (modules, bounded contexts, packages). 
 
 ```typescript
 strictBoundaries(p, {
-  folders: 'src/features/*',
-  shared: ['src/shared/**', 'src/lib/**'],
+  folders: '**/src/features/*',
+  shared: ['**/src/shared/**', '**/src/lib/**'],
   isolateTests: true,
   noCopyPaste: true,
 })
@@ -165,7 +165,7 @@ Two `error`, two `warn`. The warn rules have known, suppressible false positives
 **Options.** `include` is the source glob (default `'**/src/**'`, matched against each file's absolute path). A `**/src/**` glob already covers monorepos — `packages/foo/src/**` matches at any depth — so only projects whose source lives _outside_ any `src/` folder (e.g. `lib/`) need to override it:
 
 ```typescript
-export default [...recommended(p, { include: 'lib/**' })]
+export default [...recommended(p, { include: '**/lib/**' })]
 ```
 
 The `overrides` map (below) changes individual rule severity. Codegen, templating, or serializer libraries that legitimately build functions from strings should turn off the Function-constructor rule: `overrides: { 'preset/recommended/no-function-constructor': 'off' }`. (`eval` has no comparable legitimate use, so it stays `error`.)
@@ -190,7 +190,7 @@ const p = project('tsconfig.json')
 
 export default [
   ...agentGuardrails(p, {
-    src: 'src/**',
+    src: '**/src/**',
     noInlineLogic: ['parseInt', 'JSON.parse', 'eval'],
     noGenericErrors: true,
     noStubs: true,
@@ -245,7 +245,7 @@ Presets and custom rules compose freely — spread them into the same rule file:
 export default [
   // Presets handle the structural rules
   ...layeredArchitecture(p, { layers: { ... } }),
-  ...strictBoundaries(p, { folders: 'src/features/*' }),
+  ...strictBoundaries(p, { folders: '**/src/features/*' }),
 
   // Custom rules handle project-specific concerns (builders, no .check())
   functions(p).that().resideInFolder('**/services/**').should().satisfy(mustCall(/Repository/)),

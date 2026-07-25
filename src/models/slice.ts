@@ -27,36 +27,140 @@ export interface Slice {
 export type SliceDefinition = Record<string, string>
 
 /**
- * Resolve slices by matching a glob pattern against source file paths.
- * Each unique directory matching the glob becomes a slice.
+ * Characters that make a segment non-literal for prefix purposes.
  *
- * The glob must contain a wildcard segment that distinguishes slices.
- * For example, 'src/features/*\/' matches each subdirectory of src/features/
- * as a separate slice.
+ * Only `*` and `?`. Brackets and braces are excluded deliberately: `[slug]`,
+ * `(marketing)` and `{a,b}` occur as real directory names, and a `baseDir` cut
+ * before them is located in the path literally — which is what makes those routes
+ * resolve correctly. Cutting at `*`/`?` matters for partial wildcards
+ * (`src/feature-*\/x/*`), where keeping the segment would put a `*` inside
+ * `baseDir` and no path could ever contain it.
+ */
+const WILDCARD_CHARS = /[*?]/
+
+/**
+ * The two things a `matching()` glob has to yield, derived from **one**
+ * normalization of the input.
+ *
+ * Deriving them from differently-normalized inputs is what made bug 0009
+ * possible: the picomatch pattern accepted spellings whose `baseDir` could never
+ * be found in a path, so files matched and were then silently discarded during
+ * slice-name extraction. Both now come from the same `normalized` string, which
+ * removes that divergence class — though they remain distinct derivations (for
+ * `'src/features'` the pattern's base is `src/features` while `baseDir` is
+ * `src/`, by design: the final segment is a name filter, not a directory).
+ */
+interface MatchingGlob {
+  /** Absolute-path pattern handed to picomatch. */
+  readonly fullGlob: string
+  /** Wildcard-free literal directory prefix, located in the path to name slices. */
+  readonly baseDir: string
+}
+
+/**
+ * Normalize a `matching()` glob so every spelling of one intent agrees.
+ *
+ * Redundant and therefore stripped: a leading `**\/` (patterns are matched against
+ * absolute paths anyway), a leading `./` (never present in an absolute path), and a
+ * trailing `/` once the glob already contains a wildcard segment.
+ *
+ * A trailing `/` on a wildcard-free glob becomes an explicit `*`, so `'src/features/'`
+ * ("the things inside features") is exactly `'src/features/*'`. These are all
+ * equivalent — `'src/features/*'`, `'src/features/*\/'`, `'src/features/'`,
+ * `'**\/src/features/*'`, `'./src/features/*'` — while `'src/features'` (no slash) is
+ * deliberately different: its final segment is a name filter, yielding one slice.
+ */
+function parseMatchingGlob(glob: string): MatchingGlob {
+  let normalized = glob
+  // Loop over BOTH redundant prefixes together: './' and '**/' can appear in
+  // either order ('**/./src/*'), and stripping one kind to exhaustion before the
+  // other left a residual that made the whole glob unmatchable.
+  while (normalized.startsWith('./') || normalized.startsWith('**/')) {
+    normalized = normalized.startsWith('./') ? normalized.slice(2) : normalized.slice(3)
+  }
+
+  // A trailing '/' is redundant once the glob already contains a wildcard segment:
+  // that wildcard is the slice level, and the pattern appends its own '*/**'. Left
+  // in, it demanded one directory MORE than baseDir implies, so every file sitting
+  // directly in the matched directory was silently dropped ('src/feature-*/' lost
+  // each feature's index.ts; 'packages/*/src/' lost everything directly in src).
+  //
+  // With no wildcard anywhere the slash is meaningful and stays: 'src/features/'
+  // means "the directories inside features". The test is about the glob as a whole,
+  // not the final segment's shape — `[slug]` and `(marketing)` are real directory
+  // names, and testing them for metacharacters is what broke them before.
+  if (normalized.endsWith('/')) {
+    const withoutSlash = normalized.slice(0, -1)
+    const hasWildcardSegment = withoutSlash.split('/').some((seg) => WILDCARD_CHARS.test(seg))
+    // With a wildcard already present that wildcard IS the slice level, so the
+    // slash is noise. Otherwise 'dir/' means "the things inside dir", which is
+    // exactly 'dir/*' — make it explicit so both spellings take the same path and
+    // a flat directory (files, no subdirectories) resolves for both.
+    normalized = hasWildcardSegment ? withoutSlash : normalized + '*'
+  }
+
+  const segments = normalized.split('/').filter((segment) => segment !== '')
+
+  // The slice level is the first wildcard segment; everything literal before it is
+  // the directory prefix we locate in the path. A trailing '/' has already been
+  // turned into an explicit '*', so the remaining no-wildcard case is a bare
+  // 'src/feature-', where the final segment is a NAME FILTER rather than a
+  // directory — which is what distinguishes it from 'src/features/'.
+  const wildcardIdx = segments.findIndex((segment) => WILDCARD_CHARS.test(segment))
+  const prefixSegments = wildcardIdx >= 0 ? segments.slice(0, wildcardIdx) : segments.slice(0, -1)
+  const baseDir = prefixSegments.length > 0 ? prefixSegments.join('/') + '/' : ''
+
+  // The pattern keeps the glob's own shape (interior segments included) so that
+  // `packages/*/src/*` still requires the `/src/` level, and `dir/*` still matches
+  // files sitting directly in `dir` as well as subdirectories. Only `baseDir` is
+  // segment-derived — it is the part that has to be findable in a real path.
+  const fullGlob = (normalized.startsWith('/') ? normalized : '**/' + normalized) + '*/**'
+
+  return { fullGlob, baseDir }
+}
+
+/**
+ * The literal directory prefix a `matching()` glob would search for, or `''` when
+ * it has none (`'*'`, `'src'`, `'{a,b}/x/*'`). Exposed so the rule builder can
+ * state the *actual* cause of an empty result instead of guessing at one.
+ */
+export function matchingGlobPrefix(glob: string): string {
+  return parseMatchingGlob(glob).baseDir
+}
+
+/**
+ * Resolve slices by matching a glob pattern against source file paths.
+ *
+ * The segment following the glob's literal prefix names each slice. That segment
+ * is a **directory** when files are nested under it, and otherwise each matching
+ * **file** name — `matching('src/features/*')` over `features/billing/order.ts`
+ * yields a `billing` slice, while over a flat `services/order.service.ts` it
+ * yields an `order.service.ts` slice.
+ *
+ * Every spelling of the same intent agrees: `'src/features/*'`,
+ * `'src/features/*\/'`, `'src/features/'` and `'**\/src/features/*'` are equivalent.
  *
  * @param project - The loaded ArchProject
- * @param glob - A glob pattern where the wildcard segment defines slice boundaries
- * @returns Array of slices, one per matching directory
+ * @param glob - A glob whose literal prefix locates the slices; the next segment names them
+ * @returns Array of slices, one per distinct name
  *
  * @example
- * resolveByMatching(project, 'src/features/*\/')
+ * resolveByMatching(project, 'src/features/*')
  * // => [{ name: 'auth', files: [...] }, { name: 'billing', files: [...] }]
  */
 export function resolveByMatching(project: ArchProject, glob: string): Slice[] {
-  // Prepend ** if the glob is not already absolute or globbed at the root,
-  // so it matches anywhere in an absolute file path.
-  // Append */** to match: the slice directory segment (*) + any files inside (/**)
-  const fullGlob =
-    glob.startsWith('/') || glob.startsWith('**') ? glob + '*/**' : '**/' + glob + '*/**'
+  const { fullGlob, baseDir } = parseMatchingGlob(glob)
+
+  // No literal directory prefix (e.g. '*', '**', 'src' with no '/'). Bail rather
+  // than search for '' in the path: `indexOf('')` is 0, so the "slice name" would
+  // be the path's first segment — empty on POSIX (harmless by accident) but the
+  // drive letter on Windows, which would mint ONE slice holding every file and
+  // silently pass every inter-slice condition. Returning no slices makes the
+  // discovery guard fire instead (ADR-008).
+  if (baseDir === '') return []
   const isMatch = picomatch(fullGlob)
   const sourceFiles = project.getSourceFiles()
   const sliceMap = new Map<string, SourceFile[]>()
-
-  // Extract the base directory (everything up to and including the last / in the original glob)
-  // For 'src/feature-', basedir is 'src/' so that 'feature-a' is extracted as slice name.
-  // For 'src/features/*/', basedir is 'src/features/' so that the wildcard dirs are slice names.
-  const lastSlashIdx = glob.lastIndexOf('/')
-  const baseDir = lastSlashIdx >= 0 ? glob.slice(0, lastSlashIdx + 1) : ''
 
   for (const sf of sourceFiles) {
     const filePath = sf.getFilePath()

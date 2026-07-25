@@ -59,10 +59,10 @@ describe('Layer Dependencies', () => {
   it('layers must respect dependency direction', () => {
     slices(p)
       .assignedFrom({
-        controllers: 'src/controllers/**',
-        services: 'src/services/**',
-        repositories: 'src/repositories/**',
-        domain: 'src/domain/**',
+        controllers: '**/src/controllers/**',
+        services: '**/src/services/**',
+        repositories: '**/src/repositories/**',
+        domain: '**/src/domain/**',
       })
       .should()
       .respectLayerOrder('controllers', 'services', 'repositories', 'domain')

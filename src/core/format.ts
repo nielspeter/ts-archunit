@@ -23,9 +23,14 @@ function formatSingleViolation(
 ): string {
   const counter = bold(red(`Architecture Violation [${String(index + 1)} of ${String(total)}]`))
   const ruleLine = `  ${dim('Rule:')} ${v.rule}`
-  const relativePath = path.relative(cwd, v.file)
-  const locationRef = cyan(relativePath + ':' + String(v.line))
-  const location = `  ${locationRef} ${dim('—')} ${v.element}`
+  // A config-level meta-finding (empty selector / empty discovery) has no source
+  // location: `path.relative(cwd, '')` renders as the cwd and ':0' is noise, while
+  // `message` carries the whole remedy. Show the message in the location's place —
+  // otherwise the remedy is invisible on the default surface, which is exactly
+  // where the agent consumer reads it (ADR-008).
+  const location = v.file
+    ? `  ${cyan(path.relative(cwd, v.file) + ':' + String(v.line))} ${dim('—')} ${v.element}`
+    : `  ${v.message}`
   const codeLine = showCodeFrames && v.codeFrame ? `\n${v.codeFrame}` : ''
 
   const whyText = v.because ?? reason

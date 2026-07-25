@@ -23,7 +23,9 @@ import { project, crossLayer, haveMatchingCounterpart } from '@nielspeter/ts-arc
 
 const p = project('tsconfig.json')
 
-const layers = crossLayer(p).layer('routes', 'src/routes/**').layer('schemas', 'src/schemas/**')
+const layers = crossLayer(p)
+  .layer('routes', '**/src/routes/**')
+  .layer('schemas', '**/src/schemas/**')
 
 const resolved = layers.mapping(
   (a, b) => a.getBaseName().replace('-route.ts', '') === b.getBaseName().replace('-schema.ts', ''),
@@ -56,9 +58,9 @@ Define a named layer by glob pattern. Call at least twice before `.mapping()`. E
 
 ```typescript
 crossLayer(p)
-  .layer('routes', 'src/routes/**')
-  .layer('schemas', 'src/schemas/**')
-  .layer('sdk', 'src/sdk/**')
+  .layer('routes', '**/src/routes/**')
+  .layer('schemas', '**/src/schemas/**')
+  .layer('sdk', '**/src/sdk/**')
 ```
 
 ### `.mapping(fn)`
@@ -171,8 +173,8 @@ Check options support `baseline`, `diff`, and `format` -- the same as all other 
 
 ```typescript
 crossLayer(p)
-  .layer('routes', 'src/routes/**')
-  .layer('schemas', 'src/openapi/**')
+  .layer('routes', '**/src/routes/**')
+  .layer('schemas', '**/src/openapi/**')
   .mapping((route, schema) => {
     const routeName = route.getBaseName().replace('.route.ts', '')
     const schemaName = schema.getBaseName().replace('.schema.ts', '')
@@ -192,8 +194,8 @@ crossLayer(p)
 
 ```typescript
 crossLayer(p)
-  .layer('schemas', 'src/schemas/**')
-  .layer('sdk', 'src/sdk/**')
+  .layer('schemas', '**/src/schemas/**')
+  .layer('sdk', '**/src/sdk/**')
   .mapping((schema, client) => {
     const name = schema.getBaseName().replace('-schema.ts', '')
     return client.getBaseName() === `${name}-client.ts`
@@ -213,9 +215,9 @@ crossLayer(p)
 
 ```typescript
 crossLayer(p)
-  .layer('routes', 'src/routes/**')
-  .layer('schemas', 'src/schemas/**')
-  .layer('sdk', 'src/sdk/**')
+  .layer('routes', '**/src/routes/**')
+  .layer('schemas', '**/src/schemas/**')
+  .layer('sdk', '**/src/sdk/**')
   .mapping((a, b) => {
     const normalize = (f: SourceFile) =>
       f

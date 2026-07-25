@@ -94,7 +94,7 @@ describe('runInit', () => {
     const rules = read(dir, 'arch.rules.ts')
     expect(rules).toContain("import { agentGuardrails } from '@nielspeter/ts-archunit/presets'")
     expect(rules).toContain('...agentGuardrails(p, {')
-    expect(rules).toContain("src: 'src/**'")
+    expect(rules).toContain("src: '**/src/**'")
   })
 
   it('rejects an unknown --preset and lists the valid ones', () => {
@@ -135,7 +135,7 @@ describe('runInit', () => {
     expect(rules).toContain(
       "import { recommended, strictBoundaries } from '@nielspeter/ts-archunit/presets'",
     )
-    for (const key of ["folders: 'src/features/*'", 'shared:']) {
+    for (const key of ["folders: '**/src/features/*'", 'shared:']) {
       expect(rules).toContain(key)
     }
   })
@@ -185,7 +185,7 @@ describe('runInit', () => {
     const out = captureStdout()
     runInit({ cwd: dir, preset: 'layered' })
     out.restore()
-    expect(read(dir, 'arch.rules.ts')).toContain("routes: 'lib/routes/**'")
+    expect(read(dir, 'arch.rules.ts')).toContain("routes: '**/lib/routes/**'")
   })
 
   it('config omits the dead project/watchDirs fields, keeps rules/baseline/format', () => {
@@ -502,7 +502,7 @@ describe('template option shapes stay valid against the presets', () => {
     expect(recommended(p, { include: '**/lib/**' }).length).toBeGreaterThan(0)
     expect(
       agentGuardrails(p, {
-        src: 'src/**',
+        src: '**/src/**',
         noGenericErrors: true,
         noStubs: true,
         noEmptyBodies: true,
@@ -516,15 +516,15 @@ describe('template option shapes stay valid against the presets', () => {
     // If a shape preset's options drift from the init template, this fails to typecheck.
     layeredArchitecture(p, {
       layers: {
-        routes: 'src/routes/**',
-        services: 'src/services/**',
-        repositories: 'src/repositories/**',
+        routes: '**/src/routes/**',
+        services: '**/src/services/**',
+        repositories: '**/src/repositories/**',
       },
-      shared: ['src/shared/**'],
+      shared: ['**/src/shared/**'],
     })
-    strictBoundaries(p, { folders: 'src/features/*', shared: ['src/shared/**'] })
+    strictBoundaries(p, { folders: '**/src/features/*', shared: ['**/src/shared/**'] })
     dataLayerIsolation(p, {
-      repositories: 'src/repositories/**',
+      repositories: '**/src/repositories/**',
       baseClass: 'BaseRepository',
       requireTypedErrors: true,
     })

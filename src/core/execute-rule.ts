@@ -37,7 +37,29 @@ export function applyFilters(
   const exclusions = ctx.exclusions ?? []
   if (exclusions.length > 0) {
     const matchedPatterns = new Set<number>()
+    /** Patterns that matched a meta-finding, which cannot be excluded. */
+    const refusedPatterns = new Set<number>()
     result = result.filter((v) => {
+      // Config-level meta-findings (empty selector / empty discovery) are never
+      // excludable: they report that the rule checks NOTHING, so silencing one
+      // silences the guard itself. Baseline and diff-aware already honor this
+      // flag; `.excluding()` must too, or a rule that enforces nothing can be
+      // made green — the exact false-green ADR-008 exists to prevent. This
+      // matters more now that meta-messages quote the user's own globs/paths,
+      // which an unrelated path exclusion can incidentally match.
+      if (v.bypassFilters) {
+        // Record a pattern that WOULD have matched, so the "unused exclusion" warning
+        // below doesn't tell the caller their exclusion is stale after a rename. It
+        // isn't stale — it is refused, which is a different instruction.
+        const wouldMatch = exclusions.findIndex((pattern) =>
+          typeof pattern === 'string'
+            ? [v.element, v.file, v.message].includes(pattern)
+            : [v.element, v.file, v.message].some((target) => pattern.test(target)),
+        )
+        if (wouldMatch >= 0) refusedPatterns.add(wouldMatch)
+        return true
+      }
+
       // Match against element, file, or message — so that custom conditions
       // using createViolation() can be excluded by file path or message content,
       // not just by element name (which may be a generic AST node kind).
@@ -57,7 +79,13 @@ export function applyFilters(
     const ruleId = ctx.metadata?.id ?? 'unnamed'
     const silentIndices = ctx.silentIndices ?? new Set()
     exclusions.forEach((pattern, index) => {
-      if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
+      if (refusedPatterns.has(index)) {
+        console.warn(
+          `[ts-archunit] Exclusion '${String(pattern)}' in rule '${ruleId}' matched a ` +
+            `configuration finding, which cannot be excluded — that finding reports the ` +
+            `rule enforces nothing. Fix the rule's selector instead.`,
+        )
+      } else if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
         console.warn(
           `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
             `It matched zero violations — it may be stale after a rename.`,

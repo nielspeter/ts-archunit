@@ -62,10 +62,10 @@ Enforce that dependencies between architectural layers only flow in one directio
 // Dependencies flow inward
 slices(p)
   .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
-    domain: 'src/domain/**',
+    controllers: '**/src/controllers/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
+    domain: '**/src/domain/**',
   })
   .should()
   .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
@@ -362,7 +362,7 @@ import { modules, jsxText } from '@nielspeter/ts-archunit'
 // No hardcoded user-facing text in components — route it through t()
 modules(p)
   .that()
-  .resideInFolder('src/components/**')
+  .resideInFolder('**/src/components/**')
   .should()
   .notContain(jsxText())
   .because('User-facing text must go through t()')
@@ -446,12 +446,12 @@ Find copy-pasted logic and inconsistent patterns across sibling files automatica
 
 ```typescript
 // Detect near-identical function bodies
-smells.duplicateBodies(p).inFolder('src/routes/**').withMinSimilarity(0.9).minLines(10).warn()
+smells.duplicateBodies(p).inFolder('**/src/routes/**').withMinSimilarity(0.9).minLines(10).warn()
 
 // Flag the odd one out in a folder
 smells
   .inconsistentSiblings(p)
-  .inFolder('src/repositories/**')
+  .inFolder('**/src/repositories/**')
   .forPattern(call('this.extractCount'))
   .warn()
 ```
@@ -487,8 +487,8 @@ Verify that matching counterparts exist across layers, such as a schema for ever
 ```typescript
 // Every route must have a matching schema
 crossLayer(p)
-  .layer('routes', 'src/routes/**')
-  .layer('schemas', 'src/schemas/**')
+  .layer('routes', '**/src/routes/**')
+  .layer('schemas', '**/src/schemas/**')
   .mapping(
     (route, schema) =>
       route.getBaseName().replace('-route', '') === schema.getBaseName().replace('-schema', ''),
@@ -693,17 +693,17 @@ modules(p)
 // No orphaned files (nobody imports them)
 modules(p)
   .that()
-  .resideInFolder('src/**')
+  .resideInFolder('**/src/**')
   .should()
   .satisfy(noDeadModules())
   .excluding('index.ts', 'main.ts', 'config.ts', /\.d\.ts$/)
   .check()
 
 // No unused exports
-modules(p).that().resideInFolder('src/**').should().satisfy(noUnusedExports()).check()
+modules(p).that().resideInFolder('**/src/**').should().satisfy(noUnusedExports()).check()
 
 // No TODO/FIXME left in production
-functions(p).that().resideInFolder('src/**').should().satisfy(noStubComments()).check()
+functions(p).that().resideInFolder('**/src/**').should().satisfy(noStubComments()).check()
 ```
 
 For broad exclusion patterns that legitimately match nothing in some workspaces, wrap them in `silent()` to suppress the stale-exclusion warning: `.excluding(silent(/\.d\.ts$/), 'index.ts')`. See [Setup & Best Practices](/setup-best-practices#suppressing-individual-violations) for baseline-vs-`.excluding()` guidance.
@@ -712,10 +712,10 @@ For broad exclusion patterns that legitimately match nothing in some workspaces,
 
 ```typescript
 // Named exports only (easier to refactor and tree-shake)
-modules(p).that().resideInFolder('src/**').should().notHaveDefaultExport().check()
+modules(p).that().resideInFolder('**/src/**').should().notHaveDefaultExport().check()
 
 // Too many exports suggests the file should be split (warn, don't fail)
-modules(p).that().resideInFolder('src/**').should().haveMaxExports(10).warn()
+modules(p).that().resideInFolder('**/src/**').should().haveMaxExports(10).warn()
 ```
 
 ### Centralized parsing & logging
@@ -724,7 +724,7 @@ modules(p).that().resideInFolder('src/**').should().haveMaxExports(10).warn()
 // Only src/parsers/ may call JSON.parse
 functions(p)
   .that()
-  .resideInFolder('src/**')
+  .resideInFolder('**/src/**')
   .and()
   .satisfy(not(resideInFolder('**/parsers/**')))
   .should()
@@ -735,7 +735,7 @@ functions(p)
 // No raw console.* — use the logger abstraction
 functions(p)
   .that()
-  .resideInFolder('src/**')
+  .resideInFolder('**/src/**')
   .should()
   .satisfy(functionNoConsole())
   .because('use Logger from @app/logger')

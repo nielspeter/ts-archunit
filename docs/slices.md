@@ -18,6 +18,40 @@ Slices can represent:
 - **Features** -- user management, billing, notifications
 - **Packages** -- in a monorepo, each package is a slice
 
+## Glob conventions (read this first)
+
+**File-path** globs are matched against the **absolute** path, so a
+project-relative glob like `'src/services/**'` matches nothing:
+
+::: tip Anchor file-path globs with `**/`
+Write `'**/src/services/**'`, not `'src/services/**'`. This applies to
+`assignedFrom()`, the preset options (`layers`, `folders`, `shared`, `src`), and
+path predicates like `resideInFolder()` / `resideInFile()`.
+
+**Import** globs need the anchor too, with one exception. They are matched against
+the _resolved_ absolute path, falling back to the raw specifier only when the import
+does not resolve — so a bare package name works as written
+(`importFrom('fastify')`), while anything path-shaped must be anchored
+(`notImportFrom('**/src/repositories/**')`).
+
+Genuinely exempt: `.excluding()`, which takes an exact string or a `RegExp` rather
+than a glob; and the GraphQL entry points `schema()` / `resolvers()`, whose globs
+are matched against paths relative to the tsconfig directory.
+
+Watch `shared` in particular — anchoring `layers` but leaving `shared` relative
+turns a silent no-op into a false positive, because with `strict: true` `shared`
+is the innermost layer's import allow-list.
+:::
+
+`matching()` is the one exception, because its glob does double duty — the literal
+prefix locates the files, and the segment after it _names_ each slice. It accepts
+either spelling: `'src/features/*'`, `'src/features/*/'` and `'**/src/features/*'`
+are equivalent.
+
+A glob that matches nothing is not silently ignored: since v0.18 a slice rule that
+discovers no slices **fails** with a message naming the glob at fault, because a
+rule that discovers nothing enforces nothing.
+
 ## Defining Slices
 
 There are two ways to assign files to slices: automatic discovery from directory structure, or explicit assignment via a map. Use `matching()` when your folder layout already reflects the architecture; use `assignedFrom()` when slices do not map one-to-one to directories or when you want explicit control.
@@ -39,6 +73,15 @@ slices(p).matching('src/features/*/').should().beFreeOfCycles().check()
 
 The `*/` captures one directory level. `src/features/billing/order.ts` and `src/features/billing/invoice.ts` both land in the `billing` slice.
 
+::: warning The captured segment may be a file
+The segment after the literal prefix names each slice — a **directory** when files
+are nested under it, otherwise each **file**. Over a flat folder,
+`matching('src/services/*')` yields one slice per file (`order.service.ts`,
+`user.service.ts`, …), not one `services` slice. That is useful for file-level
+cycle detection, but it means layer names in `respectLayerOrder()` will not match
+file-named slices — use `assignedFrom()` when you want to name the groups yourself.
+:::
+
 ### `assignedFrom(map)`
 
 Defines slices by providing a name-to-glob mapping. Use this when your architectural layers do not correspond to a single directory level, or when you need to name slices independently of folder structure. This is the typical choice for layer-based rules like Clean Architecture or Hexagonal Architecture.
@@ -48,10 +91,10 @@ Explicitly assign slices from a map of glob patterns:
 ```typescript
 slices(p)
   .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
-    domain: 'src/domain/**',
+    controllers: '**/src/controllers/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
+    domain: '**/src/domain/**',
   })
   .should()
   .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
@@ -94,10 +137,10 @@ Asserts that dependencies between slices follow the declared order. The first la
 ```typescript
 slices(p)
   .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    repositories: 'src/repositories/**',
-    domain: 'src/domain/**',
+    controllers: '**/src/controllers/**',
+    services: '**/src/services/**',
+    repositories: '**/src/repositories/**',
+    domain: '**/src/domain/**',
   })
   .should()
   .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
@@ -122,9 +165,9 @@ Asserts that no slice depends on the named slice.
 ```typescript
 slices(p)
   .assignedFrom({
-    core: 'src/core/**',
-    legacy: 'src/legacy/**',
-    features: 'src/features/**',
+    core: '**/src/core/**',
+    legacy: '**/src/legacy/**',
+    features: '**/src/features/**',
   })
   .should()
   .notDependOn('legacy')
@@ -138,10 +181,10 @@ slices(p)
 
 ```typescript
 const layers = {
-  presentation: 'src/presentation/**',
-  infrastructure: 'src/infrastructure/**',
-  application: 'src/application/**',
-  domain: 'src/domain/**',
+  presentation: '**/src/presentation/**',
+  infrastructure: '**/src/infrastructure/**',
+  application: '**/src/application/**',
+  domain: '**/src/domain/**',
 }
 
 slices(p)
@@ -183,10 +226,10 @@ slices(p)
 ```typescript
 slices(p)
   .assignedFrom({
-    presentation: 'src/presentation/**',
-    infrastructure: 'src/infrastructure/**',
-    application: 'src/application/**',
-    domain: 'src/domain/**',
+    presentation: '**/src/presentation/**',
+    infrastructure: '**/src/infrastructure/**',
+    application: '**/src/application/**',
+    domain: '**/src/domain/**',
   })
   .should()
   .beFreeOfCycles()
@@ -212,9 +255,9 @@ Use `slices()` for architectural structure and `modules()` for fine-grained impo
 // Architectural: layers respect order
 slices(p)
   .assignedFrom({
-    controllers: 'src/controllers/**',
-    services: 'src/services/**',
-    domain: 'src/domain/**',
+    controllers: '**/src/controllers/**',
+    services: '**/src/services/**',
+    domain: '**/src/domain/**',
   })
   .should()
   .respectLayerOrder('controllers', 'services', 'domain')

@@ -1,9 +1,9 @@
 # Proposal 017 — Correspondence / Coverage Primitive (`correspondence`)
 
 **Status:** Draft 2 — revised after architect + product review (2026-07-24)
-**Priority:** High — it is the single missing primitive behind the two largest recurring bug classes in the reference project (cmless): route↔permission-matrix drift (~12 bugs) and phantom limits (~12 bugs). It is also the generic form of a check cmless has **hand-built twice** because ts-archunit offers no primitive for it.
+**Priority:** High — it is the single missing primitive behind the two largest recurring bug classes in the reference project: route↔permission-matrix drift (~12 bugs) and phantom limits (~12 bugs). It is also the generic form of a check that project has **hand-built twice** because ts-archunit offers no primitive for it.
 **Affects:** one new top-level entry point + builder in the public DSL (`src/builders/correspondence-builder.ts`, `correspondence` in `src/index.ts`). The builder extends `TerminalBuilder` (inherits `.rule`/`.excluding`/`.check`/`.warn`/`.violations`/`.severity` unchanged, ADR-003). Depends on two shared foundations from the product direction: **F1** (a filtered-subject materialization contract on `RuleBuilder` — does not exist today) and **F2** (a shared set-difference + non-vacuity core, which `crossLayer` also re-expresses on). No new engine surface (ADR-007 boundary intact); the `keyFn` escape hatch is the one acknowledged raw-node seam (§keyFn). Adjacent to `crossLayer`, whose _existence_ check collapses into the same F2 core (§Relationship).
-**Origin:** The 2026-07-24 cmless coverage audit (`cmless/architecture-docs/ts-archunit-coverage-audit-2026-07.md`). Two independent lines of evidence converged on the same gap: the bug corpus (route↔matrix + phantom-limit clusters, ~24 bugs) and two hand-rolled correspondence tests in cmless (`sdk-coverage.test.ts`, `limits-enforcement-completeness.test.ts`) — one of which certifies coverage with a **cardinality** check, the exact [ADR-008](../adr/008-agent-first-failure-surfaces.md) Rule 5 anti-pattern.
+**Origin:** A 2026-07-24 internal coverage audit of a large adopting codebase. Two independent lines of evidence converged on the same gap: the bug corpus (route↔matrix + phantom-limit clusters, ~24 bugs) and two hand-rolled correspondence tests in the reference project (`sdk-coverage.test.ts`, `limits-enforcement-completeness.test.ts`) — one of which certifies coverage with a **cardinality** check, the exact [ADR-008](../adr/008-agent-first-failure-surfaces.md) Rule 5 anti-pattern.
 
 ## Changes in draft 2
 
@@ -13,16 +13,16 @@
 - **Reconciled with `crossLayer` (architect I3):** `haveMatchingCounterpart` _is_ the file↔file one-directional case and ships a live empty-layer false-green. Draft 2 proposes extracting the shared **F2** core and re-expressing crossLayer's existence check on it (fixing that false-green), keeping crossLayer's pairwise-_content_ conditions separate — the ADR-006 / lego-bricks move, not a YAGNI defer.
 - **Fixed the worked examples (architect I4):** all snippets now call the real API — `ArchCall.getMethodName()` / `.getArguments()` (not `.method()` / `.stringArg()`), `type.getProperties().map(p => p.getName())` (not `.propertyNames()`). Decided the `keyFn` engine-boundary story (§keyFn).
 - **Defined key-collision semantics (architect M5):** each side is a `key → node[]` multimap with a stated collision rule and a named hazard (over-normalizing masks "two subjects, one counterpart" drift); acceptance fixture added.
-- **Added two generic code↔code examples (product):** command↔handler, event↔listener — beyond the cmless AST↔runtime cases. Kept route↔matrix as the flagship cmless example.
+- **Added two generic code↔code examples (product):** command↔handler, event↔listener — beyond the original AST↔runtime cases. Kept route↔matrix as the flagship example.
 - **Added the literal↔literal independence heuristic (product):** the builder warns when _both_ sides are supplied literals (the independence footgun).
 
 > **"Every X has a matching Y" is a first-class architectural relation, and ts-archunit cannot state it.** The whole DSL selects _one_ set and asserts a property of its members. But the drift that actually ships is relational: a route with no permission-matrix entry, a declared limit no code enforces, an API route with no SDK method. Each is a set-membership gap between **two independently-derived sets** — which is not incidentally, but _exactly_, the shape ADR-008 Rule 5 demands ("a derivation is unguarded until a differently-derived value disagrees with it"). Correspondence is Rule 5 turned into a primitive.
 
 ## Problem
 
-Three real, recurring gaps from cmless, all the same shape:
+Three real, recurring gaps from the audited project, all the same shape:
 
-1. **Route ↔ permission-matrix drift (~12 bugs: 0031, 0033, 0034, 0025, 0013, 0028, 0143, 0030, 0029, 0035, 0141, 0142).** cmless has the right structure — a centralized `ROUTE_PERMISSIONS` map + a fail-closed enforcer. But route↔matrix correspondence is hand-maintained, so it drifts: a route ships without a matrix entry (falls through to 403), a param-name mismatch (`:userId` vs `:id`) breaks normalization (0013), a whole surface (`requirePlatformScope`, 72 inline preHandlers) bypasses the matrix (0143). The only existing guard is a **runtime integration test** needing testcontainers — slow, flaky (0106). A static correspondence check catches the same class at compile time.
+1. **Route ↔ permission-matrix drift (~12 bugs: 0031, 0033, 0034, 0025, 0013, 0028, 0143, 0030, 0029, 0035, 0141, 0142).** It has the right structure — a centralized `ROUTE_PERMISSIONS` map + a fail-closed enforcer. But route↔matrix correspondence is hand-maintained, so it drifts: a route ships without a matrix entry (falls through to 403), a param-name mismatch (`:userId` vs `:id`) breaks normalization (0013), a whole surface (`requirePlatformScope`, 72 inline preHandlers) bypasses the matrix (0143). The only existing guard is a **runtime integration test** needing testcontainers — slow, flaky (0106). A static correspondence check catches the same class at compile time.
 
 2. **Phantom limits (~12 bugs: 0322, 0331, 0334, 0327, 0326, 0330, 0335, 0343, 0342, 0091).** A limit exists in a config/tier/plan table (and shows in usage reports and pricing docs) but **no call-site reads it to reject**. `assetStorageBytes` — "stored, seeded, shown in a telemetry gauge, and enforced by no one" (0331). `maxGraphQLRequestSizeBytes`, `maxResponseSizeBytes` — "read nowhere" (0326). This is a coverage gap: the set of _declared_ limits is not covered by the set of _enforced_ limits.
 
@@ -192,7 +192,7 @@ correspondence(p)
   .check()
 ```
 
-**cmless — phantom limits (0331, 0326, …)** — declared limit fields must each be read somewhere:
+**Phantom limits (0331, 0326, …)** — declared limit fields must each be read somewhere:
 
 ```ts
 import { correspondence, types } from '@nielspeter/ts-archunit'
@@ -223,7 +223,7 @@ correspondence(p)
 
 _Honest scope:_ v1 asserts the field is **referenced**; it does not prove the reference **flows into a reject** (value-flow). That catches the pure phantom (a field nothing reads — the majority of the cluster) but not "read then ignored." "Flows into a throw/reject" is a v2 body-analysis extension, flagged, not silently omitted.
 
-**cmless — SDK coverage (the 341-line hand map):** derive side A from `Object.keys(ROUTE_PERMISSIONS).filter(isContentRoute)` via a `routeToSdkKey` convention, side B from the SDK methods discovered in the AST, and assert `.beBijective()`. Where the route→method mapping is genuinely non-mechanical the author still supplies `routeToSdkKey` — but the primitive then guarantees the map's **domain = the real route set** and **range ⊆ the real method set**, both by identity, replacing the hand-count. It cannot eliminate an irreducible mapping (see limits), only make its completeness and non-staleness a derived, identity check.
+**SDK coverage (the 341-line hand map):** derive side A from `Object.keys(ROUTE_PERMISSIONS).filter(isContentRoute)` via a `routeToSdkKey` convention, side B from the SDK methods discovered in the AST, and assert `.beBijective()`. Where the route→method mapping is genuinely non-mechanical the author still supplies `routeToSdkKey` — but the primitive then guarantees the map's **domain = the real route set** and **range ⊆ the real method set**, both by identity, replacing the hand-count. It cannot eliminate an irreducible mapping (see limits), only make its completeness and non-staleness a derived, identity check.
 
 ## What it deliberately does NOT do (honest limits)
 
@@ -249,7 +249,7 @@ The two then divide cleanly and compose:
 ## Why not…
 
 - **…extend `crossLayer` in place.** It is glob-layer + pairwise-content by construction; correspondence needs arbitrary key sets (runtime object keys, type fields) and existence semantics. The correct sharing is _below_ both — the F2 core — not bolting two grammars onto one builder.
-- **…leave it as a plain vitest `Object.keys()` diff (status quo).** That is what cmless did — twice — and one instance shipped the cardinality false-green. The value of a primitive is that identity-not-cardinality and non-vacuity become unwritable-wrong, and the failure is agent-first with file:line. A recipe re-derives those guarantees each time and, per the evidence, gets them wrong.
+- **…leave it as a plain vitest `Object.keys()` diff (status quo).** That is what the audited project did — twice — and one instance shipped the cardinality false-green. The value of a primitive is that identity-not-cardinality and non-vacuity become unwritable-wrong, and the failure is agent-first with file:line. A recipe re-derives those guarantees each time and, per the evidence, gets them wrong.
 - **…a warning (for the assertion itself).** The remedy (add the matrix entry / enforce the limit) is non-optional; per ADR-008 Rule 1 an actionable finding fails. Default `.check()`. (The both-sides-literal _independence heuristic_ warns, because it can't prove the problem — a different thing from the assertion.)
 
 ## Acceptance test (ADR-008)
@@ -266,7 +266,7 @@ A "does not throw" test is a check that cannot fail. The primitive's own tests m
 
 ## Prior art / relationship
 
-- **cmless hand-rolled instances:** `apps/api/tests/unit/architecture/sdk-coverage.test.ts`, `.../limits-enforcement-completeness.test.ts`. This primitive is their generic, identity-correct form.
+- **Hand-rolled instances in the audited project:** `apps/api/tests/unit/architecture/sdk-coverage.test.ts`, `.../limits-enforcement-completeness.test.ts`. This primitive is their generic, identity-correct form.
 - **ADR-008 Rule 5** — the governing decision; correspondence is Rule 5 as a primitive. **ADR-008 Rules 1 & 2** — fail + carry-the-remedy, baked in.
 - **F1 — filtered-subject materialization on `RuleBuilder`** (product direction). Today `getElements()` (`src/core/rule-builder.ts:277`) is _pre-filter_; predicate filtering happens only inside private `evaluate()` (`rule-builder.ts:340–350` — filters at :345, discards the count at :350, returns `ArchViolation[]`). **No method yields the filtered subject set**, so `.side(selection, keyFn)` cannot be built until F1 lands. F1 is **shared** with proposal 014's `.expectNonEmpty()` — design it once as a general contract.
 - **F2 — shared set-difference + non-vacuity core** (product direction). Powers correspondence; `crossLayer`'s existence check re-expresses on it, fixing the empty-layer false-green (§Relationship).
@@ -283,6 +283,6 @@ A "does not throw" test is a check that cannot fail. The primitive's own tests m
 
 ## Alternatives considered
 
-- **Ship only the two cmless rules (route↔matrix, phantom-limit) as standard rules, not a primitive.** Rejected: they are CMS-specific _arguments_ to a generic relation; baking them into core violates ADR-006, and the next project needs a third and a fourth. The primitive is the lego brick; the rules are compositions.
+- **Ship only the two original rules (route↔matrix, phantom-limit) as standard rules, not a primitive.** Rejected: they are CMS-specific _arguments_ to a generic relation; baking them into core violates ADR-006, and the next project needs a third and a fourth. The primitive is the lego brick; the rules are compositions.
 - **A `coverage()` smell detector instead of a builder.** Rejected: smells default to `.warn()` and have their own (no `.that()`) grammar; correspondence is an assertion with a non-optional remedy and wants the standard `.rule()`/`.check()` terminals.
 - **Fold into a generalized "relation-over-a-set" family now** (consistency + correspondence + canonicity as one builder). Attractive and probably the eventual shape, but YAGNI for one proposal — correspondence is the piece with ~24 bugs of evidence. Draft 2 names the family and picks family-aware surface (§Family-aware naming) so the members slot in without a breaking rename; it builds only the evidenced member.

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.18.1] - 2026-07-25
+
+Fixes a family of glob defects in `slices()` and the agent-facing messages around
+them, found by adopting 0.18.0 on a real codebase. See [bug 0009](./bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md).
+
+### Fixed
+
+- **`slices().matching()` now resolves every spelling of the same intent.** Its glob was parsed twice, inconsistently: the picomatch pattern accepted a leading `**/`, while the slice-name step took everything up to the _last_ `/` and located it with a literal `indexOf`. Any glob with a leading globstar or a trailing/interior wildcard therefore matched files and then silently discarded all of them — 0 slices. `'src/features/*'`, `'src/features/*/'`, `'**/src/features/*'` and `'**/src/features/*/'` are now equivalent, from a single parse. **This makes the form used throughout the docs, the examples and `ts-archunit init` (`matching('src/features/*/')`) work for the first time.**
+- **Empty-discovery remedies are derived from the actual globs, not one hardcoded string (ADR-008).** 0.18.0 told every caller to _"use `**/src/*`"_ — right for `assignedFrom()`, wrong for `matching()`, where following it turned a working rule into a silently empty one. Each branch now states only what it can verify: an unanchored `assignedFrom()` glob or a `./` segment (both named individually with their slice keys, and both a transformation you can check), an empty `assignedFrom({})`, a project that loaded 0 source files, a `matching()` glob with no directory prefix, and calling neither source at all. Anything else lands on a clause that lists likely causes **without asserting one** — asserting "the directory does not exist" or "append `/**`" was false for globs targeting a file and for directory names ending in `]` or `}`.
+- **Config-level meta-findings are now visible in the default output.** The rich formatter never printed `violation.message`, so an empty-selector/discovery failure rendered as `:0 — <ruleId>` with the entire remedy invisible unless you used `--format json`. Findings with no source location now show their message in the location's place (and no misleading `:0`).
+- **`.excluding()` can no longer silence a meta-finding.** Exclusions match against the violation message, which now quotes the user's own globs — so an unrelated path exclusion could incidentally suppress the guard that reports a rule enforcing nothing. `applyFilters` now honors `bypassFilters`, consistent with baseline and diff-aware.
+- **Docs, examples and `init` templates now anchor their globs.** Every `assignedFrom()` / `layers` / `folders` / `shared` / `src` example used the project-relative form that matches nothing (`'src/services/**'`), including the code `ts-archunit init` scaffolds. New [Glob conventions](https://nielspeter.github.io/ts-archunit/slices) section and a troubleshooting entry for "Slice discovery matched no files"; `matching()`'s doc now states that the captured segment may be a **file** (a flat folder yields one slice per file, not one slice for the folder).
+
+### Deferred
+
+Two guards were prototyped for this release and withdrawn: failing when discovery yields exactly one non-empty slice (every inter-slice condition is then unfalsifiable), and failing when one slice is empty among populated siblings. Both catch real false-greens. Both fired on legitimate projects — a one-feature repo, a layer not created yet, and the `strict-boundaries` scaffold itself — with no opt-out, and their remedies were written for one input and emitted for all of them. They return once each remedy is executable data and an opt-out exists, mirroring `correspondence().allowEmpty(name)`.
+
+### Upgrading
+
+**Anchor your globs.** The single instruction that matters: every file-path glob needs `**/` (`'**/src/services/**'`, not `'src/services/**'`). That applies to `assignedFrom()`; every glob-valued preset option (`layers`, `folders`, `shared`, `src`, `include`, `repositories`, `typeImportsAllowed`, and the **keys** of `restrictedPackages`); path predicates like `resideInFolder()` / `resideInFile()`; and path-shaped import globs (`notImportFrom('**/src/repositories/**')` — a bare package name like `importFrom('fastify')` is fine, because unresolvable imports fall back to the raw specifier).
+
+Fix them **all at once**: anchoring `layers` while leaving `shared` relative turns a silent no-op into a **false positive** on imports your own config permits. `matching()` accepts either spelling, and GraphQL's `schema()` / `resolvers()` globs are relative to the tsconfig directory. See [Glob conventions](https://nielspeter.github.io/ts-archunit/slices).
+
+From **0.18.0**, two things can change a build's colour:
+
+- Red → green: `matching()` globs that resolve for the first time now produce real slices. A rule whose glob had been mis-parsed may now legitimately pass.
+- Green → red: an `.excluding()` that happened to match a discovery finding's text used to silence it and no longer can. The warning in that case now says the exclusion was refused rather than claiming it is stale.
+
+From **0.17.x or earlier**, a mis-anchored slice rule used to pass _vacuously_. It will now either fail with the discovery guard (naming the glob at fault) or — if this release makes its glob resolve — start reporting **real** cycle/layer violations it never checked before. That is the intended outcome, but budget for it.
+
+Note when baselining: discovery/empty-selector findings are deliberately **not** baselineable (they report that a rule enforces nothing), so `ts-archunit baseline` will not silence them — fix the glob instead. `baseline` now reports the count it actually wrote and lists each finding it refused, with the reason.
+
 ## [0.18.0] - 2026-07-24
 
 Roadmap foundations F1–F4 and proposals 017/016/014 (see `plans/ai-era-product-direction.md`). All new/changed public API is additive except the ⚠️ breaking behavior changes noted below. Pre-1.0, so these ship in a minor.

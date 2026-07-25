@@ -19,10 +19,10 @@ const p = project('tsconfig.json')
 
 describe('The Dependency Rule', () => {
   const layers = {
-    presentation: 'src/presentation/**',
-    infrastructure: 'src/infrastructure/**',
-    application: 'src/application/**',
-    domain: 'src/domain/**',
+    presentation: '**/src/presentation/**',
+    infrastructure: '**/src/infrastructure/**',
+    application: '**/src/application/**',
+    domain: '**/src/domain/**',
   }
 
   it('dependencies point inward', () => {
@@ -84,10 +84,10 @@ describe('No Cycles', () => {
   it('no circular dependencies between layers', () => {
     slices(p)
       .assignedFrom({
-        presentation: 'src/presentation/**',
-        infrastructure: 'src/infrastructure/**',
-        application: 'src/application/**',
-        domain: 'src/domain/**',
+        presentation: '**/src/presentation/**',
+        infrastructure: '**/src/infrastructure/**',
+        application: '**/src/application/**',
+        domain: '**/src/domain/**',
       })
       .should()
       .beFreeOfCycles()

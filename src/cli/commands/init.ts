@@ -165,7 +165,7 @@ function recommendedCallFor(sourceRoot: string): string {
 function floorRulesTemplate(preset: FloorPreset, tsconfig: string, sourceRoot: string): string {
   const recommendedCall = recommendedCallFor(sourceRoot)
   const agentCall = `agentGuardrails(p, {
-    src: '${sourceRoot}/**',
+    src: '**/${sourceRoot}/**',
     noGenericErrors: true,
     noStubs: true,
     noEmptyBodies: true,
@@ -190,7 +190,7 @@ function floorRulesTemplate(preset: FloorPreset, tsconfig: string, sourceRoot: s
   // imperative rules block for the agent's system prompt.
   // See https://nielspeter.github.io/ts-archunit/ai-agents. Then, with
   // { agentGuardrails } imported from '@nielspeter/ts-archunit/presets':
-  //   ...agentGuardrails(p, { src: '${sourceRoot}/**', noGenericErrors: true })`
+  //   ...agentGuardrails(p, { src: '**/${sourceRoot}/**', noGenericErrors: true })`
       : `  // Thin universal safety floor (eval, Function constructor, silent catches,
   // empty bodies). Import { recommended } from '@nielspeter/ts-archunit/presets':
   //   ...${recommendedCall},`
@@ -210,7 +210,7 @@ ${alternateBlock}
 
   // Add project-specific rules below — builders, no .check().
   // (Builders default to error; append .asSeverity('warn') to warn, not fail.)
-  //   classes(p).that().resideInFolder('${sourceRoot}/services/**')
+  //   classes(p).that().resideInFolder('**/${sourceRoot}/services/**')
   //     .should().notContain(call('parseInt')),
   //   slices(p).matching('${sourceRoot}/features/*/').should().beFreeOfCycles(),
 ]
@@ -234,11 +234,11 @@ function shapePresetSpec(
         call: `layeredArchitecture(p, {
     // Example globs — point these at your real layer folders (top to bottom).
     layers: {
-      routes: '${root}/routes/**',
-      services: '${root}/services/**',
-      repositories: '${root}/repositories/**',
+      routes: '**/${root}/routes/**',
+      services: '**/${root}/services/**',
+      repositories: '**/${root}/repositories/**',
     },
-    shared: ['${root}/shared/**'],
+    shared: ['**/${root}/shared/**'],
   })`,
       }
     case 'strict-boundaries':
@@ -247,8 +247,8 @@ function shapePresetSpec(
         describe: 'Feature boundaries: each folder imports only from itself and shared.',
         call: `strictBoundaries(p, {
     // Example glob — point this at your real feature folders.
-    folders: '${root}/features/*',
-    shared: ['${root}/shared/**'],
+    folders: '**/${root}/features/*',
+    shared: ['**/${root}/shared/**'],
   })`,
       }
     case 'data-layer':
@@ -257,7 +257,7 @@ function shapePresetSpec(
         describe: 'Repository pattern: repositories extend a base class and throw typed errors.',
         call: `dataLayerIsolation(p, {
     // Example values — point at your repository folder and its real base class.
-    repositories: '${root}/repositories/**',
+    repositories: '**/${root}/repositories/**',
     baseClass: 'BaseRepository',
     requireTypedErrors: true,
   })`,
@@ -291,7 +291,7 @@ export default [
 
   // Add project-specific rules below — builders, no .check().
   // (Builders default to error; append .asSeverity('warn') to warn, not fail.)
-  //   classes(p).that().resideInFolder('${sourceRoot}/services/**')
+  //   classes(p).that().resideInFolder('**/${sourceRoot}/services/**')
   //     .should().notContain(call('parseInt')),
 ]
 `

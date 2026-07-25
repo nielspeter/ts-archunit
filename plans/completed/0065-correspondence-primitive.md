@@ -1,14 +1,14 @@
 # Plan 0065 — Correspondence / Coverage Primitive (proposal 017)
 
 **Status:** Complete (implemented on branch `feat/f1-filtered-subjects`)
-**Priority:** P2 — the flagship primitive answering the two largest cmless bug clusters (route↔matrix drift, phantom limits; ~24 bugs). Proposal 017.
+**Priority:** P2 — the flagship primitive answering the two largest bug clusters in the reference project (route↔matrix drift, phantom limits; ~24 bugs). Proposal 017.
 **Effort:** ~1 day
 **Depends on:** plan 0064 (F1 — `RuleBuilder.subjects()`). **Builds on / reconciles:** `crossLayer`.
 **Context:** `proposals/017-correspondence-coverage-primitive.md` (draft 2), `plans/ai-era-product-direction.md` (F2).
 
 ## Problem
 
-"Every X has a matching Y" is a first-class architectural relation the DSL could not state — every entry point selects one set and asserts a property of its members. The drift that ships is relational: a route with no permission-matrix entry, a declared limit no code enforces. cmless hand-rolled this twice (`sdk-coverage.test.ts`, `limits-enforcement-completeness.test.ts`), one certifying coverage with a `mapCount === permCount` **cardinality** check — the exact ADR-008 Rule 5 anti-pattern.
+"Every X has a matching Y" is a first-class architectural relation the DSL could not state — every entry point selects one set and asserts a property of its members. The drift that ships is relational: a route with no permission-matrix entry, a declared limit no code enforces. the audited project hand-rolled this twice (`sdk-coverage.test.ts`, `limits-enforcement-completeness.test.ts`), one certifying coverage with a `mapCount === permCount` **cardinality** check — the exact ADR-008 Rule 5 anti-pattern.
 
 ## Design
 
@@ -47,7 +47,7 @@ correspondence(p)
 
 ### ADR notes
 
-ADR-005: no `any`/`as` — the location adapter uses `Node.isNode` + a `getNode` type guard; typed errors (`TypeError`/`RangeError`) for precondition failures (caught in-flight by the project's own dogfooded "no generic Error" rule). ADR-006: generic primitive; the cmless rules are compositions, not baked in. ADR-003: fluent, extends `TerminalBuilder`. ADR-007: `keyFn` is the one acknowledged raw-node seam.
+ADR-005: no `any`/`as` — the location adapter uses `Node.isNode` + a `getNode` type guard; typed errors (`TypeError`/`RangeError`) for precondition failures (caught in-flight by the project's own dogfooded "no generic Error" rule). ADR-006: generic primitive; those rules are compositions, not baked in. ADR-003: fluent, extends `TerminalBuilder`. ADR-007: `keyFn` is the one acknowledged raw-node seam.
 
 ## Files changed
 

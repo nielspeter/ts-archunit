@@ -235,10 +235,10 @@ describe('5. Layer Rules', () => {
   it('layers must respect dependency direction', () => {
     slices(p)
       .assignedFrom({
-        controllers: 'src/controllers/**',
-        services: 'src/services/**',
-        repositories: 'src/repositories/**',
-        domain: 'src/domain/**',
+        controllers: '**/src/controllers/**',
+        services: '**/src/services/**',
+        repositories: '**/src/repositories/**',
+        domain: '**/src/domain/**',
       })
       .should()
       .respectLayerOrder('controllers', 'services', 'repositories', 'domain')
@@ -287,9 +287,9 @@ describe('6. Cycle Rules', () => {
   it('no cycles between layers', () => {
     slices(p)
       .assignedFrom({
-        controllers: 'src/controllers/**',
-        services: 'src/services/**',
-        repositories: 'src/repositories/**',
+        controllers: '**/src/controllers/**',
+        services: '**/src/services/**',
+        repositories: '**/src/repositories/**',
       })
       .should()
       .beFreeOfCycles()

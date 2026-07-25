@@ -137,7 +137,11 @@ const p = project('tsconfig.json')
 
 export default [
   classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')),
-  modules(p).that().resideInFolder('src/domain/**').should().notImportFrom('src/repositories/**'),
+  modules(p)
+    .that()
+    .resideInFolder('**/src/domain/**')
+    .should()
+    .notImportFrom('**/src/repositories/**'),
 ]
 ```
 
@@ -152,7 +156,12 @@ reported, but does not fail:
 ```typescript
 export default [
   classes(p).that().extend('BaseRepository').should().notContain(call('parseInt')), // error
-  modules(p).that().resideInFolder('src/**').should().satisfy(noEmptyBodies()).asSeverity('warn'),
+  modules(p)
+    .that()
+    .resideInFolder('**/src/**')
+    .should()
+    .satisfy(noEmptyBodies())
+    .asSeverity('warn'),
 ]
 ```
 
