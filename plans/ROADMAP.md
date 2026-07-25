@@ -1,234 +1,133 @@
-# ts-archunit Development Roadmap
+# ts-archunit Roadmap
 
-**Created:** 2026-03-25
-**Updated:** 2026-07-24
-**Spec:** `ts-archunit-spec.md`
-**Direction:** `plans/ai-era-product-direction.md` (the AI-era program, below)
-**Total Plans:** 55 completed + the AI-era program (0064–0067, merged 2026-07-24) + proposal 010
+**Version:** 0.18.1 · **Tests:** 2160 across 156 files · **Updated:** 2026-07-25
+**Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
+**Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/`
 
----
-
-## Priority Matrix
-
-| Priority | Plan                                                                             | Effort    | Status               |
-| -------- | -------------------------------------------------------------------------------- | --------- | -------------------- |
-| **P0**   | ~~Project Bootstrap & Package Setup (0000)~~                                     | 2-3 hours | COMPLETED 2026-03-25 |
-| **P0**   | ~~Exploratory PoC & Technical Validation (0001)~~                                | 0.5 day   | COMPLETED 2026-03-25 |
-| **P0**   | ~~Project Loader & Query Engine (0002)~~                                         | 0.5 day   | COMPLETED 2026-03-25 |
-| **P0**   | ~~Predicate Engine & Identity Predicates (0003)~~                                | 1 day     | COMPLETED 2026-03-25 |
-| **P0**   | ~~Condition Engine & Structural Conditions (0004)~~                              | 1 day     | COMPLETED 2026-03-25 |
-| **P0**   | ~~Fluent Rule Builder & `.check()` / `.warn()` (0005)~~                          | 1 day     | COMPLETED 2026-03-25 |
-| **P1**   | ~~Violation Reporting & Code Frames (0006)~~                                     | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Module Entry Point & Dependency Conditions (0007)~~                            | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Class Entry Point & Class Predicates/Conditions (0008)~~                       | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Function Entry Point & Function Predicates (0009)~~                            | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Type Entry Point & Type-Level Conditions (0010)~~                              | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Body Analysis: `call()`, `access()`, `newExpr()`, `expression()` (0011)~~      | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Slice Entry Point & Cycle/Layer Conditions (0012)~~                            | 1 day     | COMPLETED 2026-03-26 |
-| **P1**   | ~~Custom Predicates, Conditions & `definePredicate` / `defineCondition` (0013)~~ | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | ~~Call Entry Point & Call Predicates (0014)~~                                    | 1 day     | COMPLETED 2026-03-26 |
-| **P2**   | ~~Named Selections, `within()` & Scoped Rules (0015)~~                           | 1 day     | COMPLETED 2026-03-26 |
-| **P2**   | ~~Baseline Mode & Diff-Aware Mode (0016)~~                                       | 1 day     | COMPLETED 2026-03-26 |
-| **P2**   | ~~Pattern Templates & `definePattern` / `followPattern` (0017)~~                 | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | ~~Output Formats: JSON, GitHub Annotations (0019)~~                              | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | ~~CLI Standalone Runner (0020)~~                                                 | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | ~~Standard Rules Library (0024)~~                                                | 1 day     | COMPLETED 2026-03-26 |
-| **P2**   | ~~Rich Rule Metadata (0025)~~                                                    | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | ~~User Guide with VitePress (0023)~~                                             | 1 day     | COMPLETED 2026-03-26 |
-| **P3**   | ~~Smell Detectors: Duplicate Bodies & Inconsistent Siblings (0018)~~             | 1 day     | COMPLETED 2026-03-26 |
-| **P3**   | ~~GraphQL Extension: Schema & Resolver Rules (0021)~~                            | 1 day     | COMPLETED 2026-03-26 |
-| **P4**   | ~~Cross-Layer Validation (0022)~~                                                | 1 day     | COMPLETED 2026-03-26 |
-| **P2**   | ~~CLI Watch Mode (0027)~~                                                        | 0.5 day   | COMPLETED 2026-03-26 |
-| **P3**   | ~~Metric-Based Standard Rules (0028)~~                                           | 1 day     | COMPLETED 2026-03-26 |
-| **P3**   | ~~Function Signature Predicates (0029)~~                                         | 0.5 day   | COMPLETED 2026-03-26 |
-| **P2**   | ~~Member Property Conditions (0030)~~                                            | 1 day     | COMPLETED 2026-03-27 |
-| **P2**   | ~~Parameter Type Conditions (0031)~~                                             | 0.5 day   | COMPLETED 2026-03-27 |
-| **P2**   | ~~Member Visibility Predicates (0032)~~                                          | 0.5 day   | COMPLETED 2026-03-27 |
-| **P2**   | ~~Return Type Condition (0033)~~                                                 | 0.25 day  | COMPLETED 2026-03-27 |
-| **P2**   | ~~Call Argument Property Condition (0034)~~                                      | 0.5 day   | COMPLETED 2026-03-27 |
-| **P2**   | ~~Aliased Import Condition (0035)~~                                              | 0.25 day  | COMPLETED 2026-03-27 |
-| **P1**   | ~~Property Matcher & Argument Containing Condition (0036)~~                      | 0.5 day   | COMPLETED 2026-03-28 |
-| **P0**   | ~~expression() Ancestor Deduplication (0037)~~                                   | 0.25 day  | COMPLETED 2026-03-28 |
-| **P1**   | ~~notImportFrom Type-Import Awareness (0038)~~                                   | 0.5 day   | COMPLETED 2026-03-28 |
-| **P2**   | ~~within() Object Literal Callback Extraction (0039)~~                           | 0.5 day   | COMPLETED 2026-03-28 |
+> Conventions: a plan is **READY** when its design is settled and it can be built as
+> written; **PROPOSED** when the design is reviewed but nobody has decided to build
+> it; **PARTIAL** when some phases shipped and the rest were deliberately deferred.
 
 ---
 
-## Final batch (completed 2026-03-30)
+## Open work
 
-| Priority | Plan                                                                | Effort   | Status               | Depends on       |
-| -------- | ------------------------------------------------------------------- | -------- | -------------------- | ---------------- |
-| **P1**   | ~~Architecture Rule Framework Primitives (0041)~~                   | 2.5 days | COMPLETED 2026-03-30 | 0011, 0007       |
-| **P1**   | ~~Standard Architecture Rule Conditions (0042)~~                    | 0.5 day  | COMPLETED 2026-03-30 | 0041             |
-| **P1**   | ~~Architecture Presets (0040)~~                                     | 1.5 days | COMPLETED 2026-03-30 | 0041, 0042       |
-| **P1**   | ~~Docs, Explain Command, and Recipes (0043)~~                       | 1 day    | COMPLETED 2026-03-30 | 0041, 0042, 0040 |
-| **P2**   | ~~TypeScript Assertion Matchers + Function/Module Variants (0046)~~ | 0.5 day  | COMPLETED 2026-04-12 |                  |
-| **P1**   | ~~Argument-Aware Identity for `calls()` Rules (0057)~~              | 1 day    | COMPLETED 2026-06-13 | none             |
-| **P3**   | ~~`jsxText()` Matcher (0056)~~                                      | ~3 hours | COMPLETED 2026-07-03 | none             |
+| Plan                                           | State        | Effort   | Blocked on                              |
+| ---------------------------------------------- | ------------ | -------- | --------------------------------------- |
+| 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)    |
+| 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed |
+| 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand        |
 
----
+Nothing is currently READY: every remaining item needs a decision, not
+implementation. **0063 (docs deprecation scan) shipped 2026-07-25.**
 
-## What's Shipped
+**0067 part C** is the remaining slice of proposal 014: path-glob auto-fail on every
+builder plus path normalization. It is the broadest breaking change left, which is
+why it is parked on a version decision rather than an implementation question.
 
-**2108 tests across 153 files. All checks pass.** (2042 → 2108 with the AI-era program.)
+**0047 / 0048** were reviewed 2026-07-13 and given a go/no-go on 2026-07-14: 0047
+ship **trimmed** (`doubleCast` + `anyAnnotation`; defer `broadType`/`tsDirective`),
+0048 **defer until demand** (overlaps `@typescript-eslint/no-deprecated`; the symbol
+layer is speculative). Both remain PROPOSED — the open question is whether each earns
+API surface, not how to build it.
 
-### Core (P0)
+## Deferred — decided, not scheduled
 
-- `project('tsconfig.json')` with singleton caching, `workspace([...tsconfigs])` for monorepos
-- `Predicate<T>` + `Condition<T>` interfaces with combinators
-- `RuleBuilder<T>` with fluent `.that().should().check()` chain
-- `.because()`, `.warn()`, `.severity()`, `.rule({ id, because, suggestion, docs })`
-
-### Entry Points (P1)
-
-- `modules(p)` — import/dependency rules, type-only import enforcement, `dependOn()`, dynamic import detection
-- `classes(p)` — inheritance, decorators, methods, body analysis
-- `functions(p)` — function declarations, arrow functions, class methods
-- `types(p)` — interfaces + type aliases, type matchers through Partial/Pick
-- `slices(p)` — cycle detection (Tarjan's SCC), layer ordering, isolation
-- `calls(p)` — framework-agnostic call expression matching (P2)
-
-### Body Analysis (P1) — the differentiator
-
-- `call()`, `newExpr()`, `access()`, `property()`, `expression()` matchers
-- `contain()`, `notContain()`, `useInsteadOf()` conditions
-- Optional chaining normalization, nested call detection
-
-### Advanced Features (P2)
-
-- `within(selection).functions()` — scoped rules inside matched callbacks
-- `withBaseline()` + `diffAware()` — gradual adoption for existing codebases
-- `detectFormat()` — GitHub Actions annotations, JSON, terminal output
-- `.rule({ id, because, suggestion, docs })` — rich violation messages
-- `definePattern()` + `followPattern()` — return shape conventions
-- `defineConfig()` + `npx ts-archunit check` — CLI runner
-- `definePredicate()` + `defineCondition()` + `.satisfy()` — extension API
-- 13 standard rules via `@nielspeter/ts-archunit/rules/*` sub-path exports
-
-### P3 + P4
-
-- `smells.duplicateBodies()` + `smells.inconsistentSiblings()` — AST fingerprint similarity
-- `ts-archunit/graphql` — schema + resolver rules with optional graphql peer dep
-- `crossLayer(p)` — route ↔ schema ↔ SDK consistency validation
-
-### Documentation
-
-- VitePress user guide with 13 pages (plan 0023)
-- GitHub Pages deployment workflow
-
-### CLI & Metrics (P2/P3 — plan 0027, 0028)
-
-- `npx ts-archunit check --watch` — debounced file watcher with `resetProjectCache()` + `importFresh()`
-- `ts-archunit/rules/metrics` — `maxCyclomaticComplexity`, `maxClassLines`, `maxMethodLines`, `maxMethods`, `maxParameters` + function-level equivalents
-- Metric predicates for composition: `haveCyclomaticComplexity`, `haveMoreLinesThan`, `haveMoreMethodsThan`, `haveComplexity`, `haveMoreFunctionLinesThan`
-- `docs/cli.md` — full CLI documentation page
-- `docs/metrics.md` — full metrics documentation page
-
-### Member Inspection Layer (P2 — plans 0030–0034)
-
-- Property conditions: `havePropertyNamed`, `notHavePropertyNamed`, `havePropertyMatching`, `notHavePropertyMatching`, `haveOnlyReadonlyProperties`, `maxProperties`
-- Parameter type conditions: `acceptParameterOfType`, `notAcceptParameterOfType` (classes + functions)
-- Visibility predicates: `arePublic`, `areProtected`, `arePrivate`
-- Return type condition: `haveReturnTypeMatching`
-- Call argument conditions: `haveArgumentWithProperty`, `notHaveArgumentWithProperty`, `haveArgumentContaining`, `notHaveArgumentContaining`
-
-### Bug Fixes
-
-- BUG-0001: `.excluding()` now matches against `element`, `file`, and `message` (was element-only)
-- BUG-0002 through BUG-0007: See CHANGELOG 0.3.0
-
-### Documentation
-
-- VitePress user guide with 16 pages (plans 0023, 0027, 0028)
-- GitHub Pages deployment workflow
-
-### Standard Architecture Rule Conditions (P1 — plan 0042)
-
-- Security function variants: `functionNoEval`, `functionNoFunctionConstructor`, `functionNoProcessEnv`, `functionNoConsoleLog`, `functionNoConsole`, `functionNoJsonParse`
-- Security module variants: `moduleNoEval`, `moduleNoProcessEnv`, `moduleNoConsoleLog`
-- New class security rules: `noConsole` (all console methods), `noJsonParse`
-- Error function variants: `functionNoGenericErrors`, `functionNoTypeErrors`
-- Architecture primitives: `mustCall(pattern)`, `classMustCall(pattern)` — positive body assertion
-- Hygiene rules: `noDeadModules`, `noUnusedExports`, `noStubComments`, `noEmptyBodies`
-- Sub-path exports: `./rules/architecture`, `./rules/hygiene`
-
-### Architecture Rule Primitives (P1 — plan 0041)
-
-- Builder phase tracking: `_phase` field, dual-use methods dispatch as predicate or condition based on `.that()` / `.should()` context
-- Phase-aware methods: `notImportFrom`, `resideInFile`, `resideInFolder`, `haveNameMatching`, `extend`, `implement`, `haveMethodNamed` across 4 builders
-- Module body analysis: `modules().should().notContain()` / `contain()` / `useInsteadOf()` with `{ scopeToModule: true }` option
-- Export conditions: `notHaveDefaultExport()`, `haveDefaultExport()`, `haveMaxExports(n)`
-- Reverse dependency: `onlyBeImportedVia()`, `beImported()`, `haveNoUnusedExports()` with cached reverse import graph
-- Stub detection: `comment()` matcher, `STUB_PATTERNS` constant, `notHaveEmptyBody()` on functions + classes
-- 7 deprecated aliases: `notImportFromCondition`, `shouldResideInFile`, `shouldResideInFolder`, `conditionHaveNameMatching`, `shouldExtend`, `shouldImplement`, `shouldHaveMethodNamed`
-
-### Architecture Presets (P1 — plan 0040)
-
-- `layeredArchitecture(p, options)` — layer ordering, cycle detection, innermost isolation, type-import enforcement, restricted packages
-- `dataLayerIsolation(p, options)` — base class extension, typed error enforcement for repositories
-- `strictBoundaries(p, options)` — no cycles, no cross-boundary imports, shared isolation, test isolation, copy-paste detection
-- `.violations()` terminal on `RuleBuilder` and `TerminalBuilder` — returns violations without throwing
-- `dispatchRule()` + `throwIfViolations()` — aggregated error reporting across multiple rules
-- Sub-path export: `./presets`
-- Override system: per-rule severity (`'error'`, `'warn'`, `'off'`)
-
-### Docs, Explain Command, and Recipes (P1 — plan 0043)
-
-- `npx ts-archunit explain` CLI subcommand — dumps active rules as JSON or markdown
-- `.describeRule()` on `RuleBuilder` and `TerminalBuilder` — metadata extraction without rule execution
-- VitePress: `docs/presets.md`, `docs/recipes.md`, `docs/explain.md` — 3 new pages
-- Updated: `docs/standard-rules.md`, `docs/getting-started.md`, `docs/cli.md`
-- Explanatory descriptions added to all 45+ sections across 18 documentation files
+- **Discovery surface → fail-grade** — promote `smells.duplicateBodies` /
+  `inconsistentSiblings` from `.warn()` toward `.check()` with agent-first messages,
+  paired with a baseline/ratchet so they are adoptable on a codebase that already has
+  debt. This is the strategic gap: the enforcement half is mature, the discovery half
+  is barely used. **Proposal unwritten.**
+- **`runtimeIsolation`** — proposal unwritten.
+- **Slice discovery guards** — failing on a single-slice result, and on an empty slice
+  among populated siblings. Both catch real false-greens; both were built and withdrawn
+  from 0.18.1 because they fire on legitimate projects with no opt-out. They return once
+  each remedy is executable data and an opt-out exists (`correspondence().allowEmpty()`
+  is the model). See `../bugs/fixed/0009-*.md`.
+- **015 (Bun)** — decided: no core preset. A tier-3 `@ts-archunit/bun` package, gated on
+  a second real app. Nothing to build in core.
+- **Proposal 012 (workspace config-coverage)** — rejected as core (2026-07-17): the root
+  fix is a package-manager flag and the problem is structurally absent on
+  pnpm/Turborepo/Nx. One idea extracted for its own proposal: reasoned exclusions
+  (`deferred(pattern, reason)` beside `silent()`).
 
 ---
 
-## AI-era program — merged 2026-07-24 (PR #2)
+## Releases
 
-Turned the "architecture governance for the AI era" positioning into shipped code. Positioning: `docs/why-ts-archunit.md` + README; the sequenced, review-validated roadmap: `plans/ai-era-product-direction.md`. Motivated by that audit (its two largest recurring bug classes — route↔permission-matrix drift and phantom limits — plus an empty-selector false-green the tool committed twice on a real app).
+| Version    | Theme                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable      |
+| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking |
+| 0.17.0     | `init` scaffolds the shape presets                                                               |
+| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                       |
+| 0.15.0     | `tsconfig()` config-assertion rule                                                               |
+| 0.14.0     | `ts-archunit init` scaffolder                                                                    |
+| 0.13.0     | AI-agent delivery program                                                                        |
 
-**Foundations + features (merged, 2108 tests green, 3-persona code-reviewed):**
+### 0.18.0 — the AI-era program (PR #2, 2026-07-24)
 
-| Plan | What                                                                                                                                                | Public API                                                                                                                                                                |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0064 | **F1** — filtered-subject materialization (the keystone the others build on)                                                                        | `RuleBuilder.subjects()`                                                                                                                                                  |
-| 0065 | **F2 + proposal 017** — coverage/relation primitive; `crossLayer`'s existence check reconciled onto the shared core (empty-layer false-green fixed) | `correspondence(p).side().beComplete()/.haveNoOrphans()/.beBijective()` (+ `.allowEmpty()`, `.distinctKeysOn()`); `byName`/`byArg`/`byPropertyNames`; `setCorrespondence` |
-| 0066 | **F3 + proposal 016** — object-literal function collection                                                                                          | `functions(p, { includeObjectLiteralFunctions })`; `collectObjectLiteralFunctions`                                                                                        |
-| 0067 | **F4 + proposal 014 (A/B/D)** — empty-selector safety                                                                                               | `ArchViolation.bypassFilters`; `.expectNonEmpty()`; slice/preset discovery non-vacuity                                                                                    |
+Turned the "architecture governance for the AI era" positioning into shipped code.
+Positioning lives in `docs/why-ts-archunit.md`; the sequenced roadmap in
+`ai-era-product-direction.md`. Motivated by an audit of a large adopting codebase —
+its two largest recurring bug classes were route↔permission-matrix drift and phantom
+limits, plus an empty-selector false-green the tool itself committed twice.
 
-Proposals 014–017 revised to draft 2 (architect + product reviewed) also merged.
-
-⚠️ **Breaking:** empty discovery now **fails** instead of passing vacuously — `slices().matching()`/`.assignedFrom()`, `crossLayer` empty layer, and `strictBoundaries` with no matching boundaries. See CHANGELOG `[Unreleased]`; **needs a version number** (not yet released).
-
-**Deferred (documented, not yet built):**
-
-- **014-C** — path-glob auto-fail on every builder + path-normalization (the broadest breaking re-cut; needs a version decision).
-- **discovery-surface → fail-grade** (promote the `smells` detectors to `.check()` + a baseline/ratchet — the "moat") and **runtimeIsolation** — proposals unwritten.
-- **015 (Bun)** — decision adopted (no core preset; tier-3 `@ts-archunit/bun` gated on a second app); nothing to build in core.
-
----
-
-## Open Plans
-
-Three items remain. **0063 is ready to build**; 0047/0048 are **PROPOSED** — their design was reviewed 2026-07-13 (decisions locked), but **neither has a go/no-go decision to build.** They are independent matchers; the open question is whether each earns a place in the API, not how to implement it.
-
-Shipped: the AI-agent delivery program — **0060 → 0044 → 0049** (v0.13.0) — the **`init` scaffolder (0050, v0.14.0)**, the **`tsconfig()` config-assertion rule (0055, v0.15.0)**, and **v0.16.0** — the **docs restructure (0061)** (golden path, one reconciled workflow, four-tier IA) plus **shape presets → returning form (0062)** (the whole preset family now composes uniformly; `arch:baseline` no longer crashes; warn rules flow through the pipeline).
-
-| Priority | Plan                                         | Effort       | State                                           | Depends on       |
-| -------- | -------------------------------------------- | ------------ | ----------------------------------------------- | ---------------- |
-| **P2**   | TypeScript Escape-Hatch Matchers (0047)      | ~1 day       | **PROPOSED** — reviewed, needs go/no-go         | 0046             |
-| **P2**   | Docs Deprecation Scan (0063)                 | ~2.5–3 hours | **READY TO BUILD** — 3 drafts + 2 review rounds | ADR-008          |
-| **P2**   | `usingTagged()` Symbol-Tagged Matcher (0048) | ~1–1.5 days  | **PROPOSED** — reviewed, needs go/no-go         | 0011, 0013, 0046 |
-
-**Go/no-go done (2026-07-14):** 0047 → **ship trimmed** (`doubleCast` + `anyAnnotation` only; defer `broadType`/`tsDirective`); 0048 → **defer until demand** (overlaps `@typescript-eslint/no-deprecated`; the symbol layer is speculative infra). Both stay PROPOSED.
-
-**0063 (2026-07-17)** graduated from proposal 013 after three drafts. `tests/`-only, no API, no new deps — a scan that fails the build if any doc teaches deprecated API, with everything (names, replacement text, and the disambiguation rule) derived from `src/` so no hand-maintained list can rot. Reviews found real rot **twice**: a manual sweep missed 9 of 27 usages, then draft 2's hand-coded matching rule was measured blind to its own headline evidence. **Sequencing:** 0047 is user-facing and already decided — a 2-hour task does not displace it.
-
-**Closed (2026-07-17):** proposal 012 (workspace config-coverage) → **rejected as core**; the root fix is a package-manager flag, and the disease is structurally absent on pnpm/Turborepo/Nx. One win extracted: **reasoned exclusions on `RuleBuilder`** (`deferred(pattern, reason)` beside the existing `silent()`) — generic, serves every builder, needs its own proposal.
-
-**Built since:** 0062 Phase 5 — `ts-archunit init --preset layered|strict-boundaries|data-layer` now scaffolds the shape presets (v0.17.0).
+| Plan | What                                                 | Public API                                                                                                               |
+| ---- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 0064 | F1 — filtered-subject materialization (the keystone) | `RuleBuilder.subjects()`                                                                                                 |
+| 0065 | F2 + proposal 017 — coverage/relation primitive      | `correspondence(p).side()` → `.beComplete()` / `.haveNoOrphans()` / `.beBijective()`; `byName`/`byArg`/`byPropertyNames` |
+| 0066 | F3 + proposal 016 — object-literal functions         | `functions(p, { includeObjectLiteralFunctions })`                                                                        |
+| 0067 | F4 + proposal 014 (A/B/D) — empty-selector safety    | `.expectNonEmpty()`; `ArchViolation.bypassFilters`; slice/preset discovery non-vacuity                                   |
 
 ---
 
-## Completed
+## Capabilities
 
-55 plans implemented + proposal 010 (JSX Element Rules). Latest (v0.16.0): docs restructure — golden path (0061) + shape presets → returning form (0062), so the whole preset family composes uniformly. On top of `tsconfig()` (0055, v0.15.0), the `init` scaffolder (0050, v0.14.0), and the AI-agent delivery program (0060/0044/0049, v0.13.0). 2042 tests across 151 files.
+What the library can do today. Details in `../docs/`.
+
+**Entry points** — `modules()` imports and dependency direction · `classes()`
+inheritance, decorators, members · `functions()` declarations, arrows, methods, and
+optionally object-literal values · `types()` interfaces and aliases, matching through
+`Partial`/`Pick` · `slices()` cycles (Tarjan), layer order, isolation · `calls()`
+framework-agnostic call matching.
+
+**Body analysis** (the differentiator) — `call()`, `newExpr()`, `access()`,
+`property()`, `expression()`, `comment()` matchers with `contain()` / `notContain()` /
+`useInsteadOf()`; optional-chaining normalization and nested-call detection.
+`within(selection)` scopes rules inside matched callbacks.
+
+**Relations & consistency** — `correspondence()` for "every X has a matching Y" by
+identity · `crossLayer()` route↔schema↔SDK · `smells.duplicateBodies()` and
+`smells.inconsistentSiblings()` AST-fingerprint detectors.
+
+**Member inspection** — property, parameter-type, return-type and call-argument
+conditions; visibility predicates.
+
+**Adoption** — `withBaseline()` and `diffAware()` for existing codebases; per-rule
+severity overrides; `.excluding()` / `silent()`; config-level findings deliberately
+bypass both filters.
+
+**Presets & standard rules** — `layeredArchitecture`, `dataLayerIsolation`,
+`strictBoundaries`, `recommended`, `agentGuardrails` (all composable, returning form);
+standard rules under `rules/` — `architecture`, `code-quality`, `dependencies`,
+`errors`, `hygiene`, `metrics`, `metrics-function`, `naming`, `security`, `typescript`.
+
+**CLI & output** — `check` (with `--watch`), `baseline`, `explain`, `init`;
+terminal / JSON / GitHub-annotation formats; `tsconfig()` compiler-option assertions.
+
+**Extension** — `definePredicate()`, `defineCondition()`, `.satisfy()`,
+`definePattern()` / `followPattern()`, `not()` / `and()` / `or()` combinators.
+
+---
+
+## Completed plans
+
+59 plans in `completed/`, numbered 0000–0066. Accepted proposals that shipped without
+a numbered plan live in `../proposals/completed/` (multi-project workspace, dynamic
+imports, builtin `importsFrom`, silent exclusions, JSX element rules, call-argument
+identity, per-rule exclusions).
+
+The per-plan history lives in those files and in `../CHANGELOG.md`; it is deliberately
+not duplicated here — three overlapping "what's done" tables were what made the
+previous version of this file hard to read.
