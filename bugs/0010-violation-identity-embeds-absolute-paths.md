@@ -131,7 +131,7 @@ command, instead of silently reporting all 1006 accepted findings as new.
 
 Measured against the spike (i.e. with root-scrubbing already applied), each
 perturbing the _circumstances_ a message describes while leaving the finding
-itself untouched. All three reproduce; the third is not fixed.
+itself untouched. All three reproduce; all three are now fixed.
 
 | Perturbation                           | `duplicateBodies`  | `inconsistentSiblings` | module body analysis |
 | -------------------------------------- | ------------------ | ---------------------- | -------------------- |
@@ -145,14 +145,38 @@ Two machines can legitimately disagree — and the two-worktree measurement abov
 could never have caught it, because both worktrees read one filesystem in one
 order.
 
-The third row is the worst of the three and is **still open**. Prepending two
-lines to a file with `console.log` at lines 2 and 4 moves them to 4 and 6 — and
-the old identity for line 4 now matches the violation that used to be at line 2.
-Coordinate-based identity does not merely lose baseline entries, it **matches
-the wrong one**. The fix is not "drop the line": within one file those two
-findings are distinguished by nothing else, so dropping it merges them. It needs
-a discriminator (enclosing element + occurrence ordinal), which changes what
-counts as one finding — a decision, not a patch.
+The third row is the worst of the three: prepending two lines to a file with
+`console.log` at lines 2 and 4 moves them to 4 and 6, and the old entry for line
+4 then matches the violation that used to be at line 2. Coordinate-based
+identity does not merely lose baseline entries, it **matches the wrong one**.
+
+Dropping the line is not sufficient on its own — within one file those two
+findings are distinguished by nothing else, so removing it merges them, and a
+merged pair means accepting one accepts both. The scope is narrow: only
+`body-analysis-module.ts:64,99` put a coordinate in a message. Every other
+`getStartLineNumber()` call feeds the un-hashed `line` field, and
+`exclusion-comments.ts:114` is an `ExclusionWarning`, a different type.
+
+Five candidate discriminators, measured over 596 matched nodes in a real
+808-file project (merges in brackets):
+
+| scheme               | console.log (284) | JSON.parse (51) | parseInt (58) | process.env (203) |
+| -------------------- | ----------------- | --------------- | ------------- | ----------------- |
+| today — line         | 284               | 51              | 58            | 202 **(-1)**      |
+| enclosing scope only | 42 (-242)         | 43 (-8)         | 52 (-6)       | 40 (-163)         |
+| **scope + ordinal**  | **284**           | **51**          | **58**        | **203**           |
+| matched node text    | 282 (-2)          | 32 (-19)        | 46 (-12)      | 25 (-178)         |
+| scope + node text    | 282 (-2)          | 43 (-8)         | 55 (-3)       | 40 (-163)         |
+
+`scope + ordinal` is 1:1 everywhere, and strictly better than the line, which
+already merges two `process.env` accesses that share one. Node text reads like
+the meaningful choice and is the worst of the four. Residual cost: adding or
+removing a match renumbers later matches **in the same declaration** — 24 of 42
+`console.log` scopes hold more than one match, so this is not rare, but it is a
+change to that declaration. Today, editing any line above shifts every finding
+in the file.
+
+**Fixed in the spike**, via the same `identity` field.
 
 **Fixed in the spike**, via a new optional `ArchViolation.identity` — a
 canonical form that replaces `element` and `message` in the hash and leaves the

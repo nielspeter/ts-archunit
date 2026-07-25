@@ -19,6 +19,7 @@ import { Project } from 'ts-morph'
 import { smells } from '../../src/smells/index.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
+import { modules } from '../../src/builders/module-rule-builder.js'
 import { generateBaseline, withBaseline, hashViolation } from '../../src/helpers/baseline.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
@@ -282,6 +283,61 @@ describe('violation identity is stable under unrelated change (bug 0010)', () =>
     const beforeIds = identitiesOf(beforeFindings, before.root)
     const afterIds = identitiesOf(afterFindings, after.root)
     expect([...afterIds].sort()).toEqual([...beforeIds].sort())
+  })
+
+  it('a per-node finding survives lines being inserted above it', () => {
+    // The nastiest of the three: with "at line N" in the message, prepending two
+    // lines to a file whose matches sit at lines 2 and 4 moves them to 4 and 6 —
+    // and the baseline entry recorded for line 4 then matches the violation that
+    // used to be at line 2. Coordinate identity does not merely lose entries, it
+    // accepts the WRONG one, which is worse than reporting everything as new.
+    const body = `export function handler(input: string): string {
+  console.log('one')
+  const trimmed = input.trim()
+  console.log('two')
+  return trimmed
+}
+`
+    const tsconfig = JSON.stringify({
+      compilerOptions: { target: 'ES2022', module: 'ES2022', moduleResolution: 'bundler' },
+      include: ['*.ts'],
+    })
+    const build = (prefix: string): Layout => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-shift-'))
+      created.push(tmp)
+      fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"fixture"}')
+      fs.writeFileSync(path.join(tmp, 'tsconfig.json'), tsconfig)
+      fs.writeFileSync(path.join(tmp, 'a.ts'), prefix + body)
+      const tsConfigPath = path.join(tmp, 'tsconfig.json')
+      const tsMorphProject = new Project({ tsConfigFilePath: tsConfigPath })
+      return {
+        root: tmp,
+        project: {
+          tsConfigPath,
+          _project: tsMorphProject,
+          getSourceFiles: () => tsMorphProject.getSourceFiles(),
+        },
+      }
+    }
+    const findings = (layout: Layout): ArchViolation[] =>
+      modules(layout.project).should().notContain(call('console.log')).violations()
+
+    const plain = build('')
+    const shifted = build('// a comment added at the top\n\n')
+
+    const plainFindings = findings(plain)
+    const shiftedFindings = findings(shifted)
+
+    // Two distinct findings in one file, distinguished in the message by line
+    // alone — the situation that makes this hard.
+    expect(plainFindings.length).toBe(2)
+    expect(shiftedFindings.length).toBe(2)
+    expect(shiftedFindings.map((v) => v.line)).not.toEqual(plainFindings.map((v) => v.line))
+
+    const plainIds = identitiesOf(plainFindings, plain.root)
+    const shiftedIds = identitiesOf(shiftedFindings, shifted.root)
+    expect(plainIds.size).toBe(2)
+    expect([...shiftedIds].sort()).toEqual([...plainIds].sort())
   })
 
   it('two findings from one rule never share an identity', () => {
