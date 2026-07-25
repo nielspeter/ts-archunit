@@ -13,12 +13,12 @@ open defects in `../bugs/`
 
 ## Open work
 
-| Plan                                           | State        | Effort   | Blocked on                                 |
-| ---------------------------------------------- | ------------ | -------- | ------------------------------------------ |
-| 0069 — No rule may certify nothing             | **DRAFT**    | ~2 days  | review (`/review-proposal`), then bug 0014 |
-| 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)       |
-| 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed    |
-| 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand           |
+| Plan                                           | State        | Effort   | Blocked on                                     |
+| ---------------------------------------------- | ------------ | -------- | ---------------------------------------------- |
+| 0069 — No rule may certify nothing             | **DRAFT 4**  | ~3 days  | R-any/R1/R2 approved; R3 needs the gate re-run |
+| 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)           |
+| 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed        |
+| 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand               |
 
 All three need a decision, not implementation. 0063 shipped 2026-07-25.
 
