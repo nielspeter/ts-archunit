@@ -106,3 +106,56 @@ describe('agentGuardrails preset', () => {
     expect(builders).toHaveLength(2)
   })
 })
+
+/**
+ * Presets must see handler maps (bug 0013).
+ *
+ * `functions()` keeps object-literal collection opt-in so that widening a
+ * selector the USER wrote does not silently change their rule. A preset's
+ * subject set is the preset's own, and this one's docstring already promises
+ * that "standalone functions, arrow functions, and class methods are all
+ * covered" — a handler map is none of the three, so `{ POST: () => {} }`
+ * slipped every guardrail in the preset named for the mistakes agents make.
+ *
+ * Ask ADR-008's question of the tests above: what would they do if no preset
+ * rule could see a handler map? They would all pass — every other fixture here
+ * declares its functions. That is why this block has its own fixture.
+ */
+describe('agentGuardrails sees handler maps', () => {
+  const handlerMapDir = path.resolve(import.meta.dirname, '../fixtures/presets/handler-map')
+  const handlerMapTsconfig = path.join(handlerMapDir, 'tsconfig.json')
+  const project = new Project({ tsConfigFilePath: handlerMapTsconfig })
+  const hp: ArchProject = {
+    tsConfigPath: handlerMapTsconfig,
+    _project: project,
+    getSourceFiles: () => project.getSourceFiles(),
+  }
+
+  const elementsFor = (id: string): string[] =>
+    agentGuardrails(hp, {
+      src: '**/src/**',
+      noGenericErrors: true,
+      noStubs: true,
+      noEmptyBodies: true,
+    })
+      .flatMap((r) => r.violations())
+      .filter((v) => v.ruleId === id)
+      .map((v) => v.element)
+      .sort()
+
+  it('flags the same defect in a named function and an object-literal handler', () => {
+    // Identical bodies, so anything reported for one must be reported for the
+    // other. Asserting the exact pair rather than a count keeps this from
+    // passing if the object-literal one were reported twice.
+    expect(elementsFor('preset/agent/no-stubs')).toEqual(['namedHandler', 'routes.objectHandler'])
+    expect(elementsFor('preset/agent/no-generic-errors')).toEqual([
+      'namedHandler',
+      'routes.objectHandler',
+    ])
+  })
+
+  it('flags an empty arrow used as a handler-map value', () => {
+    // The canonical agent stub: `{ POST: () => {} }`.
+    expect(elementsFor('preset/agent/no-empty-bodies')).toEqual(['routes.emptyHandler'])
+  })
+})

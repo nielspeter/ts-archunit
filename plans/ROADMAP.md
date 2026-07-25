@@ -1,6 +1,6 @@
 # ts-archunit Roadmap
 
-**Version:** 0.18.1 · **Tests:** 2160 across 156 files · **Updated:** 2026-07-25
+**Version:** 0.19.0 · **Tests:** 2204 across 159 files · **Updated:** 2026-07-25
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
 **Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/` ·
 open defects in `../bugs/`
@@ -33,17 +33,32 @@ API surface, not how to build it.
 
 ## Open defects
 
-Measured, reproduced, not yet fixed. Full write-ups in `../bugs/`.
+Measured and reproduced. Full write-ups in `../bugs/`.
 
-| Bug                                                                                          | What is broken                                                                                                                                                |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | `withBaseline()` never matches in CI. Hits every `strictBoundaries` user, not just smells. **Precondition for proposal 018.**                                 |
-| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | Our own ADR-005 / hygiene / security enforcement is vacuous in any checkout not named `ts-archunit`; one rule is vacuous everywhere. Evidence for **0067-C**. |
+| Bug                                                                                          | State                                                                                                                                            |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | **Fixed** in 0.19.0, after a review round found two criticals in the fix itself.                                                                 |
+| [0013](../bugs/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals | **Fixed** in 0.19.0. `resolvers()`, both smells and two presets could not see handler-map functions.                                             |
+| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | **Open**, and its fix is now known: the 0067-C empty-selector flip detects all 13 automatically. No bespoke guard needed — see below.            |
+| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix. |
 
-Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) is the third
-item in this class — a rule with subjects and no conditions warns and returns a pass —
-but it is a design change, not a defect report, so it stays a proposal. All three are
-the same ADR-008 failure: a check that cannot fail, on a run that exits 0.
+**0011 no longer needs its own mechanism.** It originally proposed a file-set
+identity assertion. The 0067-C measurement supersedes that: running the
+empty-selector flip from a checkout **not** named `ts-archunit` produces 23
+failures against 10 from a correctly-named one, and the 13-failure delta is
+exactly these rules. Whatever fixes the class fixes them, so 0011 is now
+waiting on the 0067-C decision rather than on work of its own.
+
+**Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) got
+cheaper.** It replaces `console.warn(...) + return []` at five sites — a rule
+that has subjects but no conditions asserts nothing and passes. All five are
+still there. But 0014 merged the two builder hierarchies into one root, so the
+fix is now a single implementation on `TerminalBuilder` instead of five copies,
+and it composes with the census's `conditions: 0`, which already reports the
+state without failing on it.
+
+019 and 0067-C are the two halves of one guard: **019 is empty conditions,
+0067-C is empty subjects.** Neither is a defect report; both are decisions.
 
 ## Deferred — decided, not scheduled
 
@@ -74,15 +89,17 @@ the same ADR-008 failure: a check that cannot fail, on a run that exits 0.
 
 ## Releases
 
-| Version    | Theme                                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable      |
-| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking |
-| 0.17.0     | `init` scaffolds the shape presets                                                               |
-| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                       |
-| 0.15.0     | `tsconfig()` config-assertion rule                                                               |
-| 0.14.0     | `ts-archunit init` scaffolder                                                                    |
-| 0.13.0     | AI-agent delivery program                                                                        |
+| Version    | Theme                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| **0.19.0** | Portable violation identity (`withBaseline()` works across checkouts); three collectors see handler maps |
+| **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps |
+| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable              |
+| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking         |
+| 0.17.0     | `init` scaffolds the shape presets                                                                       |
+| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                               |
+| 0.15.0     | `tsconfig()` config-assertion rule                                                                       |
+| 0.14.0     | `ts-archunit init` scaffolder                                                                            |
+| 0.13.0     | AI-agent delivery program                                                                                |
 
 ### 0.18.0 — the AI-era program (PR #2, 2026-07-24)
 

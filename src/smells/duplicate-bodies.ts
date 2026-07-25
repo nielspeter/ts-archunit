@@ -77,7 +77,13 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
         continue
       }
 
-      for (const fn of collectFunctions(sf)) {
+      // Detectors scan for a property of the code, not a user-declared subject
+      // set, so they always include object-literal functions. `functions()`
+      // keeps that opt-in because widening a selector silently changes every
+      // existing rule; a detector has no such contract to break, and a
+      // duplicated arrow under an object key — a resolver, a route handler, a
+      // reducer case — is exactly the copy-paste rot this exists to find.
+      for (const fn of collectFunctions(sf, { includeObjectLiteralFunctions: true })) {
         if (this.meetsMinLines(fn)) {
           allFunctions.push(fn)
         }
@@ -158,6 +164,22 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
         file: fileA,
         line: lineA,
         message: `${nameA} (${fileA}:${String(lineA)}) is ${String(pct)}% similar to ${nameB} (${fileB}:${String(lineB)})`,
+        // Which endpoint is "a" comes from the source-file walk order, which is
+        // a property of the filesystem: the same pair reports A→B on one
+        // machine and B→A on another, and the reported message alone would
+        // give them different identities. Sort the endpoints so the pair reads
+        // the same either way. Qualified by path — a bare function name is not
+        // unique across files — and without the similarity percentage, which
+        // drifts as either body is edited.
+        //
+        // Limitation: two anonymous functions in one file share an endpoint
+        // (`<file>#<anonymous>`) and so share an identity. Nothing stable
+        // distinguishes them — a line number would, and that is the coordinate
+        // dependence being removed. Measured at 0 collisions over 1006 findings
+        // on a real codebase; the collision guard in
+        // `tests/integration/baseline-portability.test.ts` is what would catch
+        // it becoming common.
+        identity: `duplicate-pair::${[`${fileA}#${nameA}`, `${fileB}#${nameB}`].sort().join('::')}`,
         because: this._reason,
       })
     }

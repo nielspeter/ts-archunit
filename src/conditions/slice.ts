@@ -21,6 +21,31 @@ import { tarjanSCC, type AdjacencyList } from '../helpers/tarjan.js'
  *   .should().beFreeOfCycles()
  *   .check()
  */
+/**
+ * Rotate a cycle to start at its lexicographically smallest member.
+ *
+ * Tarjan emits an SCC in traversal order, and traversal order follows the
+ * source-file walk — a filesystem property. So the same cycle is reported as
+ * `c -> b -> a -> c` on one machine and `b -> a -> c -> b` on another, giving
+ * one cycle two identities and breaking any baseline that accepted it
+ * (bug 0010). Measured: reversing the file walk rotates it.
+ *
+ * Rotation only. Direction is NOT normalized, because `a -> b -> c -> a` and
+ * `a -> c -> b -> a` traverse different edges and are genuinely different
+ * cycles.
+ */
+function canonicalizeCycle(names: readonly (string | undefined)[]): string[] {
+  const present = names.filter((n): n is string => n !== undefined)
+  if (present.length < 2) return present
+  let start = 0
+  for (let i = 1; i < present.length; i++) {
+    const candidate = present[i]
+    const current = present[start]
+    if (candidate !== undefined && current !== undefined && candidate < current) start = i
+  }
+  return [...present.slice(start), ...present.slice(0, start)]
+}
+
 export function beFreeOfCycles(): Condition<Slice> {
   return {
     description: 'be free of cycles',
@@ -50,7 +75,7 @@ export function beFreeOfCycles(): Condition<Slice> {
 
       const violations: ArchViolation[] = []
       for (const scc of sccs) {
-        const cycleNames = scc.map((i) => sliceNames[i])
+        const cycleNames = canonicalizeCycle(scc.map((i) => sliceNames[i]))
         const cyclePath = [...cycleNames, cycleNames[0]].join(' -> ')
 
         // Find one concrete file causing the cycle for the violation location

@@ -124,6 +124,34 @@ createViolation(
 )
 ```
 
+#### Keep coordinates and counts out of your message
+
+`withBaseline()` identifies a violation by its rule, element and message, so
+whatever you interpolate into the message becomes part of its identity. Three
+things look natural in a message and quietly break the baseline:
+
+| In the message        | What happens                                                                 |
+| --------------------- | ---------------------------------------------------------------------------- |
+| An absolute file path | Identity encodes the checkout directory, so the baseline never matches in CI |
+| A line number         | Editing anything above the finding changes its identity                      |
+| A derived count       | `"3 of 5 files ..."` changes when an unrelated sibling is added              |
+
+Absolute paths are handled for you — they are normalised against the repository
+root before hashing. Line numbers and counts are not, because they are not
+paths. When your message needs one, set `identity` to a canonical form:
+
+```typescript
+violations.push({
+  ...createViolation(node, `${name} logs at line ${String(node.getStartLineNumber())}`, context),
+  // Identity replaces element AND message in the hash, so it must be unique
+  // per finding within the rule — two findings sharing one identity are one
+  // violation to the baseline, and accepting either accepts both.
+  identity: `no-console::${node.getSourceFile().getFilePath()}::${name}#${String(occurrence)}`,
+})
+```
+
+The rendered output is unaffected; this is identity only.
+
 ## `.satisfy()`
 
 Plug custom predicates and conditions into the fluent chain:

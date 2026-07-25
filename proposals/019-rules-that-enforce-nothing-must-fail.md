@@ -42,6 +42,25 @@ _conditions_ is the same bug one field over, and it was not in scope then.
 `src/builders/correspondence-builder.ts:257` already carries a comment conceding the
 point: _"console.warn is invisible to the agent consumer (ADR-008)"_.
 
+## Update: one implementation, not five
+
+When this was written, the five sites lived in two unrelated class hierarchies,
+so the fix meant five near-identical copies. `spike/0014-rule-census` merged
+them: `TerminalBuilder` is now the single root of every builder, and the
+`collectViolations()` hook is shared. The meta-finding can be emitted once, in
+one place, for every builder that will ever exist.
+
+It also composes with something that now exists. `RuleCensus.conditions` already
+reports `0` for a rule that asserts nothing — the state is _observable_ and
+still passes. This proposal is the half that makes it _fail_.
+
+Worth stating the relationship plainly, since the two are easily confused:
+**this proposal covers empty conditions; the 0067-C empty-selector flip covers
+empty subjects.** A rule can be vacuous either way, and neither guard sees the
+other's case.
+
+All five sites are unchanged as of 0.19.0 — verified, not assumed.
+
 ## Proposal
 
 Replace `console.warn(...) + return []` at all four sites with the meta-finding

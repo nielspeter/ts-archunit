@@ -120,6 +120,44 @@ const p = project('tsconfig.json')
 const r = resolvers(p, 'src/resolvers/**')
 ```
 
+The glob is relative to the **tsconfig directory**, unlike the file-path globs
+elsewhere in the library, which match absolute paths.
+
+### Each resolver is its own subject
+
+A resolver map is an object literal, so its resolvers are property values rather
+than declarations. `resolvers()` collects them, named by the binding that owns
+the map plus the property path:
+
+```
+schemaResolvers.Query.assetCollection
+schemaResolvers.Asset.url
+```
+
+That is what lets a rule hold **per resolver** instead of per file. The
+distinction matters: a rule written against whole files passes as soon as _any_
+resolver in the file satisfies it, which reads as green over the ones that do
+not.
+
+```typescript
+// Every collection resolver must bound its result set.
+resolvers(p, 'src/resolvers/**')
+  .that()
+  .haveNameMatching(/Collection$/)
+  .should()
+  .contain(call('addComplexity'))
+  .rule({
+    id: 'graphql/collection-complexity',
+    because: 'an unbounded collection resolver is a fan-out denial-of-service',
+    suggestion: 'call addComplexity() with the requested page size',
+  })
+  .check()
+```
+
+Prior to 0.19.0 `resolvers()` collected only named declarations, so on an
+idiomatic resolver map it selected the helper functions beside the resolvers and
+none of the resolvers themselves — see the upgrade note in the changelog.
+
 ### Resolver predicates
 
 ```typescript

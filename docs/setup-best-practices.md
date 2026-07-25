@@ -51,7 +51,14 @@ git add arch-baseline.json && git commit
 # only NOW gate CI on `npm run arch`
 ```
 
-As you fix legacy violations, regenerate the baseline to ratchet down — it can only shrink. A baselined violation is identified by its content (rule + element + message), not its file path, so the baseline is stable across machines and CI checkouts.
+As you fix legacy violations, regenerate the baseline to ratchet down — it can only shrink.
+
+A baselined violation is identified by its content, not by where it sits: the rule, the element and the message, with the repository root normalised out of all three. Some rules supply their own canonical identity where the message would otherwise be unstable — a duplicate pair is identified by its two endpoints regardless of which is reported first, and a per-occurrence finding by its enclosing declaration rather than its line number. The baseline records where the repository root sat relative to itself, so the file matches on any machine and in any CI checkout, whatever the directory is called.
+
+Two things still change identity, by design and by omission:
+
+- **By design** — renaming the element, rewording `.because()`, or changing the rule's own configuration. The finding should be re-reviewed.
+- **By omission** — the size and complexity metrics (`maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings) put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding. Improving the code turns the build red. That is [bug 0012](https://github.com/NielsPeter/ts-archunit/blob/main/bugs/0012-metric-findings-have-no-usable-ratchet.md); those rules are not yet baselineable in a useful way.
 
 ## Suppressing individual violations
 

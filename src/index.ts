@@ -252,7 +252,7 @@ export { detectFormat, isCI } from './core/environment.js'
 
 // Baseline mode
 export { withBaseline, generateBaseline, Baseline } from './helpers/baseline.js'
-export type { BaselineEntry, BaselineFile } from './helpers/baseline.js'
+export type { BaselineEntry, BaselineFile, BaselineOptions } from './helpers/baseline.js'
 
 // Diff-aware mode
 export { diffAware, DiffFilter } from './helpers/diff-aware.js'

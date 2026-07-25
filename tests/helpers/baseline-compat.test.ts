@@ -1,0 +1,183 @@
+/**
+ * The two ways a baseline can be wrong about itself (bug 0010, review round).
+ *
+ * Both were reproduced by reviewers against code that had no test covering
+ * them, and both fail in the same direction: the run goes red and the reason
+ * given is not the real one.
+ *
+ * 1. A v1 baseline that still matches. v2 hashing is byte-identical to v1 for
+ *    any violation whose fields contain no path, so most existing baselines
+ *    were never broken. Failing them on the version field alone is a false red
+ *    carrying a false statement.
+ * 2. Generation and loading discovering different roots. Silent, because the
+ *    format version is identical on both sides.
+ */
+import { describe, it, expect, afterEach } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import { generateBaseline, withBaseline, hashViolation } from '../../src/helpers/baseline.js'
+import type { ArchViolation } from '../../src/core/violation.js'
+
+const created: string[] = []
+
+afterEach(() => {
+  while (created.length > 0) {
+    const dir = created.pop()
+    if (dir !== undefined && fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+function scratch(marker: '.git' | 'package.json' | 'pnpm-workspace.yaml' | 'none'): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-compat-'))
+  created.push(dir)
+  if (marker === '.git') fs.writeFileSync(path.join(dir, '.git'), 'gitdir: /elsewhere\n')
+  if (marker === 'package.json') fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"x"}')
+  if (marker === 'pnpm-workspace.yaml')
+    fs.writeFileSync(path.join(dir, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n")
+  return dir
+}
+
+/** A violation with no path anywhere in it — the common case. */
+const pathFree: ArchViolation = {
+  rule: 'classes should not contain call to parseInt',
+  element: 'OrderService.total',
+  file: '/anywhere/src/order.ts',
+  line: 12,
+  message: 'OrderService.total contains call to parseInt',
+}
+
+describe('a v1 baseline that still matches must not be failed (review C1)', () => {
+  it('stays green when its entries match, despite the older format', () => {
+    const root = scratch('.git')
+    const file = path.join(root, 'baseline.json')
+    // A genuine v1 file: no hashVersion, hashes computed without a root.
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        count: 1,
+        violations: [
+          { rule: pathFree.rule, file: 'src/order.ts', line: 12, hash: hashViolation(pathFree) },
+        ],
+      }),
+    )
+
+    const baseline = withBaseline(file)
+    // Precondition: the entry really does still match, or this proves nothing.
+    expect(baseline.isKnown(pathFree), 'v1 hash must still match for path-free fields').toBe(true)
+
+    const remaining = baseline.filterNew([pathFree])
+    expect(remaining, 'a working baseline must not be failed for being v1').toEqual([])
+  })
+
+  it('fails, and says so accurately, when the entries match nothing', () => {
+    const root = scratch('.git')
+    const file = path.join(root, 'baseline.json')
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        count: 2,
+        violations: [
+          { rule: 'r', file: 'a.ts', line: 1, hash: 'deadbeefdeadbeef' },
+          { rule: 'r', file: 'b.ts', line: 2, hash: 'cafebabecafebabe' },
+        ],
+      }),
+    )
+
+    const remaining = withBaseline(file).filterNew([pathFree])
+    const meta = remaining.filter((v) => v.bypassFilters === true)
+    expect(meta).toHaveLength(1)
+    // The message must state the measurement, not a guess from the version field.
+    expect(meta[0]?.message).toContain('matched 0 of its 2 entries')
+    expect(meta[0]?.message).toContain('identity format v1')
+    // The real finding is still reported — the meta-finding is additional.
+    expect(remaining).toHaveLength(2)
+  })
+
+  it('says nothing when the run produced nothing to match', () => {
+    const root = scratch('.git')
+    const file = path.join(root, 'baseline.json')
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        count: 1,
+        violations: [{ rule: 'r', file: 'a.ts', line: 1, hash: 'deadbeefdeadbeef' }],
+      }),
+    )
+    // An empty run is not evidence about the baseline.
+    expect(withBaseline(file).filterNew([])).toEqual([])
+  })
+
+  it('tells the reader to upgrade, not regenerate, when the file is newer', () => {
+    const root = scratch('.git')
+    const file = path.join(root, 'baseline.json')
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        hashVersion: 99,
+        count: 1,
+        violations: [{ rule: 'r', file: 'a.ts', line: 1, hash: 'deadbeefdeadbeef' }],
+      }),
+    )
+    const meta = withBaseline(file)
+      .filterNew([pathFree])
+      .filter((v) => v.bypassFilters === true)
+    expect(meta[0]?.suggestion).toContain('Upgrade ts-archunit')
+    expect(meta[0]?.suggestion).not.toContain('Regenerate')
+  })
+})
+
+describe('the recorded root keeps generate and load in agreement (review C2)', () => {
+  it('matches even when the loading machine would discover a different root', () => {
+    // Generate inside a repo that HAS a marker at the top…
+    const repo = scratch('pnpm-workspace.yaml')
+    const pkgDir = path.join(repo, 'packages', 'api')
+    fs.mkdirSync(pkgDir, { recursive: true })
+    fs.writeFileSync(path.join(pkgDir, 'package.json'), '{"name":"api"}')
+
+    const finding: ArchViolation = {
+      rule: 'no direct db access',
+      element: 'handler',
+      file: path.join(pkgDir, 'src', 'handler.ts'),
+      line: 3,
+      message: `handler reads ${path.join(pkgDir, 'src', 'handler.ts')} directly`,
+    }
+    const file = path.join(pkgDir, 'baseline.json')
+    generateBaseline([finding], file)
+
+    const written: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'))
+    expect(written).toHaveProperty('root')
+
+    // …then remove the marker, which is what a container build does to `.git`.
+    // Re-discovery would now anchor on packages/api instead of the repo root.
+    fs.rmSync(path.join(repo, 'pnpm-workspace.yaml'))
+    expect(withBaseline(file).filterNew([finding])).toEqual([])
+  })
+
+  it('an explicit root still overrides the recorded one', () => {
+    const repo = scratch('.git')
+    const finding: ArchViolation = { ...pathFree, file: path.join(repo, 'a.ts') }
+    const file = path.join(repo, 'baseline.json')
+    generateBaseline([finding], file)
+    // Deliberately wrong root — the caller is overriding on purpose, so the
+    // override must win even though the file records the right answer.
+    const other = scratch('.git')
+    expect(withBaseline(file, { root: other }).isKnown(finding)).toBe(true)
+    // (path-free identity, so it matches either way — assert the override is
+    // actually consulted by checking a path-bearing finding instead.)
+    const pathBearing: ArchViolation = {
+      ...finding,
+      message: `reads ${path.join(repo, 'a.ts')}`,
+    }
+    generateBaseline([pathBearing], file)
+    expect(withBaseline(file).isKnown(pathBearing), 'recorded root matches').toBe(true)
+    expect(
+      withBaseline(file, { root: other }).isKnown(pathBearing),
+      'a wrong explicit root must NOT match — proving the option is honoured',
+    ).toBe(false)
+  })
+})

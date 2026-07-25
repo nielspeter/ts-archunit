@@ -164,7 +164,17 @@ export class ResolverRuleBuilder extends TerminalBuilder {
   }
 
   private getElements(): ArchFunction[] {
-    return this.sourceFiles.flatMap((sf) => collectFunctions(sf))
+    // Object-literal collection is opt-in for `functions()`, where turning it on
+    // by default would flood every rule with inline callbacks. Here it is the
+    // opposite: a GraphQL resolver map IS an object literal
+    // (`{ Query: { assetCollection: async () => {} } }`), so without this the
+    // builder named `resolvers()` selects the helper functions that happen to
+    // sit beside the resolvers and none of the resolvers themselves — measured
+    // on a real schema as 60 subjects, 0 of them resolvers. Every rule written
+    // against it then passes on the wrong subjects (ADR-008).
+    return this.sourceFiles.flatMap((sf) =>
+      collectFunctions(sf, { includeObjectLiteralFunctions: true }),
+    )
   }
 
   private buildRuleDescription(): string {

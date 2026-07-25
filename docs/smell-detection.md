@@ -4,7 +4,9 @@
 Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
 :::
 
-The `smells` entry point detects code smells -- patterns that are not necessarily wrong but indicate potential design problems. Unlike hard architectural rules, smells are advisory by default and typically use `.warn()` instead of `.check()`.
+The `smells` entry point detects code smells -- patterns that are not necessarily wrong but indicate potential design problems.
+
+There is **no default severity**: like every other builder, a smell does nothing until you call a terminal. `.warn()` reports without failing, `.check()` fails. The examples here use `.check()` unless they are making a point about severity. If your consumer is an AI agent, prefer `.check()` — the CLI derives its exit code from error-severity findings only, so a warning is invisible to a loop that stops at `exit 0` ([ADR-008](https://github.com/NielsPeter/ts-archunit/blob/main/adr/008-agent-first-failure-surfaces.md)).
 
 ## What Smells Are
 
@@ -51,10 +53,10 @@ Each detection run can be scoped, tuned, and filtered using these chainable meth
 
 Terminal methods end the builder chain and execute the smell detection. Choose `.warn()` for advisory feedback during adoption or `.check()` when you want CI to block on smell violations.
 
-| Method     | Description                                         |
-| ---------- | --------------------------------------------------- |
-| `.warn()`  | Log violations to stderr without throwing. Default. |
-| `.check()` | Throw `ArchRuleError` if any violations are found.  |
+| Method     | Description                                        |
+| ---------- | -------------------------------------------------- |
+| `.warn()`  | Log violations to stderr without throwing.         |
+| `.check()` | Throw `ArchRuleError` if any violations are found. |
 
 Both accept an optional `{ format: 'terminal' | 'json' | 'github' }` parameter.
 
@@ -171,7 +173,8 @@ smells
 
 ## Tips
 
-- **Default to `.warn()`** -- smells are advisory. Use `.check()` only when you want to enforce zero tolerance.
+- **Choose the terminal deliberately** -- `.warn()` while you triage a large backlog, `.check()` once you are ready to hold the line. Neither is a default. A smell registered through a preset is promoted the same way as any other rule: `overrides: { 'preset/agent/no-copy-paste': 'error' }`.
+- **Adopt a large backlog with a baseline, not a warning** -- `withBaseline()` accepts today's findings and fails on new ones, which keeps the signal at error severity where an agent will see it.
 - **Start with high similarity** -- `withMinSimilarity(0.9)` avoids false positives. Lower gradually as you clean up duplicates.
 - **Combine with `ignorePaths()`** -- exclude generated files, migration scripts, or intentionally duplicated code.
 - **Use `groupByFolder()`** -- makes violation output easier to triage by grouping related findings together.

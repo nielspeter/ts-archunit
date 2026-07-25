@@ -104,7 +104,7 @@ export function recommended(p: ArchProject, options: RecommendedOptions = {}): R
     const sev = options.overrides?.[meta.id] ?? def
     if (sev === 'off') continue
     builders.push(
-      functions(p)
+      functions(p, { includeObjectLiteralFunctions: true })
         .that()
         .resideInFile(include)
         .should()

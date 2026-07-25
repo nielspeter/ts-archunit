@@ -83,6 +83,28 @@ resolved file set, as sets, both sides asserted non-empty. That axis — a file'
 existence vs the compiler's module graph — is the independence ADR-008 rule 5 asks
 for, and it catches every failure above including the metacharacter case.
 
+## Update: the fix is no longer an open question
+
+This report proposed a bespoke file-set identity assertion, on the grounds that
+`.expectNonEmpty()` is "necessary but not sufficient". The 0067-C measurement
+supersedes that. Running the empty-selector-fails-by-default experiment
+(`spike/0067c-empty-by-default`) from a checkout **not** named `ts-archunit`
+produces **23** failures; from a correctly-named one, **10**. The 13-failure
+delta is precisely the rules below.
+
+So the generic mechanism already detects every one of them, by name, with no
+per-rule work — which is exactly the argument 0067-C was parked on. Nothing here
+needs its own guard; this bug is now waiting on that decision.
+
+Two things still need doing by hand once it lands, because they are wrong
+independently of how they are detected:
+
+1. Rescope the 13 globs. The correct form is a `satisfy()` predicate, not a
+   glob — see the measured table above.
+2. Decide `api/no-single-glob-predicates`, which is vacuous everywhere and hides
+   a live violation (`havePathMatching` at `src/predicates/module.ts:97`, still
+   present).
+
 ## Relationship to plan 0067 part C
 
 Plan 0067-C already designs the generic fix: _mark path predicates with their globs

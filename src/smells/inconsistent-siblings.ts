@@ -29,7 +29,13 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
 
   /** Check if a source file contains any function matching the pattern. */
   private fileMatchesPattern(sf: SourceFile, pattern: ExpressionMatcher): boolean {
-    for (const fn of collectFunctions(sf)) {
+    // Detectors scan for a property of the code, not a user-declared subject
+    // set, so they always include object-literal functions. `functions()`
+    // keeps that opt-in because widening a selector silently changes every
+    // existing rule; a detector has no such contract to break, and a
+    // duplicated arrow under an object key — a resolver, a route handler, a
+    // reducer case — is exactly the copy-paste rot this exists to find.
+    for (const fn of collectFunctions(sf, { includeObjectLiteralFunctions: true })) {
       const body = fn.getBody()
       if (!body) continue
 
@@ -77,6 +83,12 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
         message:
           `${String(matching.length)} of ${String(total)} files in ${folder} use ${patternDesc}, ` +
           `but ${sf.getBaseName()} does not`,
+        // The message states the population ("3 of 5"), which is a fact about
+        // the folder rather than about this file: adding one unrelated sibling
+        // rewrites it, and every already-accepted finding in the folder loses
+        // its identity. The finding itself is "this file, in this folder, does
+        // not follow this pattern" — that, and only that, is the identity.
+        identity: `inconsistent-sibling::${sf.getFilePath()}::${patternDesc}`,
         because: this._reason,
       })
     }

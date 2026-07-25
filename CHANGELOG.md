@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] - 2026-07-25
+
+Makes `withBaseline()` work across machines, and makes three collectors see the
+handler-map idiom they were blind to. Both were found by adopting 0.18.x on a
+real codebase; see [bug 0010](./bugs/0010-violation-identity-embeds-absolute-paths.md)
+and [bug 0013](./bugs/0013-resolvers-cannot-see-resolvers.md). Pre-1.0, so the
+behavioural changes ship in a minor.
+
+### Fixed
+
+- **A baseline generated on your machine now matches in CI.** Violation identity is `rule::element::message`, and several producers interpolate **absolute file paths** into those fields, so the hash encoded the checkout directory. Measured across two checkouts of one commit: 1006 findings on each side, **0 shared identities**. `generateBaseline` had always relativised the stored `file` field "so they're portable across machines" and the hash defeated it on the next line. The repository root is now normalised out of all three fields before hashing.
+- **Three further ways identity moved without the code changing.** A duplicate pair reported `A → B` or `B → A` depending on the order the filesystem enumerated the files; `"3 of 5 files in X use Y"` changed for every accepted finding in a folder when one unrelated sibling was added; and a cycle was reported as `c -> b -> a` or `b -> a -> c` depending on the traversal start. Pairs are now canonicalised, populations are out of identity, and cycles are rotated to a fixed starting point (rotation only — `a -> b -> c` and `a -> c -> b` traverse different edges and remain different findings).
+- **`at line N` no longer decides identity, at any of the eight sites that emit one finding per match.** This was worse than a lost baseline entry: with matches at lines 2 and 4, inserting two lines above made the entry recorded for line 4 match the violation that used to be at line 2 — the baseline **accepted the wrong finding**, keeping a genuinely new violation green. Occurrences are now identified by their enclosing declaration plus an ordinal within it, so adding a match renumbers only that declaration rather than everything below it in the file.
+- **`resolvers()` selects resolvers.** A resolver map is an object literal, so its resolvers are property values; the GraphQL entry point collected only named declarations. On a real 38-file resolver layer it selected **60 subjects, none of which was a resolver** — they were the mapping helpers beside them. Every rule written with it, including the DataLoader example in our own docs, was evaluating the wrong functions and reporting green.
+- **The smell detectors and the presets see handler maps.** `duplicateBodies` returned **0** on two byte-identical object-literal handlers; `inconsistentSiblings` was blind to the same shape; and `agentGuardrails` / `recommended` — reaching functions through the `functions()` selector — missed every stub, generic error and empty body written as `{ POST: () => {} }`. That is the shape agents generate most, in the preset named for the mistakes agents make.
+- **Object-literal functions are named by the binding that owns them** — `app.routes["/x"].GET`, not `routes["/x"].GET`. Two literals in one file that share a key name were both reported as the bare key: ambiguous in the output, ambiguous to `.excluding()`, and merged in duplicate-pair identity so accepting one finding silently accepted the other.
+
+- **Every preset rule now fails with a remedy.** `collectRule` attached `{ id }` and nothing else, so all 37 rules `strictBoundaries` emits — and every rule in `layeredArchitecture` and `dataLayerIsolation` — reported a bare message with no `because` and no `suggestion`. ADR-008 requires a failure to carry its sanctioned fix, and a preset is the one place a user cannot supply one themselves: they did not write the rule. The empty-discovery meta-finding gained a `because` for the same reason.
+
+### Added
+
+- **`ArchViolation.identity`** — an optional canonical form that replaces `element` and `message` in the baseline hash, leaving rendered output untouched. Set it in a custom condition whose message names a population, an ordering or a coordinate; see [Custom rules](https://nielspeter.github.io/ts-archunit/custom-rules). It must be unique per finding within a rule: two findings sharing an identity are one violation to the baseline.
+- **`withBaseline(path, { root })` and `generateBaseline(violations, path, { root })`** — override the repository root used for portable identity. You should not normally need it. The root is discovered from the nearest `.git`, then a monorepo marker (`pnpm-workspace.yaml`, `nx.json`, `lerna.json`, `rush.json`) or a `package.json` declaring `workspaces`, then the nearest `package.json` — and `generateBaseline` records where that root sat **relative to the baseline file**, which `withBaseline` then reuses, so the two ends cannot silently disagree. Note the CLI (`ts-archunit baseline` / `check`) does not expose `root`; use the programmatic API if the default is wrong for you.
+- **`hashVersion` in the baseline file**, and a finding when a baseline matches nothing. If a non-empty baseline matches **zero** of a run's findings, that is reported as what it is, with the counts, rather than silently presenting every accepted violation as a regression.
+
+### Upgrading
+
+**Most baselines keep working. Regenerate if yours contains findings from the affected rules.**
+
+v2 hashing is byte-identical to v1 for any finding whose fields contain no path, so the majority of baselines — `notContain(call('parseInt'))` and everything shaped like it — match exactly as before, and nothing will tell you to regenerate them. The families whose identity changes, and which therefore need one regeneration:
+
+- `smells.duplicateBodies()` and `smells.inconsistentSiblings()`
+- `strictBoundaries` (its discovered boundary folders are absolute, and reach identity through the rule description)
+- module-, class- and function-level body analysis — `notContain()`, `useInsteadOf()`, `notHaveCallbackContaining()`, `notHaveArgumentContaining()`
+- `slices().should().beFreeOfCycles()`
+
+If a baseline stops matching entirely you will get a finding saying so, with the counts and the likely cause, instead of a wall of "new" violations.
+
+**Not fixed: the size and complexity metrics.** `maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding — improving the code turns the build red. Regenerating does not help, and this release does not change it ([bug 0012](./bugs/0012-metric-findings-have-no-usable-ratchet.md)). Those rules remain effectively unbaselineable.
+
+**Green → red, on unchanged code.** Three collectors now see functions they previously could not, so rules that were quietly passing may start reporting:
+
+- `resolvers()` gains every resolver in a resolver map. Its findings are **real and previously unchecked** — no baseline absorbs them, and regenerating hides a layer that was never enforced. Read them before you accept them.
+- `duplicateBodies` and `inconsistentSiblings` gain object-literal functions. Measured on a class-heavy codebase this was +3% (1019 → 1049 findings); on a project written in the handler-map style — Hono/Elysia route maps, `Bun.serve`, GraphQL resolvers, reducer maps — the detectors were previously blind to that code entirely, so expect a much larger jump. `duplicateBodies` is pairwise, so its cost rises with the square of the functions it can see: measured on this repository's own source, 267 findings in 609ms became 328 in 901ms.
+- `agentGuardrails` and `recommended` gain handler-map functions, so stubs and generic errors written as object-literal properties now fail.
+
+**Element names changed for object-literal functions.** They are now prefixed with the owning binding (`app.routes["/x"].GET`). If you `.excluding()` one by name, update the pattern.
+
 ## [0.18.1] - 2026-07-25
 
 Fixes a family of glob defects in `slices()` and the agent-facing messages around

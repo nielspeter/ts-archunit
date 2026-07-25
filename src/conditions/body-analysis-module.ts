@@ -1,6 +1,7 @@
 import type { SourceFile } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
+import { identifyMatches } from './match-identity.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import { searchModuleBody, type ModuleBodyOptions } from '../helpers/body-traversal.js'
 
@@ -55,16 +56,23 @@ export function moduleNotContain(
       const violations: ArchViolation[] = []
       for (const sf of elements) {
         const result = searchModuleBody(sf, matcher, options)
-        for (const node of result.matchingNodes) {
+        const identities = identifyMatches(
+          'module-body',
+          sf.getFilePath(),
+          result.matchingNodes,
+          matcher.description,
+        )
+        result.matchingNodes.forEach((node, index) => {
           violations.push({
             rule: context.rule,
             element: sf.getBaseName(),
             file: sf.getFilePath(),
             line: node.getStartLineNumber(),
             message: `${sf.getBaseName()} contains ${matcher.description} at line ${String(node.getStartLineNumber())}`,
+            identity: identities[index],
             because: context.because,
           })
-        }
+        })
       }
       return violations
     },
@@ -90,16 +98,23 @@ export function moduleUseInsteadOf(
         const badResult = searchModuleBody(sf, bad, options)
         const goodResult = searchModuleBody(sf, good, options)
 
-        for (const node of badResult.matchingNodes) {
+        const identities = identifyMatches(
+          'module-body',
+          sf.getFilePath(),
+          badResult.matchingNodes,
+          bad.description,
+        )
+        badResult.matchingNodes.forEach((node, index) => {
           violations.push({
             rule: context.rule,
             element: sf.getBaseName(),
             file: sf.getFilePath(),
             line: node.getStartLineNumber(),
             message: `${sf.getBaseName()} contains ${bad.description} at line ${String(node.getStartLineNumber())} — use ${good.description} instead`,
+            identity: identities[index],
             because: context.because,
           })
-        }
+        })
 
         if (!goodResult.found) {
           violations.push({

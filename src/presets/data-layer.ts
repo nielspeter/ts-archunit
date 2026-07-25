@@ -37,7 +37,14 @@ export function dataLayerIsolation(
     builders.push(
       ...collectRule(
         classes(p).that().resideInFolder(options.repositories).should().extend(options.baseClass),
-        'preset/data/extend-base',
+        {
+          id: 'preset/data/extend-base',
+          because:
+            'a repository that does not extend the base class silently opts out of whatever the base guarantees — connection handling, tenancy scoping, error translation',
+          suggestion:
+            'Extend the base repository. If this one genuinely cannot, exclude it by name and record why, rather than leaving it looking conformant.',
+          imperative: 'Do NOT define a repository that does not extend the base repository',
+        },
         'error',
         overrides,
       ),
@@ -53,7 +60,14 @@ export function dataLayerIsolation(
           .resideInFolder(options.repositories)
           .should()
           .notContain(newExpr('Error')),
-        'preset/data/typed-errors',
+        {
+          id: 'preset/data/typed-errors',
+          because:
+            'a generic Error crossing the data layer loses the information callers need to distinguish not-found from conflict from a real failure',
+          suggestion:
+            'Throw a domain error type instead, so the caller can branch on it and the API layer can map it to a status code.',
+          imperative: 'Do NOT throw new Error() in a repository — throw a domain error type',
+        },
         'error',
         overrides,
       ),
