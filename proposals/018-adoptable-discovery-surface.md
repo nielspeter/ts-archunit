@@ -1,19 +1,24 @@
 # Proposal 018 — An Adoptable Discovery Surface
 
-**Status:** Draft 1
+**Status:** Draft 2 — the severity flip moved from out-of-scope into the proposal after measuring what an agent actually receives for a warning in CI (exit 0; the loop ends before the text is read).
 **Priority:** High — the discovery surface is the largest shipped-but-unused capability in the library, and the reason it is unused is a **fixable defect**, not a philosophical one.
-**Affects:** `hashViolation` identity inputs (`src/helpers/baseline.ts`), the message construction in `src/smells/*`, and one new opt-in ratchet terminal. No change to any predicate, condition, or entry point.
+**Affects:** `hashViolation` identity inputs (`src/helpers/baseline.ts`), the message construction in `src/smells/*`, one new opt-in ratchet terminal, and the smell severity registered by `agentGuardrails` / `strictBoundaries`. No change to any predicate, condition, or entry point.
 **Origin:** A 2026-07 coverage audit of a large adopting codebase, plus the "flip checklist" from that project's earlier (March) rule inventory. Both are external documents; the relevant evidence is reproduced below.
 
-> **The discovery detectors already support `.check()`.** `SmellBuilder extends TerminalBuilder`, so fail-grade is available today and has been all along. "Detectors default to `.warn()`" is a sentence in a comment, not a capability limit. The reason nobody turns them on is that **the ratchet does not work for them** — you cannot accept existing debt and block new debt, so the only options are "red on arrival" or "off".
+> **Two independent things are wrong, and fixing either alone changes nothing.** The detectors are registered at `warn`, which in CI means `exit 0` — an agent's loop ends before it reads the finding, so the signal does not exist. And the ratchet is broken for them, so simply promoting to `error` puts 700 findings red on arrival and the rule gets deleted. Note `.check()` itself was never missing: `SmellBuilder extends TerminalBuilder`, so fail-grade has always been one call away. What is missing is a way to **survive turning it on**.
 
 ## Problem
 
 A mature adopting project — 177 enforced rules, 1 warn, agent-first messages throughout, a genuine power user of the enforcement surface — used the discovery surface **zero times**. Pointing `duplicateBodies` at it surfaced **~700 findings that all 177 enforced rules were blind to**, including the exact copy-paste rot the tool exists to prevent.
 
-The obvious diagnosis is severity: advisory findings are invisible to an agent (ADR-008), so promote them to `.check()`. That diagnosis is wrong, and the evidence says so twice.
+The obvious diagnosis is severity: advisory findings are invisible to an agent
+(ADR-008), so promote them to `.check()`. That diagnosis is **necessary but not
+sufficient**, and two measurements say why.
 
-**1. `.check()` already works.** Nothing has to be built for fail-grade.
+**1. `.check()` already works, so severity is a registration choice, not a missing
+feature.** `SmellBuilder extends TerminalBuilder`. Promoting is one argument — and
+§3 shows it must happen. But if that were the whole story the fix would have been a
+one-line change years ago, and it is not, because of (2).
 
 **2. The ratchet is structurally broken for smells.** `hashViolation` is
 `rule::element::message` and deliberately **excludes** `violation.line`, so a
@@ -52,9 +57,12 @@ design**, the stated reasons are:
 | **Real design work**                                           | 2     | a genuine circular dependency                        |
 | **Severity itself**                                            | **0** | —                                                    |
 
-Nobody's rule is advisory because they wanted a softer signal. They are advisory
-because of reachability, exceptions, and volume. Fixing severity addresses the one
-column that is empty.
+Nobody's rule is advisory because they wanted a softer signal — they are advisory
+because of reachability, exceptions and volume. Read carefully, that is not an
+argument against §3; it is the reason §3 cannot ship alone. Raising severity
+addresses **none** of these four columns, so on its own it converts a rule nobody
+reads into a rule everybody deletes. §1 and §2 attack the volume column, which is
+the one this proposal can actually close.
 
 ## Proposal
 
@@ -89,17 +97,51 @@ re-baselining. This is the mechanism the adopting project hand-rolled twice (its
 limits catalogue carries an `allowlistBaseline` integer with a shrink-only
 assertion) — the same signal that justified the correspondence primitive.
 
-### 3. Agent-first messages on the security-relevant subset
+### 3. Fail-grade by default, once (2) makes it survivable
 
-Per ADR-008, for the findings where the remedy is unambiguous (unescaped LIKE
-patterns, uncapped pagination, duplicated diverging bodies), the message should
-carry the sanctioned fix, not just the observation.
+**Draft 1 had this as out of scope. That was wrong.** The correction came from asking
+what an agent in CI actually receives for a warning, and measuring it:
+
+- `src/cli/commands/check.ts:62` — the exit code counts **error severity only**, so a
+  warn-only run exits **0**.
+- Terminal warnings go to **stderr**; GitHub gets a non-blocking `::warning`.
+
+An agent's CI loop terminates on `exit 0`. It does not "ignore" the warning as noise
+— it never reaches the text, because the run reported success. So an advisory
+discovery surface is not a quieter signal, it is **no signal**.
+
+The evidence for this is in our own code, not the adopting project's.
+`src/presets/agent-guardrails.ts:107-118` — the preset written _for the agent
+consumer_ — registers the copy-paste detector at `'warn'` while carrying:
+
+```
+imperative: 'Do NOT duplicate a function body — extract the shared logic'
+```
+
+An instruction addressed to an agent, emitted at a severity that agent cannot
+observe. `strictBoundaries` does the same at `src/presets/boundaries.ts:174-176`.
+
+So the severity flip is not a follow-up decision — it is **the point of the
+proposal**, and (1) and (2) are the preconditions that stop it being deleted on
+arrival. The ordering stands; the scoping does not. Ship them together:
+
+| Phase | Change                                | Why it cannot ship alone                                   |
+| ----- | ------------------------------------- | ---------------------------------------------------------- |
+| 1     | Stable identity + shrink-only ratchet | Alone: adoption becomes _possible_ but nothing turns it on |
+| 2     | Presets and default move to `error`   | Alone: 700 findings red on arrival → the rule gets deleted |
+
+**Blast radius, and why this needs a version decision.** Moving the preset
+registrations from `'warn'` to `'error'` turns an existing green build red for
+anyone using `agentGuardrails`/`strictBoundaries` with a codebase that has
+duplication — which is the point, but it is breaking. It should land with the
+ratchet in the same release, with the CHANGELOG telling users to baseline first.
+
+Also per ADR-008: for findings where the remedy is unambiguous (unescaped LIKE
+patterns, uncapped pagination, duplicated diverging bodies) the message must carry
+the sanctioned fix, not just the observation.
 
 ## Out of scope — deliberately
 
-- **Flipping the `.warn()` default.** It is a one-line decision, and it should be
-  made _after_ adoption works, not as a substitute for making it work. Shipping a
-  fail-grade surface that cannot be ratcheted would be the worst of both.
 - **The reachability gap** (factory-returned arrows, computed-key assignments —
   two of the four shapes the audit listed; `0066` shipped the other two). Real, and
   it blocks 4 of the 13 advisory rules, but it is a different mechanism in a
