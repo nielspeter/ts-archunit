@@ -170,6 +170,35 @@ All-ancestors is still the right choice, but the false-fire it prevents is **nar
 
 **Finding 3 — the gate is runnable before `doctor` exists.** Everything above came from ts-morph plus picomatch against a cloned repo. The R2 `doctor` makes it repeatable and user-facing; it is not a prerequisite for measuring. The remaining unmeasured population is a monorepo where a _shared_ rule file spans packages — open question 2.
 
+### Spike 2: the shared rule file across a monorepo (open question 2)
+
+Fixture: two packages, `a` with `src/domain/` and `src/api/`, `b` with only `src/api/`. One shared rule scoped `resideInFolder('**/src/domain/**')`.
+
+```
+SHAPE 1 — one project() per package
+   package a: satisfiable=true   subjects=1
+   package b: satisfiable=false  subjects=0    <- GUARD FIRES, false red
+
+SHAPE 2 — workspace() union (documented at docs/core-concepts.md:71)
+   satisfiable=true   subjects=1               <- no fault
+```
+
+**The exposure is real but confined to one usage shape**, and it is not the shape the docs recommend. `workspace()` unifies the tsconfigs into one project, so the path universe is the union and a layer present in _any_ package satisfies the glob. Open question 2 therefore has an answer that needs no new API:
+
+- **`workspace()` is the supported monorepo path**, and R3's Upgrading note must say so explicitly — this is the first time that choice has a _correctness_ consequence rather than only an import-graph one.
+- **Per-package `project()` with a shared rule file is the exposed shape.** It is legitimate (it is how you get per-package strictness — `docs/config-rules.md:66` recommends exactly that for `tsconfig()`), so R3 cannot simply declare it unsupported.
+
+Options, none free, for review to settle: accept the false red and document `workspace()` as the fix; scope the fault to globs unsatisfiable in **every** loaded project (mirrors the `every`-not-`some` preset quantifier, but needs cross-project state a single `check()` does not have); or admit this is the one place an opt-out is unavoidable, which reopens the `.allowEmpty()` decision this draft closed.
+
+**A trap the implementation must avoid, found while measuring.** The first run of this spike reported `satisfiable=true` for package `b`, which has no `src/domain/` at all. Cause: `files.some(matcher)` passes the **array index** as picomatch's second parameter, which switches it into `returnObject` mode — it then returns a truthy result object whose `isMatch` is `false`.
+
+```
+['/x/a','/x/b'].some(m)        -> true    (wrong)
+['/x/a','/x/b'].some(s => m(s)) -> false   (correct)
+```
+
+Production code is clean — every call site already wraps in an arrow — but `PathUniverse` satisfiability is set-matching by nature and is precisely where this would be written. It is a silent true, in the guard against silent trues.
+
 ### The R3 gate, pre-registered
 
 - **Population:** both known codebases **plus at least one we did not write** — highest-yield shape is an OSS TypeScript monorepo with codegen.
@@ -209,7 +238,7 @@ Each verified by sabotage: revert the fix, watch it go red.
 ## Open questions
 
 1. **`api/no-single-glob-predicates`** (R-any) surfaces a live `havePathMatching` violation at `src/predicates/module.ts:97`. Make it variadic — a public API change — or record it as a legitimate single-glob identity predicate? Decide before R-any.
-2. **The monorepo shared-rule-file case:** presets get input-guarding, but a shared `arch.rules.ts` spread across packages — the documented golden path — has no equivalent. Needs a product answer before R3.
+2. **The monorepo shared-rule-file case** — now measured (spike 2). `workspace()` dissolves it; per-package `project()` with a shared rule file produces a false red. Three options listed there; review to pick one. This is the last thing between the plan and an approvable R3.
 3. **1.0 gate.** R3 is breaking and path-normalization is a further deferred breaking change, so 1.0 is at minimum R3 → path-norm → two quiet releases.
 
 ## Out of scope
