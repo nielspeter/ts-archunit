@@ -37,7 +37,7 @@ functions(p, { includeObjectLiteralFunctions: true })
   .check()
 ```
 
-This collects arrow, function-expression, and method-shorthand property values (recursively, depth-limited), each named by its qualified property-key path (e.g. `routes["/owners/:id"].GET`). It is **off by default** — turning it on would flood existing rules with every inline callback and break the "named unit" contract. `{ includeMethods: false }` is available on the same options object to exclude class methods.
+This collects arrow, function-expression, and method-shorthand property values (recursively, depth-limited), each named by the binding that owns the literal plus its property-key path (e.g. `app.routes["/owners/:id"].GET`), so two literals in one file that share a key name stay distinguishable. It is **off by default** — turning it on would flood existing rules with every inline callback and break the "named unit" contract. `{ includeMethods: false }` is available on the same options object to exclude class methods.
 
 ## Basic Usage
 

@@ -27,6 +27,10 @@ import type { ArchViolation } from '../../src/core/violation.js'
 
 const duplicateFixture = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
 const siblingFixture = path.resolve(import.meta.dirname, '../fixtures/smells/inconsistent-siblings')
+const collisionFixture = path.resolve(
+  import.meta.dirname,
+  '../fixtures/smells/same-key-object-literals',
+)
 
 /** A repository that follows the majority pattern — pure population noise. */
 const EXTRA_SIBLING = `export class ExtraRepository {
@@ -394,10 +398,39 @@ describe('violation identity is stable under unrelated change (bug 0010)', () =>
     // picks too coarse a form silently merges distinct findings: accepting one
     // in a baseline would accept the other. Collision is the failure mode this
     // primitive introduces, so it gets its own guard.
-    const layout = materialize('archunit-collision-', ['repo'])
+    //
+    // The fixture matters more than the assertion here. An earlier cut pointed
+    // at duplicate-bodies/, which yields exactly ONE finding — so `1 === 1`
+    // held for any identity function at all, including a literal constant, the
+    // worst possible implementation. This fixture yields several findings from
+    // one rule in one file, including two object literals that share a key
+    // name, which is the shape that actually collided (measured: 3 findings, 2
+    // identities, before the owning-binding prefix).
+    const layout = materialize('archunit-collision-', ['repo'], {
+      fixture: collisionFixture,
+    })
     const findings = duplicateFindings(layout.project)
 
-    expect(findings.length).toBeGreaterThan(0)
+    // Vacuity guard with teeth: one finding can never collide with anything.
+    expect(findings.length, 'the fixture must produce several findings').toBeGreaterThan(2)
     expect(identitiesOf(findings, layout.root).size).toBe(findings.length)
+  })
+
+  it('distinguishes same-named keys in different object literals', () => {
+    // The specific collision above, asserted on the names rather than the
+    // count, so a regression says which half broke.
+    const layout = materialize('archunit-samekey-', ['repo'], { fixture: collisionFixture })
+    const elements = duplicateFindings(layout.project).map((v) => v.element)
+
+    expect(elements.length).toBeGreaterThan(0)
+    // Every reported element is qualified by the binding that owns its literal.
+    for (const element of elements) {
+      expect(element, 'object-literal findings must name their owning binding').toMatch(
+        /^(routeA|routeB|routeC)\./,
+      )
+    }
+    // Both `handler` keys are represented — they are not merged into one.
+    expect(elements.some((e) => e.startsWith('routeA.'))).toBe(true)
+    expect(elements.some((e) => e.startsWith('routeB.'))).toBe(true)
   })
 })

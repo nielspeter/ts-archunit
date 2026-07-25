@@ -217,14 +217,46 @@ export function collectFunctions(
       .getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression)
       .filter((objectLiteral) => !isNestedInObjectLiteral(objectLiteral))
     for (const root of roots) {
+      // Prefix the binding that owns the literal, so two object literals in one
+      // file that share a key name (`routeA.handler` and `routeB.handler`) are
+      // distinguishable. Without it both are just `handler`: the rendered
+      // violation is ambiguous, `.excluding('handler')` hits both, and — since
+      // duplicate-pair identity is built from these names — accepting one
+      // finding silently accepts the other (bug 0010 collision, measured 3
+      // findings collapsing to 2 identities). The documented example
+      // (`routes["/x"].GET`) always implied this prefix; the code never added it.
+      const owner = owningBindingName(root)
       for (const found of collectObjectLiteralFunctions(root)) {
-        const fn = fromObjectLiteralFunction(found.node, found.keyPath)
+        const keyPath = owner === undefined ? found.keyPath : [owner, ...found.keyPath]
+        const fn = fromObjectLiteralFunction(found.node, keyPath)
         if (fn) functions.push(fn)
       }
     }
   }
 
   return functions
+}
+
+/**
+ * The name of the binding an object literal is assigned to, if any.
+ *
+ * Only the immediate parent is considered: `const routes = {...}` and
+ * `class C { routes = {...} }` name the literal, whereas a literal passed as a
+ * call argument or returned from a factory genuinely has no binding, and
+ * inventing one from a distant ancestor would be a guess.
+ */
+function owningBindingName(objectLiteral: Node): string | undefined {
+  const parent = objectLiteral.getParent()
+  if (!parent) return undefined
+  if (NodeClass.isVariableDeclaration(parent) || NodeClass.isPropertyDeclaration(parent)) {
+    return parent.getName()
+  }
+  if (NodeClass.isPropertyAssignment(parent)) {
+    const nameNode = parent.getNameNode()
+    if (NodeClass.isStringLiteral(nameNode)) return nameNode.getLiteralValue()
+    if (!NodeClass.isComputedPropertyName(nameNode)) return nameNode.getText()
+  }
+  return undefined
 }
 
 /** True if `node` is nested inside another object literal (so a root walk covers it). */

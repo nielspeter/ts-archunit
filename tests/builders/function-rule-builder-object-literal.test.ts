@@ -41,8 +41,11 @@ describe('functions({ includeObjectLiteralFunctions }) (proposal 016)', () => {
     const names = functions(p, { includeObjectLiteralFunctions: true })
       .subjects()
       .map((f) => f.getName())
-    expect(names).toContain('routes["/owners/:id"].GET')
-    expect(names).toContain('routes["/owners/:id"].POST')
+    // Qualified from the binding that owns the literal (`app`), not from the
+    // first key — two literals in one file can share a key name, and without
+    // the binding their functions are indistinguishable (bug 0010 collision).
+    expect(names).toContain('app.routes["/owners/:id"].GET')
+    expect(names).toContain('app.routes["/owners/:id"].POST')
   })
 
   it('ADR-008 acceptance: ON = OFF ∪ exactly the handler set, by identity (name+file:line)', () => {
@@ -59,18 +62,20 @@ describe('functions({ includeObjectLiteralFunctions }) (proposal 016)', () => {
     // ON adds exactly the two handlers — identity, not cardinality.
     const added = [...on].filter((t) => !off.has(t))
     expect(added).toHaveLength(2)
-    expect(added.some((t) => t.startsWith('routes["/owners/:id"].GET@'))).toBe(true)
-    expect(added.some((t) => t.startsWith('routes["/owners/:id"].POST@'))).toBe(true)
+    expect(added.some((t) => t.startsWith('app.routes["/owners/:id"].GET@'))).toBe(true)
+    expect(added.some((t) => t.startsWith('app.routes["/owners/:id"].POST@'))).toBe(true)
   })
 
-  it('names a computed-key handler <computed> (no invented remedy)', () => {
+  it('names a computed-key handler <computed>, still owner-qualified (no invented remedy)', () => {
     const p = inMemoryProject({
       'src/r.ts': 'const k = "x"\nexport const routes = { [k]: () => {} }\n',
     })
     const names = functions(p, { includeObjectLiteralFunctions: true })
       .subjects()
       .map((f) => f.getName())
-    expect(names).toContain('<computed>')
+    // The key cannot be resolved statically, but the owning binding can, so the
+    // name is still unique within the file.
+    expect(names).toContain('routes["<computed>"]')
   })
 
   it('the flag survives a .should() fork (named selection)', () => {
@@ -90,6 +95,6 @@ describe('functions({ includeObjectLiteralFunctions }) (proposal 016)', () => {
       .check()
     // If the fork had dropped the option, getElements() would not collect the
     // handler and `seen` would be empty.
-    expect(seen).toContain('routes["/owners/:id"].GET')
+    expect(seen).toContain('app.routes["/owners/:id"].GET')
   })
 })

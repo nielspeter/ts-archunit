@@ -150,11 +150,11 @@ describe('ResolverRuleBuilder — resolver maps (bug 0013)', () => {
       .violations()
       .map((v) => v.element)
 
-    expect(selected).toContain('Query.user')
-    expect(selected).toContain('Query.posts')
-    expect(selected).toContain('Post.author')
+    expect(selected).toContain('schemaResolvers.Query.user')
+    expect(selected).toContain('schemaResolvers.Query.posts')
+    expect(selected).toContain('schemaResolvers.Post.author')
     // Method shorthand too, not just arrow property values.
-    expect(selected).toContain('Post.comments')
+    expect(selected).toContain('schemaResolvers.Post.comments')
   })
 
   it('enforces a rule per resolver, not per enclosing file', () => {
@@ -167,6 +167,9 @@ describe('ResolverRuleBuilder — resolver maps (bug 0013)', () => {
     // Exactly the two that hit the database — the two that use the loader are
     // not swept up. A whole-file scan could not draw this line, which is the
     // false-green this bug describes.
-    expect(offenders.sort()).toEqual(['Post.comments', 'Query.posts'])
+    expect(offenders.sort()).toEqual([
+      'schemaResolvers.Post.comments',
+      'schemaResolvers.Query.posts',
+    ])
   })
 })
