@@ -1,6 +1,6 @@
 # ts-archunit Roadmap
 
-**Version:** 0.18.1 · **Tests:** 2160 across 156 files · **Updated:** 2026-07-25
+**Version:** 0.19.0 · **Tests:** 2204 across 159 files · **Updated:** 2026-07-25
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
 **Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/` ·
 open defects in `../bugs/`
@@ -37,8 +37,8 @@ Measured and reproduced. Full write-ups in `../bugs/`.
 
 | Bug                                                                                          | State                                                                                                                                            |
 | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | **Fixed** on `spike/0010`, after a review round found two criticals in the fix itself. Ships as 0.19.0.                                          |
-| [0013](../bugs/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals | **Fixed** on the same branch (merged in). `resolvers()`, both smells and two presets could not see handler-map functions.                        |
+| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | **Fixed** in 0.19.0, after a review round found two criticals in the fix itself.                                                                 |
+| [0013](../bugs/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals | **Fixed** in 0.19.0. `resolvers()`, both smells and two presets could not see handler-map functions.                                             |
 | [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | **Open**, and its fix is now known: the 0067-C empty-selector flip detects all 13 automatically. No bespoke guard needed — see below.            |
 | [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix. |
 
@@ -89,15 +89,17 @@ state without failing on it.
 
 ## Releases
 
-| Version    | Theme                                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable      |
-| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking |
-| 0.17.0     | `init` scaffolds the shape presets                                                               |
-| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                       |
-| 0.15.0     | `tsconfig()` config-assertion rule                                                               |
-| 0.14.0     | `ts-archunit init` scaffolder                                                                    |
-| 0.13.0     | AI-agent delivery program                                                                        |
+| Version    | Theme                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| **0.19.0** | Portable violation identity (`withBaseline()` works across checkouts); three collectors see handler maps |
+| **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps |
+| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable              |
+| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking         |
+| 0.17.0     | `init` scaffolds the shape presets                                                                       |
+| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                               |
+| 0.15.0     | `tsconfig()` config-assertion rule                                                                       |
+| 0.14.0     | `ts-archunit init` scaffolder                                                                            |
+| 0.13.0     | AI-agent delivery program                                                                                |
 
 ### 0.18.0 — the AI-era program (PR #2, 2026-07-24)
 
