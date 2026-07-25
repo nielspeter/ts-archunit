@@ -33,21 +33,32 @@ API surface, not how to build it.
 
 ## Open defects
 
-Measured, reproduced, not yet fixed. Full write-ups in `../bugs/`.
+Measured and reproduced. Full write-ups in `../bugs/`.
 
-| Bug                                                                                          | What is broken                                                                                                                                                                      |
-| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | `withBaseline()` never matches in CI. Hits every `strictBoundaries` user, not just smells. **Precondition for proposal 018.**                                                       |
-| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | Our own ADR-005 / hygiene / security enforcement is vacuous in any checkout not named `ts-archunit`; one rule is vacuous everywhere. Evidence for **0067-C**.                       |
-| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red | The measured value is part of identity, so deleting two methods from a god object fails CI. Makes the whole size/concentration family unadoptable — which is why it has zero users. |
+| Bug                                                                                          | State                                                                                                                                            |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | **Fixed** on `spike/0010`, after a review round found two criticals in the fix itself. Ships as 0.19.0.                                          |
+| [0013](../bugs/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals | **Fixed** on the same branch (merged in). `resolvers()`, both smells and two presets could not see handler-map functions.                        |
+| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | **Open**, and its fix is now known: the 0067-C empty-selector flip detects all 13 automatically. No bespoke guard needed — see below.            |
+| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix. |
 
-Bug 0010 is fixed on `spike/0010-portable-violation-identity`, validated against a
-real consumer; 0011 and 0012 are open.
+**0011 no longer needs its own mechanism.** It originally proposed a file-set
+identity assertion. The 0067-C measurement supersedes that: running the
+empty-selector flip from a checkout **not** named `ts-archunit` produces 23
+failures against 10 from a correctly-named one, and the 13-failure delta is
+exactly these rules. Whatever fixes the class fixes them, so 0011 is now
+waiting on the 0067-C decision rather than on work of its own.
 
-Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) is a fourth
-item in this class — a rule with subjects and no conditions warns and returns a pass —
-but it is a design change, not a defect report, so it stays a proposal. All three are
-the same ADR-008 failure: a check that cannot fail, on a run that exits 0.
+**Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) got
+cheaper.** It replaces `console.warn(...) + return []` at five sites — a rule
+that has subjects but no conditions asserts nothing and passes. All five are
+still there. But 0014 merged the two builder hierarchies into one root, so the
+fix is now a single implementation on `TerminalBuilder` instead of five copies,
+and it composes with the census's `conditions: 0`, which already reports the
+state without failing on it.
+
+019 and 0067-C are the two halves of one guard: **019 is empty conditions,
+0067-C is empty subjects.** Neither is a defect report; both are decisions.
 
 ## Deferred — decided, not scheduled
 
