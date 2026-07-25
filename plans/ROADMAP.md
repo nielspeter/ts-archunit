@@ -1,8 +1,8 @@
 # ts-archunit Roadmap
 
-**Version:** 0.18.1 · **Tests:** 2143 across 153 files · **Updated:** 2026-07-25
+**Version:** 0.18.1 · **Tests:** 2160 across 156 files · **Updated:** 2026-07-25
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
-**Plans:** 58 completed (`completed/`) · 4 open (below) · proposals in `../proposals/`
+**Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/`
 
 > Conventions: a plan is **READY** when its design is settled and it can be built as
 > written; **PROPOSED** when the design is reviewed but nobody has decided to build
@@ -14,15 +14,12 @@
 
 | Plan                                           | State        | Effort   | Blocked on                              |
 | ---------------------------------------------- | ------------ | -------- | --------------------------------------- |
-| 0063 — Docs deprecation scan                   | **READY**    | ~3 h     | nothing                                 |
 | 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)    |
 | 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed |
 | 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand        |
 
-**0063** graduated from proposal 013 after three drafts. `tests/`-only, no API, no new
-deps: fails the build if any doc teaches deprecated API, with names and replacement
-text derived from `src/` so no hand-maintained list can rot. Review found real rot
-twice while it was being designed.
+Nothing is currently READY: every remaining item needs a decision, not
+implementation. **0063 (docs deprecation scan) shipped 2026-07-25.**
 
 **0067 part C** is the remaining slice of proposal 014: path-glob auto-fail on every
 builder plus path normalization. It is the broadest breaking change left, which is
@@ -126,7 +123,7 @@ terminal / JSON / GitHub-annotation formats; `tsconfig()` compiler-option assert
 
 ## Completed plans
 
-58 plans in `completed/`, numbered 0000–0066. Accepted proposals that shipped without
+59 plans in `completed/`, numbered 0000–0066. Accepted proposals that shipped without
 a numbered plan live in `../proposals/completed/` (multi-project workspace, dynamic
 imports, builtin `importsFrom`, silent exclusions, JSX element rules, call-argument
 identity, per-rule exclusions).

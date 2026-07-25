@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** Ready to build. Graduated from `proposals/013-docs-deprecation-scan.md` (3 drafts), then cut down after **two** five-persona review rounds. The **design** was reproduced independently by five reviewers and holds; every earlier draft failed on the _scaffolding around it_, which is now deleted rather than elaborated.
+- **State:** ✅ **DONE** — implemented 2026-07-25 on `feat/0063-docs-deprecation-scan`. Built as written: 3 files in `tests/docs/`, 17 tests, no `src/` change. Verified by planting real rot in `docs/modules.md` and confirming the guard names the file, line, symbol and tag-derived fix; restored clean. Originally: ready to build. Graduated from `proposals/013-docs-deprecation-scan.md` (3 drafts), then cut down after **two** five-persona review rounds. The **design** was reproduced independently by five reviewers and holds; every earlier draft failed on the _scaffolding around it_, which is now deleted rather than elaborated.
 - **Priority:** P2. Now the **only READY plan** — 0047 and 0048 were deferred at their 2026-07-14 go/no-go, and ADR-008's dependents (0064–0067) shipped in 0.18.0. Docs are at **zero** deprecated usages, so this remains purely preventive.
 - **Effort:** **~2.5–3h.** (Draft 3 was ~4–5h and growing; the cut list is in "What was removed and why".)
 - **Created:** 2026-07-17 · **Re-verified:** 2026-07-25 (against 0.18.1)
