@@ -81,6 +81,56 @@ Both fail. The second is the one measured in both codebases, and it is the one
 
 ---
 
+## Three glob positions, not one
+
+The first draft of this plan guarded only **predicate** globs. Probing found two
+more positions, both live:
+
+### Position 2 — globs inside conditions
+
+A rule can have a perfect selector and still certify nothing, because the glob
+that decides what the condition _matches against_ is wrong:
+
+```
+modules(p).that().resideInFolder('**/src/core/**')
+  .should().notImportFromCondition(<glob>)
+
+  '**/src/builders/**'   -> 1 violation   correct
+  '**/src/buidlers/**'   -> 0             typo,      silent green
+  'src/builders/**'      -> 0             unanchored, silent green
+```
+
+A real violation sat there uncaught in all three runs. **The subject funnel
+below does not fire here** — `files>0, candidates>0, subjects>0, conditions=1`,
+every stage healthy. This is an _assertion_ fault, not a _selection_ fault, and
+it needs its own check: a glob argument to a condition that matches no project
+path is as broken as one in a predicate.
+
+Affected: `notImportFrom`, `onlyImportFrom`, `dependOn`, `onlyHaveTypeImportsFrom`,
+`onlyBeImportedVia`, and the `ArchFunction` `resideInFile`/`resideInFolder`
+condition forms.
+
+### Position 3 — bare package specifiers, which cannot match at all
+
+Filed separately as [bug 0014](../bugs/0014-bare-package-import-globs-match-nothing.md):
+`notImportFrom('fastify')` compares the glob against the **resolved** path, so it
+matches only when the package fails to resolve. Measured: `notImportFrom('ts-morph')`
+reports 0 with ts-morph installed, 1 when the package is missing.
+
+This one is **not** a guard question — the user wrote the documented, sanctioned
+form and it cannot match by construction. No amount of failing loudly helps. It
+is fixed at the matcher, and it establishes the ordering principle for
+everything here:
+
+> **First make the natural spelling work. Only then fail loudly when it still
+> cannot match.**
+
+0067-C reached the same conclusion for path normalization ("so `src/*` _works_
+rather than just failing loudly — the root cause"). A guard that fires on a
+spelling users were told to use is a guard they will switch off.
+
+---
+
 ## Design — the funnel is the guard
 
 Every rule runs the same pipeline. Each stage can collapse to zero, each collapse has a _different_ cause, and therefore a different remedy. The rule fails at whichever stage collapses, naming that stage.
@@ -133,6 +183,16 @@ The guard goes on `TerminalBuilder` once, so it reaches `resolvers()`, `schema()
 
 **Files:** `src/core/terminal-builder.ts`, `src/core/rule-builder.ts`, `src/core/predicate.ts`, `src/core/condition.ts`, `src/core/define.ts`, `src/predicates/*.ts` (path predicates), `src/conditions/{function,call,jsx,structural}.ts` (`emptyIsPass`).
 
+### Phase 1b — condition globs
+
+Same marker, applied to glob **arguments of conditions**. A condition whose path
+glob matches no project path fails with its own remedy, independent of whether
+the selector found subjects. Depends on bug 0014 landing first, so a bare
+package name is a working spelling rather than a reported fault.
+
+**Files:** `src/conditions/dependency.ts`, `src/conditions/reverse-dependency.ts`,
+`src/conditions/function.ts`.
+
 ### Phase 2 — proposal 019, on the same mechanism
 
 Replace `console.warn(...) + return []` at the five sites where a rule has subjects but no conditions. One implementation on the root, not five copies. This is the `conditions → 0` row of the funnel.
@@ -172,6 +232,9 @@ CHANGELOG with the honest framing; `docs/` for `.allowEmpty()`; a `--format json
 | `.should().notExist()` on an empty selection stays green                  | absence conditions unbroken                                  |
 | `.allowEmpty(reason)` silences it; without a reason it does not compile   | the opt-out is deliberate                                    |
 | the guard fires for `resolvers()`, smells, `slices()`, `tsconfig()`       | **all** builders, not half                                   |
+| a typo'd glob in `notImportFrom` fails, with a real violation present     | position 2 — the funnel cannot see this                      |
+| an unanchored condition glob fails rather than passing silently           | position 2, the 0.18.1 anchoring bug in a new position       |
+| a bare package name matches an **installed** package (bug 0014)           | the natural spelling works before anything fails loudly      |
 | the whole arch suite run from a differently-named checkout is still green | Phase 3 — bug 0011 fixed by construction                     |
 
 Every one to be verified by sabotage: revert the fix, watch it go red.
@@ -191,5 +254,6 @@ Every one to be verified by sabotage: revert the fix, watch it go red.
 ## Out of scope
 
 - **Bug 0012** (metric findings have no usable ratchet) — different mechanism, per-element thresholds.
+- **[Bug 0014](../bugs/0014-bare-package-import-globs-match-nothing.md)** — a prerequisite, not part of this plan. Ships on its own; Phase 1b depends on it.
 - **Path normalization** — 0067-C pairs this change with making `'src/*'` _work_ rather than only fail loudly. Worth doing, separable, and bundling two breaking changes is the 0.18.1 mistake.
 - **`resolvers()`/`schema()` glob convention** — they match tsconfig-relative paths while every other glob matches absolute. Real inconsistency, not this plan's.

@@ -13,11 +13,12 @@ open defects in `../bugs/`
 
 ## Open work
 
-| Plan                                           | State        | Effort   | Blocked on                              |
-| ---------------------------------------------- | ------------ | -------- | --------------------------------------- |
-| 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)    |
-| 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed |
-| 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand        |
+| Plan                                           | State        | Effort   | Blocked on                                 |
+| ---------------------------------------------- | ------------ | -------- | ------------------------------------------ |
+| 0069 — No rule may certify nothing             | **DRAFT**    | ~2 days  | review (`/review-proposal`), then bug 0014 |
+| 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)       |
+| 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed    |
+| 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand           |
 
 All three need a decision, not implementation. 0063 shipped 2026-07-25.
 
@@ -35,12 +36,13 @@ API surface, not how to build it.
 
 Measured and reproduced. Full write-ups in `../bugs/`.
 
-| Bug                                                                                          | State                                                                                                                                            |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | **Fixed** in 0.19.0, after a review round found two criticals in the fix itself.                                                                 |
-| [0013](../bugs/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals | **Fixed** in 0.19.0. `resolvers()`, both smells and two presets could not see handler-map functions.                                             |
-| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | **Open**, and its fix is now known: the 0067-C empty-selector flip detects all 13 automatically. No bespoke guard needed — see below.            |
-| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix. |
+| Bug                                                                                                | State                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths       | **Fixed** in 0.19.0, after a review round found two criticals in the fix itself.                                                                                                                                                 |
+| [0013](../bugs/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals       | **Fixed** in 0.19.0. `resolvers()`, both smells and two presets could not see handler-map functions.                                                                                                                             |
+| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing             | **Open**, and its fix is now known: the 0067-C empty-selector flip detects all 13 automatically. No bespoke guard needed — see below.                                                                                            |
+| [0014](../bugs/0014-bare-package-import-globs-match-nothing.md) — bare package globs match nothing | **Open.** `notImportFrom('fastify')` compares the glob to the _resolved_ path, so it only matches when the package is NOT installed. The docs recommend this exact form. Untested anywhere. Prerequisite for plan 0069 phase 1b. |
+| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red       | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix.                                                                                 |
 
 **0011 no longer needs its own mechanism.** It originally proposed a file-set
 identity assertion. The 0067-C measurement supersedes that: running the
