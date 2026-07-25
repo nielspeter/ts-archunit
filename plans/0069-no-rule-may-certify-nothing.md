@@ -112,7 +112,7 @@ Not an independent trigger. It is a **classification of an already-firing unsati
 - **Disk root:** reuse `discoverIdentityRoot` (`src/helpers/identity-root.ts`), which already answers "where is the root" nearest-first with a written rationale. Do not invent a second answer.
 - **Guard:** require `path.isAbsolute()` on the derived root, else the disk set is empty. Two test doubles use `tsConfigPath: 'in-memory'` (`tests/builders/correspondence-builder.test.ts:24`, `function-rule-builder-object-literal.test.ts:11`), and `path.dirname('in-memory') === '.'` would otherwise walk **the real CWD**, making the fault depend on where the suite was run. Named test.
 - **Pruning is mandatory, and is policy:** measured on this repo, a recursive walk is 1846 dirs / 127ms unpruned, 199 dirs / 4ms with `node_modules` and `.git` pruned.
-- **The message states the fact and offers both branches.** "Exists on disk, absent from the project's file set" is verifiable. **"Add it to your tsconfig `include`" is not** — it is wrong for `dist/`, `coverage/`, codegen output, and for `bin/` and `skills/`, which are in my own spike-1 data. Asserting it re-lands the defect that `slice-rule-builder.ts:57-64` exists to warn about, one fault down.
+- **The message states the fact and asserts no remedy.** "Exists on disk, absent from the project's file set" is verifiable and useful. Every candidate remedy is not: "add it to your tsconfig `include`" is wrong for `dist/`, `coverage/`, codegen output, for `bin/` and `skills/` (spike 1), and absurd for a Rust crate (gate run 2). `outside-project` therefore contributes the fact and defers to the `no-match` cause list — it is not a remedy branch.
 
 ### `glob-diagnosis`, promoted
 
@@ -162,6 +162,36 @@ Condition: the selector-empty message carries the shape as a **cause, not an ass
 **R3 — every flip together.** The glob guard, proposal 019, the severity floor + `.warn()` partition, `emptyIsPass`. One Upgrading section. Ships with the 8 vacuous-test fixes in the same commit.
 
 **R3 does not ship until** the adopting codebase has run R2's pre-flight and its findings have been classified by remedy. Otherwise R2 is a version number between two commits.
+
+### Gate run 2 — the amended rule, on an unseen codegen monorepo
+
+Population: `dotansimha/graphql-code-generator`, chosen sight-unseen as "an OSS TypeScript monorepo with codegen", loaded from its **root** tsconfig (`include: ["packages"]`). Run 2026-07-25.
+
+```
+.ts files on disk under packages/ (pruned)   215
+files in the project                         109
+directories on disk                           91
+directories absent from the project           47   ->  44 under tests/, 3 other
+```
+
+**Nearly half the TypeScript on disk is outside the project**, almost all of it tests, excluded deliberately (`exclude: ["**/tests/**/*.ts", "**/*.spec.ts", …]`). That is the ordinary shape of a real monorepo, not a defect.
+
+The three non-test directories are the finding. `packages/presets/swc-plugin/src` contains **`lib.rs` and `tests.rs`** — a **Rust crate inside a TypeScript monorepo.**
+
+Applying the registered decision rule — _does any finding's message assert a cause that is wrong for that input?_
+
+| Absent directory            | Is "add it to your tsconfig `include`" right?                                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| `**/tests/**` (44)          | Plausible — if you intend to lint tests. So is "narrow the rule." Both branches genuinely apply |
+| `swc-plugin/src` (Rust) (3) | **No.** It is not TypeScript. Adding it to `include` is nonsense                                |
+
+**So the two-branch message from draft 4 is still not enough**, and the fix is to stop treating `outside-project` as a remedy at all:
+
+> `outside-project` contributes a **verifiable fact** — "this path exists on disk but is not in the TypeScript project" — and then defers to the `no-match` cause list. It is not a separate remedy branch.
+
+That keeps the useful half (the filesystem-vs-compiler derivation, which genuinely distinguishes "your glob is wrong" from "your project does not contain this") and drops the half the data refutes. It is also the position `slice-rule-builder.ts:57-64` already argues for, reached independently a third time.
+
+**Gate verdict: pass, with that amendment.** No finding's message asserts a wrong cause once the remedy branch is removed. The `tests/` volume is the number to carry into the R3 changelog — on a real monorepo, roughly half the source may sit outside the project, so a rule scoped at test files is the most likely first red.
 
 ### The R3 gate, re-registered
 
