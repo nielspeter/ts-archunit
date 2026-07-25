@@ -67,7 +67,23 @@ const absentDirs = diskDirs.filter((d) => !projectDirs.has(d))
 // The two categories gate run 2 produced, discriminated from the walk alone:
 // a directory that holds TypeScript is excluded by config; one that holds none
 // simply has no TypeScript in it. No tsconfig parsing required.
-const holdsTs = new Set(diskFiles.map((f) => path.dirname(f)))
+//
+// Containment is TRANSITIVE, and that is load-bearing. An earlier revision used
+// `new Set(diskFiles.map(path.dirname))` — immediate parents only — which
+// labelled `docs/` "holds no TypeScript" while `docs/.vitepress/config.ts` sat
+// one level below it. Measured on this repo: 36 directories hold TypeScript
+// transitively but not directly, so the direct-parent form prints a false
+// statement in the one message whose entire defence is that it states only
+// facts.
+const holdsTs = new Set()
+for (const file of diskFiles) {
+  let dir = path.dirname(file)
+  while (dir.length > root.length) {
+    holdsTs.add(dir)
+    dir = path.dirname(dir)
+  }
+  holdsTs.add(root)
+}
 const excludedByConfig = absentDirs.filter((d) => holdsTs.has(d))
 const noTypeScript = absentDirs.filter((d) => !holdsTs.has(d))
 
