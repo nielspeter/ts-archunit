@@ -2,7 +2,7 @@
 
 **Version:** 0.18.1 · **Tests:** 2160 across 156 files · **Updated:** 2026-07-25
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
-**Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/`
+**Plans:** 59 completed (`completed/`) · 4 open (below) · proposals in `../proposals/`
 
 > Conventions: a plan is **READY** when its design is settled and it can be built as
 > written; **PROPOSED** when the design is reviewed but nobody has decided to build
@@ -14,12 +14,14 @@
 
 | Plan                                           | State        | Effort   | Blocked on                              |
 | ---------------------------------------------- | ------------ | -------- | --------------------------------------- |
+| 0068 — Close vacuity holes in our dogfooding   | **READY**    | ~2 h     | nothing                                 |
 | 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)    |
 | 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed |
 | 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand        |
 
-Nothing is currently READY: every remaining item needs a decision, not
-implementation. **0063 (docs deprecation scan) shipped 2026-07-25.**
+**0068 is READY** — it closes a live false green: 13 existing dogfood rules scope on
+`**/ts-archunit/src/**` and select nothing in a worktree or renamed checkout. The
+other three items need a decision, not implementation. 0063 shipped 2026-07-25.
 
 **0067 part C** is the remaining slice of proposal 014: path-glob auto-fail on every
 builder plus path normalization. It is the broadest breaking change left, which is
