@@ -2,6 +2,20 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { ArchViolation } from '../core/violation.js'
+import { discoverIdentityRoot, normalizeIdentityText, toPortablePath } from './identity-root.js'
+
+/**
+ * Identity-hash format version.
+ *
+ * 1 — sha256(rule::element::message) verbatim; absolute paths leak in.
+ * 2 — the repository root is replaced with a token first, so identity is
+ *     portable across checkouts (bug 0010).
+ *
+ * A version-1 file cannot be matched against version-2 hashes, so loading one
+ * produces a meta-finding telling the reader to regenerate, rather than
+ * silently reporting every accepted violation as new.
+ */
+const HASH_VERSION = 2
 
 /**
  * A single entry in the baseline file.
@@ -28,6 +42,11 @@ export interface BaselineEntry {
 export interface BaselineFile {
   /** ISO timestamp when the baseline was generated */
   generatedAt: string
+  /**
+   * Identity-hash format version. Absent means 1 — a baseline written before
+   * paths were stripped from identity, whose hashes cannot be matched.
+   */
+  hashVersion?: number
   /** Number of violations recorded */
   count: number
   /** The violations */
@@ -40,6 +59,7 @@ export interface BaselineFile {
  * Uses rule + element + message as identity. This survives:
  * - Line number changes (code moved)
  * - Unrelated code changes in the same file
+ * - **The checkout's absolute location** — see `root` below
  *
  * Does NOT survive:
  * - Rule description changes (rewording .because())
@@ -48,33 +68,55 @@ export interface BaselineFile {
  *
  * This is intentional — if the rule or element changes,
  * the violation should be re-evaluated.
+ *
+ * @param root - Repository/workspace root. Every occurrence of it inside the
+ *   rule, element and message is replaced with a stable token before hashing.
+ *   Producers interpolate absolute paths into those fields, so without a root
+ *   the identity encodes the checkout directory and a baseline written on one
+ *   machine matches nothing on another (bug 0010). Omitting it preserves the
+ *   pre-0.19 hash and is only correct when no field contains a path.
  */
-export function hashViolation(violation: ArchViolation): string {
-  const content = `${violation.rule}::${violation.element}::${violation.message}`
+export function hashViolation(violation: ArchViolation, root?: string): string {
+  const scrub = (text: string): string =>
+    root === undefined ? text : normalizeIdentityText(text, root)
+  const content = `${scrub(violation.rule)}::${scrub(violation.element)}::${scrub(violation.message)}`
   return createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 
 /**
- * Convert an absolute file path to a path relative to the baseline file.
- * Baseline files store relative paths so they're portable across machines.
+ * Options shared by baseline loading and generation.
  */
-function toRelativePath(absolutePath: string, baselineDir: string): string {
-  return path.relative(baselineDir, absolutePath)
+export interface BaselineOptions {
+  /**
+   * Repository/workspace root used to make violation identity portable.
+   *
+   * Defaults to the outermost `.git` (or `package.json`) directory above the
+   * baseline file. Pass it explicitly when the baseline lives outside the
+   * repository, or when the default would resolve above the checkout — the
+   * value must be the same on every machine, so it should be derived from the
+   * repository layout and never from `process.cwd()`.
+   *
+   * The **same** root must be used to generate and to load, or nothing matches.
+   */
+  readonly root?: string
 }
 
 /**
  * Load a baseline from a JSON file.
  *
  * @param baselinePath - Path to the baseline JSON file
+ * @param options - See \{@link BaselineOptions\}
  * @returns A Baseline object for use with check(\{ baseline \})
  */
-export function withBaseline(baselinePath: string): Baseline {
+export function withBaseline(baselinePath: string, options: BaselineOptions = {}): Baseline {
   const resolved = path.resolve(baselinePath)
   const baselineDir = path.dirname(resolved)
+  const root =
+    options.root !== undefined ? path.resolve(options.root) : discoverIdentityRoot(baselineDir)
 
   if (!fs.existsSync(resolved)) {
     // No baseline file = no known violations = all violations are new
-    return new Baseline(new Set(), baselineDir)
+    return new Baseline(new Set(), root, HASH_VERSION)
   }
 
   const raw = fs.readFileSync(resolved, 'utf-8')
@@ -86,12 +128,24 @@ export function withBaseline(baselinePath: string): Baseline {
     !Array.isArray(parsed.violations)
   ) {
     console.warn(`[ts-archunit] Invalid baseline file format at ${resolved} — treating as empty`)
-    return new Baseline(new Set(), baselineDir)
+    return new Baseline(new Set(), root, HASH_VERSION)
   }
-  const data = parsed as BaselineFile
-  const hashes = new Set(data.violations.map((v) => v.hash))
+  const hashVersion =
+    'hashVersion' in parsed && typeof parsed.hashVersion === 'number' ? parsed.hashVersion : 1
+  const hashes = new Set(
+    parsed.violations
+      .map((entry: unknown) =>
+        entry !== null &&
+        typeof entry === 'object' &&
+        'hash' in entry &&
+        typeof entry.hash === 'string'
+          ? entry.hash
+          : undefined,
+      )
+      .filter((hash: string | undefined): hash is string => hash !== undefined),
+  )
 
-  return new Baseline(hashes, baselineDir)
+  return new Baseline(hashes, root, hashVersion, resolved)
 }
 
 /**
@@ -103,9 +157,15 @@ export function withBaseline(baselinePath: string): Baseline {
  * generateBaseline(violations, 'arch-baseline.json')
  * ```
  */
-export function generateBaseline(violations: ArchViolation[], outputPath: string): void {
+export function generateBaseline(
+  violations: ArchViolation[],
+  outputPath: string,
+  options: BaselineOptions = {},
+): void {
   const resolved = path.resolve(outputPath)
   const baselineDir = path.dirname(resolved)
+  const root =
+    options.root !== undefined ? path.resolve(options.root) : discoverIdentityRoot(baselineDir)
 
   // Config-level meta-findings (empty selector/discovery) must never be
   // baselined away — they carry bypassFilters and are re-kept by filterNew
@@ -114,13 +174,17 @@ export function generateBaseline(violations: ArchViolation[], outputPath: string
     .filter((v) => v.bypassFilters !== true)
     .map((v) => ({
       rule: v.rule,
-      file: toRelativePath(v.file, baselineDir),
+      // Root-relative, not baseline-relative: the stored path must read the
+      // same in every checkout, and `../../` chains encode the baseline file's
+      // depth. Forward slashes so a file written on Windows reads on CI.
+      file: toPortablePath(v.file, root),
       line: v.line,
-      hash: hashViolation(v),
+      hash: hashViolation(v, root),
     }))
 
   const baseline: BaselineFile = {
     generatedAt: new Date().toISOString(),
+    hashVersion: HASH_VERSION,
     count: entries.length,
     violations: entries,
   }
@@ -135,7 +199,9 @@ export function generateBaseline(violations: ArchViolation[], outputPath: string
 export class Baseline {
   constructor(
     private readonly knownHashes: Set<string>,
-    private readonly baselineDir: string,
+    private readonly root: string,
+    private readonly hashVersion: number = HASH_VERSION,
+    private readonly sourcePath?: string,
   ) {}
 
   /**
@@ -143,7 +209,7 @@ export class Baseline {
    * Known violations are filtered out — they don't cause failures.
    */
   isKnown(violation: ArchViolation): boolean {
-    return this.knownHashes.has(hashViolation(violation))
+    return this.knownHashes.has(hashViolation(violation, this.root))
   }
 
   /**
@@ -151,9 +217,46 @@ export class Baseline {
    *
    * Config-level meta-findings (empty selector/discovery) are never baselined
    * away — a regenerated baseline must not silence them (ADR-008; plan 0067).
+   *
+   * A baseline written in an older hash format matches nothing, which on its
+   * own looks like "every accepted violation regressed at once". That is a
+   * misleading failure, so it is reported as what it is — see
+   * \{@link staleFormatFinding\}.
    */
   filterNew(violations: ArchViolation[]): ArchViolation[] {
-    return violations.filter((v) => v.bypassFilters === true || !this.isKnown(v))
+    const kept = violations.filter((v) => v.bypassFilters === true || !this.isKnown(v))
+    const stale = this.staleFormatFinding()
+    return stale === undefined ? kept : [stale, ...kept]
+  }
+
+  /**
+   * A meta-finding for a baseline whose hashes predate portable identity.
+   *
+   * Emitted only when the file actually holds entries: an absent or empty
+   * baseline has nothing to mismatch, and failing there would break the
+   * documented "start with no baseline" path.
+   *
+   * Carries `bypassFilters` for the reason every meta-finding does — the
+   * filters are what it is reporting on, so they must not be able to hide it
+   * (ADR-008; plan 0067).
+   */
+  private staleFormatFinding(): ArchViolation | undefined {
+    if (this.hashVersion >= HASH_VERSION || this.knownHashes.size === 0) return undefined
+    const where = this.sourcePath ?? 'the baseline file'
+    return {
+      rule: 'ts-archunit: baseline format',
+      element: 'baseline',
+      file: '',
+      line: 0,
+      message:
+        `Baseline at ${where} was written in identity format v${String(this.hashVersion)}; ` +
+        `this version reads v${String(HASH_VERSION)}. Its ${String(this.knownHashes.size)} entries ` +
+        `match nothing, so every accepted violation is being reported as new.`,
+      because:
+        'v1 identity embedded absolute file paths, so a baseline generated on one machine never matched on another (bug 0010).',
+      suggestion: `Regenerate it: \`npx ts-archunit baseline --output ${where}\`. Review the diff — entries that vanish were never matching in CI.`,
+      bypassFilters: true,
+    }
   }
 
   /** Number of known violations in the baseline */

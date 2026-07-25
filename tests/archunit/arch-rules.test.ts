@@ -454,6 +454,7 @@ describe('Hygiene', () => {
         'withBaseline', // baseline: parses baseline JSON file
         'readJsonc', // init: parses the user's tsconfig for source-root detection
         'planPackageJson', // init: parses the user's package.json to merge scripts
+        'declaresWorkspaces', // identity root: reads package.json to detect a monorepo root
       )
       .rule({
         id: 'security/no-json-parse',
