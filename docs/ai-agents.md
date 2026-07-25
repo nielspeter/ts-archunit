@@ -45,7 +45,20 @@ export default [
 Each rule carries `because` / `suggestion` / `imperative` metadata, so both the
 agent-facing rule block and the check output give the agent an actionable fix.
 `no-copy-paste` is a **warning** (reported but non-failing); the rest are errors.
-See [Architecture Presets](/presets#agentguardrails) for options and overrides.
+
+A warning is invisible to an agent: the CLI's exit code counts error-severity
+findings only, so the loop terminates on `exit 0` and the text is never read.
+If you want copy-paste to block, promote it — no separate API, just an override:
+
+```typescript
+agentGuardrails(p, {
+  src: '**/src/**',
+  overrides: { 'preset/agent/no-copy-paste': 'error' },
+})
+```
+
+The same works in reverse (`'warn'`, or `'off'` to drop the rule entirely), and
+on any preset rule id. See [Architecture Presets](/presets#agentguardrails).
 
 ### 2. Context — `explain --format agent`
 

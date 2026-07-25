@@ -289,7 +289,10 @@ classes(p).should().notContain(call('eval')).check({ format: detectFormat() })
 Find code drift — duplicate function bodies and inconsistent patterns:
 
 ```typescript
-smells.duplicateBodies(p).inFolder('**/src/routes/**').withMinSimilarity(0.9).warn()
+// .check() fails the build; .warn() reports without failing. There is no
+// default — pick one. An AI agent only reads failures, so prefer .check()
+// and accept an existing backlog with withBaseline() rather than warning.
+smells.duplicateBodies(p).inFolder('**/src/routes/**').withMinSimilarity(0.9).check()
 
 smells
   .inconsistentSiblings(p)

@@ -95,21 +95,41 @@ now a measurement.
 **Decision: do not build it.** Revisit only if a second, unrelated user asks for
 a reason this run did not cover.
 
-## Ship now, independent of all the above
+## Ship now — done
 
-Two items need no proposal and no release:
+Both docs items shipped with 0.19.0:
 
-1. **Document the severity flip.** `docs/ai-agents.md` states the warn severity as a
-   fact without telling an agent-focused reader they can set
-   `overrides: { '<rule-id>': 'error' }`. That is the whole of the drafts' §3.
-2. **Fix the "default" claims.** `docs/smell-detection.md:7,174` and the terminal
-   table at `:56` call `.warn()` the default; there is no default — a terminal must be
-   called. `README.md:292` demonstrates `.warn()` without the alternative.
+1. **The severity flip is documented.** `docs/ai-agents.md` now shows
+   `overrides: { 'preset/agent/no-copy-paste': 'error' }`, and says why it
+   matters — the CLI's exit code counts error-severity findings only, so a
+   warning is invisible to an agent loop that stops at `exit 0`.
+2. **The "default" claims are gone.** `docs/smell-detection.md` said `.warn()`
+   was the default in three places and the terminal table asserted it outright;
+   there is no default, a terminal must be called. `README.md` demonstrated
+   `.warn()` with no alternative. All corrected, and the smell pages now point
+   at `withBaseline()` as the way to adopt a backlog at error severity rather
+   than warning it away.
 
-And one small correctness fix: give `strictBoundaries`' duplicate-bodies
-registration the `because`/`suggestion` metadata it lacks
-(`src/presets/boundaries.ts:172-176`), so that if a user _does_ flip it to error they
-get a remedy rather than a bare message.
+## Still open, and larger than this proposal estimated
+
+The third item read: _"one small correctness fix — give `strictBoundaries`'
+duplicate-bodies registration the `because`/`suggestion` metadata it lacks
+(3 lines)."_ That was wrong. The metadata is not missing from one registration;
+it is missing from **every rule routed through `collectRule`**
+(`src/presets/shared.ts:32`), which attaches `{ id }` and nothing else.
+
+Measured: `strictBoundaries` emits **37 rules, 37 of them with no `because` and
+no `suggestion`.** Twelve `collectRule` call sites span `boundaries.ts`,
+`layered.ts` and `data-layer.ts`.
+
+So three of the shipped presets violate ADR-008 rule 2 — every failure carries
+its sanctioned fix — for every rule they emit. `agentGuardrails` is the
+exception and shows the target shape
+(`src/presets/agent-guardrails.ts:121-128`): `id`, `because`, `suggestion`,
+`imperative`.
+
+This is a separate piece of work from the discovery surface, and it wants
+writing 12 remedies carefully rather than filling in a template.
 
 ## Out of scope
 
