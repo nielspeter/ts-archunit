@@ -151,6 +151,25 @@ The docs sweep moves to **R2**: 014 called it a ship-blocker, and shipping it a 
 
 `doctor` exits **non-zero** on findings from day one (it is an explicitly-invoked diagnostic, not a build gate) and supports `--format json`. It is a measurement instrument with a scheduled end at R3, not the permanent answer.
 
+### Spike: the gate run early, on a codebase we did not write
+
+Run 2026-07-25 against `trpc/trpc` (shallow clone, `packages/server`, `include: ["src"]`, 107 files) — chosen because the gate's whole point is a population we did not author.
+
+**Finding 1 — `outside-project` is necessary, not speculative.** **18 of 41** directories that exist on disk are absent from the project's file set: `bin/`, `skills/`, and 16 more. A plausible `resideInFolder('**/skills/**')` is therefore _unsatisfiable against the path universe_ while the path plainly exists on disk.
+
+This is the pre-registered decision rule firing on its first outside run: a finding whose correct remedy is **"add it to your tsconfig `include`"**, not "fix the glob". Under the rule as written that would stop R3 — **unless the guard can name the right remedy**, which is exactly what the `outside-project` fault does. The spike therefore _validates_ the fault rather than blocking the release, and R3's gate is met on this population only because the fault exists. Remove it and R3 does not ship.
+
+**Finding 2 — draft 3 overstated the all-ancestors case.** Measured on the same package: 21 immediate parents, 24 ancestors, **3** directories holding only subdirectories (`src/@trpc`, `src/vendor/cookie-es`, the package root). And both plausible folder globs matched **identically** against either set:
+
+```
+**/adapters/**                       ancestors: 6   parents: 6   files: 25
+**/unstable-core-do-not-import/**    ancestors: 7   parents: 7   files: 53
+```
+
+All-ancestors is still the right choice, but the false-fire it prevents is **narrow**: it only bites an _exact-directory_ glob with no trailing `/**` (`resideInFolder('**/vendor/cookie-es')`). The common `**/x/**` spelling is unaffected, because globstar matches zero segments. Corrected here rather than left as an overclaim.
+
+**Finding 3 — the gate is runnable before `doctor` exists.** Everything above came from ts-morph plus picomatch against a cloned repo. The R2 `doctor` makes it repeatable and user-facing; it is not a prerequisite for measuring. The remaining unmeasured population is a monorepo where a _shared_ rule file spans packages — open question 2.
+
 ### The R3 gate, pre-registered
 
 - **Population:** both known codebases **plus at least one we did not write** — highest-yield shape is an OSS TypeScript monorepo with codegen.
