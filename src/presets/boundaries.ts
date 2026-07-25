@@ -41,7 +41,14 @@ function applySharedIsolation(
       builders.push(
         ...collectRule(
           modules(p).that().resideInFolder(sharedGlob).should().notImportFrom(`${dir}/**`),
-          'preset/boundaries/shared-isolation',
+          {
+            id: 'preset/boundaries/shared-isolation',
+            because:
+              'shared code is imported by every boundary, so a dependency from shared back into one of them couples all of them to it',
+            suggestion:
+              'Invert the dependency: move what shared needs into shared, or pass it in as a parameter or interface from the boundary that owns it.',
+            imperative: 'Do NOT import a boundary from shared code — invert the dependency',
+          },
           'error',
           overrides,
         ),
@@ -70,7 +77,15 @@ function applyTestIsolation(
       builders.push(
         ...collectRule(
           modules(p).that().resideInFile(testPattern).should().notImportFrom(otherTestGlob),
-          'preset/boundaries/test-isolation',
+          {
+            id: 'preset/boundaries/test-isolation',
+            because:
+              "one boundary's tests reaching into another's makes the two impossible to move, delete or run independently",
+            suggestion:
+              'Duplicate the small fixture it needs, or promote the shared helper into a test-support module both boundaries may import.',
+            imperative:
+              "Do NOT import another boundary's tests — duplicate the fixture or share it explicitly",
+          },
           'error',
           overrides,
         ),
@@ -132,7 +147,14 @@ export function strictBoundaries(
     builders.push(
       ...collectRule(
         slices(p).assignedFrom(sliceDef).should().beFreeOfCycles(),
-        'preset/boundaries/no-cycles',
+        {
+          id: 'preset/boundaries/no-cycles',
+          because:
+            'boundaries in a cycle cannot be built, tested, released or reasoned about separately, which is the whole point of having them',
+          suggestion:
+            'Break the cycle at its weakest edge: move the shared type or helper into the shared module, or invert one direction with an interface owned by the depended-on side.',
+          imperative: 'Do NOT create an import cycle between boundaries',
+        },
         'error',
         overrides,
       ),
@@ -152,7 +174,14 @@ export function strictBoundaries(
           .resideInFolder(boundaryPattern)
           .should()
           .onlyImportFrom(...allowedGlobs),
-        'preset/boundaries/no-cross-boundary',
+        {
+          id: 'preset/boundaries/no-cross-boundary',
+          because:
+            'a direct import across boundaries bypasses the public surface each boundary is supposed to be reached through',
+          suggestion:
+            "Import from the other boundary's entry point instead of reaching into its internals, or move the shared piece into the shared module.",
+          imperative: "Do NOT import another boundary's internals — go through its entry point",
+        },
         'error',
         overrides,
       ),
@@ -172,7 +201,14 @@ export function strictBoundaries(
     builders.push(
       ...collectRule(
         smells.duplicateBodies(p),
-        'preset/boundaries/no-duplicate-bodies',
+        {
+          id: 'preset/boundaries/no-duplicate-bodies',
+          because:
+            'the same body in two boundaries drifts independently, so a fix applied in one silently leaves the other wrong',
+          suggestion:
+            'Extract the shared logic into the shared module and call it from both. If the similarity is coincidental, raise withMinSimilarity() or exclude the pair.',
+          imperative: 'Do NOT copy a function body across boundaries — extract it into shared',
+        },
         'warn',
         overrides,
       ),

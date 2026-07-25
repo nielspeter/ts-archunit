@@ -49,7 +49,14 @@ function applyTypeImportRules(
             .resideInFolder(layerGlob)
             .should()
             .onlyHaveTypeImportsFrom(...otherLayerGlobs),
-          'preset/layered/type-imports-only',
+          {
+            id: 'preset/layered/type-imports-only',
+            because:
+              'a runtime import from this layer creates a real dependency, where a type-only import creates none and disappears at compile time',
+            suggestion:
+              'Use `import type { X }` so the dependency is erased, or move the value you need into a layer this one is allowed to depend on.',
+            imperative: 'Use `import type` for cross-layer imports from this layer',
+          },
           'warn',
           overrides,
         ),
@@ -91,7 +98,14 @@ function applyRestrictedPackages(
     builders.push(
       ...collectRule(
         builder.should().notImportFrom(pkg),
-        'preset/layered/restricted-packages',
+        {
+          id: 'preset/layered/restricted-packages',
+          because:
+            'this layer is meant to be independent of that package, so importing it here spreads the dependency past the layer that owns it',
+          suggestion:
+            'Move the call into the layer permitted to use the package and expose the result through a function or interface this layer may depend on.',
+          imperative: 'Do NOT import a restricted package in this layer',
+        },
         'error',
         overrides,
       ),
@@ -128,7 +142,14 @@ export function layeredArchitecture(
         .assignedFrom(layerDef)
         .should()
         .respectLayerOrder(...layerNames),
-      'preset/layered/layer-order',
+      {
+        id: 'preset/layered/layer-order',
+        because:
+          'an import against the declared layer order inverts the architecture — the outer layer becomes a dependency of the inner one',
+        suggestion:
+          'Depend inwards only. Move the shared piece into the inner layer, or invert the call with an interface the inner layer declares and the outer implements.',
+        imperative: 'Do NOT import outwards across layers — depend inwards only',
+      },
       'error',
       overrides,
     ),
@@ -138,7 +159,14 @@ export function layeredArchitecture(
   builders.push(
     ...collectRule(
       slices(p).assignedFrom(layerDef).should().beFreeOfCycles(),
-      'preset/layered/no-cycles',
+      {
+        id: 'preset/layered/no-cycles',
+        because:
+          'layers in a cycle have no order, so the layering they are declared with means nothing',
+        suggestion:
+          'Break the cycle at its weakest edge: move the shared type into the inner layer, or invert one direction with an interface.',
+        imperative: 'Do NOT create an import cycle between layers',
+      },
       'error',
       overrides,
     ),
@@ -158,7 +186,14 @@ export function layeredArchitecture(
             .resideInFolder(innermostGlob)
             .should()
             .onlyImportFrom(...allowedGlobs),
-          'preset/layered/innermost-isolation',
+          {
+            id: 'preset/layered/innermost-isolation',
+            because:
+              'the innermost layer is the one everything else depends on, so any dependency it takes is inherited by the entire system',
+            suggestion:
+              'Keep it self-contained: move the dependency outwards, or express what it needs as an interface the innermost layer declares and an outer layer implements.',
+            imperative: 'Do NOT add dependencies to the innermost layer',
+          },
           'error',
           overrides,
         ),

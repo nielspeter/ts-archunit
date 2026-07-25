@@ -20,16 +20,24 @@ interface PresetRule {
  * UN-executed builder for the caller to spread into a rule array. `'off'` →
  * empty array (spread-friendly). The returning-form replacement for the old
  * self-executing `dispatchRule`.
+ *
+ * Takes the rule's full metadata, not just its id. It used to take an id and
+ * attach `{ id }` alone, which meant every rule in `strictBoundaries`,
+ * `layeredArchitecture` and `dataLayerIsolation` — 37 of them in
+ * `strictBoundaries` alone — failed with no `because` and no `suggestion`.
+ * ADR-008 rule 2 requires every failure to carry its sanctioned fix, and a
+ * preset is the one place a user cannot supply it themselves: they did not
+ * write the rule.
  */
 export function collectRule(
   builder: PresetRule,
-  ruleId: string,
+  meta: RuleMetadata & { id: string },
   defaultSeverity: RuleSeverity,
   overrides: Record<string, RuleSeverity> | undefined,
 ): RuleBuilderLike[] {
-  const effective = overrides?.[ruleId] ?? defaultSeverity
+  const effective = overrides?.[meta.id] ?? defaultSeverity
   if (effective === 'off') return []
-  return [builder.rule({ id: ruleId }).asSeverity(effective)]
+  return [builder.rule(meta).asSeverity(effective)]
 }
 
 /**
@@ -51,6 +59,8 @@ export function assertDiscovered(
     file: '',
     line: 0,
     message: `Discovery matched 0 subjects for glob '${finding.glob}'. ${finding.remedy}`,
+    because:
+      'a preset that discovers nothing generates no rules, so the whole preset silently certifies nothing',
     suggestion: finding.remedy,
     severity: 'error',
     bypassFilters: true,

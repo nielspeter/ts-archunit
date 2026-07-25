@@ -110,7 +110,7 @@ Both docs items shipped with 0.19.0:
    at `withBaseline()` as the way to adopt a backlog at error severity rather
    than warning it away.
 
-## Still open, and larger than this proposal estimated
+## Done, at its real size
 
 The third item read: _"one small correctness fix — give `strictBoundaries`'
 duplicate-bodies registration the `because`/`suggestion` metadata it lacks
@@ -128,8 +128,17 @@ exception and shows the target shape
 (`src/presets/agent-guardrails.ts:121-128`): `id`, `because`, `suggestion`,
 `imperative`.
 
-This is a separate piece of work from the discovery surface, and it wants
-writing 12 remedies carefully rather than filling in a template.
+Fixed in 0.19.0. `collectRule` takes the rule's metadata rather than its id, and
+all 12 call sites carry a `because`, a `suggestion` and an `imperative` written
+for that rule. `strictBoundaries` goes from 37 findings without a remedy to 0.
+
+Guarded by asserting on the **violations**, not the builders: every finding a
+preset produces must carry both fields, with a vacuity guard that the fixture
+actually triggers findings. That guard immediately caught two more — the
+empty-discovery meta-finding had a `suggestion` but no `because`, and one
+preset produced no findings at all against the shared fixture, which is exactly
+how the original gap survived: every preset test asserted on counts and
+messages, never on whether a remedy was attached.
 
 ## Out of scope
 
