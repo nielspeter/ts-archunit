@@ -437,15 +437,15 @@ correspondence(p)
 
 ## Check Options
 
-| Export              | Signature                                            | Description                                                           |
-| ------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
-| `withBaseline`      | `withBaseline(path: string): Baseline`               | Load a baseline file for gradual adoption.                            |
-| `generateBaseline`  | `generateBaseline(violations, path): void`           | Write a baseline file from current violations.                        |
-| `collectViolations` | `collectViolations(...rules): ArchViolation[]`       | Collect violations from multiple rules.                               |
-| `diffAware`         | `diffAware(base: string): DiffFilter`                | Only report violations in changed files.                              |
-| `Baseline`          | class                                                | Baseline instance for filtering known violations.                     |
-| `DiffFilter`        | class                                                | Diff filter instance.                                                 |
-| `silent`            | `silent(pattern: string \| RegExp): SilentExclusion` | Wrap an exclusion pattern to suppress the "unused exclusion" warning. |
+| Export              | Signature                                                           | Description                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `withBaseline`      | `withBaseline(path: string, options?: { root?: string }): Baseline` | Load a baseline file for gradual adoption. `root` overrides the repository root used for portable identity — rarely needed, see [Baselines](./setup-best-practices). |
+| `generateBaseline`  | `generateBaseline(violations, path): void`                          | Write a baseline file from current violations.                                                                                                                       |
+| `collectViolations` | `collectViolations(...rules): ArchViolation[]`                      | Collect violations from multiple rules.                                                                                                                              |
+| `diffAware`         | `diffAware(base: string): DiffFilter`                               | Only report violations in changed files.                                                                                                                             |
+| `Baseline`          | class                                                               | Baseline instance for filtering known violations.                                                                                                                    |
+| `DiffFilter`        | class                                                               | Diff filter instance.                                                                                                                                                |
+| `silent`            | `silent(pattern: string \| RegExp): SilentExclusion`                | Wrap an exclusion pattern to suppress the "unused exclusion" warning.                                                                                                |
 
 ## ArchFunction Model
 
