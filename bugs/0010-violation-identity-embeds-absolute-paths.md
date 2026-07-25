@@ -257,6 +257,49 @@ the harness — `project()` memoises by tsconfig path (documented, with
 rather than reported: the planted file was never in the project (625 → 625
 files).
 
+### Round 4 — what review caught that the spike had wrong
+
+Two defects in the fix itself, both reproduced by reviewers against code with no
+test covering them.
+
+**The stale-format finding was false for most users.** v2 hashing is
+byte-identical to v1 for any violation whose fields contain no path — which is
+the majority of rules. The finding was gated on `hashVersion` alone, so a
+baseline that still matched perfectly was hard-failed with the message _"its
+entries match nothing"_. Measured: `isKnown` returned **true** and the build
+went red anyway. A derived value reported as a fact with nothing disagreeing
+with it — ADR-008 rule 5, inside the fix for a rule 5 bug. The "no baseline
+works today, so the format bump is cheap" argument was sound for the four
+measured producers and was wrongly generalised to the release.
+
+Now gated on the measurement: fire only when a non-empty baseline matched
+**zero** of a non-empty finding set, and state the real numbers. That one signal
+covers every cause — v1 format, a divergent root, or a baseline from another
+project — and stays silent when the run produced nothing to match.
+
+**Root discovery diverged silently on pnpm/Nx.** `declaresWorkspaces()` only
+knew the npm/yarn `workspaces` key. With `.git` absent — a Docker build
+(`.dockerignore` excludes it in essentially every Node guide), a source tarball,
+a CI source artifact — a pnpm repo fell through to the _nearest_ `package.json`,
+i.e. the individual package. Dev machine anchored at the workspace root, CI at
+`packages/api`, every hash differed, and **no meta-finding fired** because both
+files were v2. Bug 0010 reintroduced in the environment CI actually runs in.
+
+Two fixes, because the marker list alone is a heuristic and heuristics diverge:
+
+1. Root-only monorepo markers (`pnpm-workspace.yaml`, `lerna.json`, `rush.json`,
+   `nx.json`). `turbo.json` and `deno.json` are deliberately **excluded** — both
+   are legal inside a package, so honouring them would anchor below the
+   workspace root and cause the divergence the list prevents. Turborepo is
+   covered anyway via the package manager's own marker.
+2. `generateBaseline` records where the root sat **relative to the baseline
+   file**, and `withBaseline` reuses it. A relative position is a property of
+   the repository layout, identical on every machine — so agreement is
+   structural rather than coincidental. An explicit `root` option still wins.
+
+Verified end to end on the reviewers' scenario: generate in a pnpm workspace
+with `.git` present, delete `.git`, load → **0 findings reported as new**.
+
 ## Notes
 
 Found while reviewing [proposal 018](../proposals/018-adoptable-discovery-surface.md),

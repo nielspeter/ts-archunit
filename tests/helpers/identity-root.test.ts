@@ -85,6 +85,40 @@ describe('discoverIdentityRoot', () => {
     expect(discoverIdentityRoot(nested)).not.toBe(app)
   })
 
+  it('recognises monorepo roots that do not use the package.json workspaces key', () => {
+    // The realistic failure: `.git` is absent (Docker build, source tarball,
+    // CI source artifact) and the manager is pnpm or Nx, which declare
+    // workspaces in a FILE. Without these markers the walk falls through to the
+    // nearest package.json — the individual package — so the dev machine and CI
+    // disagree and every hash differs, silently.
+    for (const marker of ['pnpm-workspace.yaml', 'lerna.json', 'rush.json', 'nx.json']) {
+      const base = scratch()
+      const workspaceRoot = make(base, 'mono', { [marker]: '{}' })
+      const pkg = make(base, 'mono/packages/api', { 'package.json': '{"name":"api"}' })
+      const nested = make(base, 'mono/packages/api/src', {})
+
+      expect(discoverIdentityRoot(nested), marker).toBe(workspaceRoot)
+      // Precondition: without the marker this would anchor on the package, so
+      // the assertion above is not passing for a boring reason.
+      expect(discoverIdentityRoot(nested), marker).not.toBe(pkg)
+    }
+  })
+
+  it('does NOT treat turbo.json as a root marker', () => {
+    // turbo.json is legal inside a package (Package Configurations), so
+    // honouring it would anchor BELOW the workspace root — the divergence the
+    // marker list exists to prevent. Turborepo runs on npm/pnpm/yarn
+    // workspaces, so the real root is always found by another marker.
+    const base = scratch()
+    const workspaceRoot = make(base, 'mono', {
+      'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n",
+    })
+    make(base, 'mono/packages/api', { 'package.json': '{"name":"api"}', 'turbo.json': '{}' })
+    const nested = make(base, 'mono/packages/api/src', {})
+
+    expect(discoverIdentityRoot(nested)).toBe(workspaceRoot)
+  })
+
   it('falls back to the nearest package.json when there is no repo or workspace', () => {
     const base = scratch()
     const pkg = make(base, 'loose/project', { 'package.json': '{"name":"solo"}' })

@@ -11,9 +11,10 @@ import { discoverIdentityRoot, normalizeIdentityText, toPortablePath } from './i
  * 2 — the repository root is replaced with a token first, so identity is
  *     portable across checkouts (bug 0010).
  *
- * A version-1 file cannot be matched against version-2 hashes, so loading one
- * produces a meta-finding telling the reader to regenerate, rather than
- * silently reporting every accepted violation as new.
+ * Note that v2 is byte-identical to v1 for any violation whose fields contain
+ * no path, so most v1 baselines keep matching. The version alone is therefore
+ * NOT grounds to fail — see `unmatchedBaselineFinding`, which fires on the
+ * measurement instead.
  */
 const HASH_VERSION = 2
 
@@ -28,7 +29,7 @@ const HASH_VERSION = 2
 export interface BaselineEntry {
   /** Rule description (from the fluent chain) */
   rule: string
-  /** Relative file path (relative to baseline file location) */
+  /** File path relative to the identity root (see `root` below), forward-slashed */
   file: string
   /** Line number at time of baseline (informational, not used for matching) */
   line: number
@@ -47,6 +48,17 @@ export interface BaselineFile {
    * paths were stripped from identity, whose hashes cannot be matched.
    */
   hashVersion?: number
+  /**
+   * Where the identity root sits **relative to this file**, e.g. `'../..'`.
+   *
+   * Recorded rather than re-derived because generation and loading otherwise
+   * discover the root independently, and a disagreement between them is
+   * silent: every hash differs, the baseline matches nothing, and the format
+   * version is identical on both sides so nothing notices. A relative position
+   * is a property of the repository layout, so it is the same on every machine
+   * — which is exactly what the absolute root is not.
+   */
+  root?: string
   /** Number of violations recorded */
   count: number
   /** The violations */
@@ -88,6 +100,11 @@ export function hashViolation(violation: ArchViolation, root?: string): string {
   return createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 
+/** Forward slashes so the recorded root reads the same on Windows and CI. */
+function toPosix(value: string): string {
+  return value.replaceAll('\\', '/')
+}
+
 /**
  * Options shared by baseline loading and generation.
  */
@@ -95,13 +112,18 @@ export interface BaselineOptions {
   /**
    * Repository/workspace root used to make violation identity portable.
    *
-   * Defaults to the outermost `.git` (or `package.json`) directory above the
-   * baseline file. Pass it explicitly when the baseline lives outside the
-   * repository, or when the default would resolve above the checkout — the
-   * value must be the same on every machine, so it should be derived from the
-   * repository layout and never from `process.cwd()`.
+   * Defaults to the **nearest** enclosing repository or workspace root above
+   * the baseline file — `.git`, then a monorepo marker (`pnpm-workspace.yaml`,
+   * `nx.json`, …) or a `package.json` declaring `workspaces`, then the nearest
+   * `package.json`. Nearest, not outermost: an ancestor that is also a repo (a
+   * home directory under dotfiles version control) would otherwise anchor above
+   * the checkout and leave machine-specific segments in the "relative" path.
    *
-   * The **same** root must be used to generate and to load, or nothing matches.
+   * You should rarely need this. `generateBaseline` records where the root sat
+   * relative to the file, and `withBaseline` reuses that, so the two ends
+   * cannot silently disagree. Pass it only to override both — and then the
+   * value must be the same on every machine, so derive it from the repository
+   * layout, never from `process.cwd()`.
    */
   readonly root?: string
 }
@@ -137,6 +159,17 @@ export function withBaseline(baselinePath: string, options: BaselineOptions = {}
   }
   const hashVersion =
     'hashVersion' in parsed && typeof parsed.hashVersion === 'number' ? parsed.hashVersion : 1
+
+  // A recorded root wins over re-discovery: it is what the hashes in this file
+  // were actually built against. Re-deriving here is what lets a machine
+  // without `.git` disagree with the machine that wrote the file, and that
+  // disagreement produces no signal at all (bug 0010, review C2). An explicit
+  // `options.root` still wins over both — the caller is overriding on purpose.
+  const recordedRoot =
+    'root' in parsed && typeof parsed.root === 'string'
+      ? path.resolve(baselineDir, parsed.root)
+      : undefined
+  const effectiveRoot = options.root !== undefined ? root : (recordedRoot ?? root)
   const hashes = new Set(
     parsed.violations
       .map((entry: unknown) =>
@@ -150,7 +183,7 @@ export function withBaseline(baselinePath: string, options: BaselineOptions = {}
       .filter((hash: string | undefined): hash is string => hash !== undefined),
   )
 
-  return new Baseline(hashes, root, hashVersion, resolved)
+  return new Baseline(hashes, effectiveRoot, hashVersion, resolved)
 }
 
 /**
@@ -190,6 +223,7 @@ export function generateBaseline(
   const baseline: BaselineFile = {
     generatedAt: new Date().toISOString(),
     hashVersion: HASH_VERSION,
+    root: toPosix(path.relative(baselineDir, root)) || '.',
     count: entries.length,
     violations: entries,
   }
@@ -223,43 +257,75 @@ export class Baseline {
    * Config-level meta-findings (empty selector/discovery) are never baselined
    * away — a regenerated baseline must not silence them (ADR-008; plan 0067).
    *
-   * A baseline written in an older hash format matches nothing, which on its
-   * own looks like "every accepted violation regressed at once". That is a
-   * misleading failure, so it is reported as what it is — see
-   * \{@link staleFormatFinding\}.
+   * A baseline that matches **nothing** looks identical to "every accepted
+   * violation regressed at once", so that case is reported as what it is —
+   * see \{@link unmatchedBaselineFinding\}.
    */
   filterNew(violations: ArchViolation[]): ArchViolation[] {
-    const kept = violations.filter((v) => v.bypassFilters === true || !this.isKnown(v))
-    const stale = this.staleFormatFinding()
-    return stale === undefined ? kept : [stale, ...kept]
+    const kept: ArchViolation[] = []
+    let matched = 0
+    let matchable = 0
+    for (const violation of violations) {
+      if (violation.bypassFilters === true) {
+        kept.push(violation)
+        continue
+      }
+      matchable += 1
+      if (this.isKnown(violation)) {
+        matched += 1
+        continue
+      }
+      kept.push(violation)
+    }
+    const finding = this.unmatchedBaselineFinding(matched, matchable)
+    return finding === undefined ? kept : [finding, ...kept]
   }
 
   /**
-   * A meta-finding for a baseline whose hashes predate portable identity.
+   * A meta-finding for a baseline that is present, non-empty, and matched
+   * **nothing** in a run that produced findings it could have matched.
    *
-   * Emitted only when the file actually holds entries: an absent or empty
-   * baseline has nothing to mismatch, and failing there would break the
-   * documented "start with no baseline" path.
+   * Gated on the measurement, not on the version field. An earlier cut fired
+   * whenever `hashVersion` was older, which was wrong for most users: v2
+   * hashing is byte-identical to v1 for any violation whose fields contain no
+   * path, so the majority of existing baselines still match perfectly. Failing
+   * those with "its entries match nothing" was both a false red and a false
+   * statement — a derived value reported as a fact with nothing disagreeing
+   * with it, which is the ADR-008 rule 5 mistake this bug was about.
    *
-   * Carries `bypassFilters` for the reason every meta-finding does — the
-   * filters are what it is reporting on, so they must not be able to hide it
-   * (ADR-008; plan 0067).
+   * `matched === 0` is the independently-derived signal, and it covers every
+   * cause at once: a v1 file, a root that resolved differently here than where
+   * the file was written, or a baseline for a different project entirely.
+   *
+   * Silent when the run produced nothing to match (`matchable === 0`) — an
+   * empty run is not evidence about the baseline. Carries `bypassFilters`
+   * because the filters are what it is reporting on (ADR-008; plan 0067).
    */
-  private staleFormatFinding(): ArchViolation | undefined {
-    if (this.hashVersion >= HASH_VERSION || this.knownHashes.size === 0) return undefined
+  private unmatchedBaselineFinding(matched: number, matchable: number): ArchViolation | undefined {
+    if (this.knownHashes.size === 0 || matchable === 0 || matched > 0) return undefined
     const where = this.sourcePath ?? 'the baseline file'
+    const entries = this.knownHashes.size
+    const plural = entries === 1 ? 'entry' : 'entries'
+    const cause =
+      this.hashVersion < HASH_VERSION
+        ? `It was written in identity format v${String(this.hashVersion)} and this version reads v${String(HASH_VERSION)}, which is the likely cause.`
+        : this.hashVersion > HASH_VERSION
+          ? `It was written in identity format v${String(this.hashVersion)}, which is newer than this version reads (v${String(HASH_VERSION)}) — upgrade ts-archunit rather than regenerating.`
+          : 'Same identity format, so the likely cause is that it was generated against a different repository root — see the `root` option on withBaseline()/generateBaseline().'
     return {
-      rule: 'ts-archunit: baseline format',
+      rule: 'ts-archunit: baseline',
       element: 'baseline',
       file: '',
       line: 0,
       message:
-        `Baseline at ${where} was written in identity format v${String(this.hashVersion)}; ` +
-        `this version reads v${String(HASH_VERSION)}. Its ${String(this.knownHashes.size)} entries ` +
-        `match nothing, so every accepted violation is being reported as new.`,
+        `Baseline at ${where} matched 0 of its ${String(entries)} ${plural} against ` +
+        `${String(matchable)} finding(s) in this run, so every one of them is being reported as new. ${cause}`,
       because:
-        'v1 identity embedded absolute file paths, so a baseline generated on one machine never matched on another (bug 0010).',
-      suggestion: `Regenerate it: \`npx ts-archunit baseline --output ${where}\`. Review the diff — entries that vanish were never matching in CI.`,
+        'A baseline that matches nothing is indistinguishable from a mass regression, and silently reporting the whole set as new hides which of the two happened (bug 0010).',
+      suggestion:
+        this.hashVersion > HASH_VERSION
+          ? 'Upgrade ts-archunit to a version that reads this format.'
+          : `Regenerate it: \`npx ts-archunit baseline --output ${where}\`. Review the diff first — entries that vanish were never matching here.`,
       bypassFilters: true,
     }
   }

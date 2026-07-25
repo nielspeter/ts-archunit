@@ -38,6 +38,9 @@ export function discoverIdentityRoot(startDir: string): string {
   for (;;) {
     if (fs.existsSync(path.join(current, '.git'))) return current
 
+    if (WORKSPACE_MARKERS.some((marker) => fs.existsSync(path.join(current, marker))))
+      return current
+
     const manifest = path.join(current, 'package.json')
     if (fs.existsSync(manifest)) {
       if (nearestPackage === undefined) nearestPackage = current
@@ -53,9 +56,38 @@ export function discoverIdentityRoot(startDir: string): string {
 }
 
 /**
- * Whether a package.json declares npm/yarn workspaces, marking it as the root
- * of a monorepo. An unreadable or malformed manifest is simply not a workspace
- * root — it must not abort baseline loading.
+ * Files that mark a monorepo root for a tool other than npm/yarn/bun.
+ *
+ * Without these, a pnpm or Nx repo whose `.git` is absent — a Docker build
+ * (`.dockerignore` excludes `.git` in essentially every Node guide), a source
+ * tarball, `git archive`, a CI provider that ships a source artifact — falls
+ * through to the *nearest* `package.json`, i.e. the individual package. The
+ * developer machine has `.git` and resolves the workspace root, CI does not
+ * and resolves `packages/api`, the two roots disagree, and every hash differs.
+ *
+ * That is bug 0010's own symptom, reintroduced by the heuristic meant to fix
+ * it — and invisible, because both files carry the current hashVersion. Only
+ * npm/yarn/bun put workspaces in `package.json`; everyone else uses a file.
+ *
+ * Deliberately **root-only** files. `turbo.json` and `deno.json` are excluded
+ * even though they mark monorepos, because both are legal *inside* a package
+ * (Turborepo Package Configurations, per-package Deno config) and would anchor
+ * below the workspace root — the exact divergence this list exists to prevent.
+ * Turborepo is covered anyway: it runs on top of npm/pnpm/yarn workspaces, so
+ * one of the other markers is always present at the real root.
+ */
+const WORKSPACE_MARKERS = [
+  'pnpm-workspace.yaml',
+  'pnpm-workspace.yml',
+  'lerna.json',
+  'rush.json',
+  'nx.json',
+] as const
+
+/**
+ * Whether a package.json declares npm/yarn/bun workspaces, marking it as the
+ * root of a monorepo. An unreadable or malformed manifest is simply not a
+ * workspace root — it must not abort baseline loading.
  */
 function declaresWorkspaces(manifestPath: string): boolean {
   try {
