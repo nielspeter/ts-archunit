@@ -19,6 +19,32 @@ export interface ArchViolation {
   line: number
   /** Human-readable description of what went wrong */
   message: string
+  /**
+   * Stable identity for baseline matching, when the rendered message is not a
+   * safe identifier.
+   *
+   * By default a violation is identified by `rule::element::message`, which is
+   * right as long as the message says only what is wrong. It breaks when the
+   * message also encodes *circumstances*:
+   *
+   * - a derived population — `"3 of 5 files … use X"` becomes `"4 of 6"` when
+   *   an unrelated sibling is added, and every accepted finding in that folder
+   *   changes identity;
+   * - an ordering — a pairwise detector that reports `A → B` reports `B → A`
+   *   when the file walk runs in a different order, which is a property of the
+   *   filesystem, not of the code;
+   * - a coordinate — `"at line 12"` moves when anything above it is edited.
+   *
+   * Set this to a canonical form and identity survives all three. It replaces
+   * both `element` and `message` in the hash, so it must be unique per finding
+   * within a rule: two distinct violations sharing one identity are one
+   * violation to the baseline, and accepting either accepts both. Absolute
+   * paths inside it are fine — they are normalised away with the rest
+   * (`src/helpers/identity-root.ts`).
+   *
+   * The rendered output is unaffected; this is identity only.
+   */
+  identity?: string
   /** Optional rationale provided via .because() */
   because?: string
   /** Source code snippet around the violation line */

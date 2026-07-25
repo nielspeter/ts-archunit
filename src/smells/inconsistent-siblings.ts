@@ -77,6 +77,12 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
         message:
           `${String(matching.length)} of ${String(total)} files in ${folder} use ${patternDesc}, ` +
           `but ${sf.getBaseName()} does not`,
+        // The message states the population ("3 of 5"), which is a fact about
+        // the folder rather than about this file: adding one unrelated sibling
+        // rewrites it, and every already-accepted finding in the folder loses
+        // its identity. The finding itself is "this file, in this folder, does
+        // not follow this pattern" — that, and only that, is the identity.
+        identity: `inconsistent-sibling::${sf.getFilePath()}::${patternDesc}`,
         because: this._reason,
       })
     }

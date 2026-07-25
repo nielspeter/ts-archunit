@@ -79,7 +79,12 @@ export interface BaselineFile {
 export function hashViolation(violation: ArchViolation, root?: string): string {
   const scrub = (text: string): string =>
     root === undefined ? text : normalizeIdentityText(text, root)
-  const content = `${scrub(violation.rule)}::${scrub(violation.element)}::${scrub(violation.message)}`
+  // A producer that sets `identity` has declared its own canonical form, which
+  // supersedes both element and message — see ArchViolation.identity. Without
+  // one, the composed string is byte-identical to the pre-0.19 input, so a
+  // violation whose fields never contained a path keeps its old hash.
+  const subject = violation.identity ?? `${violation.element}::${violation.message}`
+  const content = `${scrub(violation.rule)}::${scrub(subject)}`
   return createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 

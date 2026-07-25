@@ -18,11 +18,28 @@ import os from 'node:os'
 import { Project } from 'ts-morph'
 import { smells } from '../../src/smells/index.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
+import { call } from '../../src/helpers/matchers.js'
 import { generateBaseline, withBaseline, hashViolation } from '../../src/helpers/baseline.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 
-const sourceFixture = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
+const duplicateFixture = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
+const siblingFixture = path.resolve(import.meta.dirname, '../fixtures/smells/inconsistent-siblings')
+
+/** A repository that follows the majority pattern — pure population noise. */
+const EXTRA_SIBLING = `export class ExtraRepository {
+  private db: Record<string, unknown>[] = []
+
+  getCount(): number {
+    const raw = this.db.length
+    return this.extractCount(raw)
+  }
+
+  private extractCount(value: unknown): number {
+    return typeof value === 'number' ? value : 0
+  }
+}
+`
 
 const created: string[] = []
 
@@ -33,41 +50,80 @@ afterEach(() => {
   }
 })
 
+interface Layout {
+  root: string
+  project: ArchProject
+}
+
+interface MaterializeOptions {
+  /** Which fixture directory to copy. Defaults to the duplicate-bodies set. */
+  fixture?: string
+  /** Extra files to write, keyed by path relative to the root. */
+  extra?: Record<string, string>
+  /**
+   * Enumerate source files in reverse. ts-morph resolves tsconfig globs through
+   * directory reads, so enumeration order is a property of the filesystem — two
+   * machines may legitimately disagree, and identity must not.
+   */
+  reverseWalk?: boolean
+}
+
+function copyDir(from: string, to: string): void {
+  fs.mkdirSync(to, { recursive: true })
+  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+    const src = path.join(from, entry.name)
+    const dst = path.join(to, entry.name)
+    if (entry.isDirectory()) copyDir(src, dst)
+    else fs.copyFileSync(src, dst)
+  }
+}
+
 /**
- * Materialise the fixture at a fresh absolute path.
+ * Materialise a fixture at a fresh absolute path.
  *
  * `nesting` puts the checkout at a different depth in each layout, which is the
  * part a `path.relative()`-based fix would silently get wrong: relativising
  * encodes `../../..` chains whose length is a property of the machine.
  */
-function materialize(prefix: string, nesting: string[]): { root: string; project: ArchProject } {
+function materialize(prefix: string, nesting: string[], options: MaterializeOptions = {}): Layout {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
   created.push(tmp)
   const root = path.join(tmp, ...nesting)
-  fs.mkdirSync(root, { recursive: true })
+  copyDir(options.fixture ?? duplicateFixture, root)
 
   // A root marker, so identity-root discovery has something to find — the same
   // marker a real checkout has.
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'fixture' }))
-  for (const file of fs.readdirSync(sourceFixture)) {
-    fs.copyFileSync(path.join(sourceFixture, file), path.join(root, file))
+  for (const [relative, contents] of Object.entries(options.extra ?? {})) {
+    const target = path.join(root, relative)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, contents)
   }
 
   const tsConfigPath = path.join(root, 'tsconfig.json')
   const tsMorphProject = new Project({ tsConfigFilePath: tsConfigPath })
+  const sourceFiles = tsMorphProject.getSourceFiles()
+  const ordered = options.reverseWalk === true ? [...sourceFiles].reverse() : sourceFiles
   return {
     root,
-    project: {
-      tsConfigPath,
-      _project: tsMorphProject,
-      getSourceFiles: () => tsMorphProject.getSourceFiles(),
-    },
+    project: { tsConfigPath, _project: tsMorphProject, getSourceFiles: () => ordered },
   }
 }
 
 function duplicateFindings(project: ArchProject): ArchViolation[] {
   return smells.duplicateBodies(project).withMinSimilarity(0.8).minLines(2).violations()
 }
+
+function siblingFindings(project: ArchProject): ArchViolation[] {
+  return smells
+    .inconsistentSiblings(project)
+    .forPattern(call('this.extractCount'))
+    .minLines(3)
+    .violations()
+}
+
+const identitiesOf = (findings: ArchViolation[], root: string): Set<string> =>
+  new Set(findings.map((v) => hashViolation(v, root)))
 
 describe('violation identity is portable across checkouts (bug 0010)', () => {
   it('the same code at two different absolute paths produces the same identities', () => {
@@ -171,5 +227,72 @@ describe('violation identity is portable across checkouts (bug 0010)', () => {
 
     expect(hashesA.size).toBeGreaterThan(0)
     expect([...hashesB].sort()).toEqual([...hashesA].sort())
+  })
+})
+
+/**
+ * The checkout can stay exactly where it is and identity can still move.
+ *
+ * These two axes are invisible to every test above — same root, same machine —
+ * and to the two-worktree field measurement, which reads one filesystem in one
+ * order. Each perturbs the *circumstances* a message describes while leaving
+ * the finding itself untouched.
+ */
+describe('violation identity is stable under unrelated change (bug 0010)', () => {
+  it('a pairwise finding keeps its identity when the file walk runs in reverse', () => {
+    // ts-morph enumerates tsconfig globs via directory reads. Two machines can
+    // legitimately return a different order, which swaps which half of a
+    // duplicate pair is reported as the subject: A→B becomes B→A, changing both
+    // `element` and `message`.
+    const forward = materialize('archunit-walk-fwd-', ['repo'])
+    const reverse = materialize('archunit-walk-rev-', ['repo'], { reverseWalk: true })
+
+    const forwardFindings = duplicateFindings(forward.project)
+    const reverseFindings = duplicateFindings(reverse.project)
+
+    expect(forwardFindings.length).toBeGreaterThan(0)
+    expect(reverseFindings.length).toBe(forwardFindings.length)
+    // The orientation really does flip — otherwise this passes for the boring
+    // reason and guards nothing.
+    expect(reverseFindings.map((v) => v.element)).not.toEqual(forwardFindings.map((v) => v.element))
+
+    const forwardIds = identitiesOf(forwardFindings, forward.root)
+    const reverseIds = identitiesOf(reverseFindings, reverse.root)
+    expect([...reverseIds].sort()).toEqual([...forwardIds].sort())
+  })
+
+  it('a population-derived finding survives an unrelated sibling being added', () => {
+    // "3 of 5 files in X use Y" is a fact about the folder, not about the file
+    // being reported. Adding a sixth file rewrites it — and with it every
+    // already-accepted finding in that folder.
+    const before = materialize('archunit-pop-before-', ['repo'], { fixture: siblingFixture })
+    const after = materialize('archunit-pop-after-', ['repo'], {
+      fixture: siblingFixture,
+      extra: { 'repositories/zz-extra-repo.ts': EXTRA_SIBLING },
+    })
+
+    const beforeFindings = siblingFindings(before.project)
+    const afterFindings = siblingFindings(after.project)
+
+    expect(beforeFindings.length).toBeGreaterThan(0)
+    expect(afterFindings.length).toBe(beforeFindings.length)
+    // The population text really did change.
+    expect(afterFindings[0]?.message).not.toBe(beforeFindings[0]?.message)
+
+    const beforeIds = identitiesOf(beforeFindings, before.root)
+    const afterIds = identitiesOf(afterFindings, after.root)
+    expect([...afterIds].sort()).toEqual([...beforeIds].sort())
+  })
+
+  it('two findings from one rule never share an identity', () => {
+    // `identity` replaces element AND message in the hash, so a producer that
+    // picks too coarse a form silently merges distinct findings: accepting one
+    // in a baseline would accept the other. Collision is the failure mode this
+    // primitive introduces, so it gets its own guard.
+    const layout = materialize('archunit-collision-', ['repo'])
+    const findings = duplicateFindings(layout.project)
+
+    expect(findings.length).toBeGreaterThan(0)
+    expect(identitiesOf(findings, layout.root).size).toBe(findings.length)
   })
 })

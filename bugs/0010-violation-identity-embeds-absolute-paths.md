@@ -127,9 +127,48 @@ Also in the spike: a `hashVersion` field, so a pre-fix baseline produces a
 `bypassFilters` meta-finding naming the format gap and the regeneration
 command, instead of silently reporting all 1006 accepted findings as new.
 
-**Not yet addressed** — the two further instabilities above (derived population
-counts; pair orientation) are producer-level and survive this fix. They need a
-different guard: adding an unrelated sibling file, not moving the checkout.
+### Round 2 — the instabilities that do not involve moving the checkout
+
+Measured against the spike (i.e. with root-scrubbing already applied), each
+perturbing the _circumstances_ a message describes while leaving the finding
+itself untouched. All three reproduce; the third is not fixed.
+
+| Perturbation                           | `duplicateBodies`  | `inconsistentSiblings` | module body analysis |
+| -------------------------------------- | ------------------ | ---------------------- | -------------------- |
+| source files enumerated in reverse     | **0 of 1 survive** | 1 of 1                 | —                    |
+| one unrelated file added               | 1 of 1             | **0 of 1 survive**     | —                    |
+| two lines added at the top of the file | —                  | —                      | **1 of 2, wrongly**  |
+
+The reverse-walk case is not hypothetical: ts-morph resolves tsconfig globs
+through directory reads, so enumeration order is a property of the filesystem.
+Two machines can legitimately disagree — and the two-worktree measurement above
+could never have caught it, because both worktrees read one filesystem in one
+order.
+
+The third row is the worst of the three and is **still open**. Prepending two
+lines to a file with `console.log` at lines 2 and 4 moves them to 4 and 6 — and
+the old identity for line 4 now matches the violation that used to be at line 2.
+Coordinate-based identity does not merely lose baseline entries, it **matches
+the wrong one**. The fix is not "drop the line": within one file those two
+findings are distinguished by nothing else, so dropping it merges them. It needs
+a discriminator (enclosing element + occurrence ordinal), which changes what
+counts as one finding — a decision, not a patch.
+
+**Fixed in the spike**, via a new optional `ArchViolation.identity` — a
+canonical form that replaces `element` and `message` in the hash and leaves the
+rendered output alone:
+
+- `duplicate-bodies` — the two endpoints sorted and path-qualified, no
+  similarity percentage. Sorting is what makes A→B and B→A one finding.
+- `inconsistent-siblings` — file plus pattern, no population count.
+
+Adding the field rather than rewording two messages is the generic move: any
+`defineCondition()` whose message names a population, an ordering, or a
+coordinate now has somewhere to put a stable identity. It also introduces one
+new failure mode — an identity too coarse silently merges distinct findings —
+so there is a collision guard, and the real-codebase run reports 1006 findings
+to 1006 distinct identities. Known limitation: two anonymous functions in one
+file are indistinguishable without a coordinate.
 
 ## Notes
 
