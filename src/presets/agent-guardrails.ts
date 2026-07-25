@@ -36,6 +36,14 @@ export interface AgentGuardrailsOptions extends PresetBaseOptions {
  * Uses function-variant rules so standalone functions, arrow functions, and
  * class methods are all covered.
  */
+// Presets collect object-literal functions unconditionally. `functions()`
+// keeps it opt-in because widening a selector the USER wrote silently changes
+// their rule; a preset's subject set is the preset's own, and this one already
+// promises "standalone functions, arrow functions, and class methods are all
+// covered". A handler map — the shape agents generate most — was none of the
+// three, so `{ POST: () => {} }` slipped every guardrail (bug 0013).
+const COLLECT_ALL = { includeObjectLiteralFunctions: true } as const
+
 export function agentGuardrails(
   p: ArchProject,
   options: AgentGuardrailsOptions,
@@ -54,7 +62,7 @@ export function agentGuardrails(
 
   for (const api of options.noInlineLogic ?? []) {
     push(
-      functions(p).that().resideInFile(options.src).should().notContain(call(api)),
+      functions(p, COLLECT_ALL).that().resideInFile(options.src).should().notContain(call(api)),
       {
         id: `preset/agent/no-inline-logic/${api}`,
         because: `${api} inline in a function is logic that belongs behind a named helper`,
@@ -67,7 +75,11 @@ export function agentGuardrails(
 
   if (options.noGenericErrors) {
     push(
-      functions(p).that().resideInFile(options.src).should().satisfy(functionNoGenericErrors()),
+      functions(p, COLLECT_ALL)
+        .that()
+        .resideInFile(options.src)
+        .should()
+        .satisfy(functionNoGenericErrors()),
       {
         id: 'preset/agent/no-generic-errors',
         because: 'a generic Error loses the type/context callers need to handle it',
@@ -80,7 +92,7 @@ export function agentGuardrails(
 
   if (options.noStubs) {
     push(
-      functions(p).that().resideInFile(options.src).should().satisfy(noStubComments()),
+      functions(p, COLLECT_ALL).that().resideInFile(options.src).should().satisfy(noStubComments()),
       {
         id: 'preset/agent/no-stubs',
         because: 'stub comments (TODO/FIXME/"not implemented") ship unfinished work',
@@ -93,7 +105,7 @@ export function agentGuardrails(
 
   if (options.noEmptyBodies) {
     push(
-      functions(p).that().resideInFile(options.src).should().satisfy(noEmptyBodies()),
+      functions(p, COLLECT_ALL).that().resideInFile(options.src).should().satisfy(noEmptyBodies()),
       {
         id: 'preset/agent/no-empty-bodies',
         because: 'an empty function body is almost always an unfinished stub',
