@@ -18,6 +18,7 @@ import os from 'node:os'
 import { Project } from 'ts-morph'
 import { smells } from '../../src/smells/index.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
+import { slices } from '../../src/builders/slice-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
 import { generateBaseline, withBaseline, hashViolation } from '../../src/helpers/baseline.js'
@@ -338,6 +339,54 @@ describe('violation identity is stable under unrelated change (bug 0010)', () =>
     const shiftedIds = identitiesOf(shiftedFindings, shifted.root)
     expect(plainIds.size).toBe(2)
     expect([...shiftedIds].sort()).toEqual([...plainIds].sort())
+  })
+
+  it('a cycle keeps its identity when the file walk runs in reverse', () => {
+    // Tarjan emits an SCC in traversal order, and traversal follows the source
+    // walk — so the same cycle reports as `c -> b -> a` on one machine and
+    // `b -> a -> c` on another. Rotation only: direction is meaningful, since
+    // a -> b -> c and a -> c -> b traverse different edges.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-cycle-'))
+    created.push(tmp)
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"fixture"}')
+    fs.writeFileSync(
+      path.join(tmp, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: { target: 'ES2022', module: 'ES2022', moduleResolution: 'bundler' },
+        include: ['src/**/*'],
+      }),
+    )
+    const ring: Array<{ dir: string; imports: string; fn: string }> = [
+      { dir: 'a', imports: 'b', fn: 'b' },
+      { dir: 'b', imports: 'c', fn: 'c' },
+      { dir: 'c', imports: 'a', fn: 'a' },
+    ]
+    for (const { dir, imports, fn } of ring) {
+      fs.mkdirSync(path.join(tmp, 'src', dir), { recursive: true })
+      fs.writeFileSync(
+        path.join(tmp, 'src', dir, 'index.ts'),
+        `import { ${fn} } from '../${imports}/index.js'\nexport const ${dir} = () => ${fn}()\n`,
+      )
+    }
+
+    const run = (reverse: boolean): ArchViolation[] => {
+      const tsConfigPath = path.join(tmp, 'tsconfig.json')
+      const tsMorphProject = new Project({ tsConfigFilePath: tsConfigPath })
+      const all = tsMorphProject.getSourceFiles()
+      const ordered = reverse ? [...all].reverse() : all
+      return slices({ tsConfigPath, _project: tsMorphProject, getSourceFiles: () => ordered })
+        .matching('src/')
+        .should()
+        .beFreeOfCycles()
+        .violations()
+    }
+
+    const forward = run(false)
+    const reversed = run(true)
+    expect(forward.length, 'the fixture must actually contain a cycle').toBeGreaterThan(0)
+    expect(reversed.length).toBe(forward.length)
+    expect(reversed.map((v) => v.message)).toEqual(forward.map((v) => v.message))
+    expect(reversed.map((v) => v.element)).toEqual(forward.map((v) => v.element))
   })
 
   it('two findings from one rule never share an identity', () => {

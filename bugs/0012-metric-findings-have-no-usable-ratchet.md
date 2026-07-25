@@ -32,12 +32,26 @@ failing on every incremental step until the class drops under the threshold
 entirely. A team that splits four methods out of an 87-method service gets a red
 build for their trouble.
 
-## Affected conditions
+## Affected conditions — the full set
 
-Every metric that reports its measurement — `src/rules/metrics.ts:162`
-(`maxMethods`) and its siblings `maxClassLines`, `maxMethodLines`,
-`maxParameters`, `maxFunctionComplexity`, plus `haveMaxExports` /
-`maxImports` in `src/conditions/exports.ts`.
+Enumerated mechanically rather than by memory (the first draft of this report
+cited only `rules/metrics.ts`, which was one corner of it):
+
+| Site                                | Message shape                                     |
+| ----------------------------------- | ------------------------------------------------- |
+| `src/rules/metrics.ts:94`           | `has N lines (max: M)`                            |
+| `src/rules/metrics.ts:127`          | `has N lines (max: M)` — per member               |
+| `src/rules/metrics.ts:162`          | `has N methods (max: M)`                          |
+| `src/rules/metrics.ts:197`          | `has N parameters (max: M)` — per member          |
+| `src/rules/metrics-function.ts:65`  | `has N lines (max: M)`                            |
+| `src/rules/metrics-function.ts:101` | `has N parameters (max: M)`                       |
+| `src/conditions/members.ts:268`     | `has N properties, max allowed is M`              |
+| `src/conditions/exports.ts:97`      | `has N named export(s), exceeding the limit of M` |
+
+**Eight sites, two of them outside `rules/metrics.ts` entirely.** Any fix has to
+be a shared mechanism rather than eight message edits — which is the argument
+for the threshold ratchet below rather than for scrubbing the numbers out of
+each string.
 
 ## Why the bug 0010 fix does not cover this
 

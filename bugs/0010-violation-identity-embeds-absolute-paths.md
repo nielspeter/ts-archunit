@@ -194,6 +194,31 @@ so there is a collision guard, and the real-codebase run reports 1006 findings
 to 1006 distinct identities. Known limitation: two anonymous functions in one
 file are indistinguishable without a coordinate.
 
+### Round 2b — the sites this report listed but never checked
+
+The "suggested fix" above named four more producers that stringify locations
+into messages. Three are stable: `conditions/cross-layer.ts:78,118` and
+`conditions/reverse-dependency.ts:174` interpolate **basenames**, layer names
+and user-declared globs, none of which move with the checkout or the walk.
+
+The fourth was not. `conditions/slice.ts:67` reports
+`Cycle detected: ${cyclePath}`, built from Tarjan's SCC output — and Tarjan
+emits in traversal order, which follows the source-file walk. Measured:
+
+```
+natural walk    Cycle detected: c -> b -> a -> c     element [c, b, a]
+reversed walk   Cycle detected: b -> a -> c -> b     element [b, a, c]
+```
+
+One cycle, two identities, on a filesystem difference. Same class as the
+duplicate-pair orientation bug. Fixed by rotating the cycle to start at its
+lexicographically smallest member — **rotation only**, since `a -> b -> c` and
+`a -> c -> b` traverse different edges and are genuinely different cycles.
+
+Found by auditing this report's own follow-ups rather than by a new symptom:
+"where else does this defect live" turned out to be a question the first two
+rounds had not finished answering.
+
 ### Round 3 — run as the consumer runs it
 
 The measurements above point the library's own detectors at a real codebase.
