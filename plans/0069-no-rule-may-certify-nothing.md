@@ -1,24 +1,23 @@
 # Plan 0069 — No rule may certify nothing
 
-**Status:** DRAFT 2 — rewritten after `/review-proposal` (architect + product, 2026-07-25). Not yet re-reviewed.
-**Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool, measured in every codebase we have pointed it at.
-**Effort:** ~3 days across four releases. Only release 3 is breaking.
+**Status:** DRAFT 3 — rewritten after `/review-proposal` round 2. Not yet re-reviewed.
+**Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
 **Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md); closes [bug 0011](../bugs/0011-dogfood-rules-select-nothing.md).
 **Prerequisite:** [bug 0014](../bugs/0014-bare-package-import-globs-match-nothing.md) ships first, alone.
 
-## What changed in draft 2
+## What changed in draft 3
 
-Draft 1 proposed guarding **the collapse** — fail when a pipeline stage reaches zero. Review falsified that at four points, so the mechanism is now **glob satisfiability**: ask whether a glob can match this project at all, independent of what any rule selected.
+Round 2 verdicts: architect _"not ready to implement"_; product _"approve R1 and R-any now, R2 needs restructuring, R3 not approvable."_ Five substantive corrections:
 
-| Draft 1                                  | Why it failed review                                                                                                                                                                     |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Guard the empty funnel                   | Cannot see a typo'd glob in a condition (`subjects > 0`, every stage healthy) — draft 1 admitted this and bolted on a phase                                                              |
-| Mark predicates with `pathScope`         | `not()`/`and()`/`or()` build fresh `{description, test}` objects and **drop any marker**. One shipped preset (`presets/layered.ts:95`) and our own `excluding()` JSDoc use that spelling |
-| "the funnel `census()` already reports"  | **False.** `census.files` is derived from candidates, so `files === 0 ⟺ candidates === 0`. The two headline rows were not computable from anything that exists                           |
-| `.allowEmpty(reason)` on the shared root | **Collides** with `CorrespondenceBuilder.allowEmpty(sideName)`. Both `(string) => this`; compiling the pair produces **zero diagnostics**, and they mean opposite things                 |
-| Semantic emptiness fails by default      | The plan contradicted itself (funnel table vs composite prose) and silently reversed proposal 014's _"Why not 'empty always fails'"_ section without rebutting it                        |
+| Round-2 finding                                                                                                    | Draft 3                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `globs()` on the builder cannot see `satisfy(not(resideInFolder(x)))` — the marker problem, moved                  | The contract is **three-part**: a field on `Predicate` **and** `Condition`, unioned by combinators |
+| After R1, the `unanchored` fault fires on `notImportFrom('fastify')` — a rule **our own preset writes**            | Anchoring consults `kind`; specifiers and import-targets are exempt, with a named test             |
+| "Only R3 is breaking" was false — R2 carried 019, the severity floor, and an abstract member on two public exports | R2 is **zero behaviour change**. Every flip moved into R3                                          |
+| The `doctor` gate could not falsify anything — same two codebases already enumerated as broken                     | Gate **pre-registered**: outside population, decision rule on _remedy category_, stated stop       |
+| "every builder contributes `globs()`" passes if every builder returns `[]`                                         | Replaced with a **set-identity** test against an independent derivation                            |
 
-Three further glob positions were found (`crossLayer().layer()`, `SmellBuilder.inFolder()`, `resolvers()`), plus a hole in the **already-shipped** 0067 guards.
+And four numbers I had hand-typed were wrong (`~20` sites → 27; "37 unsilenceable findings" → today it is **one**; "15 JSDoc examples" → 20+; "`mapping()` discards its globs" → it does not). Every count below is derived at the stated date, or derived by `doctor`.
 
 ---
 
@@ -29,126 +28,173 @@ A rule that cannot match anything passes. Measured:
 | Where                 | What                                                                                                                                          |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | This repo             | 13 dogfood rules select nothing outside a checkout named `ts-archunit`; 1 selects nothing everywhere and hides a live violation               |
-| This repo's own suite | 8 tests assert on rules that select nothing — one **encodes the false green as expected behaviour** (`tests/smells/smell-builder.test.ts:70`) |
+| This repo's own suite | 8 tests assert on rules that select nothing — one **encodes the false green as expected behaviour** (`tests/smells/smell-builder.test.ts:78`) |
 | An adopting codebase  | 7 rule sites, **2 of them security rules** — JWT verification and internal-route auth, both guarding nothing                                  |
-| Our shipped JSDoc     | 15 examples use unanchored globs; `cross-layer-builder.ts:56` is a documented example that matches nothing                                    |
 | Our shipped presets   | `layeredArchitecture`'s restricted-packages rule is dead twice over — `not(resideInFolder(...))` plus a bare package name                     |
 
 `.expectNonEmpty()` exists for this and is opt-in. The adopting team calls it **eight times**, in the same files as their seven vacuous rules. Opt-in does not work.
 
 ---
 
-## Mechanism: satisfiability, not emptiness
+## Mechanism
 
 > **Can this glob match anything in this project?** — a question about the _project_, answerable without running the rule.
 
-1. **`PathUniverse`**, computed once per `ArchProject` and cached (ADR-007: one batch, not a walk per rule): the set of source-file paths, and separately the set of their directory prefixes. Two derivations, deliberately distinct — that split **is** the folder/file discriminator.
-2. **`GlobUse = { glob, kind: 'file' | 'folder' | 'specifier', base: 'absolute' | 'tsconfig-relative', origin: string }`** — emitted at every site that compiles a glob (~20 sites).
-3. **`globs(): GlobUse[]`**, abstract on the single root, so the compiler enumerates every builder that must contribute. (`spike/0014` found `TsconfigBuilder` this way, which I had missed by hand.)
-4. One check: an **unsatisfiable** glob is a finding, regardless of how many subjects the rule has.
+### The contract is three-part, and it is a marker
 
-Why this and not the funnel:
+Round 2 was right: `globs()` on the builder cannot see a glob composed by `satisfy(not(...))`, and `dependOn` has no builder method at all — its only spelling is `.should().satisfy(dependOn(glob))`. So:
 
-- **Condition globs need no separate phase.** `notImportFrom('**/src/buidlers/**')` is unsatisfiable — a fact about the project, independent of whether anything imported anything.
-- **It survives combinators and polarity.** `not(resideInFolder(typo))` matches _everything_, so no emptiness check can ever see it; satisfiability still reports the typo.
-- **It reaches `crossLayer()`, the smells and `resolvers()`** as `globs()` entries rather than per-builder guard logic.
-- **It cannot be confused with a legitimate empty.** "No repositories yet" is a _satisfiable_ folder with no matching elements. Silent.
+```ts
+interface Predicate<T> { description: string; test(e: T): boolean; globs?: readonly GlobSite[] }
+interface Condition<T> { description: string; evaluate(...): ArchViolation[]; globs?: readonly GlobSite[] }
+```
 
-Rejected alternatives, recorded so they are not re-derived: an _observational_ matcher ("did I ever return true") cannot distinguish a negative condition's success from a typo; parsing the glob back out of `description` is a derivation from the same source the check protects (ADR-008 rule 5) and breaks the day someone rewords a string.
+- `not()` / `and()` / `or()` **union** the `globs` of their inputs (`src/core/combinators.ts:23,60,88`).
+- `abstract globs(): GlobSite[]` on the single root returns builder-recorded ∪ predicate ∪ condition.
+- `definePredicate` / `defineCondition` gain a symmetric options parameter so third-party path predicates can participate.
 
-### Polarity decides whether unsatisfiability is a fault
+This _is_ `pathScope` with the propagation round 1 found missing. Draft 2 dismissed the marker and then depended on it; stating it plainly is the correction.
 
-Measured:
+The hole that remains: a user can hand-write `{ description, test }` with no `globs`. `doctor` reports how many predicates declared none, so the coverage claim is **bounded rather than implicitly total** (ADR-008: state the gap).
+
+### `GlobSite` — four axes, because the decision needs all four
+
+```ts
+interface GlobSite {
+  readonly glob: string
+  readonly kind: 'file' | 'folder' | 'import-target' | 'specifier' | 'literal'
+  readonly position: 'selector' | 'discovery' | 'condition' | 'exclusion'
+  readonly polarity: 'positive' | 'negative'
+  readonly base: 'absolute' | 'tsconfig-relative' | 'normalized'
+  readonly origin: string
+}
+```
+
+`kind` decides **what universe** the glob is matched against, and it is load-bearing. Measured 2026-07-25: `getSourceFiles()` returns 430 files here and **0 of them are under `node_modules/`**. So an import-target glob like `**/node_modules/typescript/**` — which our own arch rules use, correctly — is unsatisfiable against the path universe **by construction**. Checking it would fail every correct dependency rule in existence. Likewise `withStringArg(0, '/api/users/**')` (`src/predicates/call.ts:102`) matches an argument _value_ and must never see a path set.
+
+`position` and `polarity` cannot be inferred: `ModuleRuleBuilder.resideInFolder` (`src/builders/module-rule-builder.ts:93`) dispatches on `this._phase` — same method, same glob, predicate before `.should()` and condition after. Both are knowable at the site and must be declared.
+
+### When is unsatisfiability a fault?
+
+Only for `kind ∈ {file, folder}`, and then:
+
+| position    | polarity | Unsatisfiable ⇒                                                                                            |
+| ----------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `selector`  | positive | **fault** — the rule can never have subjects                                                               |
+| `selector`  | negative | **no fault** — `.that().notImportFrom('**/legacy/**')` correctly matches everything once `legacy/` is gone |
+| `discovery` | —        | **fault** — shipped already (0067-D)                                                                       |
+| `condition` | positive | **no fault** — but see the `only*` exposure below                                                          |
+| `condition` | negative | **no fault** — indistinguishable from an armed tripwire                                                    |
+| `exclusion` | —        | **never** — proposal 006 settled that an exclusion matching zero is remedy-optional                        |
+
+Measured, for the negative-condition row:
 
 ```
 notImportFrom('**/src/gone/**')   (negative)  ->  0 violations   silent green
 onlyImportFrom('**/src/gone/**')  (positive)  ->  1 violation    loud red
 ```
 
-A **positive** constraint with an unsatisfiable glob fails every subject — loud, self-reporting, no guard needed. A **negative** constraint with an unsatisfiable glob is genuinely ambiguous: a live tripwire (`notImportFrom('**/legacy/**')` after `legacy/` was deleted — armed for its return) or a typo. Satisfiability cannot tell them apart, so it **must not fail negative conditions**. Failing them reds the build the moment a team finishes the cleanup the rule demanded.
+**Correction to draft 2:** the `only*` family is **not** reliably loud. `onlyImportFrom` iterates import declarations, so a subject with zero imports passes vacuously however broken the allowlist is; `onlyBeImportedVia` documents this at `src/conditions/reverse-dependency.ts:146` (_"Modules with zero importers pass vacuously"_). In a layered architecture the innermost layer — where an allowlist matters most — characteristically has no outbound imports. Recorded as a **known exposure**, not covered.
 
-| Position                                              | Unsatisfiable ⇒                                         |
-| ----------------------------------------------------- | ------------------------------------------------------- |
-| **Selector** predicate (`.that().resideInFolder`)     | **fault** — the rule can never have subjects            |
-| Discovery glob (`slices()`, preset `folders`)         | **fault** — shipped already (0067-D)                    |
-| **Positive** condition (`onlyImportFrom`, `dependOn`) | no guard — already fails loudly                         |
-| **Negative** condition (`notImportFrom`)              | **no fault** — indistinguishable from an armed tripwire |
+### Anchoring is the only check that survives polarity — and it exempts specifiers
 
-What _is_ verifiable at every position, regardless of polarity, is **anchoring**: a glob with a `./` segment, or one not anchored with `**/`, can never match an absolute path. That is a transformation the tool can verify and state. Negative conditions are therefore guarded for _spelling_, not for _satisfiability_.
+A `./` segment, or a missing `**/` on an absolute-base glob, can never match. That transformation is verifiable, so it applies at every position. But after R1 lands bug 0014, `notImportFrom('fastify')` is a **working rule**, and `isAnchored('fastify')` is `false` (`src/builders/slice-rule-builder.ts:33`). Emitting _"prefix these with `**/`"_ would break it — against a call **our own `layeredArchitecture` preset generates** (`src/presets/layered.ts:101`).
 
-### Reuse `diagnoseGlob`, do not reinvent it
+So anchoring consults `kind` and exempts `specifier`, `import-target` and `literal`. Named test, written before the guard: `notImportFrom('fastify')` and `layeredArchitecture({ restrictedPackages })` produce **zero** findings.
 
-`diagnoseGlob` + `FAULT_ADVICE` (`src/builders/slice-rule-builder.ts:40-76`) already implements per-fault remedies with the right discipline, including a comment explaining why `no-match` lists causes **without asserting one** — earlier revisions asserted causes that were false on reachable inputs. Promote to `src/core/glob-diagnosis.ts` and add exactly one fault:
+### `PathUniverse`
 
-| Fault                 | Condition                                            | May name a cause?     |
-| --------------------- | ---------------------------------------------------- | --------------------- |
-| `dot-segment`         | contains `./`                                        | yes — verifiable      |
-| `unanchored`          | not `**/`-prefixed, absolute-base glob               | yes — verifiable      |
-| **`file-not-folder`** | `kind: 'folder'`, matches ≥1 file, **0 directories** | yes — verifiable      |
-| `no-match`            | anything else                                        | **no** — lists causes |
+A free function with a `WeakMap<ArchProject, PathUniverse>` cache, returning plain strings — not a method on `ArchProject`, because that interface deliberately supports bare-object test doubles (`src/core/project.ts:18`), and a `WeakMap` is invalidated for free by `resetProjectCache()`.
 
-`file-not-folder` is the fault both codebases actually produced, and the only new one they produced.
+Directories must be **all ancestors**, not immediate parents. Measured here: 430 files, **81** immediate parents, **122** ancestors. A folder glob targeting a directory that contains only subdirectories would false-fire on the smaller set. The universe therefore over-approximates what `resideInFolder` can actually match — the guard is fail-open on that axis, which is the correct direction for a breaking change, and is stated rather than left implicit.
 
-`base: 'tsconfig-relative'` exists so the remedy for a `resolvers()` glob never says _"prefix with `**/`"_ — which would be actively wrong there. A guard that emits a wrong remedy is worse than no guard (ADR-008 rule 2).
+Short-circuit: if the project loaded zero source files, blame the project, not the glob — `src/builders/slice-rule-builder.ts:284` already does this and the logic is reused.
+
+### `glob-diagnosis`, promoted and extended by two faults
+
+`diagnoseGlob` + `FAULT_ADVICE` (`src/builders/slice-rule-builder.ts:40-76`) already has the right discipline, including the comment explaining why `no-match` lists causes **without asserting one**. Promote to `src/core/glob-diagnosis.ts`; add:
+
+| Fault                 | Condition                                            | May name a cause?                                                                                       |
+| --------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **`file-not-folder`** | `kind: 'folder'`, matches ≥1 file, **0 directories** | yes — verifiable                                                                                        |
+| **`outside-project`** | exists on disk, absent from the project's file set   | yes — verifiable, and it is the _filesystem vs compiler_ independent derivation ADR-008 rule 5 asks for |
+| `no-match`            | anything else                                        | **no** — lists causes                                                                                   |
+
+`outside-project` converts a wrong-remedy `no-match` ("fix the glob") into the right one ("add it to your tsconfig `include`") for generated dirs, excluded tests and codegen output.
+
+`base: 'normalized'` exists for `slices().matching()`, whose `parseMatchingGlob` (`src/models/slice.ts:73`) already strips and re-adds `**/` — so a project-relative spelling works today and must not be reported as unanchored. Today's code is careful about this; the generic version must stay careful.
 
 ---
 
-## Decisions the review demanded
+## Decisions
 
-**Semantic emptiness does not flip.** `.that().extend('BaseRepository')` matching nothing stays green, and `.expectNonEmpty()` remains the tool for pinning it. Proposal 014's _"Why not 'empty always fails'"_ stands; draft 1 reversed it by accident, not by argument, and there is no measured evidence for the semantic case — **every** bug in the table above is a path glob.
+**Semantic emptiness does not flip**, and therefore **no `.allowEmpty()` is added** — the collision with `CorrespondenceBuilder.allowEmpty(sideName)` dissolves rather than being renamed around. Proposal 014's _"Why not 'empty always fails'"_ stands; every measured bug is a path glob.
 
-**Therefore no `.allowEmpty()` is added.** An unsatisfiable glob has no legitimate reading, so it gets no opt-out (ADR-008 rule 3: say so in the message). The collision with `CorrespondenceBuilder.allowEmpty(sideName)` dissolves rather than being renamed around.
+**Preset input-guarding uses `every`, not `some`.** A glob set is faulted only when **no** glob in it resolves — the quantifier 0067-D already uses. Per-glob faulting would re-land the guard withdrawn in 0.18.1 (_"a layer not created yet"_, no opt-out) three days after withdrawing it. The guarded option list is derived from the 0.18.1 anchoring checklist — `folders`, `layers`, `shared`, `src`, `include`, `repositories`, `typeImportsAllowed`, and the **keys** of `restrictedPackages` (values are specifiers) — with a test asserting the guarded set equals the exempt set, derived not hand-listed.
 
-**Meta-findings become severity-proof.** Measured: `.asSeverity('warn')` downgrades a `bypassFilters` finding to a warning, so `overrides: { rule: 'warn' }` silences it. That is a hole in the **already-shipped** 0067-A/D guards, not only in this plan. `TerminalBuilder.violations()` must floor meta-findings at `error`, and `.warn()` must not swallow one.
+**Meta-findings become severity-proof, and this is a flip, not groundwork.** Measured: `.asSeverity('warn')` downgrades a `bypassFilters` finding, because `rule-builder.ts:200` and `terminal-builder.ts:102` overwrite unconditionally (`execute-rule.ts:137` is already `?? severity` and safe). Three of the four shipped meta-findings set no severity at all. `.warn()` currently never throws (`terminal-builder.ts:130`), so flooring severity alone changes nothing there — `executeWarn` must **partition**, escalating `bypassFilters` findings out of the warn path. That is a public contract change to `.warn()` and it ships in R3 with its own Upgrading paragraph.
 
-**`emptyIsPass` never covers a path fault.** It suppresses the _semantic_ collapse only. Otherwise every `.that().resideInFolder(<typo>).should().notExist()` is permanently green — reopening bug 0011 for the whole absence family. Its `.some()` must also become `.every()`.
-
-**Presets guard their inputs, not their generated rules.** One mis-globbed `strictBoundaries({ folders })` currently fans out to 37 unsilenceable findings. `assertDiscovered` (`presets/shared.ts:50`) already does input-guarding for boundaries; generalise it to `include`/`src`/`repositories`/`layers`, name **the option the user wrote**, and exempt preset-generated rules from the per-rule check. No third override value needed.
-
-**`notExist()` with a path glob:** the selector glob is a claim about the project and is guarded; the _condition's_ emptiness is not. `.that().resideInFolder('**/legacy/**').should().notExist()` with `legacy/` deleted fails, with the verifiable remedy _"no path matches `**/legacy/**`; if `legacy/` was intentionally removed, delete this rule."_ A reintroduction ratchet is a different assertion and deserves its own spelling.
+**`emptyIsPass` does not exist on `main`** — it is on `spike/0067c` only. It lands in R3 with its `.some()` → `.every()` fix, and never covers a path fault, or bug 0011 reopens for every absence rule.
 
 ---
 
 ## Releases
 
-**R1 — bug 0014, alone.** Matcher fix: test import globs against the resolved path _and_ non-relative specifiers. Makes the documented `notImportFrom('fastify')` work. Green→red for anyone whose ban now functions; its own Upgrading note.
+| Release   | Contents                                                                                                                                                                                       | Breaking?                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| **R-any** | Our own 14 rules, rescoped by construction. No product change. Land first.                                                                                                                     | no                               |
+| **R1**    | [Bug 0014](../bugs/0014-bare-package-import-globs-match-nothing.md) alone — match import globs against the resolved path **and** non-relative specifiers                                       | green→red for bans that now work |
+| **R2**    | Single root; `GlobSite` fields + combinator propagation; `PathUniverse`; `glob-diagnosis`; `doctor`; **the whole docs/JSDoc/template sweep**. Reports, never fails. **Zero behaviour change.** | no                               |
+| **R3**    | Every flip together: the glob guard, proposal 019, the severity floor + `.warn()` partition, `emptyIsPass`. One Upgrading section. Ships with the 8 vacuous-test fixes in the same commit.     | **yes**                          |
 
-**R2 — non-breaking groundwork.** Single root (`spike/0014` refactor). `globs()` contract, `PathUniverse`, `glob-diagnosis.ts`. The severity floor for meta-findings. Proposal 019 (`conditions === 0`, one implementation on the root — checked **first**, since it is static and knowable before any element is touched). A `ts-archunit doctor` surface that **reports** every unsatisfiable glob without failing: the pre-flight the 0.18.1 retrospective says a breaking guard needs.
+The docs sweep moves to **R2**: 014 called it a ship-blocker, and shipping it a release _earlier_ satisfies that strictly better while keeping R3's diff reviewable. It becomes an enforced invariant rather than a one-time count, by extending the existing JSDoc/markdown scanner (`tests/docs/scan-markdown.ts`) — _no shipped example contains an unsatisfiable path glob_.
 
-**R3 — the guard (breaking).** Turn R2's report into a failure, at selector predicates, discovery globs and negative-condition _spelling_. Ships with the 15 JSDoc fixes, the `init` templates and the 8 vacuous tests **in the same commit** — 014 called the docs sweep a ship-blocker because an agent copies examples verbatim.
+`doctor` exits **non-zero** on findings from day one (it is an explicitly-invoked diagnostic, not a build gate) and supports `--format json`. It is a measurement instrument with a scheduled end at R3, not the permanent answer.
 
-**R-any — our own 14 rules.** Needs no product change; the `definePredicate` + `startsWith(dirname(tsConfigPath))` form is already measured correct in bug 0011. Land it now, ahead of everything.
+### The R3 gate, pre-registered
+
+- **Population:** both known codebases **plus at least one we did not write** — highest-yield shape is an OSS TypeScript monorepo with codegen.
+- **Decision rule:** classify every finding by its **correct remedy**, not by count. If any finding's correct remedy is anything other than _"fix the glob"_ — "the path is real but excluded from tsconfig", "generated by a build step", "this package legitimately lacks that layer" — **R3 does not flip without an opt-out.**
+- **Report shape:** identity (glob + origin + resolved category), never a total.
 
 ---
 
 ## Test inventory
 
-| Test                                                                    | Proves                                            |
-| ----------------------------------------------------------------------- | ------------------------------------------------- |
-| `file-not-folder` fires; the other three faults keep their own remedies | the fault both codebases produced                 |
-| a satisfiable folder with no matching elements does **not** fire        | the legitimate case stays green                   |
-| `not(resideInFolder(typo))` still reports                               | survives combinators — the funnel could not       |
-| `or(resideInFolder(ok), resideInFolder(typo))` reports the dead branch  | ditto                                             |
-| `notImportFrom('**/legacy/**')` with `legacy/` absent does **not** fire | polarity — successful cleanup stays green         |
-| `notImportFrom('src/x/**')` fires on **anchoring**                      | spelling guarded even where satisfiability is not |
-| a `resolvers()` glob never gets the `**/` remedy                        | tsconfig-relative base                            |
-| `.asSeverity('warn')` cannot downgrade a meta-finding                   | the shipped hole                                  |
-| every builder contributes `globs()`                                     | all positions, enforced by the compiler           |
-| the arch suite is green from a differently-named checkout               | bug 0011 fixed by construction                    |
+| Test                                                                                             | Proves                                                     |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `notImportFrom('fastify')` and `layeredArchitecture({ restrictedPackages })` → **zero** findings | R1 does not break R3 — written **first**                   |
+| `satisfy(not(resideInFolder(typo)))` reports                                                     | combinator propagation                                     |
+| `satisfy(dependOn(typo))` reports                                                                | the `Condition` half of the contract                       |
+| per builder: construct with a known glob, assert **that exact string** in `globs()`              | set identity — a `return []` stub must fail                |
+| the `globs()` origin set equals the runtime-recorded compile set                                 | declaration vs behaviour, two derivations                  |
+| `withStringArg(0, '/api/**')` and `**/node_modules/x/**` produce **no** finding                  | `kind` gating; measured 0 project files under node_modules |
+| `ignorePaths('**/nonexistent/**')` produces no finding; `inFolder('**/nonexistent/**')` does     | exclusion vs selector on the same builder                  |
+| `slices().matching('src/features/*')` is not reported unanchored                                 | `base: 'normalized'`                                       |
+| `resideInFolder` over a directory of only subdirectories does not fire                           | all-ancestors universe                                     |
+| a layer glob for a not-yet-created layer does not fire                                           | the `every` quantifier; the 0.18.1 withdrawal not repeated |
+| `.asSeverity('warn')` cannot downgrade a meta-finding; `.warn()` does not swallow one            | the shipped hole                                           |
+| the arch suite is green from a differently-named checkout                                        | bug 0011 fixed by construction                             |
 
 Each verified by sabotage: revert the fix, watch it go red.
 
 ---
 
+## Known exposures, stated not hidden
+
+- The `only*` condition family passes vacuously on subjects with no edges; its globs are not guarded.
+- A hand-written `{ description, test }` predicate declares no globs; `doctor` reports the count.
+- `PathUniverse` over-approximates directories, so the guard is fail-open there.
+- `doctor` is built on rule-file loading, so users who write rules inside vitest (`docs/running-in-tests.md`) get no pre-flight. R3's Upgrading note must say so.
+
 ## Open questions
 
-1. **Blast radius of satisfiability is unmeasured.** It fires on rules _with_ subjects, so it is strictly larger than the funnel's. R2's `doctor` exists to measure it on both codebases before R3 flips.
-2. **`definePredicate` third-party path predicates** cannot emit a `GlobUse`, so the guard has a permanent hole shaped like every user-defined predicate. Symmetric options parameter, or accept and document the hole?
-3. **`.expectNonEmpty()`** stays, since the semantic case is not flipping. Confirm a no-op call does not read as "this rule is guarded" in `explain`.
-4. **1.0 gate.** Not this release. Proposed: 1.0 is the release after two consecutive releases that change no default, plus one external validation.
+1. **`api/no-single-glob-predicates`** (R-any) surfaces a live `havePathMatching` violation at `src/predicates/module.ts:97`. Make it variadic — a public API change — or record it as a legitimate single-glob identity predicate? Decide before R-any.
+2. **The monorepo shared-rule-file case:** presets get input-guarding, but a shared `arch.rules.ts` spread across packages — the documented golden path — has no equivalent. Needs a product answer before R3.
+3. **1.0 gate.** R3 is breaking and path-normalization is a further deferred breaking change, so 1.0 is at minimum R3 → path-norm → two quiet releases.
 
 ## Out of scope
 
 - **Bug 0012** — per-element thresholds, different mechanism.
-- **Path normalization** — making `'src/*'` _work_ rather than only fail loudly is the deeper fix and is separable; bundling two breaking changes is the 0.18.1 mistake.
-- **The `resolvers()`/`schema()` tsconfig-relative convention** — a real inconsistency; this plan only ensures the guard does not emit a wrong remedy because of it.
+- **Path normalization** — making `'src/*'` _work_ is the deeper fix and is separable; two breaking changes in one release is the 0.18.1 mistake.
+- **The two 0.18.1 deferred slice guards** — unchanged by this plan; they still await executable remedies and an opt-out.
