@@ -3,15 +3,35 @@
 ## Status
 
 - **State:** Ready to build. Graduated from `proposals/013-docs-deprecation-scan.md` (3 drafts), then cut down after **two** five-persona review rounds. The **design** was reproduced independently by five reviewers and holds; every earlier draft failed on the _scaffolding around it_, which is now deleted rather than elaborated.
-- **Priority:** P2, **behind 0047 and ADR-008's dependents.** Docs are at **zero** deprecated usages at HEAD, so this is purely preventive.
+- **Priority:** P2. Now the **only READY plan** — 0047 and 0048 were deferred at their 2026-07-14 go/no-go, and ADR-008's dependents (0064–0067) shipped in 0.18.0. Docs are at **zero** deprecated usages, so this remains purely preventive.
 - **Effort:** **~2.5–3h.** (Draft 3 was ~4–5h and growing; the cut list is in "What was removed and why".)
-- **Created:** 2026-07-17
-- **Depends on:** [ADR-008](../adr/008-agent-first-failure-surfaces.md) — this plan is its first application, and rule 5 is why the draft-3 scaffolding is gone.
+- **Created:** 2026-07-17 · **Re-verified:** 2026-07-25 (against 0.18.1)
+- **Depends on:** [ADR-008](../adr/008-agent-first-failure-surfaces.md) — rule 5 is why the draft-3 scaffolding is gone. (This was written as the ADR's _first_ application; 0.18.0's F1–F4 program got there first and now applies it across `src/core/`, so the ADR arrives here with precedent rather than untested.)
 - **Breaking:** No. `tests/` only. No `src/`, no public API, no new dependency, **no workflow change** (see Decisions).
+
+### Re-verification, 2026-07-25
+
+Every measured claim was re-run against HEAD after the 0.18.x releases and a large
+docs sweep (~90 globs re-anchored, two new sections). **The design is unchanged and
+the premise still holds:**
+
+| Claim                                 | Then    | Now (0.18.1)                                      |
+| ------------------------------------- | ------- | ------------------------------------------------- |
+| `@deprecated` tags in `src/`          | 10      | **10** ✔                                          |
+| Unique deprecated names               | 8       | **8** ✔                                           |
+| Colliding names                       | 4       | **4** ✔ — same set                                |
+| Tags with usable replacement text     | all     | **all** ✔ (the Phase-1 remedy guard passes today) |
+| Deprecated usages in living docs      | 0       | **0** ✔ — the corpus is still clean               |
+| Living-doc files (`docs/**` + README) | 32      | **33** (one page added)                           |
+| TypeScript code blocks / pages        | ~320/31 | **323 / 32**                                      |
+
+Only counts drifted, and only upward. What did go stale is a handful of
+**cross-references** — line numbers, a bug number, and a `ROADMAP.md` line that no
+longer exists; those are corrected inline below.
 
 ## Problem
 
-**The docs rot and nothing catches it.** ~320 TypeScript code blocks across 31 doc pages are never compiled, and no gate reads doc prose at all. `typecheck` covers only the `src`/`tests` includes; `lint` covers only `src/ tests/`; `format:check` checks markdown _formatting_, not correctness.
+**The docs rot and nothing catches it.** 323 TypeScript code blocks across 32 doc pages are never compiled, and no gate reads doc prose at all. `typecheck` covers only the `src`/`tests` includes; `lint` covers only `src/ tests/`; `format:check` checks markdown _formatting_, not correctness.
 
 They did rot: **27 usages across 7 pages** taught deprecated methods, including reference tables presenting them as canonical (`modules.md:49`). Nobody noticed for releases. **Deprecation is invisible to `tsc`** — `shouldResideInFile` compiles perfectly; it is deprecated, not removed. So no existing gate can catch this class.
 
@@ -23,19 +43,29 @@ One ts-morph pass over `src/` yields the deprecated names, their replacement tex
 
 **Measured on the frozen pre-sweep corpus (`8ddd33e`) — reproduced independently by five reviewers:**
 
-| Design                          | Hits        | False positives                            |
-| ------------------------------- | ----------- | ------------------------------------------ |
-| Bare match everything           | 27 / 27     | **4** (`api-reference.md:188,194,195,196`) |
-| Dot-prefix everything           | **22 / 27** | 0                                          |
-| **Collision-aware (this plan)** | **25 / 27** | **0**                                      |
+| Design                          | Hits        | False positives                     |
+| ------------------------------- | ----------- | ----------------------------------- |
+| Bare match everything           | 27 / 27     | **4** (the `api-reference.md` rows) |
+| Dot-prefix everything           | **22 / 27** | 0                                   |
+| **Collision-aware (this plan)** | **25 / 27** | **0**                               |
+
+The four false positives are the legitimate Export/Signature table rows in
+`api-reference.md` — today at lines 192 and 198–200, but **cite them by content, not
+by line**: they have already moved once (they were 188 and 194–196 when this was
+measured). The Phase-3 guard asserts the file is in scope rather than pinning a line.
 
 We take 25/27 with zero false positives over 27/27 with four: a scan that reddens **correct** documentation trains the reader to suppress it, and the suppression is the artifact that has failed repeatedly (ADR-008 rule 3).
 
 ### Known limit — derivable, deliberately skipped
 
-The 2 misses are bare `conditionHaveNameMatching` in two-column tables (`core-concepts.md:176`, `classes.md:56`). This is **not** undecidable: that name is an _alias_ (`haveNameMatching as conditionHaveNameMatching`), so it never legitimately appears with parens, and a reviewer implemented the alias rule and confirmed it reaches **27/27 at 0 FP**. We skip it: 2 hits, clean corpus, and it adds a third rule class.
+The 2 misses were bare `conditionHaveNameMatching` in two-column tables (then at `core-concepts.md:176`, `classes.md:56`). This is **not** undecidable: that name is an _alias_ (`haveNameMatching as conditionHaveNameMatching`), so it never legitimately appears with parens, and a reviewer implemented the alias rule and confirmed it reaches **27/27 at 0 FP**. We skip it: 2 hits, clean corpus, and it adds a third rule class.
 
-> **Warning to whoever revisits this.** The _obvious_ fix — a call-shape discriminator (`name(`) — looks right and **goes red on `api-reference.md:194-196`**, where `shouldExtend(name: string)` sits legitimately in a Signature column. Two reviewers probed it; it fails. Use the alias rule or nothing.
+**Re-verified 2026-07-25:** those two bare mentions are gone from the corpus — the
+only surviving occurrence is the legitimate `api-reference.md` Export-column row,
+which the collision rule correctly ignores. So the limitation is now theoretical
+rather than live, which weakens the case for the alias rule further.
+
+> **Warning to whoever revisits this.** The _obvious_ fix — a call-shape discriminator (`name(`) — looks right and **goes red on the `api-reference.md` Class-Conditions table**, where `shouldExtend(name: string)`, `shouldImplement(name: string)` and `shouldHaveMethodNamed(name: string)` sit legitimately in a Signature column. Two reviewers probed it; it fails. Use the alias rule or nothing.
 
 ### Everything is derived, and every derivation is checked by a _different_ derivation
 
@@ -187,7 +217,7 @@ it.each([
 **Enumerate with `node:fs`.** `picomatch` is a _matcher_ — it has no filesystem walk and cannot do this. Node 24 (ADR-001) does:
 
 ```typescript
-const files = globSync(['docs/**/*.md', 'README.md']) // 32 files, verified
+const files = globSync(['docs/**/*.md', 'README.md']) // 33 files, verified 2026-07-25
 ```
 
 Scope is `docs/**` + `README.md`, so `ts-archunit-spec.md`, `CHANGELOG.md` (which names 7 deprecated symbols in one line, legitimately, forever), `plans/`, `proposals/`, and `adr/` are out **by construction** — no exclusion list to rot (ADR-008 rule 3). `docs/.vitepress/` contains zero `.md` files.
@@ -252,9 +282,15 @@ docs/x.md:12 — `.shouldExtend()` is deprecated.
 - **Reaching 27/27** via the alias rule — verified achievable at 0 FP; skipped as a third rule class.
 - **The frozen corpus.** Draft 3 wanted 8 pages + a frozen `symbols.json`. The recall table above is a **one-time validation already performed and reproduced by five reviewers**; freezing it buys a regression test of the scanner at ~1h, against a guard with a 1.0 expiry. Not worth it. The synthetic algebra tests cover the mechanics.
 - **Enabling `@typescript-eslint/no-deprecated` for `src/`** (~15 min, `src/`-only — ~74 legitimate deprecated call-sites live in `tests/`). Raised in priority by a review finding: TypeScript parses a line-start `@deprecated` **inside an `@example`** as a real tag, and `src/` has 140 `@example` blocks — so a live API could enter the vocabulary. The lint rule is the real remedy; the deprecation-workflow note should say **never write `@deprecated` inside an `@example`**. Separate PR.
-- **`bugs/0009`** (the ~13 doc compile errors — a _stub describing work_, not a triaged list; they need the scope-aware preamble first), **`bugs/0010`** (ADR-007's dogfooding example references a non-existent `entry` export and is unscoped — would false-red against 107 test files), **`bugs/0011`** (the release-gate recovery path, decision 3). All three are **independent commits, not merge-blockers for this plan**.
-- **`ROADMAP.md:162`** says "7 deprecated aliases" and lists 7; there are **8**. Free fix, not this plan.
-- **The `shouldExtend` rename** → 0.18+, on its own merits. Note the interaction: it deprecates a standalone export in `src/conditions/`, which is exactly why Phase 1 walks `src/**/*.ts` rather than `src/builders/*.ts`.
+- Three follow-up bug reports, all **independent commits, not merge-blockers for this plan**: the ~13 doc compile errors (a _stub describing work_, not a triaged list; they need the scope-aware preamble first); ADR-007's dogfooding example, which references a non-existent `entry` export and is unscoped — it would false-red against 107 test files; and the release-gate recovery path from decision 3.
+
+  ⚠️ **Renumber before filing.** This plan originally reserved `bugs/0009`–`0011` for
+  them. **0009 is now taken** (`bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md`,
+  fixed in 0.18.1), so file these as **0010, 0011, 0012**. Note `bugs/fixed/` also
+  already contains two different `0007-*` files, so check the directory before
+  claiming a number rather than trusting the highest one you remember.
+
+- **The `shouldExtend` rename** — still open; 0.18 shipped without it, so it moves to a future minor on its own merits. Note the interaction: it deprecates a standalone export in `src/conditions/`, which is exactly why Phase 1 walks `src/**/*.ts` rather than `src/builders/*.ts`.
 
 ## What was removed and why
 
