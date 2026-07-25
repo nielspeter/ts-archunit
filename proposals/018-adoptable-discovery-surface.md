@@ -5,8 +5,8 @@ spike branch, and the one open design question was settled by measuring a real
 adoption run rather than by argument: the baseline is sufficient, the budget
 primitive is not needed. What remains is shipping 0010 and two docs fixes.
 Drafts 1–2 proposed four asks; a code survey plus architect and product review found
-three of them were already solved, already shipped, or forbidden by ADR-008. What
-survives is the strategic question and one precondition, both stated below.
+three of them were already solved, already shipped, or forbidden by ADR-008, and the
+fourth was a real bug.
 **Priority:** high, and now schedulable — the blocker has a measured fix.
 **Origin:** a 2026-07 coverage audit of a large adopting codebase, plus that
 project's earlier rule inventory ("flip checklist"). Both external; evidence
@@ -47,19 +47,22 @@ advisory **by design** in that project, the stated blockers were: reachability (
 legitimate exceptions (3), debt volume (4), real design work (2) — and **severity
 zero times**. Nobody chooses `warn` because they want a softer signal.
 
-## The precondition: bug 0010
+## The precondition: bug 0010 — fixed on a spike branch
 
-Adoption is impossible today for a mechanical reason, not a philosophical one.
-Violation identity embeds **absolute file paths**, so a baseline generated locally
-matches **nothing** in CI — on any machine, forever. `withBaseline()`, the documented
-way to accept existing debt, does not work for this surface at all.
+Adoption was impossible for a mechanical reason, not a philosophical one. Violation
+identity embedded **absolute file paths**, so a baseline generated locally matched
+**nothing** in CI — on any machine, forever. `withBaseline()`, the documented way to
+accept existing debt, did not work for this surface at all. Measured across two
+checkouts of one commit: 1006 findings each side, **0 shared identities**.
 
-That is filed as bug 0010 and should be fixed on its own merits: it also breaks every
-`strictBoundaries` user's baseline, so it is not a discovery-surface concern.
+That is [bug 0010](../bugs/0010-violation-identity-embeds-absolute-paths.md), fixed on
+its own merits — it broke every `strictBoundaries` user's baseline too, so it was never
+a discovery-surface concern. The spike also closed three further instabilities that
+move identity without moving the checkout (file-walk order, derived population counts,
+line coordinates).
 
-That was the honest next step, and it has now been taken: adoption was tried on a
-real codebase with a working baseline, and the result is below. No budget
-primitive was needed for a problem the functioning ratchet already solves.
+With that in hand the honest next step was to _try_ adoption rather than design for it,
+which is what the section below reports.
 
 ## The open question — now answered by measurement
 
