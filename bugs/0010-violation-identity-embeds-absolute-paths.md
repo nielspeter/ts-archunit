@@ -194,6 +194,44 @@ so there is a collision guard, and the real-codebase run reports 1006 findings
 to 1006 distinct identities. Known limitation: two anonymous functions in one
 file are indistinguishable without a coordinate.
 
+### Round 3 — run as the consumer runs it
+
+The measurements above point the library's own detectors at a real codebase.
+That is a corpus test, not a consumer test. So: the spike build was installed
+into an isolated checkout of a real adopting project (its own `node_modules`,
+its own vitest config) and its architecture suite was run before and after.
+
+**Regression: none.** 12 of 14 files pass, 57 of 57 tests, identical either
+side. (The 2 failing files fail on unbuilt workspace subpath exports, an
+artefact of installing with `--ignore-scripts`, not on anything in the library.)
+That project also does not call `withBaseline()` anywhere, so the format change
+cannot regress it — the fix removes a blocker rather than repairing something in
+use.
+
+**Adoption, end to end** — the question [proposal 018](../proposals/018-adoptable-discovery-surface.md)
+was parked on:
+
+```
+cold             check()             -> FAILS, 1006 findings
+accept the debt  check({ baseline }) -> PASSES          (1006 entries, hashVersion 2)
+plant 1 new dup  check({ baseline }) -> FAILS, 165 NEW  (all naming the planted file)
+```
+
+So the answer is yes: a 1000-finding surface **is** adoptable with a working
+baseline, and the ratchet is a real ratchet rather than a mute button.
+
+One number is worth carrying forward: copying **one** file produced **165** new
+findings. A pairwise detector is quadratic in the duplicated surface, which is
+direct evidence against a count-based budget — the count is not a measure of how
+much debt was added. That is ADR-008 rule 5's "compare identities, not
+integers", observed rather than asserted.
+
+Process note: the first run of this test reported the ratchet as broken. It was
+the harness — `project()` memoises by tsconfig path (documented, with
+`resetProjectCache()`), so the re-run analysed the pre-plant file set. Diagnosed
+rather than reported: the planted file was never in the project (625 → 625
+files).
+
 ## Notes
 
 Found while reviewing [proposal 018](../proposals/018-adoptable-discovery-surface.md),

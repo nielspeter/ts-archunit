@@ -1,11 +1,13 @@
 # Proposal 018 — An Adoptable Discovery Surface
 
-**Status:** Draft 3 — **parked**, pending [bug 0010](../bugs/0010-violation-identity-embeds-absolute-paths.md).
+**Status:** Draft 4 — **unparked.** The precondition (bug 0010) is fixed on a
+spike branch, and the one open design question was settled by measuring a real
+adoption run rather than by argument: the baseline is sufficient, the budget
+primitive is not needed. What remains is shipping 0010 and two docs fixes.
 Drafts 1–2 proposed four asks; a code survey plus architect and product review found
 three of them were already solved, already shipped, or forbidden by ADR-008. What
 survives is the strategic question and one precondition, both stated below.
-**Priority:** the _question_ is high — this is the library's largest unexploited
-capability. The _proposal_ is not schedulable until 0010 lands.
+**Priority:** high, and now schedulable — the blocker has a measured fix.
 **Origin:** a 2026-07 coverage audit of a large adopting codebase, plus that
 project's earlier rule inventory ("flip checklist"). Both external; evidence
 reproduced here.
@@ -55,30 +57,40 @@ way to accept existing debt, does not work for this surface at all.
 That is filed as bug 0010 and should be fixed on its own merits: it also breaks every
 `strictBoundaries` user's baseline, so it is not a discovery-surface concern.
 
-**Until 0010 lands, there is nothing to propose.** With it landed, the honest next
-step is to _try_ adoption on a real codebase with a working baseline and see what
-actually blocks it — rather than designing a budget primitive for a problem that a
-functioning ratchet may already solve.
+That was the honest next step, and it has now been taken: adoption was tried on a
+real codebase with a working baseline, and the result is below. No budget
+primitive was needed for a problem the functioning ratchet already solves.
 
-## The open question, narrowed
+## The open question — now answered by measurement
 
-After 0010, one genuine design question remains:
+The question was:
 
-> Is `withBaseline()` sufficient to adopt a 700-finding surface, or is a
+> Is `withBaseline()` sufficient to adopt a ~1000-finding surface, or is a
 > **violation budget** needed?
 
-Arguments for a budget: no 700-entry file to review, no regeneration merge conflicts,
-incidental cleanup is rewarded. Arguments against: it is a cardinality check
-(ADR-008 rule 5), the count is nonlinear for a pairwise detector — extracting one
-shared helper used in 20 places drops the count ~190 — and a stale-baseline-entry
-failure gives the same ratchet at _identity_ granularity, which the ADR prefers.
+The 0010 spike made it testable, so it was tested rather than argued. The spike
+build was installed into an isolated checkout of a real adopting project and the
+whole adoption path was run:
 
-**Decision: hold** until either 0010 ships and a real adoption attempt shows the
-baseline is insufficient, or a second, unrelated user asks. One project hand-rolling
-it twice is a signal, not a mandate. If it is built, name it for the contract, not
-the mechanism: `--max-violations` / `.atMost(n)`, mirroring ESLint's
-`--max-warnings`. Not "ratchet"; not "allowlist", which already means `.excluding()`
-in this codebase's vocabulary.
+```
+cold             check()             -> FAILS, 1006 findings
+accept the debt  check({ baseline }) -> PASSES          (1006 entries)
+plant 1 new dup  check({ baseline }) -> FAILS, 165 NEW  (all naming the planted file)
+```
+
+**`withBaseline()` is sufficient. No budget primitive is needed.** Existing debt
+goes green, new debt goes red, and the ratchet is a ratchet rather than a mute
+button.
+
+The same run also kills the budget idea on its own terms. Copying **one** file
+produced **165** new findings: a pairwise detector is quadratic in the duplicated
+surface, so the count is not a measure of how much debt was added, and a
+threshold on it would be noise. That is ADR-008 rule 5 — "compare identities, not
+integers" — observed rather than asserted. It was previously an argument; it is
+now a measurement.
+
+**Decision: do not build it.** Revisit only if a second, unrelated user asks for
+a reason this run did not cover.
 
 ## Ship now, independent of all the above
 
