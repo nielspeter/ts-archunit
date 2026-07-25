@@ -97,6 +97,15 @@ style the blindness was total.
 
 Pass `{ includeObjectLiteralFunctions: true }` at all three sites.
 
+**Each site needs its own fixture.** The first cut fixed all three and guarded
+two: reverting `inconsistent-siblings.ts` left the entire suite green, because
+the only object-literal fixture was a single file and that detector groups by
+**folder**. A fix nothing holds in place is a fix that comes back.
+`object-literal-siblings/` supplies the missing shape — three sibling handlers
+calling the sanctioned helper from inside an object-literal function, one that
+does not — and the detector reports nothing at all without the fix, since no
+file matches and the majority threshold is never reached.
+
 The principle, worth stating because it is the reason `functions()` differs: a
 **selector** has a documented subject set, so widening it silently changes every
 existing rule — hence opt-in. A **detector** scans for a property of the code
