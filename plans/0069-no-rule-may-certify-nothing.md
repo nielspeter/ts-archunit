@@ -40,6 +40,45 @@ Every real bug is a **folder glob pointed at a file**. The glob matches a file, 
 
 **The check must be per-predicate-semantics, not one global file test.**
 
+### The check belongs to the predicate
+
+Not to the rule. Each predicate is the only thing that knows what "matched
+nothing" means for it, and the answers are opposite:
+
+| Predicate                                                                          | Empty means                    | Verdict                                   |
+| ---------------------------------------------------------------------------------- | ------------------------------ | ----------------------------------------- |
+| `resideInFolder(glob)`                                                             | nothing resides in that folder | **fault** — always                        |
+| `resideInFile(glob)`                                                               | no such file                   | **fault** — always                        |
+| `havePathMatching(glob)`                                                           | no path matches                | **fault** — always                        |
+| `slices().matching()` / `assignedFrom()` globs                                     | discovery found nothing        | **fault** — always (shipped, 0067-D)      |
+| `extend('BaseRepository')`, `haveNameMatching(/x/)`, `areAsync()`, `areExported()` | possibly "none yet"            | may be legitimate → `.allowEmpty(reason)` |
+
+A path predicate is an **assertion about the project's structure** — _this
+folder exists and has things in it_. A semantic predicate is a **filter** — it
+is allowed to select nothing. That is the same line 014 drew, moved to where it
+can be enforced per-predicate and reported precisely.
+
+**In a composite this is the whole point.** `resideInFolder(A).and().extend(B)`
+collapsing to zero has two opposite causes, and an aggregate check cannot tell
+them apart:
+
+- A matches nothing → the glob is wrong → **fail**, naming A.
+- A matches, B filters it to nothing → possibly "no repositories yet" → green,
+  or `.allowEmpty(reason)` if the author wants it pinned.
+
+Attributing the second to `resideInFolder` would cry wolf on precisely the
+legitimate case, which is how a guard gets switched off.
+
+### `resideInFolder` empty has two causes, and they need different messages
+
+| Resolves to                                     | Cause                                                                               | Remedy                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------- |
+| no path matches the glob                        | typo, or a project-relative glob where absolute is required                         | fix the glob                           |
+| paths match, but zero **elements** of that kind | `classes()` over a folder of pure functions; or a **folder glob pointed at a file** | wrong entry point, or `resideInFile()` |
+
+Both fail. The second is the one measured in both codebases, and it is the one
+0067-C's file-level check silently passes.
+
 ---
 
 ## Design — the funnel is the guard
