@@ -152,9 +152,33 @@ identity does not merely lose baseline entries, it **matches the wrong one**.
 
 Dropping the line is not sufficient on its own — within one file those two
 findings are distinguished by nothing else, so removing it merges them, and a
-merged pair means accepting one accepts both. The scope is narrow: only
-`body-analysis-module.ts:64,99` put a coordinate in a message. Every other
-`getStartLineNumber()` call feeds the un-hashed `line` field, and
+merged pair means accepting one accepts both.
+
+**The scope claimed here was wrong.** This report originally said "only
+`body-analysis-module.ts:64,99` put a coordinate in a message", derived from a
+grep for `at line ${`. Review enumerated the real class — _conditions that emit
+one violation per matched node_ — and found **eight** sites, in four families:
+
+| Site                              | Condition                                                |
+| --------------------------------- | -------------------------------------------------------- |
+| `body-analysis-module.ts:93,130`  | `moduleNotContain`, `moduleUseInsteadOf`                 |
+| `body-analysis.ts:50,88`          | `classNotContain`, `classUseInsteadOf`                   |
+| `body-analysis-function.ts:64,94` | `functionNotContain`, `functionUseInsteadOf`             |
+| `call.ts:112,317`                 | `notHaveCallbackContaining`, `notHaveArgumentContaining` |
+
+Two of eight were fixed and the other six shipped with the defect, in the same
+change whose write-up asserted the scope was narrow. The grep matched the
+message text; the class is the emission shape.
+
+`identifyMatches` is now a shared helper (`conditions/match-identity.ts`) used
+by all eight, keyed additionally by family so a class-level and a module-level
+rule reporting the same node stay distinct. The two call sites flatten their
+matches across arguments before numbering — a per-argument counter restarts at
+1, so two callbacks with a match in the same declaration would have collided —
+and bucket per call, so adding a second registration nearby does not renumber
+the first one's findings.
+
+Every other `getStartLineNumber()` call feeds the un-hashed `line` field, and
 `exclusion-comments.ts:114` is an `ExclusionWarning`, a different type.
 
 Five candidate discriminators, measured over 596 matched nodes in a real

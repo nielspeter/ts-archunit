@@ -1,43 +1,9 @@
-import type { Node, SourceFile } from 'ts-morph'
+import type { SourceFile } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
-import { getElementName, type ArchViolation } from '../core/violation.js'
+import type { ArchViolation } from '../core/violation.js'
+import { identifyMatches } from './match-identity.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import { searchModuleBody, type ModuleBodyOptions } from '../helpers/body-traversal.js'
-
-/**
- * Assign each matched node a baseline identity that is not a coordinate.
- *
- * These conditions emit one violation per matching node, and the rendered
- * message distinguishes them by line number. That cannot be the identity: add
- * two lines at the top of a file with matches at lines 2 and 4, and the entry
- * recorded for line 4 now matches the violation that used to be at line 2 — the
- * baseline accepts the **wrong** finding, rather than merely missing one.
- *
- * The line cannot simply be dropped either, because within one file two matches
- * of the same matcher are otherwise identical, and a shared identity means
- * accepting one accepts both. So: bucket by the enclosing declaration, then
- * number the matches inside each bucket.
- *
- * Measured over 596 matched nodes in a real 808-file project, this is 1:1 —
- * and strictly better than the line, which merges two `process.env` accesses
- * that share a line. Renumbering is the residual cost: adding or removing a
- * match shifts the ordinals of later matches *in the same declaration*, which
- * is a change to that declaration. Today, editing any line above shifts every
- * finding in the file.
- */
-function identifyMatches(
-  sf: SourceFile,
-  nodes: readonly Node[],
-  matcherDescription: string,
-): string[] {
-  const ordinals = new Map<string, number>()
-  return nodes.map((node) => {
-    const scope = `${getElementName(node)}::${matcherDescription}`
-    const ordinal = (ordinals.get(scope) ?? 0) + 1
-    ordinals.set(scope, ordinal)
-    return `module-body::${sf.getFilePath()}::${scope}#${String(ordinal)}`
-  })
-}
 
 // ─── Module body conditions ────────────────────────────────────────
 
@@ -90,7 +56,12 @@ export function moduleNotContain(
       const violations: ArchViolation[] = []
       for (const sf of elements) {
         const result = searchModuleBody(sf, matcher, options)
-        const identities = identifyMatches(sf, result.matchingNodes, matcher.description)
+        const identities = identifyMatches(
+          'module-body',
+          sf.getFilePath(),
+          result.matchingNodes,
+          matcher.description,
+        )
         result.matchingNodes.forEach((node, index) => {
           violations.push({
             rule: context.rule,
@@ -127,7 +98,12 @@ export function moduleUseInsteadOf(
         const badResult = searchModuleBody(sf, bad, options)
         const goodResult = searchModuleBody(sf, good, options)
 
-        const identities = identifyMatches(sf, badResult.matchingNodes, bad.description)
+        const identities = identifyMatches(
+          'module-body',
+          sf.getFilePath(),
+          badResult.matchingNodes,
+          bad.description,
+        )
         badResult.matchingNodes.forEach((node, index) => {
           violations.push({
             rule: context.rule,

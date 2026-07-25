@@ -4,6 +4,7 @@ import type { ArchViolation } from '../core/violation.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchCall } from '../models/arch-call.js'
 import { getFunctionBody, findMatchesInNode } from '../helpers/body-traversal.js'
+import { identifyMatches } from './match-identity.js'
 
 /**
  * Helper to create a violation from an ArchCall.
@@ -25,6 +26,15 @@ function createCallViolation(
     message,
     because: context.because,
   }
+}
+
+/**
+ * The call's identity name — the same value `createCallViolation` puts in
+ * `element`, without the message-only elision. Buckets matches per call, so
+ * adding a second registration nearby does not renumber the first one's.
+ */
+function identityNameOf(archCall: ArchCall, context: ConditionContext): string {
+  return archCall.getName({ withArgument: context.identifyByArgument }) ?? '<call>'
 }
 
 /**
@@ -101,20 +111,29 @@ export function notHaveCallbackContaining(matcher: ExpressionMatcher): Condition
         // literal-shape walk inside getName({...}) is identical for each.
         const callName = callNameForMessage(archCall, context)
         const args = archCall.getArguments()
-        for (const arg of args) {
+        // Flatten across arguments before assigning identities: a per-argument
+        // counter would restart at 1 for each callback, so two callbacks with a
+        // match in the same enclosing declaration would collide.
+        const matches = args.flatMap((arg) => {
           const body = getFunctionBody(arg)
-          if (!body) continue
-          const matches = findMatchesInNode(body, matcher)
-          for (const match of matches) {
-            violations.push(
-              createCallViolation(
-                archCall,
-                `${callName} has callback containing ${matcher.description} at line ${String(match.getStartLineNumber())}`,
-                context,
-              ),
-            )
-          }
-        }
+          return body ? findMatchesInNode(body, matcher) : []
+        })
+        const identities = identifyMatches(
+          'call-callback',
+          archCall.getSourceFile().getFilePath(),
+          matches,
+          `${identityNameOf(archCall, context)} :: ${matcher.description}`,
+        )
+        matches.forEach((match, index) => {
+          violations.push({
+            ...createCallViolation(
+              archCall,
+              `${callName} has callback containing ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+              context,
+            ),
+            identity: identities[index],
+          })
+        })
       }
       return violations
     },
@@ -308,18 +327,23 @@ export function notHaveArgumentContaining(matcher: ExpressionMatcher): Condition
         // same archCall — same identity work each time.
         const callName = callNameForMessage(archCall, context)
         const args = archCall.getArguments()
-        for (const arg of args) {
-          const matches = findMatchesInNode(arg, matcher)
-          for (const match of matches) {
-            violations.push(
-              createCallViolation(
-                archCall,
-                `${callName} argument contains ${matcher.description} at line ${String(match.getStartLineNumber())}`,
-                context,
-              ),
-            )
-          }
-        }
+        const matches = args.flatMap((arg) => findMatchesInNode(arg, matcher))
+        const identities = identifyMatches(
+          'call-argument',
+          archCall.getSourceFile().getFilePath(),
+          matches,
+          `${identityNameOf(archCall, context)} :: ${matcher.description}`,
+        )
+        matches.forEach((match, index) => {
+          violations.push({
+            ...createCallViolation(
+              archCall,
+              `${callName} argument contains ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+              context,
+            ),
+            identity: identities[index],
+          })
+        })
       }
       return violations
     },

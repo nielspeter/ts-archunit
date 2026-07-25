@@ -21,6 +21,8 @@ import { functions } from '../../src/builders/function-rule-builder.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
+import { classes } from '../../src/builders/class-rule-builder.js'
+import { calls } from '../../src/builders/call-rule-builder.js'
 import { generateBaseline, withBaseline, hashViolation } from '../../src/helpers/baseline.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
@@ -391,6 +393,163 @@ describe('violation identity is stable under unrelated change (bug 0010)', () =>
     expect(reversed.length).toBe(forward.length)
     expect(reversed.map((v) => v.message)).toEqual(forward.map((v) => v.message))
     expect(reversed.map((v) => v.element)).toEqual(forward.map((v) => v.element))
+  })
+
+  it('every body-analysis family survives lines inserted above (all 8 sites)', () => {
+    // The module-level pair was fixed first and the bug report claimed the
+    // scope was narrow. It was not: class-level, function-level and the two
+    // call-argument families emit one violation per matched node too, all
+    // distinguished in the message by `at line N` alone. Review found the
+    // other six. This runs one rule per family over the same file, with and
+    // without a prefix, and requires the identities to agree.
+    const body = `export class Svc {
+  handle(input: string): string {
+    console.log('a')
+    const t = input.trim()
+    console.log('b')
+    return t
+  }
+}
+
+export function standalone(input: string): string {
+  console.log('c')
+  const t = input.trim()
+  console.log('d')
+  return t
+}
+
+export const app = { get: (_p: string, cb: () => void) => cb() }
+app.get('/x', () => {
+  console.log('e')
+  console.log('f')
+})
+`
+    const build = (prefix: string): Layout => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-coords-'))
+      created.push(tmp)
+      fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"fixture"}')
+      fs.writeFileSync(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: { target: 'ES2022', module: 'ES2022', moduleResolution: 'bundler' },
+          include: ['*.ts'],
+        }),
+      )
+      fs.writeFileSync(path.join(tmp, 'a.ts'), prefix + body)
+      const tsConfigPath = path.join(tmp, 'tsconfig.json')
+      const tsMorphProject = new Project({ tsConfigFilePath: tsConfigPath })
+      return {
+        root: tmp,
+        project: {
+          tsConfigPath,
+          _project: tsMorphProject,
+          getSourceFiles: () => tsMorphProject.getSourceFiles(),
+        },
+      }
+    }
+
+    const families: Array<[string, (l: Layout) => ArchViolation[]]> = [
+      ['module', (l) => modules(l.project).should().notContain(call('console.log')).violations()],
+      ['class', (l) => classes(l.project).should().notContain(call('console.log')).violations()],
+      [
+        'function',
+        (l) => functions(l.project).should().notContain(call('console.log')).violations(),
+      ],
+      [
+        'call-callback',
+        (l) =>
+          calls(l.project)
+            .that()
+            .onObject('app')
+            .should()
+            .notHaveCallbackContaining(call('console.log'))
+            .violations(),
+      ],
+    ]
+
+    const plain = build('')
+    const shifted = build('// two lines added at the top\n\n')
+    for (const [label, run] of families) {
+      const before = run(plain)
+      const after = run(shifted)
+      // Vacuity: each family must actually produce several findings, or
+      // "identities agree" is trivially true.
+      expect(before.length, `${label}: findings`).toBeGreaterThan(1)
+      expect(after.length, `${label}: findings after shift`).toBe(before.length)
+      expect(
+        after.map((v) => v.line),
+        `${label}: the perturbation must actually move the lines`,
+      ).not.toEqual(before.map((v) => v.line))
+      expect(
+        [...identitiesOf(after, shifted.root)].sort(),
+        `${label}: identities must survive the shift`,
+      ).toEqual([...identitiesOf(before, plain.root)].sort())
+    }
+  })
+
+  it('numbering is per declaration, so a new match does not renumber its neighbours', () => {
+    // The ordinal is bucketed by enclosing declaration specifically to keep the
+    // blast radius local. A single per-file counter would satisfy the test
+    // above and still renumber everything downstream of any edit — review
+    // showed the bucketing itself was unguarded.
+    const withTwo = `export function a(): void {
+  console.log('a1')
+}
+export function b(): void {
+  console.log('b1')
+  console.log('b2')
+}
+`
+    const withThree = `export function a(): void {
+  console.log('a0')
+  console.log('a1')
+}
+export function b(): void {
+  console.log('b1')
+  console.log('b2')
+}
+`
+    const build = (source: string): Layout => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-bucket-'))
+      created.push(tmp)
+      fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"fixture"}')
+      fs.writeFileSync(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: { target: 'ES2022', module: 'ES2022', moduleResolution: 'bundler' },
+          include: ['*.ts'],
+        }),
+      )
+      fs.writeFileSync(path.join(tmp, 'a.ts'), source)
+      const tsConfigPath = path.join(tmp, 'tsconfig.json')
+      const tsMorphProject = new Project({ tsConfigFilePath: tsConfigPath })
+      return {
+        root: tmp,
+        project: {
+          tsConfigPath,
+          _project: tsMorphProject,
+          getSourceFiles: () => tsMorphProject.getSourceFiles(),
+        },
+      }
+    }
+
+    const idsIn = (layout: Layout, fnName: string): string[] =>
+      modules(layout.project)
+        .should()
+        .notContain(call('console.log'))
+        .violations()
+        .filter((v) => (v.identity ?? '').includes(`::${fnName}::`))
+        .map((v) => hashViolation(v, layout.root))
+        .sort()
+
+    const before = build(withTwo)
+    const after = build(withThree)
+
+    expect(idsIn(before, 'b'), 'b must have findings to compare').toHaveLength(2)
+    // A match added inside `a` must leave `b`'s identities alone.
+    expect(idsIn(after, 'b')).toEqual(idsIn(before, 'b'))
+    // And `a` itself legitimately gains one.
+    expect(idsIn(after, 'a').length).toBe(idsIn(before, 'a').length + 1)
   })
 
   it('two findings from one rule never share an identity', () => {

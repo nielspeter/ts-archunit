@@ -2,6 +2,7 @@ import type { ClassDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { createViolation, getElementName } from '../core/violation.js'
+import { identifyMatches } from './match-identity.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import { searchClassBody } from '../helpers/body-traversal.js'
 
@@ -47,15 +48,22 @@ export function classNotContain(matcher: ExpressionMatcher): Condition<ClassDecl
       const violations: ArchViolation[] = []
       for (const cls of elements) {
         const result = searchClassBody(cls, matcher)
-        for (const node of result.matchingNodes) {
-          violations.push(
-            createViolation(
+        const identities = identifyMatches(
+          'class-body',
+          cls.getSourceFile().getFilePath(),
+          result.matchingNodes,
+          matcher.description,
+        )
+        result.matchingNodes.forEach((node, index) => {
+          violations.push({
+            ...createViolation(
               cls,
               `${getElementName(cls)} contains ${matcher.description} at line ${String(node.getStartLineNumber())}`,
               context,
             ),
-          )
-        }
+            identity: identities[index],
+          })
+        })
       }
       return violations
     },
@@ -85,15 +93,22 @@ export function classUseInsteadOf(
         const goodResult = searchClassBody(cls, good)
 
         // Report each occurrence of the bad pattern
-        for (const node of badResult.matchingNodes) {
-          violations.push(
-            createViolation(
+        const identities = identifyMatches(
+          'class-body',
+          cls.getSourceFile().getFilePath(),
+          badResult.matchingNodes,
+          bad.description,
+        )
+        badResult.matchingNodes.forEach((node, index) => {
+          violations.push({
+            ...createViolation(
               cls,
               `${getElementName(cls)} contains ${bad.description} at line ${String(node.getStartLineNumber())} — use ${good.description} instead`,
               context,
             ),
-          )
-        }
+            identity: identities[index],
+          })
+        })
 
         // If the good pattern is missing entirely, report that too
         if (!goodResult.found) {
