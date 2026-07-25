@@ -1,183 +1,106 @@
 # Proposal 018 — An Adoptable Discovery Surface
 
-**Status:** Draft 2 — the severity flip moved from out-of-scope into the proposal after measuring what an agent actually receives for a warning in CI (exit 0; the loop ends before the text is read).
-**Priority:** High — the discovery surface is the largest shipped-but-unused capability in the library, and the reason it is unused is a **fixable defect**, not a philosophical one.
-**Affects:** `hashViolation` identity inputs (`src/helpers/baseline.ts`), the message construction in `src/smells/*`, one new opt-in ratchet terminal, and the smell severity registered by `agentGuardrails` / `strictBoundaries`. No change to any predicate, condition, or entry point.
-**Origin:** A 2026-07 coverage audit of a large adopting codebase, plus the "flip checklist" from that project's earlier (March) rule inventory. Both are external documents; the relevant evidence is reproduced below.
+**Status:** Draft 3 — **parked**, pending [bug 0010](../bugs/0010-violation-identity-embeds-absolute-paths.md).
+Drafts 1–2 proposed four asks; a code survey plus architect and product review found
+three of them were already solved, already shipped, or forbidden by ADR-008. What
+survives is the strategic question and one precondition, both stated below.
+**Priority:** the _question_ is high — this is the library's largest unexploited
+capability. The _proposal_ is not schedulable until 0010 lands.
+**Origin:** a 2026-07 coverage audit of a large adopting codebase, plus that
+project's earlier rule inventory ("flip checklist"). Both external; evidence
+reproduced here.
 
-> **Two independent things are wrong, and fixing either alone changes nothing.** The detectors are registered at `warn`, which in CI means `exit 0` — an agent's loop ends before it reads the finding, so the signal does not exist. And the ratchet is broken for them, so simply promoting to `error` puts 700 findings red on arrival and the rule gets deleted. Note `.check()` itself was never missing: `SmellBuilder extends TerminalBuilder`, so fail-grade has always been one call away. What is missing is a way to **survive turning it on**.
+## Why this exists (do not lose this)
 
-## Problem
+ts-archunit has two halves. The **enforcement** half is mature and heavily used. The
+**discovery** half — `smells.duplicateBodies`, `smells.inconsistentSiblings` — is
+shipped, documented, and used essentially **zero times**.
 
-A mature adopting project — 177 enforced rules, 1 warn, agent-first messages throughout, a genuine power user of the enforcement surface — used the discovery surface **zero times**. Pointing `duplicateBodies` at it surfaced **~700 findings that all 177 enforced rules were blind to**, including the exact copy-paste rot the tool exists to prevent.
+The audit that motivated the 0.18 program measured what that costs. A genuine power
+user of the enforcement surface — **177 enforced rules, 1 warn**, agent-first
+messages throughout — ran the discovery surface not once. Pointing `duplicateBodies`
+at it surfaced **~700 findings that all 177 enforced rules were blind to**, including
+the copy-paste parser rot this library was built to prevent (spec §1.1), now realised
+at scale.
 
-The obvious diagnosis is severity: advisory findings are invisible to an agent
-(ADR-008), so promote them to `.check()`. That diagnosis is **necessary but not
-sufficient**, and two measurements say why.
+That is the strategic case, and it is unchanged by everything below: **enforcement
+catches what someone already thought to forbid; discovery is the only surface that
+finds the drift nobody named.** For a codebase being written faster than it can be
+reviewed, the second is the one that compounds. Closing this gap is the moat.
 
-**1. `.check()` already works, so severity is a registration choice, not a missing
-feature.** `SmellBuilder extends TerminalBuilder`. Promoting is one argument — and
-§3 shows it must happen. But if that were the whole story the fix would have been a
-one-line change years ago, and it is not, because of (2).
+## What review established
 
-**2. The ratchet is structurally broken for smells.** `hashViolation` is
-`rule::element::message` and deliberately **excludes** `violation.line`, so a
-finding survives edits elsewhere in the file — there is an existing test asserting
-exactly that. But `duplicateBodies` writes coordinates _and_ a similarity
-percentage into the message:
+The obvious diagnosis — _advisory findings are invisible to an agent, so promote them
+to `.check()`_ — is wrong on the facts, three times over:
 
-```
-findByIds (a.ts:10) is 94% similar to findAll (b.ts:22)
-```
+| Ask (drafts 1–2)                   | Finding                                                                                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Make findings fail instead of warn | **No API needed.** `SmellBuilder extends TerminalBuilder`, and `overrides: { 'preset/agent/no-copy-paste': 'error' }` works **today**. Undocumented, that is all. |
+| Agent-first messages on the smells | **Already shipped** for `agentGuardrails` (`id`/`because`/`suggestion`/`imperative`). Only `strictBoundaries` lacks them — 3 lines.                               |
+| A shrink-only **count** ratchet    | **ADR-008 rule 5 forbids it**: "compare identities… not integers." A budget is green when one duplicate is deleted and another appears.                           |
+| Ratchet-stable identity            | **A real bug, and worse than measured** → extracted to [bug 0010](../bugs/0010-violation-identity-embeds-absolute-paths.md).                                      |
 
-so the excluded line number re-enters the hash through the back door. Measured:
+The flip-checklist corroborates the diagnosis being wrong. Across 13 rules that stay
+advisory **by design** in that project, the stated blockers were: reachability (4),
+legitimate exceptions (3), debt volume (4), real design work (2) — and **severity
+zero times**. Nobody chooses `warn` because they want a softer signal.
 
-| Change                                       | Baseline entry             |
-| -------------------------------------------- | -------------------------- |
-| Ordinary rule, same finding twice            | **stable** ✔               |
-| Smell, one blank line added above a function | **hash changes** → re-reds |
-| Smell, a body edited (94% → 92% similar)     | **hash changes** → re-reds |
+## The precondition: bug 0010
 
-A team that baselines 700 duplicate-body findings gets a green build exactly once.
-The next unrelated edit near any of those functions re-reds it, with a finding they
-already accepted. That is not an adoption speed-bump; it makes the documented
-adoption path (`withBaseline()`) non-functional for this entire surface.
+Adoption is impossible today for a mechanical reason, not a philosophical one.
+Violation identity embeds **absolute file paths**, so a baseline generated locally
+matches **nothing** in CI — on any machine, forever. `withBaseline()`, the documented
+way to accept existing debt, does not work for this surface at all.
 
-### Independent corroboration: why real rules stay advisory
+That is filed as bug 0010 and should be fixed on its own merits: it also breaks every
+`strictBoundaries` user's baseline, so it is not a discovery-surface concern.
 
-The same project's flip checklist catalogues 25 rules by whether they could be
-promoted from `.warn()` to `.check()`. Across the 13 that stay advisory **by
-design**, the stated reasons are:
+**Until 0010 lands, there is nothing to propose.** With it landed, the honest next
+step is to _try_ adoption on a real codebase with a working baseline and see what
+actually blocks it — rather than designing a budget primitive for a problem that a
+functioning ratchet may already solve.
 
-| Blocker                                                        | Count | Example                                              |
-| -------------------------------------------------------------- | ----- | ---------------------------------------------------- |
-| **Reachability** — the subject cannot be selected              | 4     | "anonymous arrow functions can't be matched by name" |
-| **Legitimate exceptions** — the rule is right, the code is too | 3     | 16 valid non-pagination `parseInt` uses              |
-| **Debt volume** — needs accept-today/block-new                 | 4     | "~99 — needs large triage"                           |
-| **Real design work**                                           | 2     | a genuine circular dependency                        |
-| **Severity itself**                                            | **0** | —                                                    |
+## The open question, narrowed
 
-Nobody's rule is advisory because they wanted a softer signal — they are advisory
-because of reachability, exceptions and volume. Read carefully, that is not an
-argument against §3; it is the reason §3 cannot ship alone. Raising severity
-addresses **none** of these four columns, so on its own it converts a rule nobody
-reads into a rule everybody deletes. §1 and §2 attack the volume column, which is
-the one this proposal can actually close.
+After 0010, one genuine design question remains:
 
-## Proposal
+> Is `withBaseline()` sufficient to adopt a 700-finding surface, or is a
+> **violation budget** needed?
 
-### 1. Ratchet-stable smell identity (the core change)
+Arguments for a budget: no 700-entry file to review, no regeneration merge conflicts,
+incidental cleanup is rewarded. Arguments against: it is a cardinality check
+(ADR-008 rule 5), the count is nonlinear for a pairwise detector — extracting one
+shared helper used in 20 places drops the count ~190 — and a stale-baseline-entry
+failure gives the same ratchet at _identity_ granularity, which the ADR prefers.
 
-Findings must be identified by **what** they are, not **where they currently sit**.
+**Decision: hold** until either 0010 ships and a real adoption attempt shows the
+baseline is insufficient, or a second, unrelated user asks. One project hand-rolling
+it twice is a signal, not a mandate. If it is built, name it for the contract, not
+the mechanism: `--max-violations` / `.atMost(n)`, mirroring ESLint's
+`--max-warnings`. Not "ratchet"; not "allowlist", which already means `.excluding()`
+in this codebase's vocabulary.
 
-Two candidate mechanisms, and this proposal deliberately does not pick one yet:
+## Ship now, independent of all the above
 
-- **(a) Move coordinates out of `message`.** Keep the human-readable text in the
-  rendered output but build it from `file`/`line` fields at format time, leaving
-  `message` coordinate-free. Smallest change; relies on every future detector
-  remembering the convention.
-- **(b) An explicit identity field.** `ArchViolation.identity?: string`, used by
-  `hashViolation` when present, falling back to today's triple. A detector states
-  its own stable key (for duplicate bodies: the unordered pair of qualified
-  names). Slightly larger, but makes the invariant _structural_ rather than a
-  convention a future detector can quietly break.
+Two items need no proposal and no release:
 
-I lean to **(b)** on the grounds that this bug is exactly a convention being broken
-silently — but the choice belongs in review.
+1. **Document the severity flip.** `docs/ai-agents.md` states the warn severity as a
+   fact without telling an agent-focused reader they can set
+   `overrides: { '<rule-id>': 'error' }`. That is the whole of the drafts' §3.
+2. **Fix the "default" claims.** `docs/smell-detection.md:7,174` and the terminal
+   table at `:56` call `.warn()` the default; there is no default — a terminal must be
+   called. `README.md:292` demonstrates `.warn()` without the alternative.
 
-Either way, the similarity percentage leaves the identity: a pair that drifts from
-94% to 92% is the same accepted finding, not a new one.
+And one small correctness fix: give `strictBoundaries`' duplicate-bodies
+registration the `because`/`suggestion` metadata it lacks
+(`src/presets/boundaries.ts:172-176`), so that if a user _does_ flip it to error they
+get a remedy rather than a bare message.
 
-### 2. A shrink-only ratchet
+## Out of scope
 
-`withBaseline()` accepts a set and blocks additions. The flip checklist shows what
-teams actually need for a 700-finding surface: a count that **may fall, never
-rise**, so incidental cleanup is rewarded and regression is blocked without
-re-baselining. This is the mechanism the adopting project hand-rolled twice (its
-limits catalogue carries an `allowlistBaseline` integer with a shrink-only
-assertion) — the same signal that justified the correspondence primitive.
-
-### 3. Fail-grade by default, once (2) makes it survivable
-
-**Draft 1 had this as out of scope. That was wrong.** The correction came from asking
-what an agent in CI actually receives for a warning, and measuring it:
-
-- `src/cli/commands/check.ts:62` — the exit code counts **error severity only**, so a
-  warn-only run exits **0**.
-- Terminal warnings go to **stderr**; GitHub gets a non-blocking `::warning`.
-
-An agent's CI loop terminates on `exit 0`. It does not "ignore" the warning as noise
-— it never reaches the text, because the run reported success. So an advisory
-discovery surface is not a quieter signal, it is **no signal**.
-
-The evidence for this is in our own code, not the adopting project's.
-`src/presets/agent-guardrails.ts:107-118` — the preset written _for the agent
-consumer_ — registers the copy-paste detector at `'warn'` while carrying:
-
-```
-imperative: 'Do NOT duplicate a function body — extract the shared logic'
-```
-
-An instruction addressed to an agent, emitted at a severity that agent cannot
-observe. `strictBoundaries` does the same at `src/presets/boundaries.ts:174-176`.
-
-So the severity flip is not a follow-up decision — it is **the point of the
-proposal**, and (1) and (2) are the preconditions that stop it being deleted on
-arrival. The ordering stands; the scoping does not. Ship them together:
-
-| Phase | Change                                | Why it cannot ship alone                                   |
-| ----- | ------------------------------------- | ---------------------------------------------------------- |
-| 1     | Stable identity + shrink-only ratchet | Alone: adoption becomes _possible_ but nothing turns it on |
-| 2     | Presets and default move to `error`   | Alone: 700 findings red on arrival → the rule gets deleted |
-
-**Blast radius, and why this needs a version decision.** Moving the preset
-registrations from `'warn'` to `'error'` turns an existing green build red for
-anyone using `agentGuardrails`/`strictBoundaries` with a codebase that has
-duplication — which is the point, but it is breaking. It should land with the
-ratchet in the same release, with the CHANGELOG telling users to baseline first.
-
-Also per ADR-008: for findings where the remedy is unambiguous (unescaped LIKE
-patterns, uncapped pagination, duplicated diverging bodies) the message must carry
-the sanctioned fix, not just the observation.
-
-## Out of scope — deliberately
-
-- **The reachability gap** (factory-returned arrows, computed-key assignments —
-  two of the four shapes the audit listed; `0066` shipped the other two). Real, and
-  it blocks 4 of the 13 advisory rules, but it is a different mechanism in a
-  different file. Bundling a verified fix with speculative extras is precisely the
-  pattern that cost five review rounds in 0.18.1.
-- **New detectors.** This proposal makes the two existing ones usable.
-
-## Migration
-
-Changing violation identity **invalidates existing baseline files** for any project
-that has baselined smell findings. One-time, and today that population is
-approximately nobody (the surface is unused, which is the whole premise) — but it
-must be stated in the CHANGELOG, and the failure mode should be a loud
-"baseline entry no longer matches any finding" rather than silent re-reporting.
-This is the main thing review should push on.
-
-## Alternatives considered
-
-- **Do nothing; document `.check()` better.** Rejected: the capability is already
-  documented and still unused. The measured blocker is the ratchet, and no amount
-  of documentation makes a broken hash stable.
-- **Exclude smells from baseline entirely, ship them advisory forever.** Honest,
-  and it is the status quo — but it concedes the largest unexploited capability in
-  the library, and the audit's central finding is that this surface catches what
-  177 enforced rules cannot.
-- **Hash on `file` + `element` only (drop `message`).** Rejected: it would collapse
-  two genuinely different findings about the same function into one, and it changes
-  identity for _every_ rule, not just smells. The blast radius is far larger than
-  the bug.
-
-## Evidence index
-
-- Hash instability: `hashViolation` at `src/helpers/baseline.ts:52-54`; message
-  construction at `src/smells/duplicate-bodies.ts:160`. Reproduced by hashing three
-  messages that differ only in line number and percentage.
-- `.check()` already available: `SmellBuilder extends TerminalBuilder`
-  (`src/smells/smell-builder.ts:13`).
-- The ~700-finding measurement and the flip-checklist taxonomy are from the
-  external audit named in **Origin**.
+- **The reachability gap** — factory-returned arrows and computed-key assignments
+  (0066 shipped the object-literal and method-shorthand shapes). Real, and it blocks
+  4 of the 13 advisory rules in the audit, but a different mechanism.
+- **`remedyOptional` metadata** — plan 0068 parked the question here; this proposal
+  hands it back. It is a question about ADR-008's discriminator, not about discovery.
+- **New detectors.** This is about making the two that exist usable.

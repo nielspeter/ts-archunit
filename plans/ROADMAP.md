@@ -2,7 +2,8 @@
 
 **Version:** 0.18.1 · **Tests:** 2160 across 156 files · **Updated:** 2026-07-25
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
-**Plans:** 59 completed (`completed/`) · 4 open (below) · proposals in `../proposals/`
+**Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/` ·
+open defects in `../bugs/`
 
 > Conventions: a plan is **READY** when its design is settled and it can be built as
 > written; **PROPOSED** when the design is reviewed but nobody has decided to build
@@ -14,14 +15,11 @@
 
 | Plan                                           | State        | Effort   | Blocked on                              |
 | ---------------------------------------------- | ------------ | -------- | --------------------------------------- |
-| 0068 — Close vacuity holes in our dogfooding   | **READY**    | ~2 h     | nothing                                 |
 | 0067 — Empty-selector safety (**part C only**) | **PARTIAL**  | ~1 day   | a version decision (breaking re-cut)    |
 | 0047 — TypeScript escape-hatch matchers        | **PROPOSED** | ~1 day   | go/no-go — trimmed scope already agreed |
 | 0048 — `usingTagged()` symbol-tagged matcher   | **PROPOSED** | ~1.5 day | go/no-go — deferred until demand        |
 
-**0068 is READY** — it closes a live false green: 13 existing dogfood rules scope on
-`**/ts-archunit/src/**` and select nothing in a worktree or renamed checkout. The
-other three items need a decision, not implementation. 0063 shipped 2026-07-25.
+All three need a decision, not implementation. 0063 shipped 2026-07-25.
 
 **0067 part C** is the remaining slice of proposal 014: path-glob auto-fail on every
 builder plus path normalization. It is the broadest breaking change left, which is
@@ -33,17 +31,32 @@ ship **trimmed** (`doubleCast` + `anyAnnotation`; defer `broadType`/`tsDirective
 layer is speculative). Both remain PROPOSED — the open question is whether each earns
 API surface, not how to build it.
 
+## Open defects
+
+Measured, reproduced, not yet fixed. Full write-ups in `../bugs/`.
+
+| Bug                                                                                          | What is broken                                                                                                                                                |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | `withBaseline()` never matches in CI. Hits every `strictBoundaries` user, not just smells. **Precondition for proposal 018.**                                 |
+| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | Our own ADR-005 / hygiene / security enforcement is vacuous in any checkout not named `ts-archunit`; one rule is vacuous everywhere. Evidence for **0067-C**. |
+
+Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) is the third
+item in this class — a rule with subjects and no conditions warns and returns a pass —
+but it is a design change, not a defect report, so it stays a proposal. All three are
+the same ADR-008 failure: a check that cannot fail, on a run that exits 0.
+
 ## Deferred — decided, not scheduled
 
 - **Discovery surface → adoptable** — [proposal 018](../proposals/018-adoptable-discovery-surface.md),
-  **drafted 2026-07-25, needs review.** Reframes the long-standing "promote the smells
-  to fail-grade" item: `.check()` already works on them (`SmellBuilder extends
-TerminalBuilder`), so severity was never the blocker. The measured blocker is that
-  `hashViolation` is destabilised by the coordinates the detectors write into
-  `message`, which makes `withBaseline()` non-functional for the whole surface — you
-  cannot accept existing debt, so the only options are red-on-arrival or off. This is
-  still the strategic gap: the enforcement half is mature, the discovery half is
-  unused.
+  **Draft 3, parked on bug 0010.** The strategic gap is real and unchanged: the
+  enforcement half is mature, the discovery half (`duplicateBodies`,
+  `inconsistentSiblings`) is used essentially zero times, and pointing it at a large
+  adopting codebase surfaced ~700 findings that all 177 of that project's enforced
+  rules were blind to. Review killed the obvious diagnosis — severity was never the
+  blocker (`.check()` already works on smells via `overrides`), and a count ratchet is
+  forbidden by ADR-008 rule 5. What remains is bug 0010 plus one parked question:
+  whether a working baseline is enough to adopt a 700-finding surface, or a violation
+  budget is needed.
 - **`runtimeIsolation`** — proposal unwritten.
 - **Slice discovery guards** — failing on a single-slice result, and on an empty slice
   among populated siblings. Both catch real false-greens; both were built and withdrawn
