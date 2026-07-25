@@ -33,11 +33,15 @@ API surface, not how to build it.
 
 ## Deferred — decided, not scheduled
 
-- **Discovery surface → fail-grade** — promote `smells.duplicateBodies` /
-  `inconsistentSiblings` from `.warn()` toward `.check()` with agent-first messages,
-  paired with a baseline/ratchet so they are adoptable on a codebase that already has
-  debt. This is the strategic gap: the enforcement half is mature, the discovery half
-  is barely used. **Proposal unwritten.**
+- **Discovery surface → adoptable** — [proposal 018](../proposals/018-adoptable-discovery-surface.md),
+  **drafted 2026-07-25, needs review.** Reframes the long-standing "promote the smells
+  to fail-grade" item: `.check()` already works on them (`SmellBuilder extends
+TerminalBuilder`), so severity was never the blocker. The measured blocker is that
+  `hashViolation` is destabilised by the coordinates the detectors write into
+  `message`, which makes `withBaseline()` non-functional for the whole surface — you
+  cannot accept existing debt, so the only options are red-on-arrival or off. This is
+  still the strategic gap: the enforcement half is mature, the discovery half is
+  unused.
 - **`runtimeIsolation`** — proposal unwritten.
 - **Slice discovery guards** — failing on a single-slice result, and on an empty slice
   among populated siblings. Both catch real false-greens; both were built and withdrawn
