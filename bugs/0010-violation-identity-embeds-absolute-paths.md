@@ -96,6 +96,41 @@ working state to preserve — the baseline never matched in CI — so this canno
 regress anyone, but the CHANGELOG must say **"regenerate your baseline"**, and it is
 not only smell users: every `strictBoundaries` user is affected.
 
+## Spike: measured fix (branch `spike/0010-portable-violation-identity`)
+
+Field test — two worktrees of the **same commit** of a large adopting codebase,
+checked out at different paths and different depths, 625 files, 1006
+`duplicateBodies` findings on each side:
+
+```
+v1 (today):  A=1006  B=1006  shared identities =    0
+v2 (spike):  A=1006  B=1006  shared identities = 1006
+withBaseline(): baseline generated in A, copied to B -> 0 reported as new
+stored paths: 0 absolute, 0 traversing ('..'), e.g. apps/api/src/factories/service-factory.ts
+```
+
+Zero, not "a few": today **every** finding changes identity when the checkout
+moves. Two decisions in the spike were not obvious from the write-up above:
+
+1. **Scrub centrally, don't fix the producers.** `hashViolation(v, root)`
+   replaces the root inside `rule`/`element`/`message` before hashing. Repairing
+   the four known producers would leave every third-party `defineCondition()`
+   with the same broken identity; this covers them. Fixing the producers is
+   still worth doing for message _quality_ — it is not the portability fix.
+2. **Nearest `.git`, not outermost.** Outermost is tempting for monorepos and
+   is wrong the moment any ancestor is also a repository — a home directory
+   under dotfiles version control is the ordinary case. The root then sits
+   above the checkout and the "relative" path still contains
+   `Documents/Projects/…`. It reproduces the bug it fixes. Covered by a test.
+
+Also in the spike: a `hashVersion` field, so a pre-fix baseline produces a
+`bypassFilters` meta-finding naming the format gap and the regeneration
+command, instead of silently reporting all 1006 accepted findings as new.
+
+**Not yet addressed** — the two further instabilities above (derived population
+counts; pair orientation) are producer-level and survive this fix. They need a
+different guard: adding an unrelated sibling file, not moving the checkout.
+
 ## Notes
 
 Found while reviewing [proposal 018](../proposals/018-adoptable-discovery-surface.md),
