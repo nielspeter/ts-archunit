@@ -35,12 +35,16 @@ API surface, not how to build it.
 
 Measured, reproduced, not yet fixed. Full write-ups in `../bugs/`.
 
-| Bug                                                                                          | What is broken                                                                                                                                                |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | `withBaseline()` never matches in CI. Hits every `strictBoundaries` user, not just smells. **Precondition for proposal 018.**                                 |
-| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | Our own ADR-005 / hygiene / security enforcement is vacuous in any checkout not named `ts-archunit`; one rule is vacuous everywhere. Evidence for **0067-C**. |
+| Bug                                                                                          | What is broken                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0010](../bugs/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths | `withBaseline()` never matches in CI. Hits every `strictBoundaries` user, not just smells. **Precondition for proposal 018.**                                                       |
+| [0011](../bugs/0011-dogfood-rules-select-nothing.md) — 14 dogfood rules select nothing       | Our own ADR-005 / hygiene / security enforcement is vacuous in any checkout not named `ts-archunit`; one rule is vacuous everywhere. Evidence for **0067-C**.                       |
+| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red | The measured value is part of identity, so deleting two methods from a god object fails CI. Makes the whole size/concentration family unadoptable — which is why it has zero users. |
 
-Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) is the third
+Bug 0010 is fixed on `spike/0010-portable-violation-identity`, validated against a
+real consumer; 0011 and 0012 are open.
+
+Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) is a fourth
 item in this class — a rule with subjects and no conditions warns and returns a pass —
 but it is a design change, not a defect report, so it stays a proposal. All three are
 the same ADR-008 failure: a check that cannot fail, on a run that exits 0.
