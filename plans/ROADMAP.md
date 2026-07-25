@@ -184,7 +184,7 @@
 
 ## AI-era program — merged 2026-07-24 (PR #2)
 
-Turned the "architecture governance for the AI era" positioning into shipped code. Positioning: `docs/why-ts-archunit.md` + README; the sequenced, review-validated roadmap: `plans/ai-era-product-direction.md`. Motivated by the cmless audit (its two largest recurring bug classes — route↔permission-matrix drift and phantom limits — plus an empty-selector false-green the tool committed twice on a real app).
+Turned the "architecture governance for the AI era" positioning into shipped code. Positioning: `docs/why-ts-archunit.md` + README; the sequenced, review-validated roadmap: `plans/ai-era-product-direction.md`. Motivated by that audit (its two largest recurring bug classes — route↔permission-matrix drift and phantom limits — plus an empty-selector false-green the tool committed twice on a real app).
 
 **Foundations + features (merged, 2108 tests green, 3-persona code-reviewed):**
 

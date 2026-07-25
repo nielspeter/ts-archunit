@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-24
 **Companion to:** `docs/why-ts-archunit.md` (the positioning) and `plans/ROADMAP.md` (the plan log).
-**Basis:** the cmless coverage audit (`../cmless` → `architecture-docs/ts-archunit-coverage-audit-2026-07.md`) + architect & product reviews of proposals 014, 015, 016, 017.
+**Basis:** an internal coverage audit of a large adopting codebase + architect & product reviews of proposals 014, 015, 016, 017.
 
 This converts the positioning into a **sequenced, review-validated roadmap**. The reviews revealed that the open proposals are not four independent features — they share unbuilt foundations and repeat one lesson (extract the shared core before the feature). That dependency structure, not the feature list, is the roadmap.
 
@@ -16,7 +16,7 @@ ts-archunit has three possible surfaces (Böckeler's guide/sensor grid, `docs/wh
 | **Discovery** (find un-ruled drift)               | duplicate/inconsistent/hotspot detection | thin — 2 advisory smells           | **the moat — invest** |
 | **Guide** (feed-forward constraints to the agent) | rules as machine-readable constraints    | nascent (`explain --format agent`) | **grow**              |
 
-The cmless audit proved the point empirically: a _power user_ of the sensor surface, using **zero** of discovery, with ~700 duplicate-body findings invisible to 177 enforced rules, and false-greens in its own gates.
+That audit proved the point empirically: a _power user_ of the sensor surface, using **zero** of discovery, with ~700 duplicate-body findings invisible to 177 enforced rules, and false-greens in its own gates.
 
 ## Foundations (build first — shared keystones)
 
@@ -49,7 +49,7 @@ The reviews surfaced live ADR-008 violations _in shipped code_ — the exact sin
 - **Path normalization for discovery globs** — the root cause of 014's miss #1 (globs matched against absolute paths); `boundaries.ts:99–106` hand-rolls discovery without the `**/`-prepend that `resolveByMatching` already applies. Fixes `src/*` _and_ kills a duplication.
 - **`runtimeIsolation` primitive** — layer-agnostic confinement of both imports _and_ globals (`Bun`/`Deno`/`process`/`Worker`); not a synonym for `restrictPackageToLayer` (import-only). The vertical-slice trigger has already fired.
 - **The "relation-over-a-set" family** — consistency / correspondence / canonicity. Don't build the family; name 017's member family-aware so it slots in without a breaking rename.
-- **Discovery surface → fail-grade + adoptability** — promote `duplicateBodies`/`inconsistentSiblings` toward `.check()` with agent-first messages, and add a **baseline/ratchet** so the metric/discovery rules are adoptable on a codebase that already has debt (why cmless left `maxMethods` etc. at zero usage).
+- **Discovery surface → fail-grade + adoptability** — promote `duplicateBodies`/`inconsistentSiblings` toward `.check()` with agent-first messages, and add a **baseline/ratchet** so the metric/discovery rules are adoptable on a codebase that already has debt (why the audited project left `maxMethods` etc. at zero usage).
 - **Guide export** — rules as feed-forward machine constraints beyond `explain --format agent` (Böckeler's computational-guide cell; Shaukat's "constraints cut tokens 30%").
 
 ## Sequencing

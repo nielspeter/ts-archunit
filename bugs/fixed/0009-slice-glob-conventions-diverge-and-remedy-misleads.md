@@ -71,7 +71,7 @@ The message defect is separate: `SliceRuleBuilder.emptyDiscoveryViolation()` had
 
 ## How it was found
 
-Adopting 0.18.0 on a real codebase (cmless). The guard did its job on one rule — an ADR-011 layer-direction rule using `assignedFrom({ routes: 'src/routes/**', ... })` had been **vacuous since it was written** and never enforced anything; 0.18 correctly turned that silent pass into a failure, and the `**/` remedy was exactly right there.
+Adopting 0.18.0 on a large real-world codebase. The guard did its job on one rule — an ADR-011 layer-direction rule using `assignedFrom({ routes: 'src/routes/**', ... })` had been **vacuous since it was written** and never enforced anything; 0.18 correctly turned that silent pass into a failure, and the `**/` remedy was exactly right there.
 
 The sibling rule in the same file used `matching('src/services/*')` and was **working correctly** (56 slices). Applying the guard's advice to it would have broken it. The near-miss is the bug: the same message served both.
 
