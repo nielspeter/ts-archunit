@@ -1,8 +1,8 @@
-# Bug 0013: `resolvers()` cannot see resolvers
+# Bug 0013: three of four function collectors are blind to object-literal functions
 
 **Reported:** 2026-07-25
 **Found in:** all versions through v0.18.1
-**Severity:** High — the GraphQL entry point selects the helper functions sitting beside the resolvers and none of the resolvers themselves. Every rule written with it passes on the wrong subjects, silently.
+**Severity:** High — the GraphQL entry point selects the helper functions sitting beside the resolvers and none of the resolvers themselves, and both smell detectors are blind to the same shape. Every rule written with `resolvers()` passes on the wrong subjects, and the discovery surface under-reports.
 
 ## Description
 
@@ -64,10 +64,44 @@ if `resolvers()` could not see a single resolver in a map?_ — and the answer i
 
 The fixture, not the assertions, was the hole.
 
+## The same defect in two more places
+
+Fixing `resolvers()` alone would have been an instance fix. Enumerating every
+caller of `collectFunctions()` mechanically:
+
+| Caller                                     | Options passed                     | Verdict   |
+| ------------------------------------------ | ---------------------------------- | --------- |
+| `src/builders/function-rule-builder.ts:96` | `this._collectionOptions` (user's) | correct   |
+| `src/graphql/resolver-rule-builder.ts`     | none                               | **blind** |
+| `src/smells/duplicate-bodies.ts:80`        | none                               | **blind** |
+| `src/smells/inconsistent-siblings.ts:32`   | none                               | **blind** |
+
+Three of four. `duplicateBodies` returns **0** findings on two byte-identical
+object-literal handlers — the handler-map idiom that `docs/functions.md` itself
+advertises support for (Bun.serve, Hono/Elysia route maps, reducer maps) and
+that every GraphQL resolver uses.
+
+Measured on a real codebase, same inputs either side:
+
+```
+                 before   after
+Cell (808 files)   1019    1049    (+30)
+IG   (571 files)    719     730    (+11)
+```
+
+41 duplicate pairs that were structurally invisible. The delta is modest there
+because that codebase is class-heavy; for a project written in the handler-map
+style the blindness was total.
+
 ## Fix
 
-Pass `{ includeObjectLiteralFunctions: true }` in
-`ResolverRuleBuilder.getElements()`. One line.
+Pass `{ includeObjectLiteralFunctions: true }` at all three sites.
+
+The principle, worth stating because it is the reason `functions()` differs: a
+**selector** has a documented subject set, so widening it silently changes every
+existing rule — hence opt-in. A **detector** scans for a property of the code
+and has no such contract, so it should always look everywhere. `resolvers()` is
+a selector, but one whose entire domain is object literals.
 
 Guarded by `tests/fixtures/graphql/src/schema-map.resolver.ts` — an idiomatic map
 with arrow properties and a method shorthand, two of which violate — plus two
