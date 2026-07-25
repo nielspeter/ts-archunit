@@ -27,17 +27,6 @@ export interface Slice {
 export type SliceDefinition = Record<string, string>
 
 /**
- * A segment that denotes "the slice level" rather than a directory name.
- *
- * Deliberately only `*` / `**`, not "any segment containing a metacharacter":
- * `[slug]`, `(marketing)`, `[...rest]` are ordinary directory names in Next.js,
- * Remix and SvelteKit projects. Treating them as wildcards truncated `baseDir`
- * mid-path, which merged real sibling directories into one slice — dropping the
- * intra-slice edges that `beFreeOfCycles` needs and turning a real cycle green.
- */
-const WILDCARD_SEGMENT = /^\*{1,2}$/
-
-/**
  * Characters that make a segment non-literal for prefix purposes.
  *
  * Only `*` and `?`. Brackets and braces are excluded deliberately: `[slug]`,
@@ -73,13 +62,13 @@ interface MatchingGlob {
  *
  * Redundant and therefore stripped: a leading `**\/` (patterns are matched against
  * absolute paths anyway), a leading `./` (never present in an absolute path), and a
- * trailing `/` **after a wildcard segment**.
+ * trailing `/` once the glob already contains a wildcard segment.
  *
- * A trailing `/` after a *literal* segment is NOT redundant: `'src/features/'` means
- * "the directories inside features", while `'src/features'` makes `features` a name
- * filter and yields a single slice. So these are equivalent —
- * `'src/features/*'`, `'src/features/*\/'`, `'src/features/'`,
- * `'**\/src/features/*'`, `'./src/features/*'` — and `'src/features'` is different.
+ * A trailing `/` on a wildcard-free glob becomes an explicit `*`, so `'src/features/'`
+ * ("the things inside features") is exactly `'src/features/*'`. These are all
+ * equivalent — `'src/features/*'`, `'src/features/*\/'`, `'src/features/'`,
+ * `'**\/src/features/*'`, `'./src/features/*'` — while `'src/features'` (no slash) is
+ * deliberately different: its final segment is a name filter, yielding one slice.
  */
 function parseMatchingGlob(glob: string): MatchingGlob {
   let normalized = glob
@@ -90,33 +79,35 @@ function parseMatchingGlob(glob: string): MatchingGlob {
     normalized = normalized.startsWith('./') ? normalized.slice(2) : normalized.slice(3)
   }
 
-  // A trailing '/' after a wildcard segment is redundant ('src/features/*/' means
-  // the same as 'src/features/*'), so drop it — otherwise the pattern would demand
-  // an extra directory level. After a LITERAL segment it is meaningful and stays:
-  // 'src/features/' means the directories inside features. The test is "the segment
-  // IS a wildcard", never "contains a metacharacter" — `[slug]` is a real directory.
+  // A trailing '/' is redundant once the glob already contains a wildcard segment:
+  // that wildcard is the slice level, and the pattern appends its own '*/**'. Left
+  // in, it demanded one directory MORE than baseDir implies, so every file sitting
+  // directly in the matched directory was silently dropped ('src/feature-*/' lost
+  // each feature's index.ts; 'packages/*/src/' lost everything directly in src).
+  //
+  // With no wildcard anywhere the slash is meaningful and stays: 'src/features/'
+  // means "the directories inside features". The test is about the glob as a whole,
+  // not the final segment's shape — `[slug]` and `(marketing)` are real directory
+  // names, and testing them for metacharacters is what broke them before.
   if (normalized.endsWith('/')) {
     const withoutSlash = normalized.slice(0, -1)
-    const finalSegment = withoutSlash.slice(withoutSlash.lastIndexOf('/') + 1)
-    if (WILDCARD_SEGMENT.test(finalSegment)) normalized = withoutSlash
+    const hasWildcardSegment = withoutSlash.split('/').some((seg) => WILDCARD_CHARS.test(seg))
+    // With a wildcard already present that wildcard IS the slice level, so the
+    // slash is noise. Otherwise 'dir/' means "the things inside dir", which is
+    // exactly 'dir/*' — make it explicit so both spellings take the same path and
+    // a flat directory (files, no subdirectories) resolves for both.
+    normalized = hasWildcardSegment ? withoutSlash : normalized + '*'
   }
 
-  const endsWithSlash = normalized.endsWith('/')
   const segments = normalized.split('/').filter((segment) => segment !== '')
 
-  // The slice level is the first `*`/`**` segment; everything literal before it is
-  // the directory prefix we locate in the path. With no wildcard segment at all, a
-  // trailing '/' means "the directories inside this one" (so every segment is
-  // prefix), while its absence makes the final segment a name filter — that is what
-  // distinguishes 'src/features/' (slices inside features) from 'src/feature-'
-  // (slices named feature-*).
+  // The slice level is the first wildcard segment; everything literal before it is
+  // the directory prefix we locate in the path. A trailing '/' has already been
+  // turned into an explicit '*', so the remaining no-wildcard case is a bare
+  // 'src/feature-', where the final segment is a NAME FILTER rather than a
+  // directory — which is what distinguishes it from 'src/features/'.
   const wildcardIdx = segments.findIndex((segment) => WILDCARD_CHARS.test(segment))
-  const prefixSegments =
-    wildcardIdx >= 0
-      ? segments.slice(0, wildcardIdx)
-      : endsWithSlash
-        ? segments
-        : segments.slice(0, -1)
+  const prefixSegments = wildcardIdx >= 0 ? segments.slice(0, wildcardIdx) : segments.slice(0, -1)
   const baseDir = prefixSegments.length > 0 ? prefixSegments.join('/') + '/' : ''
 
   // The pattern keeps the glob's own shape (interior segments included) so that

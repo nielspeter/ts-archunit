@@ -133,21 +133,9 @@ export function applyFilters(
   return result
 }
 
-/**
- * Stamp any un-stamped violation with a default severity (per-violation wins).
- *
- * Config-level meta-findings are always `error`. They report that the rule checks
- * NOTHING — downgrading one to a warning is the same false green as excluding or
- * baselining it, which are both already refused, and ADR-008 is explicit that an
- * actionable finding must fail rather than warn (the agent consumer does not read
- * warnings). `.asSeverity('warn')` remains honoured for real violations of the same
- * rule; it just cannot switch off the check that the rule is wired up at all.
- */
+/** Stamp any un-stamped violation with a default severity (per-violation wins). */
 function stampSeverity(violations: ArchViolation[], severity: 'error' | 'warn'): ArchViolation[] {
-  return violations.map((v) => ({
-    ...v,
-    severity: v.bypassFilters ? 'error' : (v.severity ?? severity),
-  }))
+  return violations.map((v) => ({ ...v, severity: v.severity ?? severity }))
 }
 
 /**

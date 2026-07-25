@@ -133,6 +133,21 @@ globs staying loud, and cross-wiring assertions in
 `tests/builders/slice-rule-builder.test.ts` (each remedy present on its own path,
 absent on the other) plus an independent check that the anchor remedy is _true_.
 
+## Scope actually shipped
+
+The fix took five review rounds, and rounds 1-4 each introduced a new defect of the
+same family (a red->green slice collapse, or a confidently-worded remedy that was
+false on a reachable input). What shipped is the subset that is independently
+verified: the single-parse glob normalization, meta-finding visibility in the
+default formatter, `.excluding()` honouring `bypassFilters`, and the docs/scaffold
+anchoring sweep.
+
+Withdrawn before release, to return behind an executable-remedy design and an
+opt-out: the single-slice and partially-empty discovery guards, and forcing
+meta-findings to error severity. Each was correct in principle and wrong in
+practice - they fired on legitimate projects with advice written for a different
+input.
+
 ## Lesson
 
 Three lessons, in increasing order of usefulness:

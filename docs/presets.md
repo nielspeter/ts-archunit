@@ -65,7 +65,7 @@ Some layers need to reference types from other layers without taking a runtime d
 ```typescript
 layeredArchitecture(p, {
   layers: { ... },
-  typeImportsAllowed: ['src/services/**'],
+  typeImportsAllowed: ['**/src/services/**'],
   // Services can `import type { User } from '../repositories/user-repo.js'`
   // but not `import { findUser } from '../repositories/user-repo.js'`
 })
@@ -79,8 +79,8 @@ Enforce that certain npm packages are only imported by specific layers. The key 
 layeredArchitecture(p, {
   layers: { ... },
   restrictedPackages: {
-    'src/repositories/**': ['knex', 'prisma'],
-    'src/infra/**': ['@aws-sdk/*'],
+    '**/src/repositories/**': ['knex', 'prisma'],
+    '**/src/infra/**': ['@aws-sdk/*'],
   },
 })
 ```

@@ -99,12 +99,7 @@ export abstract class TerminalBuilder {
       silentIndices: this._silentIndices,
     })
     const sev: 'error' | 'warn' = this._severity ?? 'error'
-    // Config-level meta-findings stay `error` regardless of the rule's severity: they
-    // report that the rule checks NOTHING, and a warning is invisible to the agent
-    // consumer (ADR-008). Exclusions and baselining are already refused for them, so
-    // allowing `.asSeverity('warn')` through would be the one remaining way to make a
-    // rule that enforces nothing look green.
-    return filtered.map((v) => ({ ...v, severity: v.bypassFilters ? 'error' : sev }))
+    return filtered.map((v) => ({ ...v, severity: sev }))
   }
 
   /**

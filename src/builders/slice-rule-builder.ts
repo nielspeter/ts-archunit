@@ -38,7 +38,7 @@ function isAnchored(glob: string): boolean {
 const DISCOVERY_DOCS = 'https://nielspeter.github.io/ts-archunit/slices'
 
 /** Why one `assignedFrom()` glob matched nothing. */
-type GlobFault = 'dot-segment' | 'unanchored' | 'directory-only' | 'not-found'
+type GlobFault = 'dot-segment' | 'unanchored' | 'no-match'
 
 /**
  * Diagnose a single glob. Each fault has a *different* fix, so they are reported
@@ -51,20 +51,27 @@ function diagnoseGlob(glob: string): GlobFault {
   // '**/' in front of it does not help ('**/./src/**' still matches nothing).
   if (/(?:^|\/)\.\//.test(glob)) return 'dot-segment'
   if (!isAnchored(glob)) return 'unanchored'
-  // '**/src/shared' matches the directory entry itself, never the files under it.
-  if (!/[*?\]}]$/.test(glob)) return 'directory-only'
-  return 'not-found'
+  return 'no-match'
 }
 
+/**
+ * Only two faults name a cause, and only because the fix is a transformation that
+ * can be verified: removing `./`, and adding the `**\/` anchor. Everything else
+ * falls into `no-match`, which lists likely causes WITHOUT asserting one.
+ *
+ * That restraint is deliberate. Earlier revisions asserted a specific cause here —
+ * "the directory does not exist", "append `/**`" — and each was false on a
+ * reachable input (a glob targeting a file, a directory whose name ends in `]`,
+ * a path that plainly existed). Under ADR-008 a confidently wrong cause is worse
+ * than an honest list: the agent acts on it.
+ */
 const FAULT_ADVICE: Readonly<Record<GlobFault, string>> = {
   'dot-segment':
     'a "./" segment never occurs in an absolute file path — remove it and anchor instead ("./src/x/**" -> "**/src/x/**")',
   unanchored:
     'these are matched against ABSOLUTE file paths, so a project-relative glob matches nothing — prefix these with "**/"',
-  'directory-only':
-    'these match the directory entry itself rather than the files inside it — append "/**"',
-  'not-found':
-    'these are anchored and well-formed, so the directories they name do not exist in this project (or hold no source files)',
+  'no-match':
+    'these are anchored but matched no file. Common causes: the glob names a directory rather than the files inside it (append "/**"), a path segment is misspelled, or the directory holds no source files',
 }
 
 /**
@@ -181,19 +188,16 @@ export class SliceRuleBuilder extends TerminalBuilder {
     // slice to relate to. This is not a hypothetical — a glob that silently
     // collapsed to one mega-slice turned a real cycle green twice while every other
     // guard stayed quiet, so the count itself has to be a finding (ADR-008).
-    // A named slice that matched nothing while its siblings matched is a config
-    // error the conditions will silently ignore (unknown layer names are skipped),
-    // and it is the likeliest outcome of hand-editing a multi-glob definition.
-    // Reported before the single-slice check because it names the exact glob to fix.
-    const empty = this._slices.filter((slice) => slice.files.length === 0)
-    if (empty.length > 0) {
-      return [this.partiallyEmptyViolation(empty.map((slice) => slice.name))]
-    }
-
-    const populated = this._slices.filter((slice) => slice.files.length > 0)
-    if (populated.length === 1) {
-      return [this.singleSliceViolation(populated[0]!.name)]
-    }
+    // NOTE: two further guards were prototyped here — failing when discovery yields
+    // exactly one non-empty slice (every inter-slice condition is then
+    // unfalsifiable), and when one slice is empty among populated siblings (the
+    // conditions silently skip names they cannot resolve). Both catch real
+    // false-greens, and both were withdrawn before release: they fire on
+    // legitimate projects (a one-feature repo, a layer not created yet, and the
+    // `strict-boundaries` scaffold itself) with no opt-out, and their remedies were
+    // written for one input and emitted for all of them. They return once the
+    // remedy is executable data and an opt-out exists, mirroring
+    // `correspondence().allowEmpty(name)`.
 
     if (this._conditions.length === 0) {
       const ruleId = this._metadata?.id ?? 'unnamed'
@@ -227,32 +231,6 @@ export class SliceRuleBuilder extends TerminalBuilder {
   }
 
   /** Config-level meta-finding for empty slice discovery (plan 0067). */
-  /** One populated slice — every inter-slice condition is unfalsifiable. */
-  private singleSliceViolation(sliceName: string): ArchViolation {
-    return this.metaViolation(
-      `Discovery produced exactly one non-empty slice (${JSON.stringify(sliceName)}), so this ` +
-        'rule cannot fail: cycle, layer-order and notDependOn checks all compare slices to ' +
-        'each other, and dependencies inside a single slice are not compared. Broaden the ' +
-        'glob so each unit becomes its own slice (e.g. "src/features/*" rather than ' +
-        '"src/features"), or drop the rule.',
-    )
-  }
-
-  /** Some slices matched, others did not — the conditions ignore the empty ones. */
-  private partiallyEmptyViolation(names: readonly string[]): ArchViolation {
-    const listed = names
-      .slice(0, 5)
-      .map((name) => JSON.stringify(name))
-      .join(', ')
-    const rest = names.length - Math.min(names.length, 5)
-    return this.metaViolation(
-      `These slices matched no files: ${listed}${rest > 0 ? `, and ${String(rest)} more` : ''}. ` +
-        'Their globs are wrong or their directories are empty, and the conditions silently ' +
-        'skip slices that do not exist — so the parts of the architecture they name are ' +
-        'currently unchecked. Fix the globs, or remove the unused slice names.',
-    )
-  }
-
   private emptyDiscoveryViolation(): ArchViolation {
     return this.metaViolation(this.emptyDiscoveryMessage())
   }
@@ -325,6 +303,25 @@ export class SliceRuleBuilder extends TerminalBuilder {
         )
       }
 
+      // Check the claim before making it. The prefix is located with a literal
+      // `indexOf` while the pattern goes through picomatch, and the two disagree
+      // for prefixes containing `(`, `{` or `!` — so "the prefix was not found"
+      // was a verifiable falsehood on exactly the route-group directory names this
+      // parser is careful to treat as literal elsewhere.
+      const prefixExists = this.project
+        .getSourceFiles()
+        .some((file) => file.getFilePath().includes(prefix))
+
+      if (prefixExists) {
+        return (
+          `matching(${JSON.stringify(glob)}) resolved no slices even though the prefix ` +
+          `${JSON.stringify(prefix)} does occur in this project's files, so the rest of the ` +
+          'glob matched nothing. If a path segment contains "(", ")", "{", "}" or "!", those ' +
+          'are pattern syntax rather than literal characters here — match that level with ' +
+          `"*" instead. ${tail}`
+        )
+      }
+
       return (
         `matching(${JSON.stringify(glob)}) resolved no slices: the prefix ` +
         `${JSON.stringify(prefix)} was not found in any of this project's ` +
@@ -346,12 +343,7 @@ export class SliceRuleBuilder extends TerminalBuilder {
     // grouped by its own cause. Reporting one group and stopping — or applying one
     // group's advice to all of them — is what made each earlier version of this
     // message false for somebody.
-    const FAULT_ORDER: readonly GlobFault[] = [
-      'dot-segment',
-      'unanchored',
-      'directory-only',
-      'not-found',
-    ]
+    const FAULT_ORDER: readonly GlobFault[] = ['dot-segment', 'unanchored', 'no-match']
     const groups = FAULT_ORDER.map((fault) => ({
       fault,
       list: entries.filter((entry) => diagnoseGlob(entry.glob) === fault),

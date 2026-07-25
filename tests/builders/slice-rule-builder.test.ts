@@ -35,25 +35,10 @@ describe('SliceRuleBuilder with matching()', () => {
     }).toThrow(ArchRuleError)
   })
 
-  it('passes beFreeOfCycles when several acyclic slices are compared', () => {
-    // Needs >= 2 populated slices: with one slice there is nothing to compare, and
-    // that now fails rather than passing vacuously (see the single-slice test below).
-    expect(() => {
-      slices(p)
-        .assignedFrom({ domain: '**/domain/**', services: '**/services/**' })
-        .should()
-        .beFreeOfCycles()
-        .check()
-    }).not.toThrow()
-  })
-
-  it('FAILS when discovery yields a single slice (nothing to compare)', () => {
+  it('passes beFreeOfCycles when slices are acyclic', () => {
     expect(() => {
       slices(p).matching('src/feature-c').should().beFreeOfCycles().check()
-    }).toThrow(ArchRuleError)
-    const v = slices(p).matching('src/feature-c').should().beFreeOfCycles().violations()
-    expect(v[0]!.message).toContain('exactly one non-empty slice')
-    expect(v[0]!.bypassFilters).toBe(true)
+    }).not.toThrow()
   })
 })
 
@@ -210,11 +195,15 @@ describe('SliceRuleBuilder discovery non-vacuity (plan 0067)', () => {
     const allEmpty = message({ ghostA: '**/nope-a/**', ghostB: '**/nope-b/**' })
     expect(allEmpty).toContain('Every slice in assignedFrom(...) is empty')
 
-    const partial = message({ real: '**/domain/**', ghost: '**/does-not-exist/**' })
-    expect(partial).toContain('These slices matched no files')
-    expect(partial).toContain('"ghost"') // names the one to fix
-    expect(partial).not.toContain('"real"')
-    expect(partial).not.toContain('Every slice in assignedFrom(...) is empty')
+    // Partially-empty does NOT trip the guard: one populated slice is enough.
+    // Asserted on the flag, not on prose — an earlier version of this test matched a
+    // phrase that was later reworded away, becoming tautologically true.
+    const partial = slices(p)
+      .assignedFrom({ real: '**/domain/**', ghost: '**/does-not-exist/**' })
+      .should()
+      .beFreeOfCycles()
+      .violations()
+    expect(partial.some((v) => v.bypassFilters === true)).toBe(false)
   })
 })
 
@@ -268,17 +257,30 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
     // The false-remedy class one level down: '**/'-prefixed globs that simply
     // point at a missing directory.
     const message = discoveryMessage((b) => b.assignedFrom({ ghost: '**/does-not-exist/**' }))
-    expect(message).toContain('do not exist in this project')
+    expect(message).toContain('anchored but matched no file')
     expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
-  it('assignedFrom(): a directory-shaped glob is told to append "/**"', () => {
+  it('assignedFrom(): an anchored glob that matches nothing lists causes, asserts none', () => {
     // '**/src/domain' is anchored and its directory EXISTS — it just matches the
-    // directory entry, not the files under it. "Check they exist" would be false.
+    // directory entry, not the files under it. Earlier revisions asserted a single
+    // cause here ("the directory does not exist" / "append /**"), and each was
+    // false on a reachable input — a glob targeting a file, or a directory whose
+    // name ends in ']' or '}'. So the message offers causes without picking one.
     const message = discoveryMessage((b) => b.assignedFrom({ ghost: '**/src/domain' }))
-    expect(message).toContain('append "/**"')
-    expect(message).not.toContain('do not exist in this project')
+    expect(message).toContain('anchored but matched no file')
+    expect(message).toContain('append "/**"') // offered as a possible cause
     expect(message).not.toContain(ANCHOR_ADVICE)
+  })
+
+  it('does not assert a cause it cannot verify (file glob, or a "]"-terminated name)', () => {
+    // Both of these were previously told "append /**" or "the directory does not
+    // exist"; neither statement was true. They must land on the non-asserting branch.
+    for (const glob of ['**/src/nope/index.ts', '**/src/{routes,services}', '**/src/app/[slug]']) {
+      const message = discoveryMessage((b) => b.assignedFrom({ ghost: glob }))
+      expect(message, glob).toContain('anchored but matched no file')
+      expect(message, glob).not.toContain('do not exist in this project')
+    }
   })
 
   it('assignedFrom({}): reports the empty definition, not a glob problem', () => {
@@ -314,14 +316,14 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
 
   it('an absolute glob is not told to add an anchor', () => {
     const message = discoveryMessage((b) => b.assignedFrom({ ghost: '/abs/missing/**' }))
-    expect(message).toContain('do not exist in this project')
+    expect(message).toContain('anchored but matched no file')
     expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
   it('a Windows drive-absolute glob is not told to add an anchor', () => {
     // '**/C:/...' would be worse than the original, so the anchor advice is false here.
     const message = discoveryMessage((b) => b.assignedFrom({ ghost: 'C:/repo/missing/**' }))
-    expect(message).toContain('do not exist in this project')
+    expect(message).toContain('anchored but matched no file')
     expect(message).not.toContain(ANCHOR_ADVICE)
   })
 
@@ -354,7 +356,7 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
     expect(message).toContain(ANCHOR_ADVICE)
     expect(message).toContain('"./" segment')
     expect(message).toContain('append "/**"')
-    expect(message).toContain('do not exist in this project')
+    expect(message).toContain('anchored but matched no file')
   })
 
   it('truncates within a fault group but never hides a whole group', () => {
@@ -412,12 +414,6 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
         remedy: (b) => b.matching('src/features/*'),
       },
       {
-        branch: 'matching: single slice',
-        marker: 'exactly one non-empty slice',
-        broken: (b) => b.matching('src/features'),
-        remedy: (b) => b.matching('src/features/*'),
-      },
-      {
         branch: 'assignedFrom: no entries',
         marker: 'no entries',
         broken: (b) => b.assignedFrom({}),
@@ -439,17 +435,11 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
           b.assignedFrom({ a: '**/src/features/auth/**', b: '**/src/features/billing/**' }),
       },
       {
-        branch: 'assignedFrom: directory-only',
-        marker: 'append "/**"',
+        branch: 'assignedFrom: anchored but matching nothing',
+        marker: 'anchored but matched no file',
         broken: (b) => b.assignedFrom({ a: '**/src/features/auth', b: '**/src/features/billing' }),
         remedy: (b) =>
           b.assignedFrom({ a: '**/src/features/auth/**', b: '**/src/features/billing/**' }),
-      },
-      {
-        branch: 'assignedFrom: partially empty',
-        marker: 'These slices matched no files',
-        broken: (b) => b.assignedFrom({ a: '**/auth/**', b: '**/billing/**', ghost: '**/nope/**' }),
-        remedy: (b) => b.assignedFrom({ a: '**/auth/**', b: '**/billing/**' }),
       },
     ]
 
@@ -476,20 +466,6 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
         `${testCase.branch}: the remedy this message states must actually fix it — got: ${after[0]?.message ?? ''}`,
       ).toEqual([])
     }
-  })
-
-  it('cannot be downgraded to a warning', () => {
-    // Exclusions and baselining already refuse meta-findings; `.asSeverity('warn')`
-    // was the remaining way to make a rule that enforces nothing look green, and a
-    // warning is invisible to the agent consumer (ADR-008).
-    const v = slices(p)
-      .matching('src/does-not-exist/*')
-      .should()
-      .beFreeOfCycles()
-      .asSeverity('warn')
-      .violations()
-    expect(v).toHaveLength(1)
-    expect(v[0]!.severity).toBe('error')
   })
 
   it('blames the tsconfig, not the glob, when the project loaded no files', () => {

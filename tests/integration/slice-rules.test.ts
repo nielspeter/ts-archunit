@@ -28,11 +28,11 @@ describe('slices() — full fluent chain', () => {
       }).toThrow(ArchRuleError)
     })
 
-    it('a single standalone slice FAILS — the rule could not have failed', () => {
-      // feature-c resolves to one slice. Cycle-freedom is then trivially true
-      // (intra-slice edges are not compared), so a pass would certify nothing.
-      const v = slices(p).matching('src/feature-c').should().beFreeOfCycles().violations()
-      expect(v[0]?.message).toContain('exactly one non-empty slice')
+    it('standalone slice is cycle-free', () => {
+      // feature-c has no imports — a single acyclic slice
+      expect(() => {
+        slices(p).matching('src/feature-c').should().beFreeOfCycles().check()
+      }).not.toThrow()
     })
   })
 
