@@ -157,13 +157,13 @@ resolved
 
 ## Terminal Methods
 
-| Method             | Description                                                   |
-| ------------------ | ------------------------------------------------------------- |
-| `.because(reason)` | Attach a human-readable rationale to the rule.                |
-| `.rule(metadata)`  | Attach rich metadata (`id`, `because`, `suggestion`, `docs`). |
-| `.check(options?)` | Throw `ArchRuleError` if any violations are found.            |
-| `.warn(options?)`  | Log violations to stderr without throwing.                    |
-| `.severity(level)` | `'error'` calls `.check()`, `'warn'` calls `.warn()`.         |
+| Method             | Description                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.because(reason)` | Attach a human-readable rationale to the rule.                                                                                                    |
+| `.rule(metadata)`  | Attach rich metadata (`id`, `because`, `suggestion`, `docs`).                                                                                     |
+| `.check(options?)` | Throw `ArchRuleError` if any violations are found.                                                                                                |
+| `.warn(options?)`  | Log violations to stderr without throwing, with one exception ([configuration findings](/violation-reporting#the-one-thing-warn-cannot-silence)). |
+| `.severity(level)` | `'error'` calls `.check()`, `'warn'` calls `.warn()`.                                                                                             |
 
 Check options support `baseline`, `diff`, and `format` -- the same as all other rule builders.
 

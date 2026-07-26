@@ -464,7 +464,8 @@ function printClosing(
   if (hasSource(cwd, sourceRoot)) {
     process.stdout.write(
       `\nThis codebase already has source under ${sourceRoot}/. Errors fail the build; ` +
-        `warnings are advisory and never fail CI.\n` +
+        `warnings are advisory and never fail CI, except a finding that a rule\n` +
+        `enforces nothing.\n` +
         `To accept current violations as tracked legacy debt before gating CI, run ` +
         `\`${baselineCmd}\` and commit the result, then: \`${runCmd}\`.\n`,
     )

@@ -53,10 +53,10 @@ Each detection run can be scoped, tuned, and filtered using these chainable meth
 
 Terminal methods end the builder chain and execute the smell detection. Choose `.warn()` for advisory feedback during adoption or `.check()` when you want CI to block on smell violations.
 
-| Method     | Description                                        |
-| ---------- | -------------------------------------------------- |
-| `.warn()`  | Log violations to stderr without throwing.         |
-| `.check()` | Throw `ArchRuleError` if any violations are found. |
+| Method     | Description                                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.warn()`  | Log violations to stderr without throwing, with one exception ([configuration findings](/violation-reporting#the-one-thing-warn-cannot-silence)). |
+| `.check()` | Throw `ArchRuleError` if any violations are found.                                                                                                |
 
 Both accept an optional `{ format: 'terminal' | 'json' | 'github' }` parameter.
 

@@ -148,7 +148,7 @@ describe('Custom Conditions', () => {
       .should()
       .satisfy(haveJsDocOnPublicMethods)
       .because('public API must be documented')
-      .warn() // advisory, not blocking
+      .warn() // advisory, not blocking — except for configuration findings
   })
 
   it('domain entities must not have public fields', () => {
