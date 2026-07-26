@@ -55,7 +55,11 @@ const project = new Project({ tsConfigFilePath: tsconfig })
 const projectFiles = new Set(project.getSourceFiles().map((f) => f.getFilePath()))
 
 // A directory counts as "in the project" if it is an ancestor of any project
-// file — the same all-ancestors universe PathUniverse materializes.
+// file. This is the ancestor closure, and deliberately NOT `PathUniverse`'s
+// parent-dir view: a directory whose only content is subdirectories of project
+// files IS in the project, so calling it "absent" would be wrong for THIS
+// question. `PathUniverse` answers a different one — what `resideInFolder` can
+// match — and uses immediate parents. See the plan's PathUniverse section.
 const projectDirs = new Set()
 for (const file of projectFiles) {
   const parts = file.split('/')

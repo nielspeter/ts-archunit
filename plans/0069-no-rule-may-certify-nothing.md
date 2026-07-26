@@ -1,27 +1,49 @@
 # Plan 0069 — No rule may certify nothing
 
-**Status:** DRAFT 6 — after `/review-proposal` round 5. **R1 is approved outright. R-any, R2 and R3 are approved conditional on corrections only** — both reviewers state that **no open design decisions remain**. Every round-5 item is settled below.
+**Status:** DRAFT 7 — after `/review-proposal` round 6. **R-any and R1 are approved outright; product approves all six units; architect approves R2a/R2b/R3a/R3b conditional on corrections only.** No open design decisions remain in either review. Every round-6 item is settled below.
 **Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
 **Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md); closes [bug 0011](../bugs/0011-dogfood-rules-select-nothing.md).
 **Prerequisites:** [bug 0014](../bugs/0014-bare-package-import-globs-match-nothing.md) ships first, alone. The single-root refactor (`spike/0014-rule-census`, +456/−165) is **unmerged** and lands as its own commit with its own test pass.
 
-## Corrections carried into draft 6
+## Corrections carried into draft 7
 
-Round 5 found three defects **inside draft 5's own fixes**, which is the pattern this plan keeps predicting about itself. Every row was re-derived before being written down.
+Round 6 again found the largest defect **inside the previous draft's own fix**, for the third draft running — all three in the same six lines of evaluator. That is what motivated `spikes/0069-tree-model-check.mjs`; the algorithm is small enough to check completely, so arguing about it was the mistake.
 
-| Claimed in draft 5                                                     | Derived 2026-07-26                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "`not()` flips `polarity` across its subtree" is sufficient            | Only for an unnested `not()`. With a `not` already inside the subtree it produces a **false red** one way and a **miss** the other. `not()` must invert `op` as well — full De Morgan push-down                                    |
-| An `any` node may drop children that declare no globs                  | That makes `or()` fail **closed**: `or(havePathMatching(dead), exportSymbolNamed('Foo'))` reds a working rule. Most predicates declare no globs, so this would be commoner than the bug the tree replaced                          |
-| R-any's `havePathMatching` move "makes the scope glob the enforcement" | It does not. The selector is `resideInFolder('**/src/predicates/module**')`, which matches **0 directories and 1 file** — before the move and after it. The census still prints `DEAD …:567` on the commit that claims to close it |
-| `kind: 'file' \| 'folder'`                                             | Names the intent, not the matched string. `SmellBuilder.inFolder()` matches the **full path** (`src/smells/duplicate-bodies.ts:52`). Renamed to `file-path` / `parent-dir` and derived from the matcher                            |
-| Directories are all ancestors; "only 3 hold solely subdirectories"     | **41** ancestors are no file's immediate parent (**36** in-repo), and `resideInFolder` tests the immediate parent only (`src/predicates/identity.ts:96`). All-ancestors is a **false green**, not a fail-open. The 3 was wrong     |
-| `onDisk` derived from `path.dirname` of each disk file                 | Direct-parent containment. **36** directories hold TypeScript transitively but not directly — including `docs/`, which would print "contains no TypeScript" above `docs/.vitepress/config.ts`. A false fact                        |
-| "Four documented promises change with `.warn()`"                       | **18 by grep, across 12 files — and the grep undercounts by at least 4.** No total is asserted; the sweep is specified instead. `.severity('warn')` / `.asSeverity('warn')` are documented aliases the sentence never mentioned    |
-| "8 synthetic doubles across 6 files"                                   | 8 doubles, **7 files**. The 8 and the 2/3/2/1 split are exact                                                                                                                                                                      |
-| gcg's 44 `tests/` + 3 Rust map onto the two categories                 | Inferred, not measured — the script was never run against a gcg checkout with the two-category split. Claim withdrawn; this repo carries it                                                                                        |
-| `loadSchemaFromGlob` needs its glob threaded, "same as `resolvers()`"  | It **throws** on zero matches (`src/graphql/schema-loader.ts:109-112`). Threading buys nothing. Only `resolvers()` needs the R2 widening                                                                                           |
-| "149 directories, 15ms"                                                | 149 verified; 4ms warm. A wall-clock figure is not re-derivable under this plan's own rule. Dropped                                                                                                                                |
+| Claimed in draft 6                                                   | Derived 2026-07-26                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "`and()` may drop globless children; `some(dead)` is monotone"       | Monotone **under a fixed `op`** — and draft 6 made `op` mutable. Model-checked: **2 false reds** over 4088 expressions. Replaced by a retained opaque leaf: **0 false reds, 0 misses**                                                          |
+| "exactly **one** selector matches a directory"                       | Three do. The omission that matters is `strictBoundaries({ folders })` (`src/presets/boundaries.ts:117`), `parent-dir` in **`discovery`** position, where unsatisfiable ⇒ fault                                                                 |
+| "a preset's option list → `any`"                                     | Both shipped presets **fan out one rule per glob** (`layered.ts:135`, `boundaries.ts:39`). `any` would say "no fault unless every layer is dead" — a false green inside a preset                                                                |
+| `GlobSite` carries `position` and `origin`                           | Neither is knowable by the code that mints a site, and the type is exported for users to write. Split into `DeclaredGlob` (author-facing) and `GlobSite` (builder-stamped)                                                                      |
+| R3a ships "its **13** doc edits"                                     | The withdrawn number, surviving in the one section anyone executes from. 13 is the dogfood-rule count from the Problem table. **Both reviewers caught this independently**                                                                      |
+| The sweep is "the grep plus a read of every `### .warn()` heading"   | There are exactly **3** such headings, covering **1** of the 4 known misses. A procedure needing a hand-list to be complete is the defect this plan is about. Replaced with a bounded superset: **136** `/warn/i` lines in docs+examples+README |
+| R2a is non-breaking, and threads a glob into `resolvers()`           | `ResolverRuleBuilder` is exported from the public `./graphql` subpath (`src/graphql/index.ts:93`); its constructor is public API. The parameter must be optional                                                                                |
+| the set-identity test reflects over "the exported builder list"      | `src/index.ts` does **not** export `SchemaRuleBuilder`/`ResolverRuleBuilder` — including the one builder R2a modifies. Must reflect over both entry points. 6 `RuleBuilder` + 7 `TerminalBuilder` subclasses, derived                           |
+| the `#monorepo-setup` "anchor fix", scheduled in R2b                 | The heading exists, at `docs/modules.md:201`; `standard-rules.md:270` targets `/getting-started`. It is a **retarget**, and R3 makes it load-bearing, so it moves to R3a                                                                        |
+| "**36** in-repo" ancestors that are no file's parent                 | 35 strictly below the repo root; 36 counts the root itself. It also collided with an unrelated 36 (transitive-not-direct), which is exact                                                                                                       |
+| "an eleventh builder"                                                | Underived ordinal, which this plan bans. There are 13 builder classes: 6 + 7                                                                                                                                                                    |
+| proposal 019 ships in R3b, gated on R2a's pre-flight                 | `doctor` reports **glob** findings; 019 fires on condition-less rules. Applying this plan's own question: the gate would pass if 019's blast radius were completely wrong. `doctor` must report condition-less rules too                        |
+| `docs/standard-rules.md:460` "is about metric limits, not `.warn()`" | Correct as written — round 6 pushed back claiming it says "use `.warn()` for soft limits". It does not; it says "start with generous limits". The dismissal stands                                                                              |
+
+`docs/standard-rules.md:460` has now been miscited in two consecutive review rounds — first as a `.warn()` promise, then as saying "use `.warn()` for soft limits". It says "Start with generous limits and tighten over time." Reviewer output is evidence, not authority; every row above was re-derived from the source before being written down, and two rows exist only because a reviewer's claim did **not** survive that check.
+
+### Corrections carried into draft 6
+
+Round 5 found three defects **inside draft 5's own fixes**. Every row was re-derived before being written down.
+
+| Claimed in draft 5                                                     | Derived 2026-07-26                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "`not()` flips `polarity` across its subtree" is sufficient            | Only for an unnested `not()`. With a `not` already inside the subtree it produces a **false red** one way and a **miss** the other. `not()` must invert `op` as well — full De Morgan push-down                                                     |
+| An `any` node may drop children that declare no globs                  | That makes `or()` fail **closed**: `or(havePathMatching(dead), exportSymbolNamed('Foo'))` reds a working rule. Most predicates declare no globs, so this would be commoner than the bug the tree replaced                                           |
+| R-any's `havePathMatching` move "makes the scope glob the enforcement" | It does not. The selector is `resideInFolder('**/src/predicates/module**')`, which matches **0 directories and 1 file** — before the move and after it. The census still prints `DEAD …:567` on the commit that claims to close it                  |
+| `kind: 'file' \| 'folder'`                                             | Names the intent, not the matched string. `SmellBuilder.inFolder()` matches the **full path** (`src/smells/duplicate-bodies.ts:52`). Renamed to `file-path` / `parent-dir` and derived from the matcher                                             |
+| Directories are all ancestors; "only 3 hold solely subdirectories"     | **41** ancestors are no file's immediate parent (**35** strictly below the repo root), and `resideInFolder` tests the immediate parent only (`src/predicates/identity.ts:96`). All-ancestors is a **false green**, not a fail-open. The 3 was wrong |
+| `onDisk` derived from `path.dirname` of each disk file                 | Direct-parent containment. **36** directories hold TypeScript transitively but not directly — including `docs/`, which would print "contains no TypeScript" above `docs/.vitepress/config.ts`. A false fact                                         |
+| "Four documented promises change with `.warn()`"                       | **18 by grep, across 12 files — and the grep undercounts by at least 4.** No total is asserted; the sweep is specified instead. `.severity('warn')` / `.asSeverity('warn')` are documented aliases the sentence never mentioned                     |
+| "8 synthetic doubles across 6 files"                                   | 8 doubles, **7 files**. The 8 and the 2/3/2/1 split are exact                                                                                                                                                                                       |
+| gcg's 44 `tests/` + 3 Rust map onto the two categories                 | Inferred, not measured — the script was never run against a gcg checkout with the two-category split. Claim withdrawn; this repo carries it                                                                                                         |
+| `loadSchemaFromGlob` needs its glob threaded, "same as `resolvers()`"  | It **throws** on zero matches (`src/graphql/schema-loader.ts:109-112`). Threading buys nothing. Only `resolvers()` needs the R2 widening                                                                                                            |
+| "149 directories, 15ms"                                                | 149 verified; 4ms warm. A wall-clock figure is not re-derivable under this plan's own rule. Dropped                                                                                                                                                 |
 
 Standing rule for this plan: **no count appears in it that was not derived on the stated date, and none that a reader cannot re-derive.** Both scripts are committed under `spikes/`; both were themselves wrong this round and are fixed.
 
@@ -55,61 +77,87 @@ Derivation status of each row, because two of the three are not yet reproducible
 
 ### The data model is a tree, and `not()` pushes through it
 
-Draft 3 flattened everything, which destroyed the grouping. Draft 4 specified `or()` as concatenation, which reds `or(dead, live)` — a working rule. Draft 5's tree fixed that and introduced two of its own, both in the same three lines. The settled model:
+Draft 3 flattened everything, which destroyed the grouping. Draft 4 specified `or()` as concatenation, which reds `or(dead, live)`. Draft 5's tree fixed that and broke `not()`. Draft 6 fixed `not()` and broke `and()`. **Three consecutive drafts produced a false verdict from the same six lines**, each on a shape the author had not thought to try — so draft 7 stops arguing about it and checks it exhaustively. `spikes/0069-tree-model-check.mjs` enumerates every expression with at most three combinator nodes over `{dead, live, opaque}` and compares the evaluator against plain set semantics:
+
+```
+draft 6  or:total-prop, and:drops   expressions 4088   FALSE REDS 2   fail-open misses 2
+      false red: not(and(opaque, not(DEAD)))
+draft 7  opaque leaf retained       expressions 4088   FALSE REDS 0   fail-open misses 0
+```
+
+A fault is sound only if the expression selects ∅ for **every** assignment to the leaves the evaluator cannot see, since it knows only that a `dead` site matches nothing. Draft 7 is exact over the whole space — no false reds, and no missed emptiness either.
+
+The settled model. Two types, because a predicate cannot know what a builder knows:
 
 ```ts
-interface GlobSite {
+/** What a predicate declares. This is the type a rule author writes. */
+interface DeclaredGlob {
   readonly glob: string
   readonly kind: 'file-path' | 'parent-dir' | 'import-target' | 'specifier' | 'literal'
+  readonly polarity?: 'positive' | 'negative' // default 'positive'
+  readonly base?: 'absolute' | 'tsconfig-relative' | 'normalized' // default 'absolute'
+}
+/** What the builder stamps onto it at record time. */
+type GlobSite = DeclaredGlob & {
   readonly position: 'selector' | 'discovery' | 'condition' | 'exclusion'
-  readonly polarity: 'positive' | 'negative'
-  readonly base: 'absolute' | 'tsconfig-relative' | 'normalized'
-  /** Where the glob was written, for the message: `resideInFolder("…") in rule "adr005/no-any"`. */
+  /** For the message: `resideInFolder("…") in rule "adr005/no-any"`. */
   readonly origin: string
+}
+/** A predicate that declares no globs. Never dead, never dropped. */
+interface OpaqueLeaf {
+  readonly opaque: true
 }
 interface GlobNode {
   readonly op: 'any' | 'all'
-  readonly children: readonly (GlobNode | GlobSite)[]
+  readonly children: readonly (GlobNode | GlobSite | OpaqueLeaf)[]
 }
 ```
 
-Both are **exported** in R2. A user-written predicate that cannot declare globs would otherwise permanently disable the check for any `or()` it appears in, by the propagation rule below.
+Draft 6 had one type carrying `position` and `origin`, which the code that mints a site — inside `resideInFolder()`, several frames below any builder — cannot know, and which the builder then overwrites. Worse, `GlobSite` is **exported** so users can write predicates, and a user who copy-pastes `position: 'exclusion'` silently and permanently exempts their predicate, since exclusion is never a fault. `DeclaredGlob` is the author-facing type and cannot express that.
 
 ```
-dead(site) = site.polarity === 'positive'
-          && (site.kind === 'file-path' || site.kind === 'parent-dir')
-          && no path in that kind's universe matches site.glob
-
-dead(node) = node.op === 'all' ? node.children.some(dead)
-                               : node.children.every(dead)
+dead(site)   = site.polarity === 'positive'
+            && (site.kind === 'file-path' || site.kind === 'parent-dir')
+            && no path in that kind's universe matches site.glob
+dead(opaque) = false
+dead(node)   = node.op === 'all' ? node.children.some(dead)
+                                 : node.children.every(dead)
 ```
 
-`and(a, b)` → `all`; `or(a, b)` → `any`; a variadic predicate (`importFrom(...globs)` is `matchers.some`, `src/predicates/module.ts:45`) → `any`; a preset's option list → `any`; repeated `.inFolder()` calls OR together (`folderMatchers.some`) → `any`. `or(and(deadA, liveB), deadC)` evaluates exactly, where a flat merge would miss it.
+`and(a, b)` → `all`; `or(a, b)` → `any`; a variadic predicate (`importFrom(...globs)` is `matchers.some`, `src/predicates/module.ts:45`) → `any`; repeated `.inFolder()` calls OR together (`folderMatchers.some`) → `any`.
 
-**`not()` inverts `op` as well as `polarity`** — standard negation-normal-form push-down, not a polarity flip. Draft 5 flipped polarity only, which is right for `not()` over plain leaves and wrong as soon as the subtree already contains a `not()`. Both directions were reachable through public exports, since `and()` returns a `Predicate<T>` and `not()` takes one:
+**`not()` inverts `op` as well as `polarity`** — a full negation-normal-form push-down. Draft 5 flipped polarity only, which is right for `not()` over plain leaves and wrong as soon as the subtree already contains a `not()`. Both directions are reachable through public exports, since `and()` returns a `Predicate<T>` and `not()` takes one:
 
 | Expression                  | Truth                                 | Polarity flip alone | With `op` inverted |
 | --------------------------- | ------------------------------------- | ------------------- | ------------------ |
 | `not(and(live, not(dead)))` | selects the complement of `live` — no | **false red**       | no fault ✓         |
 | `not(or(live, not(dead)))`  | selects ∅ — **genuinely dead**        | **missed**          | fault ✓            |
 
-Every row already in the polarity table survives: `not(not(dead))` still faults, `not(and(a, b))` still does not.
+**A predicate declaring no globs contributes an opaque leaf, which is never dead and is never dropped.** Draft 6 said `or()` propagates only when every input declares globs while `and()` may drop the ones that do not — reasoning that dropping is safe under `all` because `some(dead)` is monotone. Monotone _under a fixed `op`_; the very same draft made `op` mutable. `not(and(not(havePathMatching(dead)), exportSymbolNamed('Foo')))` drops the opaque child, inverts to `any[positive dead]`, and reds a rule selecting every module that does not export `Foo`.
 
-**A negative site is never dead.** That single clause is what makes the flip correct without a special case, and it holds for all four op/polarity combinations once `op` inverts too.
+Retaining opaque leaves costs nothing — `and(dead, opaque)` is still `some(dead)` and still faults — subsumes the `or()` rule so there is one rule instead of two asymmetric ones, and makes an **empty node unreachable**, which matters because `[].every(dead)` is `true` and would otherwise fault a rule containing no globs at all. Invariant, stated anyway: **an empty node is never dead, and none is ever emitted.**
 
-**`or()` propagates globs only when every input declares them; `and()` may drop the ones that do not.** Under `all`, `some(dead)` is monotone, so dropping an opaque child is safe. Under `any`, `every(dead)` is not: `or(havePathMatching('**/nope/**'), exportSymbolNamed('Foo'))` would drop the second child, leave one dead child, and red a rule that selects every module exporting `Foo`. Since `globs` is optional and most predicates carry none, that failure would have been commoner than the one the tree was introduced to fix.
+**A negative site is never dead.** With `op` inverting, that one clause is what makes `not()` correct in all four op/polarity combinations.
+
+**Where a non-flat tree can actually come from.** `that(): this` takes no argument (`src/core/rule-builder.ts:43`) and `.and()` only ANDs, so in selector position a tree deeper than one level arises **only** through `.that().satisfy(combinator)`. That bounds the test surface. It also means the three `@example` blocks at `src/core/combinators.ts:12,45,74` — `functions(p).that(not(areAsync()))` — **do not compile**. Three real doc bugs inside `src/`, invisible to the markdown scanner; they go in the R2b sweep.
 
 ### `kind` names the matched string; `position` is stored, not inferred
 
-`kind` is not what the API is called. Derived across every glob-taking selector in `src/`, exactly **one** matches a directory:
+`kind` is not what the API is called. Derived by grepping **every directory derivation** in `src/` — `lastIndexOf('/')`, `path.dirname`, `replace(/\/[^/]+$/, '')` — rather than every selector, because draft 6 used the narrower reading and missed one:
 
-| Selector                                                                  | Matched against      | `kind`          |
-| ------------------------------------------------------------------------- | -------------------- | --------------- |
-| `resideInFolder` (`src/predicates/identity.ts:96`)                        | immediate parent dir | `parent-dir`    |
-| `resideInFile`, `havePathMatching`, `assignedFrom`, `slices().matching()` | full absolute path   | `file-path`     |
-| `SmellBuilder.inFolder()` (`src/smells/duplicate-bodies.ts:52`)           | full absolute path   | `file-path`     |
-| `crossLayer().layer()`                                                    | full absolute path   | `file-path`     |
-| `importFrom` and family                                                   | resolved module path | `import-target` |
+| Site                                                                                      | Matched against      | `kind`          | position    |
+| ----------------------------------------------------------------------------------------- | -------------------- | --------------- | ----------- |
+| `resideInFolder` (`src/predicates/identity.ts:96`)                                        | immediate parent dir | `parent-dir`    | `selector`  |
+| `resideInFolder` as a Condition (`conditions/structural.ts:43,48`, `function.ts:205,210`) | immediate parent dir | `parent-dir`    | `condition` |
+| **`strictBoundaries({ folders })` (`src/presets/boundaries.ts:117`)**                     | immediate parent dir | `parent-dir`    | `discovery` |
+| `resideInFile`, `havePathMatching`, `assignedFrom`, `slices().matching()`                 | full absolute path   | `file-path`     | varies      |
+| `SmellBuilder.inFolder()` (`src/smells/duplicate-bodies.ts:52`)                           | full absolute path   | `file-path`     | `discovery` |
+| `crossLayer().layer()`                                                                    | full absolute path   | `file-path`     | `discovery` |
+| `importFrom` and family                                                                   | resolved module path | `import-target` | varies      |
+
+The `strictBoundaries` row is the one that matters: it is `parent-dir` in **`discovery`** position, where the polarity table says unsatisfiable ⇒ **fault**. Under draft 6's stated rule ("everything but `resideInFolder` is `file-path`") an implementer types it `file-path`, and `folders: '**/src/features/*'` then checks satisfiable against matching _file paths_ while matching zero directories — the R-any bug, reproduced inside a preset.
+
+**A preset's fan-out list is not an `any` node.** Draft 6 said "a preset's option list → `any`", which is right for one predicate taking many globs and wrong for a list that becomes one rule per entry — and both shipped presets are the latter: `src/presets/layered.ts:135` iterates `options.layers` and `src/presets/boundaries.ts:39` iterates `sharedGlobs`, each producing its own builder. One dead layer glob is one vacuous rule, and `any` would say "no fault unless every layer is dead" — a false green inside a preset. Each generated builder declares its own root site; the preset declares no combined node. Only `strictBoundaries({ folders })` is a genuine preset-level site.
 
 `position` lives **on `GlobSite`**, set at record time. Draft 5 described its derivation and then left it out of the model, which cannot work: `discovery` and `exclusion` sites have no predicate to hang it on. It has two structural sources, neither a hand-written label:
 
@@ -157,7 +205,7 @@ Free function, `WeakMap<ArchProject, …>`, plain strings — not a method on `A
 
 **The disk set is a memoized lazy view in the same entry, computed on first fault only.** Draft 4 specified it eagerly and called it "never a trigger"; those contradict, and the eager form charges every `check()` a filesystem walk to answer a question no fault asked.
 
-The walk needs an **entry budget with a documented degrade**. The prune list is `node_modules`, `.git`, `dist`, `build`, `out`, `coverage`, `.next` — and the plan's own gate repository defeats it: `graphql-code-generator` contains a Rust crate, so a contributor who has run `cargo build` has a `target/` of tens of thousands of entries. Same for `.venv`, `vendor`, `.turbo`, `.yarn`, `.gradle`. Lazy evaluation bounds this to already-failing runs, but a failing run that then hangs inside a 5s vitest timeout is worse than the false green. On exceeding the budget the enrichment degrades to "not determined" — it is already fail-open, so the only cost is message quality.
+The walk needs an **entry budget with a documented degrade**. The prune list is `node_modules`, `.git`, `dist`, `build`, `out`, `coverage`, `.next` — and the plan's own gate repository defeats it: `graphql-code-generator` contains a Rust crate, so a contributor who has run `cargo build` has a `target/` of tens of thousands of entries. Same for `.venv`, `vendor`, `.turbo`, `.yarn`, `.gradle`. Lazy evaluation bounds this to already-failing runs, but a failing run that then hangs inside a 5s vitest timeout is worse than the false green. The budget is **50,000 directory entries**, an implementation constant outside the public contract and not user-tunable. On exceeding it the enrichment degrades to "not determined" — it is already fail-open, so the only cost is message quality, and the degrade path gets its own test rather than being reached only by accident.
 
 Tests assert the **property** — every project file's parent is in the parent view — not the counts. A pinned 430/81 is the snapshot ADR-008 rule 4 bars.
 
@@ -203,7 +251,7 @@ interface GlobDiagnosis {
 
 ### Globs that escape the contract
 
-`resolvers(p, glob)` filters eagerly in the entry function and hands the builder only `SourceFile[]` — **the glob string is discarded** (`src/graphql/index.ts:82-88`), so no `globs()` can ever report `resolvers(p, 'src/reslvers/**')`. **Decision:** thread it into the builder in R2. It is a constructor widening on one public export and belongs in R2's release note.
+`resolvers(p, glob)` filters eagerly in the entry function and hands the builder only `SourceFile[]` — **the glob string is discarded** (`src/graphql/index.ts:82-88`), so no `globs()` can ever report `resolvers(p, 'src/reslvers/**')`. **Decision:** thread it into the builder in R2a, as an **optional** parameter. `ResolverRuleBuilder` is re-exported from the public `./graphql` subpath (`src/graphql/index.ts:93`), so its constructor is public API and a required second parameter would break anyone constructing it directly — which would make R2a breaking, and R2a is the release people install in order to measure. `resolvers()` always passes it.
 
 `loadSchemaFromGlob` (`src/graphql/schema-loader.ts:104`) does **not** need this. It already throws on zero matches (`:109-112`), which is the outcome this plan wants; threading its glob would buy nothing. Draft 5 called the two cases "the same"; they are opposites.
 
@@ -211,7 +259,7 @@ interface GlobDiagnosis {
 
 Checked and clear: `TypeMatcher` (regex, no path globs), smell builders (builder-recorded), `TsconfigBuilder` (no globs), `correspondence()` (takes selections).
 
-`globs(): GlobNode[]` on the root is **concrete with a `[]` default**, not abstract — adding an abstract member to `RuleBuilder`/`TerminalBuilder` (both public exports, `src/index.ts:21-22`) is a compile break for subclassers, and R2 is the release people install in order to measure. The set-identity test fails a `return []` stub, and it is driven off the exported builder list rather than hand-written per builder, so an eleventh builder inheriting the default is covered.
+`globs(): GlobNode[]` on the root is **concrete with a `[]` default**, not abstract — adding an abstract member to `RuleBuilder`/`TerminalBuilder` (both public exports, `src/index.ts:21-22`) is a compile break for subclassers, and R2 is the release people install in order to measure. The set-identity test fails a `return []` stub. It reflects over the namespace objects of **both** `src/index.ts` and `src/graphql/index.ts`, filtering by prototype chain on `RuleBuilder`/`TerminalBuilder`, because the main entry point does not export `SchemaRuleBuilder`/`ResolverRuleBuilder` — and `ResolverRuleBuilder` is the one builder R2a modifies. Derived: 13 builder classes, 6 extending `RuleBuilder<T>` and 7 extending `TerminalBuilder`.
 
 ---
 
@@ -249,11 +297,15 @@ grep -rnEi "warn" docs examples README.md src/core/execute-rule.ts \
 
 `docs/api-reference.md:49,61`; `docs/violation-reporting.md:57`; `docs/core-concepts.md:223,230`; `docs/running-in-tests.md:66`; `docs/smell-detection.md:18,54,58`; `docs/standard-rules.md:386`; `docs/cross-layer.md:165,166`; `docs/cli.md:153`; `docs/setup-best-practices.md:17,31`; `docs/ai-agents.md:47`; `docs/what-to-check.md:717`; `examples/custom-rules.test.ts:151`.
 
-**And the grep undercounts**, which is the part worth writing down. It misses four promises whose promising line does not contain the token `warn` at all: `docs/violation-reporting.md:46` ("does not throw. The test passes."), `docs/running-in-tests.md:101`, `docs/smell-detection.md:9` ("reports without failing"), and `src/core/execute-rule.ts:202` ("Advisory — … never throws"). So the commit's checklist is the grep **plus** a read of every `### .warn()` section heading. Asserting a total here would repeat the error twice over: draft 5 said four, and round 5's own derived list contained a line (`docs/standard-rules.md:460`) that turns out to be about metric limits, not `.warn()`.
+**And the grep undercounts**, which is the part worth writing down. It misses four promises whose promising line does not contain the token `warn` at all: `docs/violation-reporting.md:46` ("does not throw. The test passes."), `docs/running-in-tests.md:101`, `docs/smell-detection.md:9` ("reports without failing"), and `src/core/execute-rule.ts:202` ("Advisory — … never throws").
+
+So the keyword grep is a starting point, not the checklist. Draft 6 said the checklist was "the grep plus a read of every `### .warn()` heading" — there are exactly **three** such headings (`violation-reporting.md:34,44`, `core-concepts.md:227`), and they cover **one** of the four known misses. A procedure that needs a hand-written list to be complete is the defect this plan is about.
+
+**The checklist is therefore a bounded superset that requires no hand-list: every line matching `/warn/i`.** Measured 2026-07-26: **136** in `docs/`, `examples/` and `README.md` (excluding the built `docs/.vitepress/dist/`), plus **124** in `src/` for the JSDoc class. That is one sitting, it is mechanically complete, it is re-derivable by anyone, and it asserts no total about how many will actually need editing — which is the number nobody can know in advance.
 
 **A fifth suppression surface needs the same guard: inline exclusion comments** (`src/core/execute-rule.ts:113-116`). `isExcludedByComment` has no `bypassFilters` check. Meta-findings are immune today only **by accident** — they carry `file: ''` (`rule-builder.ts:399`), `readFileSync('')` throws into the catch, and `comment.file === ''` can never hold. The moment a meta-finding carries a real path — and R2's `doctor` reporting glob _origins_ is exactly that temptation — an `// arch-ignore` silently suppresses the finding that says the rule enforces nothing. Add the explicit guard at `:114` in the same commit.
 
-**`emptyIsPass`** lands in R3 (it exists only on `spike/0067c`), with `.some()` → `.every()`, and never covers a path fault.
+**`emptyIsPass`, specified** — it was previously named only as "`.some()` → `.every()`", which lives on `spike/0067c-empty-by-default` and not in this plan, making it unimplementable from here. The contract: a condition today reports a violation when **some** subject fails; over an empty subject set that is vacuously false, so the rule passes. `emptyIsPass` inverts the default — a condition is satisfied only when **every** subject satisfies it _and_ at least one subject exists — so an empty subject set fails instead. It is opt-out per condition for the genuine cases (`.notExist()` rules, where zero subjects is the passing state), it **never covers a path fault** (an unsatisfiable glob is caught earlier, by the tree, with a different message), and it lands in R3b. Its doc surface is `docs/core-concepts.md`'s condition semantics section.
 
 ---
 
@@ -266,24 +318,39 @@ grep -rnEi "warn" docs examples README.md src/core/execute-rule.ts \
 **R2a — groundwork. Non-breaking. Gates R3.** Single root (own commit); `GlobNode`/`GlobSite`, exported, + combinator propagation; `PathUniverse`; `glob-diagnosis`; the `resolvers()` glob threading; `doctor`.
 
 - `doctor` is an explicitly-invoked diagnostic that **reports findings and exits non-zero**, so an agent does not read `exit 0` as "nothing to do". It is not a build gate and should not be wired into a pipeline; it ships **experimental/hidden**, because removing a documented command later is its own breaking change.
-- It must also cover **rules written inside vitest** — a co-equal documented path (`docs/running-in-tests.md`) — via an exported in-process entry point. Without it R2a fails at its one job for half the users.
+- It must also cover **rules written inside vitest** — a co-equal documented path (`docs/running-in-tests.md`) — via an exported in-process entry point. Without it R2a fails at its one job for half the users. Named, because it is public API on the release people install in order to measure: `diagnose(rules: RuleBuilderLike[]): DiagnosticFinding[]`, exported from the root, where `DiagnosticFinding` carries `{ origin, glob, kind, position, fault, onDisk? }`.
+- It reports **condition-less rules** as well as glob faults. Without that, R3b's gate cannot see proposal 019 at all — see the sequencing note below.
 - It reports **identities, never totals**.
 
-**R2b — the docs sweep. Not on R3's critical path.** `tests/docs/scan-markdown.ts` is 95 lines of per-line regex over symbol names, and the invariant it can enforce is **syntactic** (anchored, no `./` segment), never satisfiability — doc examples legitimately reference paths that do not exist here. It needs code-fence awareness and per-API classification, or it reds three legitimate patterns: the deliberate counter-example at `docs/troubleshooting.md:36`, the `base: 'normalized'` cases at `docs/slices.md:71,112,202,217`, and every bare specifier. That is real work of unpredictable size, and it gates nothing but R3's own prose. It also carries the one-line `#monorepo-setup` anchor fix (`docs/standard-rules.md:270`), which R3 makes load-bearing. Lands with or after R3.
+**R2b — the docs sweep. Not on R3's critical path.** `tests/docs/scan-markdown.ts` is 95 lines of per-line regex over symbol names, and the invariant it can enforce is **syntactic** (anchored, no `./` segment), never satisfiability — doc examples legitimately reference paths that do not exist here. It needs code-fence awareness and per-API classification, or it reds three legitimate patterns: the deliberate counter-example at `docs/troubleshooting.md:36`, the `base: 'normalized'` cases at `docs/slices.md:71,112,202,217`, and every bare specifier. That is real work of unpredictable size, and it gates nothing but R3's own prose. It also carries the three non-compiling `@example` blocks at `src/core/combinators.ts:12,45,74`, which are type errors rather than glob errors and which no markdown scanner can ever see. Lands with or after R3.
 
 **R3 — the flips.** Two units, deliberately separable:
 
-- **R3a, no external gate:** the severity floor, the `.warn()` throw and its 13 doc edits, the inline-comment guard. These fire on the meta-findings that **already ship** — empty selector, empty discovery, empty correspondence side, empty layer, baseline-matched-nothing — all six producers live in this repo and the blast radius is fully measurable here.
+- **R3a, no external gate:** the severity floor, the `.warn()` throw and its doc sweep, the inline-comment guard, and the `#monorepo-setup` retarget. These fire on the meta-findings that **already ship** — empty selector, empty discovery, empty correspondence side, empty layer, baseline-matched-nothing — all six producers live in this repo and the blast radius is fully measurable here.
 - **R3b, gated:** the glob guard, proposal 019, `emptyIsPass`. Only these red on globs the adopting team wrote.
 
 **R3b does not ship until** the adopting codebase has run R2a's pre-flight and its findings have been classified by remedy. **Fallback: R3b slips, and R3a ships without it.** R3b explicitly does not fall back to the dogfood corpus — all 35 of this repo's path-glob sites were written by someone who knew the guard was coming and cannot falsify it. The fallback for a missing gate is a slip, not a weaker gate. Splitting a and b is what stops an indefinite external slip holding open a live false-green hole on findings that ship today.
 
-R3's Upgrading section is ordered, and the order is the point:
+**The gate must be able to see everything it gates.** Proposal 019 fires on condition-less rules, not on globs, so a `doctor` that reports only glob faults would pass while 019's blast radius was completely wrong — this plan's own question, asked of its own gate, answered "pass". Hence R2a's `doctor` reports condition-less rules too. Without that addition, 019 belongs in R3a.
+
+### R3a's Upgrading section, which is not R3b's
+
+R3a ships first and may ship alone, so it cannot borrow R3b's notes. Three sentences of its own:
+
+1. **`.warn()` can now throw** — only for a configuration finding, never for an ordinary violation. So can `.severity('warn')` and `.asSeverity('warn') + .check()`.
+2. **Here is the complete list of findings that trigger it:** empty selector, empty discovery, empty correspondence side, empty layer, baseline-matched-nothing. Five, enumerable, all pre-existing.
+3. **`.violations()` is the non-throwing surface** if you need to inspect rather than fail.
+
+Plus one hazard that is genuinely new and easy to miss: **in a self-executing rule file, a throwing `.warn()` truncates the rest of the module.** Today `rule1.warn(); rule2.check()` evaluates both, because `.warn()` cannot throw. After R3a a meta-finding in `rule1` aborts module evaluation, the CLI's catch (`src/cli/commands/check.ts:41-50`) folds `rule1`'s finding into the run and the output looks entirely normal — while `rule2` was never registered. Silent coverage loss, shipped by the release whose thesis is that silent coverage loss is the defect. `.check()` already has this hazard; R3a extends it to the surface documented as "logs, does not throw". The `export default [rule1, rule2]` shape is unaffected. R3a states the semantics, and the CLI **reports the truncation rather than absorbing it**.
+
+### R3b's Upgrading section, ordered — and the order is the point
 
 1. _"Before upgrading, run `ts-archunit doctor` on 0.2x and classify what it reports."_
 2. _"These findings are true. A rule scoped at a path your tsconfig excludes enforces nothing — that is the defect this release surfaces, not a false positive."_ Without this sentence, the release that fixes the false-green problem gets filed as a false-positive release.
 3. The measurement, with its mechanism. On `graphql-code-generator` 109 of 215 files on disk are in the project; on this repo, 430 of 438. The spread is not noise: the 49% is dominated by 44 excluded `tests/` directories under a root tsconfig with `include: ["packages"]`. **The ratio is a property of which tsconfig you load, and the at-risk population is monorepo users pointing rules at a build tsconfig that excludes tests.** Naming that audience is the actionable form; "it depends on the repo" reads as "we don't know".
-4. **What to do when you cannot fix it today.** There is deliberately no opt-out, so ADR-008 rule 3's other half applies — say what to do instead. The honest cheap remedy happens to be the correct one: **deleting a rule that matches nothing loses no coverage, because it was never enforcing anything.** Saying it out loud is what stops an agent reaching for `**/**`, `.excluding()`, or silent deletion of a rule that _was_ working.
+4. **What to do when you cannot fix it today.** There is deliberately no opt-out, so ADR-008 rule 3's other half applies — say what to do instead. The honest cheap remedy happens to be the correct one: **deleting a rule that matches nothing loses no coverage, because it was never enforcing anything.** Saying it out loud is what stops an agent reaching for `**/**` or `.excluding()`. But it is an **ordered** step, not a standalone sentence, because there are exactly two ways it deletes something live:
+   - **If the message names the monorepo cause**, switch to `workspace([...])` and re-run first. Per-package `project()` with a shared rule file is a known false red, and an agent told "deleting loses no coverage" will otherwise delete a rule that is live in a sibling package. Delete only if the glob is still dead under the union.
+   - **If the path is meant to exist later** — a tripwire on `src/generated/**` written before generation exists — the rule belongs in the PR that creates the path, not in the bin.
 
 ### Gate run 2 — the amended rule, on an unseen codegen monorepo
 
@@ -294,6 +361,9 @@ Population: `dotansimha/graphql-code-generator`, chosen sight-unseen as "an OSS 
 files in the project                         109
 directories on disk                           91
 directories absent from the project           47   ->  44 under tests/, 3 other
+
+# NOTE: the 44/3 split is DIRECT containment. It is not a measurement
+# against the two shipped categories, which use transitive containment.
 ```
 
 The three non-test directories are `packages/graphql-cli-codegen-plugin`, `packages/presets/swc-plugin`, and `packages/presets/swc-plugin/src` — the last containing **`lib.rs` and `tests.rs`**, a **Rust crate inside a TypeScript monorepo.**
@@ -313,36 +383,36 @@ So the two-branch message was not enough, and the fix was to stop treating `outs
 
 ## Test inventory
 
-| Test                                                                                        | Proves                                                            |
-| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `notImportFrom('fastify')` and `layeredArchitecture({ restrictedPackages })` → **zero**     | R1 does not break R3 — written **first**                          |
-| `notImportFrom('**/legacy/**', '**/old/**')` with only `legacy/` present → **no fault**     | the `any` node quantifier                                         |
-| `or(havePathMatching(dead), havePathMatching(live))` → **no fault**                         | `or()` is not concatenation                                       |
-| `or(and(dead, live), dead)` → **fault**                                                     | the tree is exact where a merge would be fail-open                |
-| `or(havePathMatching(dead), <predicate declaring no globs>)` → **no fault**                 | `or()` propagates only when every input declares globs            |
-| `not(and(live, not(dead)))` → **no fault**; `not(or(live, not(dead)))` → **fault**          | `not()` inverts `op`, not only polarity                           |
-| `not(not(havePathMatching(dead)))` → **fault**                                              | double negation restores polarity                                 |
-| `satisfy(not(resideInFolder(typo)))` reports an **anchoring** fault, not unsatisfiability   | polarity flip through `not()`                                     |
-| `satisfy(dependOn(typo))` reports                                                           | the `Condition` half of the contract                              |
-| driven off the exported builder list: construct with a known glob, assert it in `globs()`   | set identity — a `return []` default must fail, for every builder |
-| `SmellBuilder.inFolder()` declares `kind: 'file-path'`                                      | `kind` is the matched string, not the method name                 |
-| for every `file-path`/`parent-dir` site: a real path yields ≥1 subject, nonsense yields 0   | `kind` is behaviourally correct, not just declared                |
-| `resideInFolder('**/tests/fixtures')` (an ancestor, no file's parent) → **fault**           | the parent-dir universe, not all-ancestors                        |
-| a `parent-dir` glob matching a **file** and no parent dir reports `file-not-folder`         | the measured `'**/src/predicates/module**'` case                  |
-| every project file's parent is in the parent view                                           | `PathUniverse` as a property, not a pinned count                  |
-| **every unsatisfiable-glob fixture contains ≥2 candidate paths**                            | mechanically catches `.some(matcher)` — the trap needs index ≥1   |
-| a dir holding `.ts` only **below** it classifies `holds-typescript`                         | transitive containment — the `docs/` case                         |
-| a glob matching paths in both categories reports `holds-typescript`                         | the per-glob rule                                                 |
-| all 8 synthetic `tsConfigPath` doubles produce no disk-derived fault                        | the input-side `isAbsolute` **and** `existsSync` guard            |
-| a mis-declared `base` changes the message and not the verdict                               | `base` cannot cause a false red                                   |
-| `ignorePaths('**/nonexistent/**')` no finding; `inFolder('**/nonexistent/**')` fires        | exclusion vs selector on one builder                              |
-| `slices().matching('src/features/*')` not reported unanchored                               | `base: 'normalized'`                                              |
-| per stamp site × per reachable producer: a meta-finding cannot be downgraded                | the floor is at three sites, and reachability is per-path         |
-| `.warn()` throws carrying **only** the meta-finding; the 200 ordinary violations are logged | both clauses of the contract                                      |
-| `.severity('warn')` and `.asSeverity('warn') + .check()` inherit the throw                  | the two aliases                                                   |
-| an `// arch-ignore` comment cannot suppress a meta-finding carrying a real file path        | the fifth suppression surface, guarded explicitly not by accident |
-| the arch suite is green from a differently-named checkout                                   | bug 0011 fixed by construction                                    |
-| `spikes/0069-glob-census.mjs` prints no `DEAD` line on the R-any commit                     | R-any actually closes what it claims                              |
+| Test                                                                                        | Proves                                                              |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `notImportFrom('fastify')` and `layeredArchitecture({ restrictedPackages })` → **zero**     | R1 does not break R3 — written **first**                            |
+| `notImportFrom('**/legacy/**', '**/old/**')` with only `legacy/` present → **no fault**     | the `any` node quantifier                                           |
+| `or(havePathMatching(dead), havePathMatching(live))` → **no fault**                         | `or()` is not concatenation                                         |
+| `or(and(dead, live), dead)` → **fault**                                                     | the tree is exact where a merge would be fail-open                  |
+| `or(havePathMatching(dead), <predicate declaring no globs>)` → **no fault**                 | `or()` propagates only when every input declares globs              |
+| `not(and(live, not(dead)))` → **no fault**; `not(or(live, not(dead)))` → **fault**          | `not()` inverts `op`, not only polarity                             |
+| `not(not(havePathMatching(dead)))` → **fault**                                              | double negation restores polarity                                   |
+| `satisfy(not(resideInFolder(typo)))` reports an **anchoring** fault, not unsatisfiability   | polarity flip through `not()`                                       |
+| `satisfy(dependOn(typo))` reports                                                           | the `Condition` half of the contract                                |
+| reflecting over both entry points: construct with a known glob, assert it in `globs()`      | set identity — a `return []` default must fail, for all 13 builders |
+| `SmellBuilder.inFolder()` declares `kind: 'file-path'`                                      | `kind` is the matched string, not the method name                   |
+| for every `file-path`/`parent-dir` site: a real path yields ≥1 subject, nonsense yields 0   | `kind` is behaviourally correct, not just declared                  |
+| `resideInFolder('**/tests/fixtures')` (an ancestor, no file's parent) → **fault**           | the parent-dir universe, not all-ancestors                          |
+| a `parent-dir` glob matching a **file** and no parent dir reports `file-not-folder`         | the measured `'**/src/predicates/module**'` case                    |
+| every project file's parent is in the parent view                                           | `PathUniverse` as a property, not a pinned count                    |
+| **every unsatisfiable-glob fixture contains ≥2 candidate paths**                            | mechanically catches `.some(matcher)` — the trap needs index ≥1     |
+| a dir holding `.ts` only **below** it classifies `holds-typescript`                         | transitive containment — the `docs/` case                           |
+| a glob matching paths in both categories reports `holds-typescript`                         | the per-glob rule                                                   |
+| all 8 synthetic `tsConfigPath` doubles produce no disk-derived fault                        | the input-side `isAbsolute` **and** `existsSync` guard              |
+| a mis-declared `base` changes the message and not the verdict                               | `base` cannot cause a false red                                     |
+| `ignorePaths('**/nonexistent/**')` no finding; `inFolder('**/nonexistent/**')` fires        | exclusion vs selector on one builder                                |
+| `slices().matching('src/features/*')` not reported unanchored                               | `base: 'normalized'`                                                |
+| per stamp site × per reachable producer: a meta-finding cannot be downgraded                | the floor is at three sites, and reachability is per-path           |
+| `.warn()` throws carrying **only** the meta-finding; the 200 ordinary violations are logged | both clauses of the contract                                        |
+| `.severity('warn')` and `.asSeverity('warn') + .check()` inherit the throw                  | the two aliases                                                     |
+| an `// arch-ignore` comment cannot suppress a meta-finding carrying a real file path        | the fifth suppression surface, guarded explicitly not by accident   |
+| the arch suite is green from a differently-named checkout                                   | bug 0011 fixed by construction                                      |
+| `spikes/0069-glob-census.mjs` prints no `DEAD` line on the R-any commit                     | R-any actually closes what it claims                                |
 
 Each verified by sabotage: revert the fix, watch it go red.
 
@@ -356,9 +426,24 @@ Each verified by sabotage: revert the fix, watch it go red.
 - `workspace()` sets `tsConfigPath` to the alphabetically-first member tsconfig (`src/core/project.ts:143`), so the disk walk's root derives from one member. `discoverIdentityRoot` walks up to `.git` and usually recovers; an unusual layout scopes the walk below some members and mislabels their globs. Fail-open.
 - Per-package `project()` with a shared glob-bearing rule file gets a false red; `workspace()` is the answer, in the message and the docs.
 - `outside-project` names the tsconfig as the cause but cannot quote the offending `exclude` entry.
-- Above the walk's entry budget, `outside-project` reports "not determined" rather than a category.
+- Above the walk's 50,000-entry budget, `outside-project` reports "not determined" rather than a category.
+- **Contradiction is not detected.** `and(havePathMatching(X), not(havePathMatching(X)))` selects ∅ for every `X` and never faults, because the evaluator treats distinct leaves as independent — which is also the stated limit of the model check. Fail-open, correct direction, but it is the one shape the tree provably cannot see.
 
 _Removed this draft:_ "`PathUniverse` over-approximates directories; the guard is fail-open there." It was not fail-open, it was a false green, and the parent-dir universe deletes it.
+
+## Reviewer findings not adopted
+
+Six rounds of review have produced a large yield, and taking all of it would be its own failure mode. What was declined, and why — so the next round does not re-raise it:
+
+| Finding                                                                                                      | Why not                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A `globSite()` factory or discriminant tag, so a stray `op` on a user object cannot route to the node branch | The `DeclaredGlob` split already removes it: the author-facing type has neither `op` nor `children`, and excess-property checking rejects the literal. A runtime factory guards a case the type system has closed |
+| An entry budget inside `spikes/0069-gate-walk.mjs`                                                           | The spike runs once against a clone; it is a measurement artifact, not the implementation. The budget belongs in `PathUniverse`, where it is specified with a number and a required test for the degrade path     |
+| Move proposal 019 into R3a so its gate can see it                                                            | Fixes the symptom. R2a's `doctor` reports condition-less rules instead, which makes the gate valid rather than routing around it                                                                                  |
+| `docs/standard-rules.md:460` as a `.warn()` promise, then as "use `.warn()` for soft limits"                 | Miscited twice. It says "Start with generous limits and tighten over time"                                                                                                                                        |
+| Flat-merge `or()` with a stated fail-open residual (round 4)                                                 | The tree is exact for the same ten lines. Model-checked: 0 false reds and 0 misses, versus a merge that misses `or(and(dead, live), dead)`                                                                        |
+| Flooring severity in `stampSeverity` alone (round 4)                                                         | Only reaches one of three sites; `.violations()` inlines its own map at `rule-builder.ts:200` and `terminal-builder.ts:102`                                                                                       |
+| Prove the evaluator with a hand-written four-row table (round 6)                                             | Superseded rather than declined. A hand table is what produced three consecutive wrong evaluators; 4088 enumerated expressions is the same effort once                                                            |
 
 ## Open questions
 
