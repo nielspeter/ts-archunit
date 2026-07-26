@@ -4,7 +4,7 @@ import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
 import type { RuleDescription } from './rule-description.js'
 import type { DeclaredGlob, GlobNode } from './glob-site.js'
-import { stampGlobs } from './glob-site.js'
+import { countDeclaredGlobs, stampGlobs } from './glob-site.js'
 import { TerminalBuilder } from './terminal-builder.js'
 
 /**
@@ -159,15 +159,21 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
     const trees: GlobNode[] = []
     for (const predicate of this._predicates) {
       if (predicate.globs) {
+        const count = countDeclaredGlobs(predicate.globs)
         trees.push(
-          stampGlobs(predicate.globs, 'selector', (g) => describeOrigin(predicate.description, g)),
+          stampGlobs(predicate.globs, 'selector', (g) =>
+            describeOrigin(predicate.description, g, count),
+          ),
         )
       }
     }
     for (const condition of this._conditions) {
       if (condition.globs) {
+        const count = countDeclaredGlobs(condition.globs)
         trees.push(
-          stampGlobs(condition.globs, 'condition', (g) => describeOrigin(condition.description, g)),
+          stampGlobs(condition.globs, 'condition', (g) =>
+            describeOrigin(condition.description, g, count),
+          ),
         )
       }
     }
@@ -399,8 +405,10 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
  * description unless one predicate declared several globs — in which case the
  * glob is appended to tell them apart.
  */
-function describeOrigin(description: string, glob: DeclaredGlob): string {
-  return description.includes(`"${glob.glob}"`) || description.includes(`'${glob.glob}'`)
-    ? description
-    : `${description} ("${glob.glob}")`
+function describeOrigin(description: string, glob: DeclaredGlob, siteCount: number): string {
+  // Keyed on the COUNT, not on whether the description happens to contain the
+  // glob. A variadic predicate's description contains every one of its globs
+  // (`import from "**/a/**", "**/b/**"`), so a substring test collapsed the
+  // one case this exists to separate.
+  return siteCount > 1 ? `${description} ("${glob.glob}")` : description
 }

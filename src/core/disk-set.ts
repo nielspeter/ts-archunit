@@ -45,6 +45,11 @@ const PRUNE = new Set([
  */
 const ENTRY_BUDGET = 50_000
 
+// `.d.ts` and its `.d.mts`/`.d.cts` siblings count. They ARE TypeScript for
+// the question this set answers — "does this path contain TypeScript your
+// tsconfig is keeping out" — and excluding them made a `types/` directory of
+// pure declarations report "this path exists but contains no TypeScript",
+// which is false.
 const TS_FILE = /\.(m|c)?tsx?$/
 
 /**
@@ -73,12 +78,25 @@ const cache = new WeakMap<ArchProject, DiskSet>()
 export function diskSet(project: ArchProject): DiskSet {
   const cached = cache.get(project)
   if (cached) return cached
-  const built = build(project)
+  const built = build(project, ENTRY_BUDGET)
   cache.set(project, built)
   return built
 }
 
-function build(project: ArchProject): DiskSet {
+/**
+ * The walk, with the budget injectable.
+ *
+ * Exported for tests only. The degrade path is the difference between "not
+ * determined" and a *partial, wrong* classification — a false "contains no
+ * TypeScript" in the one message whose whole defence is that it states only
+ * facts — and with the budget a module constant it could only ever have been
+ * reached by accident on a repository nobody has.
+ */
+export function buildDiskSet(project: ArchProject, budgetLimit = ENTRY_BUDGET): DiskSet {
+  return build(project, budgetLimit)
+}
+
+function build(project: ArchProject, budgetLimit: number): DiskSet {
   // Guard on the INPUT, before deriving anything. `discoverIdentityRoot` calls
   // `path.resolve`, so every root it returns is absolute and checking the
   // output can never fail. Both halves matter: of the eight synthetic
@@ -92,8 +110,10 @@ function build(project: ArchProject): DiskSet {
   if (!fs.existsSync(root)) return UNDETERMINED
 
   const files: string[] = []
+  /** Every file, TypeScript or not — so `absent` means absent, not "not TypeScript". */
+  const everyFile: string[] = []
   const dirs: string[] = []
-  let budget = ENTRY_BUDGET
+  let budget = budgetLimit
   let exhausted = false
 
   const walk = (dir: string): void => {
@@ -111,12 +131,16 @@ function build(project: ArchProject): DiskSet {
     }
     for (const entry of entries) {
       const full = path.join(dir, entry.name).replaceAll('\\', '/')
+      // `Dirent.isDirectory()` is false for a symlink under `withFileTypes`,
+      // so symlink loops are impossible by construction. Do not "fix" this
+      // with `statSync`, which follows them.
       if (entry.isDirectory()) {
         if (PRUNE.has(entry.name)) continue
         dirs.push(full)
         walk(full)
-      } else if (TS_FILE.test(entry.name) && !entry.name.endsWith('.d.ts')) {
-        files.push(full)
+      } else {
+        everyFile.push(full)
+        if (TS_FILE.test(entry.name)) files.push(full)
       }
     }
   }
@@ -140,7 +164,14 @@ function build(project: ArchProject): DiskSet {
     }
   }
 
-  const everything = [...files, ...dirs]
+  // Directories AND every file, not just the TypeScript ones. Deriving
+  // `absent` from the TypeScript-only set asserted "this path does not exist"
+  // about any path holding a `.md`, a `.json`, or anything under a pruned
+  // name — and `absent` carries no advice, so the caller fell back to
+  // `no-match`'s list, whose first cause is "a path segment is misspelled".
+  // Exactly the confidently-wrong cause ADR-008 rule 2 forbids.
+  const everything = [...everyFile, ...dirs]
+  const typeScript = new Set(files)
   return {
     classify(glob: string): OnDisk {
       const isMatch = picomatch(glob)
@@ -152,7 +183,9 @@ function build(project: ArchProject): DiskSet {
       // categories — `**/tests/**` matched 44 directories of mixed kind on the
       // monorepo this was gated against. Any matched path holding TypeScript
       // makes the tsconfig the story worth telling.
-      return matched.some((candidate) => holdsTypeScript.has(candidate) || TS_FILE.test(candidate))
+      return matched.some(
+        (candidate) => holdsTypeScript.has(candidate) || typeScript.has(candidate),
+      )
         ? 'holds-typescript'
         : 'no-typescript'
     },

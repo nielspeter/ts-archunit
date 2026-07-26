@@ -47,12 +47,24 @@ export type GlobPosition = 'selector' | 'discovery' | 'condition' | 'exclusion'
 /**
  * Which set of paths the glob is written against.
  *
- * Message-only, deliberately. An earlier revision let `base` select which view
- * a glob was matched against, which makes a mis-declared `base` produce a
- * false red **by construction** — on the one axis with no second derivation.
- * The verdict is taken against the union of the views for the glob's `kind`;
- * `base` only chooses the wording, so getting it wrong costs a worse sentence
- * rather than a red build.
+ * **This affects the verdict**, and the earlier claim here that it was
+ * message-only is withdrawn. Satisfiability is still taken against the union
+ * of the views for the glob's `kind`, but the ANCHOR check consults `base`:
+ * an unanchored glob can never match an absolute path, so for
+ * `base: 'absolute'` it is dead however the project is shaped — while for a
+ * base whose entry point rewrites or relativises the glob, an unanchored
+ * spelling is correct and telling the author to anchor it would break a
+ * working rule.
+ *
+ * The union alone was tried and was a false green on the commonest real
+ * mistake: the tsconfig-relative view accepts `'src/domain/**'`, which
+ * `resideInFolder` can never match. Unanchored globs are the entire subject of
+ * the 0.18.1 release, so a design that quietly calls them satisfiable defeats
+ * its own purpose.
+ *
+ * So a mis-declared `base` CAN cause a red build. It is set beside `kind` by
+ * the same code, from what the entry point does rather than from intent, and
+ * `tests/core/glob-declaration.test.ts` asserts the equivalent spellings agree.
  */
 export type GlobBase = 'absolute' | 'tsconfig-relative' | 'normalized'
 
@@ -138,6 +150,16 @@ export type DeclaredGlobs = GlobTree<DeclaredGlob>
 
 /** A declared tree after a builder has stamped position and origin onto it. */
 export type GlobNode = GlobTree<GlobSite>
+
+/** How many real declarations a tree holds. Opaque leaves do not count. */
+export function countDeclaredGlobs<L extends object>(tree: GlobTree<L>): number {
+  let total = 0
+  for (const child of tree.children) {
+    if (isGlobNode(child)) total += countDeclaredGlobs(child)
+    else if (!isOpaqueGlob(child)) total++
+  }
+  return total
+}
 
 /** Narrow a tree position to an interior node. */
 export function isGlobNode<L extends object>(

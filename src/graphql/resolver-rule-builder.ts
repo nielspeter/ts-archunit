@@ -2,6 +2,7 @@ import type { SourceFile } from 'ts-morph'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { Predicate } from '../core/predicate.js'
+import type { ArchProject } from '../core/project.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
@@ -76,8 +77,14 @@ export class ResolverRuleBuilder extends TerminalBuilder {
   constructor(
     private readonly sourceFiles: SourceFile[],
     private readonly glob?: string,
+    private readonly project?: ArchProject,
   ) {
     super()
+  }
+
+  /** The project this rule was built against. See `RuleBuilder.getProject`. */
+  getProject(): ArchProject | undefined {
+    return this.project
   }
 
   /**

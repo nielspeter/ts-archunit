@@ -78,7 +78,12 @@ describe('runDoctor', () => {
     expect(text).toContain('x/a')
     expect(text).toContain('x/b')
     expect(text).toContain('**/src/nope-a/**')
-    expect(text).not.toMatch(/\b2 (findings|problems|issues)\b/)
+    // Structural, not a guess at one phrasing. The previous form was
+    // `/\b2 (findings|problems|issues)\b/`, and appending the most natural
+    // spelling of the banned thing — "Total: 2 rules cannot enforce
+    // anything." — slipped straight through it.
+    expect(text).not.toMatch(/\d+\s+\w*\s*(finding|rule|glob|problem|issue)/i)
+    expect(text).not.toMatch(/\btotal\b/i)
   })
 
   it('states what the filesystem knows, and asserts no remedy for it', async () => {

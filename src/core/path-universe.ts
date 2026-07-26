@@ -62,11 +62,15 @@ export function pathUniverse(project: ArchProject): PathUniverse {
 /**
  * The views a glob of this kind is matched against.
  *
- * The verdict is taken against the **union** — a glob is unsatisfiable only
- * when nothing in any view matches it. That is what makes `base` message-only:
- * declaring a tsconfig-relative glob `'absolute'` costs a worse sentence, not
- * a red build. `import-target`, `specifier` and `literal` are not path kinds
- * and have no views, so they can never be found unsatisfiable here.
+ * Satisfiability is taken against the **union** — a glob is unsatisfiable only
+ * when nothing in any view matches it. That is deliberately generous, so that
+ * a wrong `base` cannot make a glob look unmatched. It does NOT make `base`
+ * message-only: the anchor check in `syntacticFault` consults it, and an
+ * unanchored `base: 'absolute'` glob is dead regardless of what any view
+ * holds. See `GlobBase`.
+ *
+ * `import-target`, `specifier` and `literal` are not path kinds and have no
+ * views, so they can never be found unsatisfiable here.
  */
 export function viewsFor(
   universe: PathUniverse,

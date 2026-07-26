@@ -1,5 +1,6 @@
 import type { DiagnosableRule, DiagnosticFinding } from '../../core/diagnose.js'
 import { diagnose } from '../../core/diagnose.js'
+import { ArchRuleError } from '../../core/errors.js'
 import { loadRuleFiles } from '../load-rules.js'
 
 export interface DoctorArgs {
@@ -25,9 +26,28 @@ export interface DoctorArgs {
  * position, and what is verifiably true about it.
  */
 export async function runDoctor(args: DoctorArgs): Promise<number> {
+  if (args.ruleFiles.length === 0) {
+    process.stderr.write(
+      'Error: no rule files. Pass them as arguments or set `rules` in your config.\n',
+    )
+    return 1
+  }
+
   const rules: DiagnosableRule[] = []
   for (const file of args.ruleFiles) {
-    rules.push(...(await loadRuleFiles([file])))
+    try {
+      rules.push(...(await loadRuleFiles([file])))
+    } catch (error: unknown) {
+      // A rule file that self-executes a throwing `.check()` at import is a
+      // documented shape, and `runCheck` already tolerates it. Without this,
+      // `doctor` — the pre-flight R3b's gate depends on — crashes on the
+      // commonest legacy rule-file shape and abandons every remaining file,
+      // so the gate cannot be run on the population it was invented for.
+      if (!(error instanceof ArchRuleError)) throw error
+      process.stderr.write(
+        `Note: ${file} executed its rules at import; diagnosing what loaded before it threw.\n`,
+      )
+    }
   }
 
   const findings = diagnose(rules)
@@ -49,16 +69,20 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
 function format(findings: readonly DiagnosticFinding[]): string {
   const lines: string[] = ['']
   for (const finding of findings) {
-    if (finding.kind === 'no-condition') {
-      lines.push(`  ${finding.rule}`, `    no condition — ${finding.advice}`, '')
-      continue
+    lines.push(`  ${finding.rule}`)
+    if (finding.kind === 'dead-glob') {
+      lines.push(
+        `    ${finding.origin ?? finding.glob ?? '(unknown)'}  [${finding.position ?? 'unknown'}]`,
+        `    ${finding.fault ?? 'unknown'}: ${finding.advice}`,
+      )
+    } else {
+      // `no-condition` and `project-unknown` have no glob, no position and no
+      // fault. Rendering them through the dead-glob shape printed
+      // `(unknown) [unknown]` / `unknown: …`, which reads like a bug in the
+      // tool rather than a finding about the rule.
+      lines.push(`    ${finding.kind}: ${finding.advice}`)
     }
-    lines.push(
-      `  ${finding.rule}`,
-      `    ${finding.origin ?? finding.glob ?? '(unknown)'}  [${finding.position ?? 'unknown'}]`,
-      `    ${finding.fault ?? 'unknown'}: ${finding.advice}`,
-      '',
-    )
+    lines.push('')
   }
   // Deliberately no total. A count is the snapshot ADR-008 rule 4 bars, and it
   // is the number people ratchet against instead of fixing the findings.

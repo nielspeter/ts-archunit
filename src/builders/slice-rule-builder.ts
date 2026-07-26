@@ -3,6 +3,7 @@ import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
+import { matchingGlobPattern } from '../models/slice.js'
 import type { GlobFault } from '../core/glob-diagnosis.js'
 import { FAULT_ADVICE, GLOB_DOCS, syntacticFault } from '../core/glob-diagnosis.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
@@ -97,20 +98,27 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * green. This is the same reason a preset's option list is not an `any`
    * node.
    *
-   * `matching()` declares `base: 'normalized'` because `parseMatchingGlob`
-   * strips and re-adds the `**\/` anchor, so `'src/features/*'` is a correct
-   * spelling there and must not be reported unanchored. `base` affects only
-   * the wording of a message, never the verdict.
+   * `matching()` needs no `base` special case, because it declares the glob
+   * `parseMatchingGlob` produces rather than the one the author wrote — and
+   * that one is already anchored. Declaring the author's spelling and
+   * exempting it via `base` was the earlier design, and it reported every
+   * nested-layout rule as dead while looking correct on a flat fixture.
    */
   override globs(): readonly GlobNode[] {
     if (!this._discovery) return []
     if (this._discovery.mode === 'matching') {
-      const glob = this._discovery.glob
+      // Declare the glob picomatch is given, not the one the author wrote.
+      // `parseMatchingGlob` strips './' and '**/', normalises a trailing
+      // slash, and appends '*/**' — so the author's spelling is matched
+      // against nothing at runtime and declaring it reports every correct
+      // nested-layout rule as dead. `origin` keeps the spelling, which is what
+      // the reader needs to find the line.
+      const authored = this._discovery.glob
       return [
         stampGlobs(
-          globAnyOf([glob], 'file-path', 'normalized'),
+          globAnyOf([matchingGlobPattern(authored)], 'file-path'),
           'discovery',
-          (g) => `matching("${g.glob}")`,
+          () => `matching("${authored}")`,
         ),
       ]
     }

@@ -7,7 +7,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
-import type { Located, Predicate } from '../../src/index.js'
+import type { GlobSite, Located, Predicate } from '../../src/index.js'
+import { isDeadSite } from '../../src/core/glob-evaluator.js'
+import { pathUniverse } from '../../src/core/path-universe.js'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
 import { noAnyProperties, noTypeAssertions } from '../../src/rules/typescript.js'
 import {
@@ -90,6 +92,49 @@ describe('rule scope (bug 0011)', () => {
     expect(fromCompiler.length).toBeGreaterThan(0)
     expect(fromDisk.length).toBeGreaterThan(0)
     expect(fromCompiler).toEqual(fromDisk.sort())
+  })
+
+  it('no glob written in this file can ever match', () => {
+    // The guard that actually closes bug 0011, and the one that was missing:
+    // reverting `api/no-single-glob-predicates` to its vacuous
+    // `resideInFolder('**/src/predicates/module**')` scope left all 165 test
+    // files green. The two guards beside this one could not see it — the
+    // file-set check only covers `inProjectSrc()`, and the name ban only bans
+    // one string.
+    //
+    // Every path glob in this file is put through the SHIPPED evaluator, with
+    // its kind derived from the selector it was written on. Only the
+    // extraction is test-local; the verdict is production code, so this cannot
+    // drift from what `doctor` would say. It is also independent of what the
+    // checkout is called.
+    const KIND: Record<string, 'parent-dir' | 'file-path'> = {
+      resideInFolder: 'parent-dir',
+      resideInFile: 'file-path',
+      havePathMatching: 'file-path',
+      inFolder: 'file-path',
+    }
+    const universe = pathUniverse(p)
+    const source = fs.readFileSync(import.meta.filename, 'utf-8')
+
+    const dead: string[] = []
+    source.split('\n').forEach((line, index) => {
+      const text = line.trim()
+      if (text.startsWith('*') || text.startsWith('//')) return
+      for (const match of text.matchAll(/\.(\w+)\(\s*'([^']*\*[^']*)'/g)) {
+        const kind = KIND[match[1] ?? '']
+        const glob = match[2]
+        if (kind === undefined || glob === undefined) continue
+        const site: GlobSite = {
+          glob,
+          kind,
+          position: 'selector',
+          origin: `${match[1] ?? ''}("${glob}")`,
+        }
+        if (isDeadSite(site, universe)) dead.push(`${String(index + 1)}: ${site.origin}`)
+      }
+    })
+
+    expect(dead).toEqual([])
   })
 
   it('no rule scopes by the name of the checkout directory', () => {

@@ -16,7 +16,17 @@ import path from 'node:path'
 import picomatch from 'picomatch'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
-import { onlyImportFrom, notImportFrom, dependOn } from '../../src/conditions/dependency.js'
+import {
+  onlyImportFrom,
+  notImportFrom,
+  dependOn,
+  onlyHaveTypeImportsFrom,
+} from '../../src/conditions/dependency.js'
+// A namespace import, not an alias: `notImportFrom` exists as both a predicate
+// and a condition, and this repo's own `hygiene/no-aliased-imports` rule bans
+// `as` renaming in test files — it caught this the moment it was written,
+// which is the rule working.
+import * as modulePredicates from '../../src/predicates/module.js'
 import { importCandidates, matchedCandidate } from '../../src/core/import-candidates.js'
 import { layeredArchitecture } from '../../src/presets/layered.js'
 import type { ArchProject } from '../../src/core/project.js'
@@ -94,6 +104,40 @@ describe('bug 0014 — bare package specifiers', () => {
     it('still matches a relative import by its resolved path', () => {
       const violations = notImportFrom('**/services/**').evaluate(
         [fixture('src/app/consumer.ts')],
+        ctx,
+      )
+      expect(violations).toHaveLength(1)
+    })
+  })
+
+  describe('the PREDICATES, not just the conditions', () => {
+    // `importFrom`/`notImportFrom` as selectors had no bare-specifier test at
+    // all, so reverting `importCandidatePaths` to one candidate per import
+    // left the suite green — and a selector matching nothing is precisely
+    // plan 0069's subject.
+    it('importFrom selects a module importing an installed package by bare name', () => {
+      const sf = fixture('src/installed-package.ts')
+      expect(modulePredicates.importFrom('picomatch').test(sf)).toBe(true)
+      expect(modulePredicates.notImportFrom('picomatch').test(sf)).toBe(false)
+    })
+
+    it('and still selects on a path glob', () => {
+      const sf = fixture('src/installed-package.ts')
+      expect(modulePredicates.importFrom('**/picomatch/**').test(sf)).toBe(true)
+    })
+
+    it('does not select a relative specifier by its raw string', () => {
+      expect(
+        modulePredicates.importFrom('../services/*').test(fixture('src/app/consumer.ts')),
+      ).toBe(false)
+    })
+  })
+
+  describe('onlyHaveTypeImportsFrom', () => {
+    it('matches a bare name for an installed package', () => {
+      // The fourth production call site, also revertible with the suite green.
+      const violations = onlyHaveTypeImportsFrom('picomatch').evaluate(
+        [fixture('src/installed-package.ts')],
         ctx,
       )
       expect(violations).toHaveLength(1)

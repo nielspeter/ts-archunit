@@ -9,7 +9,7 @@ import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { diagnose } from '../../src/core/diagnose.js'
-import { modules, classes, slices, or, not } from '../../src/index.js'
+import { modules, classes, slices, smells, or, not } from '../../src/index.js'
 import { resideInFolder } from '../../src/predicates/identity.js'
 import type { Located } from '../../src/predicates/identity.js'
 import type { ArchProject } from '../../src/core/project.js'
@@ -96,6 +96,44 @@ describe('diagnose', () => {
     expect(findings[0]?.position).toBe('discovery')
   })
 
+  it('repeated inFolder() calls are ANY, not ALL', () => {
+    // `folderMatchers.some` — one live scope is enough, so the set is dead
+    // only when every glob in it is. Flipping this quantifier is what the
+    // 0.18.1 withdrawal was, and it is the only reachable multi-glob
+    // path-kind declaration in the codebase.
+    const live = smells.duplicateBodies(p).inFolder('**/domain/**').inFolder('**/nowhere-at-all/**')
+    expect(diagnose([live])).toEqual([])
+
+    const dead = smells.duplicateBodies(p).inFolder('**/nowhere-a/**').inFolder('**/nowhere-b/**')
+    expect(diagnose([dead])).toHaveLength(2)
+  })
+
+  it('never reports an import glob — node_modules is outside the project', () => {
+    // Checking import-target against a path universe would fail every correct
+    // dependency rule in existence. The exemption lives in `viewsFor`, and
+    // removing it left the whole suite green.
+    const rule = modules(p)
+      .that()
+      .importFrom('fastify', '**/node_modules/typescript/**')
+      .should()
+      .notHaveDefaultExport()
+    expect(diagnose([rule])).toEqual([])
+  })
+
+  it('says nothing about a dead exclusion, and does report a dead scope', () => {
+    // proposal 006: an exclusion matching zero is remedy-optional and never a
+    // fault. `position` used to be copied into the finding and never read, so
+    // this reported "a path segment is misspelled" about a correct rule.
+    const excluded = smells
+      .duplicateBodies(p)
+      .inFolder('**/domain/**')
+      .ignorePaths('**/nonexistent/**')
+    expect(diagnose([excluded])).toEqual([])
+
+    const scoped = smells.duplicateBodies(p).inFolder('**/nonexistent/**')
+    expect(diagnose([scoped])).toHaveLength(1)
+  })
+
   it('carries a verifiable remedy for a syntactic fault', () => {
     const rule = classes(p).that().resideInFolder('src/domain/**').should().beExported()
     const findings = diagnose([rule])
@@ -118,6 +156,45 @@ describe('diagnose', () => {
     // wrong in both directions — phantom faults and missed ones. Silence is
     // the honest answer.
     expect(diagnose([{ violations: () => [] }])).toEqual([])
+  })
+})
+
+describe('slices().matching() — the glob the matcher receives', () => {
+  // A NESTED fixture, deliberately. `tests/fixtures/modules` has a flat
+  // `src/domain/`, so the author's spelling `src/domain/*` happened to match
+  // the tsconfig-relative file path and hid the fact that `matching()`
+  // rewrites its glob before matching. Every nested-layout rule — the shape
+  // docs/slices.md teaches — was reported dead.
+  const nestedDir = path.resolve(import.meta.dirname, '../fixtures/nested-slices')
+  const nestedTsconfig = path.join(nestedDir, 'tsconfig.json')
+  const nested: ArchProject = (() => {
+    const tsMorphProject = new Project({ tsConfigFilePath: nestedTsconfig })
+    return {
+      tsConfigPath: nestedTsconfig,
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+  })()
+
+  // Every spelling `parseMatchingGlob` treats as equivalent, including the two
+  // that the syntactic checks would otherwise reject: an unanchored glob and a
+  // './' prefix, both of which that function deliberately supports.
+  it.each(['src/features/*', 'src/features/*/', './src/features/*', '**/src/features/*'])(
+    'reports nothing for the working spelling %s',
+    (glob) => {
+      const rule = slices(nested).matching(glob).should().beFreeOfCycles()
+      expect(rule.violations()).toEqual([])
+      expect(diagnose([rule])).toEqual([])
+    },
+  )
+
+  it('still reports a matching() glob that genuinely finds no slices', () => {
+    const rule = slices(nested).matching('src/nowhere-at-all/*').should().beFreeOfCycles()
+    const findings = diagnose([rule])
+    expect(findings).toHaveLength(1)
+    // `origin` keeps the author's spelling — that is what they have to go and
+    // edit — while the declared glob is the rewritten one the matcher sees.
+    expect(findings[0]?.origin).toBe('matching("src/nowhere-at-all/*")')
   })
 })
 

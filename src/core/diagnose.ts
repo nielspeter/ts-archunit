@@ -35,8 +35,12 @@ export interface DiagnosableRule extends RuleBuilderLike {
 
 /** One thing wrong with one rule, named specifically enough to fix. */
 export interface DiagnosticFinding {
-  /** `'dead-glob'` — a glob that can never match — or `'no-condition'`. */
-  readonly kind: 'dead-glob' | 'no-condition'
+  /**
+   * `'dead-glob'` — a glob that can never match; `'no-condition'` — a rule
+   * that asserts nothing; `'project-unknown'` — a rule whose globs could not
+   * be checked because it cannot name the project it was built against.
+   */
+  readonly kind: 'dead-glob' | 'no-condition' | 'project-unknown'
   /** The rule's id if it has one, else its assembled description. */
   readonly rule: string
   /** Where the glob was written: `resideInFolder("**\/src/x/**")`. */
@@ -65,18 +69,18 @@ export function diagnose(
   rules: readonly DiagnosableRule[],
   project?: ArchProject,
 ): DiagnosticFinding[] {
-  // Default to the project the rules were built against rather than asking the
-  // caller to name one. Comparing a rule's globs against a DIFFERENT project
-  // than the rule runs on would report faults that do not exist and miss the
-  // ones that do — a diagnostic that is wrong in both directions is worse than
-  // no diagnostic.
-  const target = project ?? rules.find((rule) => rule.getProject)?.getProject?.()
-  if (!target) return []
-  const universe = pathUniverse(target)
   const findings: DiagnosticFinding[] = []
 
   for (const rule of rules) {
     const name = ruleName(rule)
+
+    // PER RULE, not once for the whole array. Taking the first project any
+    // rule could name and diagnosing everything against it is wrong in both
+    // directions: a rule file with two `project()` calls gets half its globs
+    // checked against the wrong universe — the documented monorepo hazard,
+    // committed by the diagnostic itself — and a file whose rules cannot name
+    // a project at all got silence.
+    const target = project ?? rule.getProject?.()
 
     // A rule with a selector and no condition asserts nothing about what it
     // selected. Reported here so that R3b's gate can see proposal 019 at all:
@@ -92,13 +96,39 @@ export function diagnose(
       })
     }
 
-    for (const tree of rule.globs?.() ?? []) {
+    const trees = rule.globs?.() ?? []
+
+    // Silence here would be a false green in the tool built to remove false
+    // greens: five of the thirteen builders cannot name their project, so a
+    // rule file made entirely of `crossLayer()` or `resolvers()` rules used to
+    // report a clean bill of health and exit 0 with every one of its globs
+    // unchecked. Say so instead.
+    if (!target) {
+      if (trees.length > 0) {
+        findings.push({
+          kind: 'project-unknown',
+          rule: name,
+          advice:
+            'this rule declares globs but cannot name the project it was built against, so they were not checked — pass the project explicitly as diagnose(rules, project)',
+        })
+      }
+      continue
+    }
+    const universe = pathUniverse(target)
+
+    for (const tree of trees) {
       // Only diagnose sites inside a tree that is actually dead. A live tree
       // may still contain a dead site — `or(dead, live)` is a working rule —
       // and reporting the dead one there is the false red the tree exists to
       // prevent.
       if (!isDeadGlobTree(tree, universe)) continue
       for (const site of globSitesOf(tree)) {
+        // An exclusion matching zero is remedy-optional (proposal 006) and
+        // never a fault, and a positive condition glob is indistinguishable
+        // from an armed tripwire that has not fired. Reporting either asserts
+        // a remedy for a non-fault — and `position` used to be copied into the
+        // finding and never read, so both fired.
+        if (site.position === 'exclusion' || site.position === 'condition') continue
         if (!isDeadSite(site, universe)) continue
         findings.push(describe(site, name, universe, target))
       }

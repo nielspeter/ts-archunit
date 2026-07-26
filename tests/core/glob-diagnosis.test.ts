@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { diagnoseGlob, syntacticFault, FAULT_ADVICE } from '../../src/core/glob-diagnosis.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
-import { diskSet } from '../../src/core/disk-set.js'
+import { buildDiskSet, diskSet } from '../../src/core/disk-set.js'
 import type { GlobSite } from '../../src/core/glob-site.js'
 import type { ArchProject } from '../../src/core/project.js'
 
@@ -132,6 +132,58 @@ describe('the disk set', () => {
     expect(disk.classify('**/assets')).toBe('no-typescript')
     expect(disk.classify('**/not-a-real-directory')).toBe('absent')
 
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('degrades to not-determined above the entry budget', () => {
+    // The walk is unbounded in principle — a TypeScript monorepo may hold a
+    // Rust `target/` or a Python `.venv` — and a FAILING run that then hangs
+    // inside a 5s vitest timeout is worse than the false green this exists to
+    // remove. Above the budget it must say "not determined" rather than
+    // return a partial classification, which would be a confidently wrong
+    // fact.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-budget-'))
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    for (let i = 0; i < 40; i++) {
+      fs.writeFileSync(path.join(root, 'src', `f${String(i)}.ts`), 'export const x = 1\n')
+    }
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    const project = emptyProject(path.join(root, 'tsconfig.json'))
+
+    expect(buildDiskSet(project, 5).classify('**/src')).toBe('not-determined')
+    // ...and with headroom it answers for real, so the test is about the
+    // budget rather than about the temp directory being unreadable.
+    expect(buildDiskSet(project, 10_000).classify('**/src')).toBe('holds-typescript')
+
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('counts .d.ts as TypeScript', () => {
+    // A `types/` directory of pure declarations reported "this path exists but
+    // contains no TypeScript", which is false. They ARE TypeScript for the
+    // question this set answers.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-dts-'))
+    fs.mkdirSync(path.join(root, 'types'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'types', 'global.d.ts'), 'declare const x: number\n')
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    expect(diskSet(emptyProject(path.join(root, 'tsconfig.json'))).classify('**/types')).toBe(
+      'holds-typescript',
+    )
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('does not call an existing non-TypeScript file absent', () => {
+    // `absent` was derived from the TypeScript-only set, so any path holding a
+    // .md or .json was reported as not existing — and `absent` carries no
+    // advice, so the caller fell back to a cause list beginning "a path
+    // segment is misspelled".
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-nonts-'))
+    fs.mkdirSync(path.join(root, 'notes'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'notes', 'readme.md'), '# hi')
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    const disk = diskSet(emptyProject(path.join(root, 'tsconfig.json')))
+    expect(disk.classify('**/notes/readme.md')).toBe('no-typescript')
+    expect(disk.classify('**/notes/nothing-here.md')).toBe('absent')
     fs.rmSync(root, { recursive: true, force: true })
   })
 

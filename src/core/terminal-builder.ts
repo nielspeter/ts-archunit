@@ -26,8 +26,12 @@ export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
   protected _severity?: 'error' | 'warn'
-  private _exclusions: (string | RegExp)[] = []
-  private _silentIndices: Set<number> = new Set()
+  // `protected`, not `private`. `RuleBuilder` declared these `protected` before
+  // the single-root refactor and both classes are public exports, so narrowing
+  // them is a compile break for an external subclass — the same argument that
+  // kept `globs()` concrete rather than abstract.
+  protected _exclusions: (string | RegExp)[] = []
+  protected _silentIndices: Set<number> = new Set()
 
   /**
    * Attach a human-readable rationale to the rule.

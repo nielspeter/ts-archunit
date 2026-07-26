@@ -97,6 +97,15 @@ describe('globs() reaches every builder', () => {
     )
     .map(([name]) => name)
 
+  it('actually discovers the builders', () => {
+    // Guard the guard. `[].filter(...)` is `[]`, so short-circuiting the
+    // reflection to nothing left "every exported builder is classified"
+    // green — the guard's own question, answered "pass".
+    expect(discovered).toContain('ModuleRuleBuilder')
+    expect(discovered).toContain('ResolverRuleBuilder')
+    expect(discovered.length).toBeGreaterThanOrEqual(13)
+  })
+
   it('every exported builder is classified', () => {
     // `src/index.ts` does not export SchemaRuleBuilder or ResolverRuleBuilder
     // — they live behind the `./graphql` subpath — so reflecting over the main
@@ -209,9 +218,26 @@ describe('builders reached only through a chain', () => {
     ])
   })
 
-  it('slices().matching() declares base normalized, so it is not read as unanchored', () => {
+  it('slices().matching() declares the glob the MATCHER receives, not the one written', () => {
+    // `parseMatchingGlob` strips './' and '**/', normalises a trailing slash
+    // and appends '*/**', so the author's spelling is never handed to
+    // picomatch. Declaring it made every nested-layout rule report dead. The
+    // rewritten glob is the declaration; the spelling survives in `origin`,
+    // which is what the reader has to go and edit.
     const sites = rootExports.slices(p).matching('src/features/*').globs().flatMap(globSitesOf)
-    expect(sites.map((site) => site.base)).toEqual(['normalized'])
+    expect(sites.map((site) => site.glob)).toEqual(['**/src/features/**/**'])
+    expect(sites.map((site) => site.origin)).toEqual(['matching("src/features/*")'])
+  })
+
+  it('every equivalent matching() spelling declares the SAME glob', () => {
+    // The four spellings `parseMatchingGlob` documents as equivalent must
+    // reach the diagnosis as one string, or the two that are syntactically
+    // odd — unanchored, and './'-prefixed — get reported as faults on a
+    // working rule.
+    const declared = ['src/features/*', 'src/features/*/', './src/features/*', '**/src/features/*']
+      .map((glob) => rootExports.slices(p).matching(glob).globs().flatMap(globSitesOf))
+      .map((sites) => sites.map((site) => site.glob))
+    expect(new Set(declared.map((g) => JSON.stringify(g))).size).toBe(1)
   })
 
   it('slices().assignedFrom() declares one tree per named slice', () => {
@@ -224,6 +250,17 @@ describe('builders reached only through a chain', () => {
       'assignedFrom({ domain: "**/domain/**" })',
       'assignedFrom({ infra: "**/infra/**" })',
     ])
+  })
+
+  it('resolvers(p, glob) carries its glob into the declaration', () => {
+    // `resolvers()` filters eagerly and hands the builder only the surviving
+    // files, so without the threaded glob no `globs()` could ever report
+    // `resolvers(p, 'src/reslvers/**')`. Deleting the argument at the call
+    // site left the whole suite green: the reflection test proves the
+    // prototype owns a `globs`, not that it ever returns anything.
+    const sites = graphqlExports.resolvers(p, 'src/reslvers/**').globs().flatMap(globSitesOf)
+    expect(sites.map((site) => site.glob)).toEqual(['src/reslvers/**'])
+    expect(sites.map((site) => site.position)).toEqual(['discovery'])
   })
 
   it('a smell detector declares inFolder as file-path and ignorePaths as exclusion', () => {
