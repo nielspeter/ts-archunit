@@ -1,0 +1,190 @@
+/**
+ * The declaration side of plan 0069: what a glob is, and how a set of globs
+ * combines, so that "this rule can never match anything" is answerable without
+ * running the rule.
+ *
+ * Nothing here evaluates. Evaluation lives in `glob-diagnosis.ts`, against the
+ * path universe; this module only describes.
+ */
+
+/**
+ * Which string a glob is matched against.
+ *
+ * This names **the target**, never the API. `SmellBuilder.inFolder()` matches
+ * the full file path despite its name (`src/smells/duplicate-bodies.ts`), and
+ * exactly one selector in `src/` — `resideInFolder` — matches a directory.
+ * Two revisions of the plan's own census got this wrong by reading the method
+ * name, and each time reported a vacuous rule as satisfiable.
+ *
+ * - `file-path`   — the whole absolute path of the file
+ * - `parent-dir`  — the immediate parent directory of the file, and only the
+ *                   immediate parent: `resideInFolder` tests
+ *                   `filePath.substring(0, filePath.lastIndexOf('/'))`
+ * - `import-target` — a resolved module path or a bare specifier. Never
+ *                   checked against the path universe: `node_modules` is
+ *                   outside the project by construction, so checking it would
+ *                   fail every correct dependency rule in existence
+ * - `specifier`   — a raw module specifier
+ * - `literal`     — matched against source text, not a path
+ */
+export type GlobKind = 'file-path' | 'parent-dir' | 'import-target' | 'specifier' | 'literal'
+
+/**
+ * Where in a rule the glob was written, which decides whether being
+ * unsatisfiable is a fault.
+ *
+ * - `selector`  — narrows the subject set. Unsatisfiable ⇒ the rule can never
+ *                 have subjects
+ * - `discovery` — defines a population (slices, layers, boundary folders).
+ *                 Unsatisfiable ⇒ nothing to check
+ * - `condition` — asserts something about subjects. Unsatisfiable is
+ *                 indistinguishable from an armed tripwire that has not fired
+ * - `exclusion` — subtracts. An exclusion matching zero is remedy-optional
+ *                 (proposal 006) and never a fault
+ */
+export type GlobPosition = 'selector' | 'discovery' | 'condition' | 'exclusion'
+
+/**
+ * Which set of paths the glob is written against.
+ *
+ * Message-only, deliberately. An earlier revision let `base` select which view
+ * a glob was matched against, which makes a mis-declared `base` produce a
+ * false red **by construction** — on the one axis with no second derivation.
+ * The verdict is taken against the union of the views for the glob's `kind`;
+ * `base` only chooses the wording, so getting it wrong costs a worse sentence
+ * rather than a red build.
+ */
+export type GlobBase = 'absolute' | 'tsconfig-relative' | 'normalized'
+
+/**
+ * A glob as a predicate, condition or builder declares it.
+ *
+ * This is the author-facing half. `position` and `origin` are deliberately
+ * absent: the code that mints a site — inside `resideInFolder()`, several
+ * frames below any builder — cannot know either, and the builder stamps them
+ * on. Exposing them here would also let a rule author write
+ * `position: 'exclusion'` and permanently exempt their own predicate from the
+ * check, with no signal that they had.
+ */
+export interface DeclaredGlob {
+  readonly glob: string
+  readonly kind: GlobKind
+  /** Defaults to `'positive'`. A negative site can never be dead — see `GlobNode`. */
+  readonly polarity?: 'positive' | 'negative'
+  /** Defaults to `'absolute'`. Affects the message only. */
+  readonly base?: GlobBase
+}
+
+/** A declared glob after a builder has stamped on what only it knows. */
+export type GlobSite = DeclaredGlob & {
+  readonly position: GlobPosition
+  /** For the message: `resideInFolder("**\/src/x/**") in rule "adr005/no-any"`. */
+  readonly origin: string
+}
+
+/**
+ * A predicate or condition that declares no globs.
+ *
+ * Retained in the tree rather than dropped, and never dead. Dropping is safe
+ * under `all` — `some(dead)` is monotone — but `not()` turns an `all` into an
+ * `any`, and under `any` dropping an opaque child is what makes
+ * `or(deadGlob, exportSymbolNamed('Foo'))` red a working rule. Since most
+ * predicates declare no globs, that would have been the commonest failure of
+ * the whole mechanism.
+ *
+ * Retaining it costs no detection, removes the need for a separate `or()`
+ * propagation rule, and makes an empty node unreachable — which matters
+ * because `[].every()` is `true` and would otherwise fault a rule containing
+ * no globs at all. Verified exhaustively by
+ * `spikes/0069-tree-model-check.mjs`: 0 false reds and 0 missed emptiness
+ * across every expression of at most three combinator nodes.
+ */
+export interface OpaqueGlob {
+  readonly opaque: true
+}
+
+/** A leaf of the glob tree. */
+export type GlobLeaf = GlobSite | OpaqueGlob
+
+/**
+ * How a set of globs combines.
+ *
+ * - `all` — every child must match for the whole to match, so the whole is
+ *   dead if **any** child is dead. `and()`.
+ * - `any` — one child matching is enough, so the whole is dead only if
+ *   **every** child is dead. `or()`, a variadic predicate
+ *   (`importFrom(...globs)` is `matchers.some`), repeated `.inFolder()` calls.
+ *
+ * A preset's option list is **not** an `any` node: both shipped presets fan
+ * out one rule per glob (`src/presets/layered.ts`, `src/presets/boundaries.ts`),
+ * so one dead layer glob is one vacuous rule, and `any` would say "no fault
+ * unless every layer is dead" — a false green inside a preset. Each generated
+ * builder declares its own root instead.
+ */
+export interface GlobNode {
+  readonly op: 'any' | 'all'
+  readonly children: readonly (GlobNode | GlobLeaf)[]
+}
+
+/** Narrow a tree position to an interior node. */
+export function isGlobNode(value: GlobNode | GlobLeaf): value is GlobNode {
+  return 'op' in value
+}
+
+/** Narrow a leaf to the opaque case. */
+export function isOpaqueGlob(value: GlobNode | GlobLeaf): value is OpaqueGlob {
+  return 'opaque' in value
+}
+
+/** A single site as a one-element `any` node. */
+export function globNode(site: GlobSite): GlobNode {
+  return { op: 'any', children: [site] }
+}
+
+/**
+ * Negate a glob tree: invert `op` at every node **and** flip `polarity` at
+ * every site.
+ *
+ * A polarity flip alone is not enough, and the shortfall is not exotic — it is
+ * reachable through public exports, since `and()` returns a `Predicate<T>` and
+ * `not()` takes one. `not(and(live, not(dead)))` selects a non-empty set and
+ * would be reported dead; `not(or(live, not(dead)))` selects nothing and would
+ * be missed. Inverting `op` as well is the standard negation-normal-form
+ * push-down and fixes both directions, leaving every simpler case unchanged:
+ * `not(not(dead))` still faults, `not(and(a, b))` still does not.
+ */
+export function negateGlobs(node: GlobNode): GlobNode {
+  return {
+    op: node.op === 'all' ? 'any' : 'all',
+    children: node.children.map((child) =>
+      isGlobNode(child) ? negateGlobs(child) : negateLeaf(child),
+    ),
+  }
+}
+
+function negateLeaf(leaf: GlobLeaf): GlobLeaf {
+  if (isOpaqueGlob(leaf)) return leaf
+  return {
+    ...leaf,
+    polarity: (leaf.polarity ?? 'positive') === 'positive' ? 'negative' : 'positive',
+  }
+}
+
+/**
+ * Combine inputs into one node, treating a missing declaration as opaque.
+ *
+ * Every input contributes exactly one child, so the arity of the node always
+ * matches the arity of the combinator — which is what keeps `negateGlobs`
+ * sound and empty nodes unreachable.
+ */
+export function combineGlobs(
+  op: 'any' | 'all',
+  inputs: readonly (GlobNode | undefined)[],
+): GlobNode {
+  return {
+    op,
+    children: inputs.map((input) => input ?? OPAQUE),
+  }
+}
+
+const OPAQUE: OpaqueGlob = { opaque: true }
