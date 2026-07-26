@@ -2,6 +2,19 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 /**
+ * Where the repository or workspace root is, and how to make a path portable
+ * relative to it.
+ *
+ * Lives in `core/` rather than `helpers/` because two things in `core/` need
+ * it — violation identity and the disk set behind `outside-project` — and the
+ * `core must not import from helpers` dogfood rule is right: core is the
+ * foundation. This module depends on nothing but `node:fs` and `node:path`, so
+ * it always belonged here; it was in `helpers/` only because `baseline.ts`
+ * happened to need it first. That rule caught the misplacement the same day it
+ * was introduced.
+ */
+
+/**
  * Placeholder substituted for the identity root when hashing a violation.
  * Chosen to be something no real path contains.
  */

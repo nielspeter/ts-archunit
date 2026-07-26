@@ -14,7 +14,7 @@ import {
   discoverIdentityRoot,
   toPortablePath,
   normalizeIdentityText,
-} from '../../src/helpers/identity-root.js'
+} from '../../src/core/identity-root.js'
 
 const created: string[] = []
 

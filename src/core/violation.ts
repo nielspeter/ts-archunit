@@ -40,7 +40,7 @@ export interface ArchViolation {
    * within a rule: two distinct violations sharing one identity are one
    * violation to the baseline, and accepting either accepts both. Absolute
    * paths inside it are fine — they are normalised away with the rest
-   * (`src/helpers/identity-root.ts`).
+   * (`src/core/identity-root.ts`).
    *
    * The rendered output is unaffected; this is identity only.
    */

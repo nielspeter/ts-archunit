@@ -2,7 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { ArchViolation } from '../core/violation.js'
-import { discoverIdentityRoot, normalizeIdentityText, toPortablePath } from './identity-root.js'
+import {
+  discoverIdentityRoot,
+  normalizeIdentityText,
+  toPortablePath,
+} from '../core/identity-root.js'
 
 /**
  * Identity-hash format version.
