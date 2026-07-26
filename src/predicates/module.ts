@@ -3,29 +3,32 @@ import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { isTypeOnlyImport } from '../core/import-options.js'
+import { importCandidates } from '../core/import-candidates.js'
 
 /**
- * Resolve the import paths for a source file, optionally filtering out type-only imports.
- * Returns absolute paths for resolvable imports, raw specifiers for external packages.
+ * Every string a glob may be matched against, across every import in the file.
+ *
+ * Flattened rather than grouped per import: these predicates only ask "does
+ * ANY import match", so which import a candidate came from is not needed. See
+ * `importCandidates` for why one import can contribute two strings.
  */
-function getImportPaths(sourceFile: SourceFile, ignoreTypeImports = false): string[] {
+function importCandidatePaths(sourceFile: SourceFile, ignoreTypeImports = false): string[] {
   return sourceFile
     .getImportDeclarations()
     .filter((decl) => {
       if (!ignoreTypeImports) return true
       return !isTypeOnlyImport(decl)
     })
-    .map((decl) => {
-      const resolved = decl.getModuleSpecifierSourceFile()
-      return resolved ? resolved.getFilePath() : decl.getModuleSpecifierValue()
-    })
+    .flatMap((decl) => [...importCandidates(decl)])
 }
 
 /**
  * Matches modules that import from a path matching any of the given globs.
  *
- * The globs are matched against resolved absolute import paths.
- * For external (non-resolvable) imports, they match against the raw specifier.
+ * Each import contributes the resolved absolute path **and**, when the
+ * specifier is non-relative, the specifier as written; a glob matches the
+ * import if it matches either. So a bare package name works whether or not the
+ * package is installed. See `importCandidates` for why.
  *
  * @example
  * modules(p).that().importFrom('** /infrastructure/**')
@@ -42,7 +45,7 @@ export function importFrom(...args: [string[], ImportOptions] | string[]): Predi
   return {
     description: 'import from ' + globs.map((g) => `"${g}"`).join(', '),
     test: (sourceFile) =>
-      getImportPaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
+      importCandidatePaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
   }
 }
 
@@ -66,7 +69,7 @@ export function notImportFrom(
   return {
     description: 'not import from ' + globs.map((g) => `"${g}"`).join(', '),
     test: (sourceFile) =>
-      !getImportPaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
+      !importCandidatePaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
   }
 }
 

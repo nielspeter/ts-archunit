@@ -29,10 +29,12 @@ Write `'**/src/services/**'`, not `'src/services/**'`. This applies to
 path predicates like `resideInFolder()` / `resideInFile()`.
 
 **Import** globs need the anchor too, with one exception. They are matched against
-the _resolved_ absolute path, falling back to the raw specifier only when the import
-does not resolve — so a bare package name works as written
-(`importFrom('fastify')`), while anything path-shaped must be anchored
-(`notImportFrom('**/src/repositories/**')`).
+**both** the _resolved_ absolute path and — for non-relative specifiers only — the
+specifier exactly as written, and either may match. So a bare package name works as
+written (`importFrom('fastify')`), installed or not, while anything path-shaped must
+be anchored (`notImportFrom('**/src/repositories/**')`). A **relative** specifier is
+never matched as a raw string: `'../services/*'` is an unanchored glob and matches
+nothing, which is the diagnosis you want rather than a half-working match.
 
 Genuinely exempt: `.excluding()`, which takes an exact string or a `RegExp` rather
 than a glob; and the GraphQL entry points `schema()` / `resolvers()`, whose globs

@@ -42,9 +42,10 @@ path predicates like `resideInFolder()`. Anchoring `layers` but forgetting
 `shared` is the common half-fix: with `strict: true` that turns the no-op into a
 _false positive_ on imports your config actually permits.
 
-Import globs need it too: they match the _resolved_ absolute path and only fall back
-to the raw specifier for unresolvable imports, so `importFrom('fastify')` is fine but
-`notImportFrom('**/src/repositories/**')` needs the anchor.
+Import globs need it too, for the path-shaped ones. They are matched against **both**
+the resolved absolute path and — for non-relative specifiers only — the specifier as
+written, and either may match. So `notImportFrom('fastify')` works whether or not
+fastify is installed, while `notImportFrom('**/src/repositories/**')` needs the anchor.
 
 Three real exceptions: `matching()`, where `'src/features/*'`, `'src/features/*/'`
 and `'**/src/features/*'` are interchangeable; `.excluding()`, which takes an exact
