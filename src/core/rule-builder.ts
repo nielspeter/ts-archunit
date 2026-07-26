@@ -2,15 +2,11 @@ import type { ArchProject } from './project.js'
 import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
-import type { CheckOptions } from './check-options.js'
-import type { RuleMetadata } from './rule-metadata.js'
 import type { RuleDescription } from './rule-description.js'
-import type { SilentExclusion } from './silent-exclusion.js'
-import { isSilent } from './silent-exclusion.js'
-import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
+import { TerminalBuilder } from './terminal-builder.js'
 
 /**
- * Abstract base class for all rule builders.
+ * Abstract base class for the predicate/condition rule builders.
  *
  * Concrete entry points (plans 0007+) extend this and:
  * 1. Implement `getElements()` to return the elements to check
@@ -19,19 +15,30 @@ import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
  *
  * The builder accumulates predicates and conditions. Nothing executes
  * until a terminal method (`.check()`, `.warn()`, `.severity()`) is called.
+ *
+ * Extends `TerminalBuilder`, which owns everything that is not about the
+ * predicate/condition pipeline: `because`, `rule`, `excluding`, `violations`,
+ * `check`, `warn`, `asSeverity`, `severity`. Those used to exist twice, once
+ * here and once there, and the two copies had already drifted — this class's
+ * `excluding()` documented matching against element/file/message while the
+ * other still claimed element only, and the more accurate one was the one
+ * fewer builders inherited.
+ *
+ * The cost of the second root was not duplication, it was silent
+ * non-coverage: the materialized subject set (plan 0064) and the
+ * empty-selector guard (plan 0067) were added here and never reached the
+ * seven builders on the other branch. Plan 0069 needs `globs()` to reach all
+ * thirteen, so it goes on the root and the root is now singular.
  */
-export abstract class RuleBuilder<T> {
+export abstract class RuleBuilder<T> extends TerminalBuilder {
   protected _predicates: Predicate<T>[] = []
   protected _conditions: Condition<T>[] = []
-  protected _reason?: string
-  protected _metadata?: RuleMetadata
-  protected _exclusions: (string | RegExp)[] = []
-  protected _silentIndices: Set<number> = new Set()
   protected _phase: 'predicate' | 'condition' = 'predicate'
-  protected _severity?: 'error' | 'warn'
   protected _requireNonEmpty = false
 
-  constructor(protected readonly project: ArchProject) {}
+  constructor(protected readonly project: ArchProject) {
+    super()
+  }
 
   // --- Chain methods (grammar transitions) ---
 
@@ -89,72 +96,6 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
-   * Attach a human-readable rationale to the rule.
-   * Included in violation messages when `.check()` throws.
-   */
-  because(reason: string): this {
-    this._reason = reason
-    return this
-  }
-
-  /**
-   * Attach rich metadata to the rule.
-   * Provides educational context in violation output: why, how to fix, docs link.
-   *
-   * If `metadata.because` is set, it also sets the reason (same as `.because()`).
-   */
-  rule(metadata: RuleMetadata): this {
-    this._metadata = metadata
-    if (metadata.because) {
-      this._reason = metadata.because
-    }
-    return this
-  }
-
-  /**
-   * Exclude specific violations from reporting by matching against
-   * the violation's `element`, `file`, or `message` fields.
-   *
-   * Matched violations are silently suppressed. Use for permanent,
-   * intentional exceptions — not for temporary violations (use baseline for those).
-   *
-   * Patterns are matched against all three fields. Prefer anchored regexes
-   * or full string matches over short substrings, especially for `message`
-   * matching, to avoid accidentally suppressing unrelated violations whose
-   * messages happen to contain the same text.
-   *
-   * Emits a warning if an exclusion matches zero violations — so renamed
-   * or deleted exceptions don't silently stay in the rule.
-   *
-   * For narrowing a rule's scope at the predicate phase (so the rule never
-   * evaluates the excluded element), use `satisfy(not(<predicate>))` instead.
-   * See the "Excluding a file from a rule's scope" recipe in docs/recipes.md.
-   *
-   * @example
-   * // Exclude by element name (fully qualified)
-   * .excluding('Asset.getImageUrl')
-   *
-   * @example
-   * // Exclude by file path (regex anchored to suffix)
-   * .excluding(/repositories\/index\.ts$/)
-   *
-   * @example
-   * // Multiple exclusions, mixed forms
-   * .excluding('Asset.getImageUrl', /\/legacy\//, /generated/)
-   */
-  excluding(...patterns: (string | RegExp | SilentExclusion)[]): this {
-    for (const p of patterns) {
-      if (isSilent(p)) {
-        this._exclusions.push(p.pattern)
-        this._silentIndices.add(this._exclusions.length - 1)
-      } else {
-        this._exclusions.push(p)
-      }
-    }
-    return this
-  }
-
-  /**
    * Assert that the predicate chain matches at least one subject. If the
    * filtered subject set is empty, the rule FAILS with a config-level
    * meta-finding instead of passing vacuously — the "0 === 0" false-green
@@ -185,22 +126,6 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
-   * Execute the rule and return violations after exclusion filtering.
-   * Does not throw — use for programmatic access (presets, aggregation).
-   */
-  violations(): ArchViolation[] {
-    const raw = this.evaluate()
-    const filtered = applyFilters(raw, {
-      reason: this._reason,
-      metadata: this._metadata,
-      exclusions: this._exclusions,
-      silentIndices: this._silentIndices,
-    })
-    const sev: 'error' | 'warn' = this._severity ?? 'error'
-    return filtered.map((v) => ({ ...v, severity: sev }))
-  }
-
-  /**
    * Return the subject set this rule would evaluate: the elements matched by
    * the predicate chain (`.that()...`), before any condition runs. Executes the
    * predicate filter and returns the materialized set.
@@ -221,67 +146,12 @@ export abstract class RuleBuilder<T> {
   }
 
   /**
-   * Execute the rule and throw `ArchRuleError` if any violations are found.
-   * This is the primary terminal method — use in test assertions.
-   *
-   * @param options - Optional baseline and diff filtering
+   * The root's collection hook. `evaluate()` is this builder's pipeline —
+   * filter by predicates, run conditions, add the empty-selector finding —
+   * and the root's terminal methods do the rest.
    */
-  check(options?: CheckOptions): void {
-    const violations = this.evaluate()
-    executeCheck(
-      violations,
-      {
-        reason: this._reason,
-        metadata: this._metadata,
-        exclusions: this._exclusions,
-        silentIndices: this._silentIndices,
-      },
-      options,
-    )
-  }
-
-  /**
-   * Execute the rule and log violations to stderr. Does not throw.
-   * Use for rules that should warn but not fail CI.
-   *
-   * @param options - Optional baseline and diff filtering
-   */
-  warn(options?: CheckOptions): void {
-    const violations = this.evaluate()
-    executeWarn(
-      violations,
-      {
-        reason: this._reason,
-        metadata: this._metadata,
-        exclusions: this._exclusions,
-        silentIndices: this._silentIndices,
-      },
-      options,
-    )
-  }
-
-  /**
-   * Set the severity this rule reports at WITHOUT executing it (non-terminal).
-   * Returns `this` so the builder can be collected into a rule array and run by
-   * the CLI pipeline; its `.violations()` stamp each result with this severity.
-   * Distinct from the terminal `.severity()` below, which executes immediately.
-   */
-  asSeverity(level: 'error' | 'warn'): this {
-    this._severity = level
-    return this
-  }
-
-  /**
-   * Execute the rule with the given severity.
-   * `.severity('error')` is equivalent to `.check()`.
-   * `.severity('warn')` is equivalent to `.warn()`.
-   */
-  severity(level: 'error' | 'warn'): void {
-    if (level === 'error') {
-      this.check()
-    } else {
-      this.warn()
-    }
+  protected collectViolations(): ArchViolation[] {
+    return this.evaluate()
   }
 
   // --- Protected: for subclasses ---
@@ -328,8 +198,7 @@ export abstract class RuleBuilder<T> {
     Object.assign(fork, this)
     fork._predicates = [...this._predicates]
     fork._conditions = []
-    fork._exclusions = [...this._exclusions]
-    fork._silentIndices = new Set(this._silentIndices)
+    fork.adoptFilterState(this)
     fork._metadata = this._metadata ? { ...this._metadata } : undefined
     fork._reason = fork._metadata?.because ?? this._reason
     return fork

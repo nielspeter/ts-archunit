@@ -7,23 +7,26 @@ import { isSilent } from './silent-exclusion.js'
 import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 
 /**
- * Abstract base class for builders that share the terminal method pattern
- * (because, rule, excluding, check, warn, severity) but have different
- * element collection and evaluation models.
+ * The single root of every rule builder.
  *
- * Used by SliceRuleBuilder, SchemaRuleBuilder, ResolverRuleBuilder,
- * PairFinalBuilder, and SmellBuilder — all of which implement the same
- * terminal methods but differ in how they collect and evaluate elements.
+ * Owns the terminal-method pattern — `because`, `rule`, `excluding`,
+ * `describeRule`, `violations`, `check`, `warn`, `asSeverity`, `severity` —
+ * and leaves subclasses only `collectViolations()`, which differs because
+ * each builder has its own collection and evaluation model.
  *
- * RuleBuilder<T> does NOT extend this because it predates it and has
- * additional concerns (predicate/condition pipeline, fork semantics).
+ * `RuleBuilder<T>` extends this too, as of plan 0069. It used not to, and the
+ * old docstring here said so plainly: "RuleBuilder does NOT extend this
+ * because it predates it." The cost was not the duplicated methods, it was
+ * that every safety feature added to one root silently did not reach the
+ * builders on the other — which is what bug 0013 cost. Anything that must
+ * hold for all thirteen builders now has exactly one place to live.
  */
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
   protected _severity?: 'error' | 'warn'
-  private readonly _exclusions: (string | RegExp)[] = []
-  private readonly _silentIndices: Set<number> = new Set()
+  private _exclusions: (string | RegExp)[] = []
+  private _silentIndices: Set<number> = new Set()
 
   /**
    * Attach a human-readable rationale to the rule.
@@ -49,15 +52,39 @@ export abstract class TerminalBuilder {
   }
 
   /**
-   * Exclude specific elements from violation reporting.
+   * Exclude specific violations from reporting by matching against
+   * the violation's `element`, `file`, or `message` fields.
    *
    * Matched violations are silently suppressed. Use for permanent,
    * intentional exceptions — not for temporary violations (use baseline for those).
    *
-   * Matches against the violation's `element` field.
-   * Supports exact strings and regex patterns.
+   * Patterns are matched against all three fields. Prefer anchored regexes
+   * or full string matches over short substrings, especially for `message`
+   * matching, to avoid accidentally suppressing unrelated violations whose
+   * messages happen to contain the same text.
    *
-   * Emits a warning if an exclusion matches zero violations (stale exclusion).
+   * Emits a warning if an exclusion matches zero violations — so renamed
+   * or deleted exceptions don't silently stay in the rule.
+   *
+   * A configuration meta-finding — one that reports the rule enforces
+   * nothing — is never excludable, and an exclusion that would have matched
+   * one is reported as refused rather than as stale.
+   *
+   * For narrowing a rule's scope at the predicate phase (so the rule never
+   * evaluates the excluded element), use `satisfy(not(<predicate>))` instead.
+   * See the "Excluding a file from a rule's scope" recipe in docs/recipes.md.
+   *
+   * @example
+   * // Exclude by element name (fully qualified)
+   * .excluding('Asset.getImageUrl')
+   *
+   * @example
+   * // Exclude by file path (regex anchored to suffix)
+   * .excluding(/repositories\/index\.ts$/)
+   *
+   * @example
+   * // Multiple exclusions, mixed forms
+   * .excluding('Asset.getImageUrl', /\/legacy\//, /generated/)
    */
   excluding(...patterns: (string | RegExp | SilentExclusion)[]): this {
     for (const p of patterns) {
@@ -164,6 +191,20 @@ export abstract class TerminalBuilder {
     } else {
       this.warn()
     }
+  }
+
+  /**
+   * Give this builder independent copies of another's filter state.
+   *
+   * `RuleBuilder.fork()` shallow-copies every field, so without this a fork
+   * would share its parent's exclusion array by reference and `.excluding()`
+   * on one would silently mutate the other. The copy lives here rather than in
+   * `fork()` because these fields are private to this class — the knowledge of
+   * what needs deep-copying belongs where the fields do.
+   */
+  protected adoptFilterState(source: TerminalBuilder): void {
+    this._exclusions = [...source._exclusions]
+    this._silentIndices = new Set(source._silentIndices)
   }
 
   /**
