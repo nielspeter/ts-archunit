@@ -1,4 +1,5 @@
 import type { ArchViolation } from './violation.js'
+import type { GlobNode } from './glob-site.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import type { RuleDescription } from './rule-description.js'
@@ -191,6 +192,27 @@ export abstract class TerminalBuilder {
     } else {
       this.warn()
     }
+  }
+
+  /**
+   * Every glob declaration this rule makes, as independent trees.
+   *
+   * One entry per independent declaration, because each one dies on its own:
+   * a rule whose selector is satisfiable and whose discovery glob is not has
+   * exactly one fault, and reporting them as one tree would lose that.
+   *
+   * Concrete with an empty default rather than abstract. Making it abstract
+   * would enumerate every builder at compile time — genuinely attractive, and
+   * how the census refactor did it — but `RuleBuilder` and `TerminalBuilder`
+   * are both public exports, so an abstract member is a compile break for
+   * anyone who has subclassed them. R2a is the release people install in order
+   * to MEASURE before R3 flips anything; it cannot be the one that fails to
+   * compile. The vacuity that `abstract` would have caught is caught instead
+   * by a test that reflects over both entry points and fails a `return []`
+   * stub, which the compiler could not have done anyway.
+   */
+  globs(): readonly GlobNode[] {
+    return []
   }
 
   /**

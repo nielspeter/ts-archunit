@@ -2,6 +2,8 @@ import type { SourceFile } from 'ts-morph'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { Predicate } from '../core/predicate.js'
+import type { GlobNode } from '../core/glob-site.js'
+import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
@@ -56,8 +58,44 @@ export class ResolverRuleBuilder extends TerminalBuilder {
   private readonly _predicates: Predicate<ArchFunction>[] = []
   private readonly _conditions: Condition<ArchFunction>[] = []
 
-  constructor(private readonly sourceFiles: SourceFile[]) {
+  /**
+   * @param sourceFiles - The resolver files, already filtered by `resolvers()`.
+   * @param glob - The glob they were filtered by, for diagnostics only.
+   *
+   * `glob` is **optional** because this class is re-exported from the public
+   * `./graphql` subpath, so its constructor is public API and a required
+   * second parameter would break anyone constructing it directly — which
+   * would make R2a a breaking release, and R2a is the one people install in
+   * order to measure before R3. `resolvers()` always passes it.
+   *
+   * Threading it at all is the point: `resolvers()` filters eagerly and hands
+   * this builder only the surviving files, so without the glob string no
+   * `globs()` could ever report `resolvers(p, 'src/reslvers/**')` — the rule
+   * would silently examine zero resolvers and pass.
+   */
+  constructor(
+    private readonly sourceFiles: SourceFile[],
+    private readonly glob?: string,
+  ) {
     super()
+  }
+
+  /**
+   * The discovery glob, if `resolvers()` supplied it.
+   *
+   * `tsconfig-relative`: these globs are resolved against the tsconfig
+   * directory, not matched against absolute paths. That affects the wording
+   * of a message only — the verdict is taken against the union of views.
+   */
+  override globs(): readonly GlobNode[] {
+    if (this.glob === undefined) return []
+    return [
+      stampGlobs(
+        globAnyOf([this.glob], 'file-path', 'tsconfig-relative'),
+        'discovery',
+        (g) => `resolvers(p, "${g.glob}")`,
+      ),
+    ]
   }
 
   // --- Predicate methods ---

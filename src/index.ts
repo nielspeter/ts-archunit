@@ -33,6 +33,22 @@ export type { FormatOptions } from './core/format.js'
 // Core — custom predicate/condition factories
 export { definePredicate, defineCondition } from './core/define.js'
 
+// Glob declaration model (plan 0069). Exported because a user-written
+// predicate must be able to declare its globs — otherwise it is permanently
+// opaque, and any `or()` containing it can never be diagnosed.
+export type {
+  DeclaredGlob,
+  DeclaredGlobs,
+  GlobBase,
+  GlobKind,
+  GlobNode,
+  GlobPosition,
+  GlobSite,
+  GlobTree,
+  OpaqueGlob,
+} from './core/glob-site.js'
+export { combineGlobs, globAnyOf, globNode, negateGlobs, stampGlobs } from './core/glob-site.js'
+
 // Identity predicates
 export type { Named, Located, Exportable } from './predicates/index.js'
 export {

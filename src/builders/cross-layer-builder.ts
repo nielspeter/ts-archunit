@@ -4,6 +4,8 @@ import type { ArchProject } from '../core/project.js'
 import type { PairCondition } from '../core/pair-condition.js'
 import type { ConditionContext } from '../core/condition.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
+import type { GlobNode } from '../core/glob-site.js'
+import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 
 /**
@@ -145,6 +147,24 @@ export class PairFinalBuilder extends TerminalBuilder {
     private readonly condition: PairCondition,
   ) {
     super()
+  }
+
+  /**
+   * The layer globs, one tree each.
+   *
+   * Per layer rather than one `any` node, for the same reason as
+   * `assignedFrom`: a dead glob means that layer is empty, and every pair
+   * involving it is silently unchecked. Folding them together would report a
+   * fault only when EVERY layer was empty.
+   */
+  override globs(): readonly GlobNode[] {
+    return this.layers.map((layer) =>
+      stampGlobs(
+        globAnyOf([layer.pattern], 'file-path'),
+        'discovery',
+        (g) => `layer("${layer.name}", "${g.glob}")`,
+      ),
+    )
   }
 
   protected collectViolations() {

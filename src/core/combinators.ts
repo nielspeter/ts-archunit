@@ -1,5 +1,6 @@
 import type { Predicate } from './predicate.js'
 import type { TypeMatcher } from './type-matcher.js'
+import { combineGlobs, negateGlobs } from './glob-site.js'
 
 /**
  * Negates a predicate or type matcher.
@@ -23,6 +24,12 @@ export function not<T>(input: Predicate<T> | TypeMatcher): Predicate<T> | TypeMa
   return {
     description: `not (${input.description})`,
     test: (element: T) => !input.test(element),
+    // Negation-normal-form push-down: `op` inverts as well as `polarity`.
+    // `not(unsatisfiable)` selects everything, so a negated site is
+    // over-selection rather than vacuity and can never be a fault — but a
+    // `not` nested inside the subtree flips it back, which is why this cannot
+    // just flip polarity. See `negateGlobs`.
+    globs: input.globs && negateGlobs(input.globs),
   }
 }
 
@@ -60,6 +67,11 @@ export function and<T>(...inputs: (Predicate<T> | TypeMatcher)[]): Predicate<T> 
   return {
     description: predicates.map((p) => p.description).join(' and '),
     test: (element: T) => predicates.every((p) => p.test(element)),
+    // A conjunction selects nothing as soon as ONE input does.
+    globs: combineGlobs(
+      'all',
+      predicates.map((p) => p.globs),
+    ),
   }
 }
 
@@ -88,5 +100,12 @@ export function or<T>(...inputs: (Predicate<T> | TypeMatcher)[]): Predicate<T> |
   return {
     description: predicates.map((p) => p.description).join(' or '),
     test: (element: T) => predicates.some((p) => p.test(element)),
+    // A disjunction selects nothing only when EVERY input does. Inputs that
+    // declare no globs become retained opaque children rather than being
+    // dropped — dropping them here is what would red `or(deadGlob, byName)`.
+    globs: combineGlobs(
+      'any',
+      predicates.map((p) => p.globs),
+    ),
   }
 }

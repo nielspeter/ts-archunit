@@ -1,6 +1,8 @@
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
+import type { GlobNode } from '../core/glob-site.js'
+import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { Slice, SliceDefinition } from '../models/slice.js'
 import { resolveByMatching, resolveByDefinition, matchingGlobPrefix } from '../models/slice.js'
@@ -126,6 +128,41 @@ export class SliceRuleBuilder extends TerminalBuilder {
     this._discovery = { mode: 'assignedFrom', entries }
     this._slices = resolveByDefinition(this.project, definition)
     return this
+  }
+
+  /**
+   * The discovery globs this rule was scoped with.
+   *
+   * `assignedFrom` fans out into one slice per entry, so each entry is its own
+   * tree: one dead layer glob is one empty slice, and folding them into an
+   * `any` node would say "no fault unless every slice is empty" — a false
+   * green. This is the same reason a preset's option list is not an `any`
+   * node.
+   *
+   * `matching()` declares `base: 'normalized'` because `parseMatchingGlob`
+   * strips and re-adds the `**\/` anchor, so `'src/features/*'` is a correct
+   * spelling there and must not be reported unanchored. `base` affects only
+   * the wording of a message, never the verdict.
+   */
+  override globs(): readonly GlobNode[] {
+    if (!this._discovery) return []
+    if (this._discovery.mode === 'matching') {
+      const glob = this._discovery.glob
+      return [
+        stampGlobs(
+          globAnyOf([glob], 'file-path', 'normalized'),
+          'discovery',
+          (g) => `matching("${g.glob}")`,
+        ),
+      ]
+    }
+    return this._discovery.entries.map((entry) =>
+      stampGlobs(
+        globAnyOf([entry.glob], 'file-path'),
+        'discovery',
+        (g) => `assignedFrom({ ${entry.name}: "${g.glob}" })`,
+      ),
+    )
   }
 
   /**

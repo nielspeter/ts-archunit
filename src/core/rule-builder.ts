@@ -3,6 +3,8 @@ import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
 import type { RuleDescription } from './rule-description.js'
+import type { DeclaredGlob, GlobNode } from './glob-site.js'
+import { stampGlobs } from './glob-site.js'
 import { TerminalBuilder } from './terminal-builder.js'
 
 /**
@@ -143,6 +145,33 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    */
   subjects(): readonly T[] {
     return this.filterElements()
+  }
+
+  /**
+   * The selector and condition globs this rule declares.
+   *
+   * `position` is derived, not declared: a predicate registered while
+   * `_phase` is `'predicate'` is a selector, one registered after `.should()`
+   * is a condition. That is a structural fact about where the code is, which
+   * is why it is not on `DeclaredGlob` for an author to get wrong.
+   */
+  override globs(): readonly GlobNode[] {
+    const trees: GlobNode[] = []
+    for (const predicate of this._predicates) {
+      if (predicate.globs) {
+        trees.push(
+          stampGlobs(predicate.globs, 'selector', (g) => describeOrigin(predicate.description, g)),
+        )
+      }
+    }
+    for (const condition of this._conditions) {
+      if (condition.globs) {
+        trees.push(
+          stampGlobs(condition.globs, 'condition', (g) => describeOrigin(condition.description, g)),
+        )
+      }
+    }
+    return trees
   }
 
   /**
@@ -338,4 +367,18 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       docs: this._metadata?.docs,
     }
   }
+}
+
+/**
+ * Where a glob was written, for the message.
+ *
+ * The predicate's own description already names the API and the glob
+ * (`reside in folder matching "**\/src/x/**"`), so the origin is that
+ * description unless one predicate declared several globs — in which case the
+ * glob is appended to tell them apart.
+ */
+function describeOrigin(description: string, glob: DeclaredGlob): string {
+  return description.includes(`"${glob.glob}"`) || description.includes(`'${glob.glob}'`)
+    ? description
+    : `${description} ("${glob.glob}")`
 }

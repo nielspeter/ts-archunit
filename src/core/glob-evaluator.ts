@@ -35,7 +35,7 @@ export function isDeadGlobTree(node: GlobNode, universe: PathUniverse): boolean 
       node.children.length > 0 && node.children.every((child) => isDeadChild(child, universe))
 }
 
-function isDeadChild(child: GlobNode | GlobLeaf, universe: PathUniverse): boolean {
+function isDeadChild(child: GlobNode | GlobLeaf<GlobSite>, universe: PathUniverse): boolean {
   if (isGlobNode(child)) return isDeadGlobTree(child, universe)
   if (isOpaqueGlob(child)) return false
   return isDeadSite(child, universe)

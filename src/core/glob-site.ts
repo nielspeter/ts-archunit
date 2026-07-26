@@ -103,8 +103,8 @@ export interface OpaqueGlob {
   readonly opaque: true
 }
 
-/** A leaf of the glob tree. */
-export type GlobLeaf = GlobSite | OpaqueGlob
+/** A leaf of a glob tree: a declaration of some kind, or an opaque input. */
+export type GlobLeaf<L> = L | OpaqueGlob
 
 /**
  * How a set of globs combines.
@@ -121,24 +121,78 @@ export type GlobLeaf = GlobSite | OpaqueGlob
  * unless every layer is dead" — a false green inside a preset. Each generated
  * builder declares its own root instead.
  */
-export interface GlobNode {
+export interface GlobTree<L> {
   readonly op: 'any' | 'all'
-  readonly children: readonly (GlobNode | GlobLeaf)[]
+  readonly children: readonly (GlobTree<L> | GlobLeaf<L>)[]
 }
 
+/**
+ * What a predicate, condition or builder method declares.
+ *
+ * Its leaves are `DeclaredGlob`, which has no `position` and no `origin`, so
+ * a rule author **cannot** express "this is an exclusion" and thereby exempt
+ * their own predicate from the check. That is a type-level guarantee rather
+ * than a convention.
+ */
+export type DeclaredGlobs = GlobTree<DeclaredGlob>
+
+/** A declared tree after a builder has stamped position and origin onto it. */
+export type GlobNode = GlobTree<GlobSite>
+
 /** Narrow a tree position to an interior node. */
-export function isGlobNode(value: GlobNode | GlobLeaf): value is GlobNode {
+export function isGlobNode<L extends object>(
+  value: GlobTree<L> | GlobLeaf<L>,
+): value is GlobTree<L> {
   return 'op' in value
 }
 
 /** Narrow a leaf to the opaque case. */
-export function isOpaqueGlob(value: GlobNode | GlobLeaf): value is OpaqueGlob {
+export function isOpaqueGlob<L extends object>(
+  value: GlobTree<L> | GlobLeaf<L>,
+): value is OpaqueGlob {
   return 'opaque' in value
 }
 
-/** A single site as a one-element `any` node. */
-export function globNode(site: GlobSite): GlobNode {
-  return { op: 'any', children: [site] }
+/**
+ * A variadic declaration: any one of these globs matching is enough.
+ *
+ * `importFrom(...globs)` is `matchers.some`, so the set is dead only when
+ * every glob in it is — which is exactly `any`. Getting this wrong in the
+ * other direction is what the 0.18.1 withdrawal was.
+ */
+export function globAnyOf(
+  globs: readonly string[],
+  kind: GlobKind,
+  base?: GlobBase,
+): DeclaredGlobs {
+  return { op: 'any', children: globs.map((glob) => ({ glob, kind, base })) }
+}
+
+/** A single declaration as a one-element `any` tree. */
+export function globNode<L extends object>(leaf: L): GlobTree<L> {
+  return { op: 'any', children: [leaf] }
+}
+
+/**
+ * Stamp a declared tree with what only the builder knows.
+ *
+ * `origin` is a function of the declaration so each site can name itself —
+ * `resideInFolder("**\/src/x/**")` — rather than every site in one predicate
+ * sharing a single label.
+ */
+export function stampGlobs(
+  declared: DeclaredGlobs,
+  position: GlobPosition,
+  origin: (glob: DeclaredGlob) => string,
+): GlobNode {
+  return {
+    op: declared.op,
+    children: declared.children.map((child) => {
+      if (isGlobNode(child)) return stampGlobs(child, position, origin)
+      if (isOpaqueGlob(child)) return child
+      return { ...child, position, origin: origin(child) }
+    }),
+  }
 }
 
 /**
@@ -153,16 +207,16 @@ export function globNode(site: GlobSite): GlobNode {
  * push-down and fixes both directions, leaving every simpler case unchanged:
  * `not(not(dead))` still faults, `not(and(a, b))` still does not.
  */
-export function negateGlobs(node: GlobNode): GlobNode {
+export function negateGlobs<L extends DeclaredGlob>(tree: GlobTree<L>): GlobTree<L> {
   return {
-    op: node.op === 'all' ? 'any' : 'all',
-    children: node.children.map((child) =>
+    op: tree.op === 'all' ? 'any' : 'all',
+    children: tree.children.map((child) =>
       isGlobNode(child) ? negateGlobs(child) : negateLeaf(child),
     ),
   }
 }
 
-function negateLeaf(leaf: GlobLeaf): GlobLeaf {
+function negateLeaf<L extends DeclaredGlob>(leaf: GlobLeaf<L>): GlobLeaf<L> {
   if (isOpaqueGlob(leaf)) return leaf
   return {
     ...leaf,
@@ -177,10 +231,10 @@ function negateLeaf(leaf: GlobLeaf): GlobLeaf {
  * matches the arity of the combinator — which is what keeps `negateGlobs`
  * sound and empty nodes unreachable.
  */
-export function combineGlobs(
+export function combineGlobs<L extends object>(
   op: 'any' | 'all',
-  inputs: readonly (GlobNode | undefined)[],
-): GlobNode {
+  inputs: readonly (GlobTree<L> | undefined)[],
+): GlobTree<L> {
   return {
     op,
     children: inputs.map((input) => input ?? OPAQUE),

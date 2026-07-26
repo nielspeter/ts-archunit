@@ -1,6 +1,7 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
+import { globAnyOf } from '../core/glob-site.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { isTypeOnlyImport } from '../core/import-options.js'
 import { importCandidates } from '../core/import-candidates.js'
@@ -43,6 +44,7 @@ export function importFrom(...args: [string[], ImportOptions] | string[]): Predi
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
+    globs: globAnyOf(globs, 'import-target'),
     description: 'import from ' + globs.map((g) => `"${g}"`).join(', '),
     test: (sourceFile) =>
       importCandidatePaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),
@@ -67,6 +69,10 @@ export function notImportFrom(
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
+    // `import-target` is never checked against the path universe: an installed
+    // package resolves into node_modules, which is outside the project by
+    // construction, so checking it would fail every correct dependency rule.
+    globs: globAnyOf(globs, 'import-target'),
     description: 'not import from ' + globs.map((g) => `"${g}"`).join(', '),
     test: (sourceFile) =>
       !importCandidatePaths(sourceFile, ignoreType).some((p) => matchers.some((m) => m(p))),

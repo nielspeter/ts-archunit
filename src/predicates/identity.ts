@@ -1,6 +1,7 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
+import { globNode } from '../core/glob-site.js'
 
 /** Types that have a name — ClassDeclaration, FunctionDeclaration, InterfaceDeclaration, etc. */
 export interface Named {
@@ -74,6 +75,7 @@ export function haveNameEndingWith<T extends Named>(suffix: string): Predicate<T
 export function resideInFile<T extends Located>(glob: string): Predicate<T> {
   const isMatch = picomatch(glob)
   return {
+    globs: globNode({ glob, kind: 'file-path' }),
     description: `reside in file matching "${glob}"`,
     test: (element) => isMatch(element.getSourceFile().getFilePath()),
   }
@@ -90,6 +92,10 @@ export function resideInFile<T extends Located>(glob: string): Predicate<T> {
 export function resideInFolder<T extends Located>(glob: string): Predicate<T> {
   const isMatch = picomatch(glob)
   return {
+    // `parent-dir`, not `file-path`: the test below reads the directory
+    // portion, so this glob is matched against the immediate parent and
+    // nothing else. It is the only selector in src/ that does.
+    globs: globNode({ glob, kind: 'parent-dir' }),
     description: `reside in folder matching "${glob}"`,
     test: (element) => {
       const filePath = element.getSourceFile().getFilePath()
@@ -122,6 +128,7 @@ export function resideInFolder<T extends Located>(glob: string): Predicate<T> {
 export function havePathMatching(glob: string): Predicate<SourceFile> {
   const isMatch = picomatch(glob)
   return {
+    globs: globNode({ glob, kind: 'file-path' }),
     description: `have path matching "${glob}"`,
     test: (sourceFile) => isMatch(sourceFile.getFilePath()),
   }
