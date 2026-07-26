@@ -55,18 +55,23 @@ Standing rule for this plan: **no count appears in it that was not derived on th
 
 A rule that cannot match anything passes. Measured:
 
-| Where                              | What                                                                                                                                          |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| This repo (2026-07-26)             | 13 dogfood rules select nothing outside a checkout named `ts-archunit`; 1 selects nothing everywhere and hides a live violation               |
-| This repo's own suite (2026-07-25) | 8 tests assert on rules that select nothing — one **encodes the false green as expected behaviour** (`tests/smells/smell-builder.test.ts:78`) |
-| An adopting codebase (2026-07-25)  | 7 rule sites, **2 of them security rules** — JWT verification and internal-route auth, both guarding nothing                                  |
+| Where                              | What                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| This repo (2026-07-26)             | 13 dogfood rules select nothing outside a checkout named `ts-archunit`; 1 selects nothing everywhere and hides a live violation                          |
+| This repo's own suite (2026-07-26) | **35** tests across 19 files assert on a rule whose selector matches nothing — see below; the earlier figure of 8 was wrong and, worse, not reproducible |
+| An adopting codebase (2026-07-25)  | 7 rule sites, **2 of them security rules** — JWT verification and internal-route auth, both guarding nothing                                             |
 
 `.expectNonEmpty()` exists for this and is opt-in. The adopting team calls it eight times (2026-07-25), in the same files as their seven vacuous rules. Opt-in does not work.
 
 Derivation status of each row, because two of the three are not yet reproducible:
 
 - **Row 1** — `node spikes/0069-glob-census.mjs`: 35 path-glob sites, 16 import-target sites exempt, **1 matching nothing** (`arch-rules.test.ts:567`). The 13 is a separate one-line grep (`grep -c "ts-archunit/src" tests/archunit/arch-rules.test.ts` → 13), confirmed by rerunning the universe with the checkout renamed: 14 parent directories match here, **0** renamed.
-- **Row 2** — dated but **not reproducible by anything committed**. R3 "ships with the 8 vacuous-test fixes in the same commit", so an inaccurate 8 makes that commit incomplete by construction. Given that draft 5's "four documented promises" turned out to be 13, **the 8 must be re-derived before R3 is cut**, and that is a precondition, not a nicety.
+- **Row 2** — re-derived 2026-07-26, and it was **35, not 8**. Method, reproducible in one edit: set `_requireNonEmpty = true` in `src/core/rule-builder.ts` and run the suite. 35 tests fail across 19 files.
+
+  That is the **blast radius, not the defect count**, and the distinction is the work R3b actually has to do. Most of the 35 are legitimate — `.notExist()` rules where zero subjects is the passing state, and tests whose entire point is an empty selection (`resideInFolder with nonexistent folder matches nothing`). But some are genuine, and one is a clean specimen: `tests/integration/coverage-gaps.test.ts:480` is named `finds interfaces extending Entity` and its body asserts that `extendType('NonExistentBase')` produces no violations. The name and the body disagree, the body asserts on an empty set, and its own comment records the author losing track mid-test.
+
+  **Classifying all 35 is a precondition for R3b**, not R3a. What can be asserted today is only that the previous figure was wrong by more than 4× and that nobody could have checked it.
+
 - **Row 3** — the adopting codebase, 2026-07-25. Not reproducible here by design.
 
 ---

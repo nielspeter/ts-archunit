@@ -150,7 +150,7 @@ Rule files use the same API as test files.
 ### Severity
 
 Every rule is an **error** by default — a violation fails the run. Mark a rule as
-a non-failing **warning** with the non-terminal `.asSeverity('warn')`; it is still
+a non-failing **warning** with the non-terminal `.asSeverity('warn')` (with one exception ([configuration findings](/violation-reporting#the-one-thing-warn-cannot-silence))); it is still
 reported, but does not fail:
 
 ```typescript

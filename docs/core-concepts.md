@@ -217,17 +217,17 @@ repositories.should().beExported().check()
 
 ## Enforcement Model
 
-| Method                 | Behavior                              |
-| ---------------------- | ------------------------------------- |
-| `.check()`             | Fail on any violation                 |
-| `.warn()`              | Log violations, don't fail            |
-| `.check({ baseline })` | Fail only on new violations           |
-| `.excluding(...)`      | Permanently suppress named violations |
+| Method                 | Behavior                                                   |
+| ---------------------- | ---------------------------------------------------------- |
+| `.check()`             | Fail on any violation                                      |
+| `.warn()`              | Log violations, don't fail (except configuration findings) |
+| `.check({ baseline })` | Fail only on new violations                                |
+| `.excluding(...)`      | Permanently suppress named violations                      |
 
 ## `.check()` vs `.warn()`
 
 - **`.check()`** -- throws `ArchRuleError` on violations (test fails, CI blocks)
-- **`.warn()`** -- logs violations to stderr (test passes, advisory only)
+- **`.warn()`** -- logs violations to stderr (test passes, advisory only) — with one exception ([configuration findings](/violation-reporting#the-one-thing-warn-cannot-silence))
 
 ```typescript
 // Hard rule: blocks CI

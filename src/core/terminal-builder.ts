@@ -1,4 +1,5 @@
 import type { ArchViolation } from './violation.js'
+import { severityFor } from './violation.js'
 import type { GlobNode } from './glob-site.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
@@ -131,7 +132,7 @@ export abstract class TerminalBuilder {
       silentIndices: this._silentIndices,
     })
     const sev: 'error' | 'warn' = this._severity ?? 'error'
-    return filtered.map((v) => ({ ...v, severity: sev }))
+    return filtered.map((v) => ({ ...v, severity: severityFor(v, sev) }))
   }
 
   /**

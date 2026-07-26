@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A finding that a rule enforces nothing can no longer be downgraded or silenced.** These are _configuration_ findings — an empty selector, an empty slice discovery, an empty correspondence side, an empty layer, a baseline that matched nothing — and they report that the rule is not checking anything. They now always report at `error`, and `.warn()` throws for them.
+
+  Three of the four ways to quiet a finding already refused: `.excluding()` says so out loud, baseline and diff skip them. `.warn()` was the gap, and five of the six producers set no severity at all, so on that path every one resolved to `warn` — a finding saying "this rule can never fire", reported as advice, on the surface the docs recommend for gradual adoption. An inline `// ts-archunit-exclude` comment cannot suppress one either; that was true only by accident before, because these findings carry no file path.
+
 ### Fixed
 
 - **`notImportFrom('fastify')` now matches an installed fastify** ([bug 0014](./bugs/0014-bare-package-import-globs-match-nothing.md)). Import globs were matched against the resolved path **or** the raw specifier, never both — so a package that resolves, which is every package you actually depend on, could only be matched by its `node_modules` path. The documented way to ban a dependency worked exclusively on dependencies you had not installed. Measured against this repo's own source: `notImportFrom('picomatch')` reported **0** violations while 15 files imported it. It now reports 15, the same as the path-glob form `'**/picomatch/**'`.
@@ -17,7 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Upgrading
 
-This changes results in **two directions**, and the second is easy to miss.
+**`.warn()` can now throw.** Only for a configuration finding, never for an ordinary violation, and the thrown error carries **only** those findings — your ordinary violations are still logged exactly as before. `.severity('warn')` and `.asSeverity('warn')` reach the same place. `.violations()` remains the non-throwing programmatic surface.
+
+There are five findings that trigger it, all pre-existing: empty selector (`.expectNonEmpty()`), empty slice discovery, empty correspondence side, empty cross-layer layer, and a baseline entry that matched nothing. If a rule of yours was warning about one of these, it was telling you the rule does not work — and now it fails instead.
+
+**One hazard worth knowing** if you have a self-executing rule file: `rule1.warn(); rule2.check()` used to evaluate both, because `.warn()` could not throw. If `rule1` now throws, module evaluation stops and `rule2` is never registered. The `export default [rule1, rule2]` shape is unaffected, and the CLI reports the truncation rather than absorbing it.
+
+---
+
+The import-glob change below also changes results in **two directions**, and the second is easy to miss.
 
 **Bans get louder (green → red).** `notImportFrom`, `notImportFromCondition` and `onlyHaveTypeImportsFrom` now match bare package names, so a ban you wrote against an installed package starts reporting. Those findings are real: the rule was enforcing nothing before.
 

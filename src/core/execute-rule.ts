@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import type { ArchViolation } from './violation.js'
+import { severityFor } from './violation.js'
 import type { CheckOptions, OutputFormat } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import { ArchRuleError } from './errors.js'
@@ -111,7 +112,15 @@ export function applyFilters(
     })
 
     if (allComments.length > 0) {
-      result = result.filter((v) => !isExcludedByComment(v, allComments))
+      // `v.bypassFilters` explicitly, not by accident. These findings are
+      // immune today only because they carry `file: ''`, so `readFileSync('')`
+      // throws into the catch above and `comment.file === ''` can never hold.
+      // The moment one carries a real path — and `doctor` reporting glob
+      // origins is exactly that temptation — an `// arch-ignore` would
+      // silently suppress the finding that says the rule enforces nothing.
+      result = result.filter(
+        (v) => v.bypassFilters === true || !isExcludedByComment(v, allComments),
+      )
     }
   }
 
@@ -133,9 +142,17 @@ export function applyFilters(
   return result
 }
 
-/** Stamp any un-stamped violation with a default severity (per-violation wins). */
+/**
+ * Stamp any un-stamped violation with a default severity (per-violation wins),
+ * except a configuration meta-finding, which is always `error`.
+ *
+ * This is the site that mattered most and read as the safest: `?? severity`
+ * looks conservative, but five of the six `bypassFilters` producers set no
+ * severity at all, so on the `executeWarn` path every one of them resolved to
+ * `warn` — a finding saying "this rule enforces nothing", reported as advice.
+ */
 function stampSeverity(violations: ArchViolation[], severity: 'error' | 'warn'): ArchViolation[] {
-  return violations.map((v) => ({ ...v, severity: v.severity ?? severity }))
+  return violations.map((v) => ({ ...v, severity: severityFor(v, v.severity ?? severity) }))
 }
 
 /**
@@ -199,7 +216,22 @@ export function executeCheck(
 
 /**
  * Execute the terminal "warn" action: apply options, format, log to stderr.
- * Advisory — writes to stderr (json/terminal) and never throws.
+ *
+ * Advisory for ordinary violations, which are logged exactly as before and
+ * never throw. **A `bypassFilters` configuration finding throws**, carrying
+ * only those findings.
+ *
+ * `.warn()` says "this rule's violations are advisory". A finding that the
+ * rule enforces nothing is not a violation of the rule — it reports that the
+ * rule cannot fire — and there is nothing advisory about that. Leaving the
+ * hole open would make `.warn()` the documented escape hatch for exactly the
+ * class of finding this release exists to surface, on exactly the
+ * gradual-adoption audience the docs point at it.
+ *
+ * The payload matters as much as the throw: an error carrying 200 warn-level
+ * violations plus one meta-finding would make "these findings are true" false
+ * for 200 of 201 entries. `.violations()` remains the non-throwing
+ * programmatic surface.
  */
 export function executeWarn(
   violations: ArchViolation[],
@@ -224,5 +256,11 @@ export function executeWarn(
     } else {
       console.warn(formatViolations(stamped, ctx.reason))
     }
+
+    // Logged first, then thrown: the ordinary violations still reach the
+    // reader on the surface they chose, and only the configuration findings
+    // reach the error.
+    const configFindings = stamped.filter((v) => v.bypassFilters === true)
+    if (configFindings.length > 0) throw new ArchRuleError(configFindings, ctx.reason)
   }
 }

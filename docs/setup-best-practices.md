@@ -14,7 +14,7 @@ Add rules in this order. Each rung is safe to stop on.
 
 ## Severity: error vs warn
 
-Every rule is an **error** by default — a violation fails the run (and CI). Mark a rule as a non-failing **warning** with the non-terminal `.asSeverity('warn')`:
+Every rule is an **error** by default — a violation fails the run (and CI). Mark a rule as a non-failing **warning** with the non-terminal `.asSeverity('warn')` — with one exception ([configuration findings](/violation-reporting#the-one-thing-warn-cannot-silence)):
 
 ```typescript
 export default [

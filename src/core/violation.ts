@@ -139,6 +139,28 @@ function isTopLevelDeclaration(node: Node): boolean {
  * Falls back to the node's kind name only if no named ancestor is found
  * (e.g., top-level expressions in a module).
  */
+/**
+ * Force a configuration meta-finding to `error`, whatever the rule asked for.
+ *
+ * A `bypassFilters` finding reports that the rule enforces **nothing**. That is
+ * not a violation the author gets to grade: `.asSeverity('warn')` says "these
+ * violations are advisory", and a rule that cannot fire has no violations to
+ * be advisory about. Under ADR-008 rule 1 an actionable finding must fail, and
+ * three of the four suppression paths already refuse to silence these —
+ * `.excluding()` refuses explicitly, baseline and diff honour the flag.
+ *
+ * Applied at all three severity-stamping sites. `stampSeverity` alone is not
+ * enough: `.violations()` inlines its own map in both root builders, and the
+ * `executeWarn` path resolves an unset severity to `warn`, which is where five
+ * of the six producers landed.
+ */
+export function severityFor(
+  violation: ArchViolation,
+  fallback: 'error' | 'warn',
+): 'error' | 'warn' {
+  return violation.bypassFilters === true ? 'error' : fallback
+}
+
 export function getElementName(node: Node): string {
   const directName = getNodeName(node)
   if (directName !== undefined) return directName

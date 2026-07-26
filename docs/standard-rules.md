@@ -267,7 +267,7 @@ modules(p)
 
 **Note:** Both static `import` declarations and dynamic `import()` expressions with string-literal specifiers are resolved. Only `require()` calls and dynamic imports with computed specifiers (variables, template literals with substitutions) are not resolved.
 
-**Monorepo note:** In a multi-workspace project, exports consumed by sibling workspaces are invisible to a single `project()` call. Use `workspace()` to unify the import graph across workspaces. See [Getting Started — Monorepo Setup](/getting-started#monorepo-setup).
+**Monorepo note:** In a multi-workspace project, exports consumed by sibling workspaces are invisible to a single `project()` call. Use `workspace()` to unify the import graph across workspaces. See [Modules — Monorepo Setup](/modules#monorepo-setup).
 
 ### Unused export detection
 

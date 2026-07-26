@@ -49,14 +49,24 @@ Logs violations to stderr but does not throw. The test passes. Use for advisory 
 classes(p).that().haveDecorator('Deprecated').should().notExist().warn()
 ```
 
+#### The one thing `.warn()` cannot silence
+
+A **configuration finding** — one that reports the rule enforces _nothing_, such as an empty selector or an empty slice discovery — always throws, whatever terminal you use, and is always reported at `error` severity.
+
+`.warn()` says "this rule's violations are advisory". A rule that cannot fire has no violations to be advisory about: the finding is not that your code is wrong, it is that the rule is not checking anything. Three of the four ways to quiet a finding already refused these — `.excluding()` says so out loud, and both baseline and diff skip them — and `.warn()` was the gap.
+
+The thrown error carries **only** the configuration findings; ordinary violations are still logged exactly as before. `.violations()` remains the non-throwing programmatic surface if you need to inspect rather than fail.
+
+This applies to `.severity('warn')` and to `.asSeverity('warn')` too — both reach the same place.
+
 ### When to Use Which
 
-| Scenario                                  | Method                                                         |
-| ----------------------------------------- | -------------------------------------------------------------- |
-| Hard constraint the team agreed on        | `.check()`                                                     |
-| Aspirational rule being gradually adopted | `.warn()`                                                      |
-| New rule with many existing violations    | `.warn()` or use [baseline mode](/core-concepts#baseline-mode) |
-| Deprecated code tracking                  | `.warn()`                                                      |
+| Scenario                                  | Method                                                                                   |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Hard constraint the team agreed on        | `.check()`                                                                               |
+| Aspirational rule being gradually adopted | `.warn()` (still fails on a [configuration finding](#the-one-thing-warn-cannot-silence)) |
+| New rule with many existing violations    | `.warn()` or use [baseline mode](/core-concepts#baseline-mode)                           |
+| Deprecated code tracking                  | `.warn()`                                                                                |
 
 ## Rule Metadata with `.rule()`
 

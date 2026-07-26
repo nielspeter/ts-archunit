@@ -63,7 +63,7 @@ it('architecture holds', () => {
 
 `checkAll` also takes `{ baseline, diff, format }` — the same options as `.check()`.
 
-For a non-failing warning, use the terminal `.warn()` (logs, does not throw):
+For a non-failing warning, use the terminal `.warn()` (logs, does not throw with one exception ([configuration findings](/violation-reporting#the-one-thing-warn-cannot-silence))):
 
 ```typescript
 it('no empty catches (advisory)', () => {
