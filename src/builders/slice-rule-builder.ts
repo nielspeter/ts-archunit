@@ -3,12 +3,16 @@ import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
-import { matchingGlobPattern } from '../models/slice.js'
 import type { GlobFault } from '../core/glob-diagnosis.js'
 import { FAULT_ADVICE, GLOB_DOCS, syntacticFault } from '../core/glob-diagnosis.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { Slice, SliceDefinition } from '../models/slice.js'
-import { resolveByMatching, resolveByDefinition, matchingGlobPrefix } from '../models/slice.js'
+import {
+  resolveByMatching,
+  resolveByDefinition,
+  matchingGlobPrefix,
+  matchingGlobPattern,
+} from '../models/slice.js'
 import {
   beFreeOfCycles as beFreeOfCyclesCondition,
   respectLayerOrder as respectLayerOrderCondition,
@@ -114,9 +118,15 @@ export class SliceRuleBuilder extends TerminalBuilder {
       // nested-layout rule as dead. `origin` keeps the spelling, which is what
       // the reader needs to find the line.
       const authored = this._discovery.glob
+      // `resolveByMatching` bails before matching anything when the glob has no
+      // literal directory prefix ('*', '**', 'src'), because the slice name is
+      // the segment after that prefix and there is none. Decidable from the
+      // glob alone, so declare a glob that cannot match rather than let the
+      // pre-flight stay silent about a rule the runtime guard will fail.
+      const unresolvable = matchingGlobPrefix(authored) === ''
       return [
         stampGlobs(
-          globAnyOf([matchingGlobPattern(authored)], 'file-path'),
+          globAnyOf([unresolvable ? NEVER_MATCHES : matchingGlobPattern(authored)], 'file-path'),
           'discovery',
           () => `matching("${authored}")`,
         ),
@@ -389,3 +399,10 @@ export class SliceRuleBuilder extends TerminalBuilder {
 export function slices(p: ArchProject): SliceRuleBuilder {
   return new SliceRuleBuilder(p)
 }
+
+/**
+ * A glob no path can match, for declaring a discovery that cannot resolve for
+ * a reason the glob itself does not express. Anchored, so it is reported as
+ * `no-match` rather than as a syntax fault whose remedy would be nonsense.
+ */
+const NEVER_MATCHES = '**/\u0000never-matches'

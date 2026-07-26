@@ -1,6 +1,7 @@
 import type { ArchProject } from './project.js'
 import type { GlobPosition, GlobSite } from './glob-site.js'
-import type { GlobFault, OnDisk } from './glob-diagnosis.js'
+import type { GlobFault } from './glob-diagnosis.js'
+import type { OnDisk } from './disk-set.js'
 import { diagnoseGlob, FAULT_ADVICE, ON_DISK_ADVICE } from './glob-diagnosis.js'
 import { globSitesOf, isDeadSite } from './glob-evaluator.js'
 import { pathUniverse } from './path-universe.js'
@@ -30,7 +31,7 @@ export interface DiagnosableRule extends RuleBuilderLike {
    */
   assertsSomething?: () => boolean
   /** The project this rule was built against. */
-  getProject?: () => ArchProject
+  getProject?: () => ArchProject | undefined
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -80,7 +81,13 @@ export function diagnose(
     // checked against the wrong universe — the documented monorepo hazard,
     // committed by the diagnostic itself — and a file whose rules cannot name
     // a project at all got silence.
-    const target = project ?? rule.getProject?.()
+    // The rule's own project WINS over the parameter. Backwards, the parameter
+    // silently re-checks every rule against one universe — which is the
+    // documented monorepo hazard the paragraph above complains about, and the
+    // `project-unknown` advice used to recommend it. The parameter is a
+    // fallback for rules that cannot name a project, which is the only case it
+    // was ever needed for.
+    const target = rule.getProject?.() ?? project
 
     // A rule with a selector and no condition asserts nothing about what it
     // selected. Reported here so that R3b's gate can see proposal 019 at all:
@@ -109,7 +116,7 @@ export function diagnose(
           kind: 'project-unknown',
           rule: name,
           advice:
-            'this rule declares globs but cannot name the project it was built against, so they were not checked — pass the project explicitly as diagnose(rules, project)',
+            'this rule declares globs but cannot say which project it was built against, so they were not checked. A builder constructed directly rather than through its entry point has no project to report',
         })
       }
       continue

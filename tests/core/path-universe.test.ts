@@ -5,6 +5,7 @@
  * for an all-ancestors walk left the entire suite green — the plan's own
  * headline false green, unguarded in the code that fixes it.
  */
+import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
@@ -26,9 +27,19 @@ function loadProject(): ArchProject {
 describe('pathUniverse', () => {
   const universe = pathUniverse(loadProject())
 
-  it('holds every project file, and the fixture is not empty', () => {
-    // Guard the guard: two empty sets agree about everything.
-    expect(universe.filePaths.length).toBeGreaterThan(0)
+  it('holds every project file', () => {
+    // Not merely "non-empty": silently dropping a file makes LIVE globs look
+    // dead, which is the false-red direction, and every other test here
+    // derives `parentDirs` from the same `filePaths` so they stay internally
+    // consistent with a truncated set. Compared against a filesystem walk —
+    // the same independent derivation `arch-rules.test.ts` uses.
+    const onDisk = fs
+      .readdirSync(path.join(fixturesDir, 'src'), { recursive: true, encoding: 'utf-8' })
+      .filter((entry) => entry.endsWith('.ts'))
+    expect(onDisk.length).toBeGreaterThan(0)
+    expect(universe.filePaths).toHaveLength(onDisk.length)
+    expect(universe.filePaths.some((f) => f.endsWith('/auth/login.ts'))).toBe(true)
+    expect(universe.filePaths.some((f) => f.endsWith('/billing/invoice.ts'))).toBe(true)
   })
 
   it('the folder view is immediate parents, NOT all ancestors', () => {

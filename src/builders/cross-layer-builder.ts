@@ -55,8 +55,8 @@ function computePairs(
  *
  * @example
  * crossLayer(project)
- *   .layer('routes', 'src/routes/**')
- *   .layer('schemas', 'src/schemas/**')
+ *   .layer('routes', '**\/src/routes/**')
+ *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('Route', '') === b.getBaseName().replace('Schema', ''))
  *   .forEachPair()
  *   .should(haveMatchingCounterpart())
@@ -203,8 +203,8 @@ export class PairFinalBuilder extends TerminalBuilder {
  *
  * @example
  * crossLayer(project)
- *   .layer('routes', 'src/routes/**')
- *   .layer('schemas', 'src/schemas/**')
+ *   .layer('routes', '**\/src/routes/**')
+ *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('-route', '') === b.getBaseName().replace('-schema', ''))
  *   .forEachPair()
  *   .should(haveMatchingCounterpart())

@@ -34,6 +34,7 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   }
 
   const rules: DiagnosableRule[] = []
+  let failedToLoad = false
   for (const file of args.ruleFiles) {
     try {
       rules.push(...(await loadRuleFiles([file])))
@@ -44,10 +45,28 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
       // commonest legacy rule-file shape and abandons every remaining file,
       // so the gate cannot be run on the population it was invented for.
       if (!(error instanceof ArchRuleError)) throw error
+      // `loadRuleFiles` accumulates into a local array and returns it only
+      // after its own loop, so when the import throws NOTHING from that file
+      // survives. Saying "diagnosing what loaded" would be false, and
+      // swallowing it silently turned a visible crash into `exit 0` plus a
+      // clean bill of health — the ADR-008 rule 1 failure this command exists
+      // to surface, committed by the command.
       process.stderr.write(
-        `Note: ${file} executed its rules at import; diagnosing what loaded before it threw.\n`,
+        `Error: ${file} executes its rules at import and threw, so none of it could be ` +
+          `diagnosed. Leave builders un-terminated in a rule file (see docs/running-in-tests).\n`,
       )
+      failedToLoad = true
     }
+  }
+
+  if (failedToLoad && rules.length === 0) return 1
+
+  // Nothing to diagnose is not the same as nothing wrong. The earlier guard
+  // checked `args.ruleFiles.length`, which is the wrong derivation: a file
+  // exporting `[]` reached this point and reported a clean bill of health.
+  if (rules.length === 0) {
+    process.stderr.write('Error: no rules found in the given files.\n')
+    return 1
   }
 
   const findings = diagnose(rules)

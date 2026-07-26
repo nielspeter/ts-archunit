@@ -3,7 +3,6 @@ import path from 'node:path'
 import picomatch from 'picomatch'
 import type { ArchProject } from './project.js'
 import { discoverIdentityRoot } from './identity-root.js'
-import type { OnDisk } from './glob-diagnosis.js'
 
 /**
  * Directories never worth walking.
@@ -51,6 +50,22 @@ const ENTRY_BUDGET = 50_000
 // pure declarations report "this path exists but contains no TypeScript",
 // which is false.
 const TS_FILE = /\.(m|c)?tsx?$/
+
+/**
+ * What the filesystem says about a glob that the compiler's file set does not.
+ *
+ * Only populated for `no-match` — the other faults are syntactic and the disk
+ * has nothing to add. `not-determined` is the honest answer above the walk's
+ * entry budget, or where the walk refused to look.
+ *
+ * Declared here rather than in `glob-diagnosis.ts` because this is the module
+ * that produces it: the other way round made the two files import each other.
+ * Both edges were `import type` and therefore erased at runtime — but our own
+ * `arch/no-cycles` rule slices by directory, so it could not see a cycle
+ * INSIDE `core/`, and a per-file slicing in a test found it immediately. A
+ * cycle nothing can see is the shape this whole plan is about.
+ */
+export type OnDisk = 'holds-typescript' | 'no-typescript' | 'absent' | 'not-determined'
 
 /**
  * What the filesystem knows that the compiler's file set does not.
@@ -113,6 +128,16 @@ function build(project: ArchProject, budgetLimit: number): DiskSet {
   /** Every file, TypeScript or not — so `absent` means absent, not "not TypeScript". */
   const everyFile: string[] = []
   const dirs: string[] = []
+  /**
+   * Directories the walk refused to enter.
+   *
+   * A glob matching one of these cannot be classified: nothing under it was
+   * seen. Reporting `absent` would say "this path does not exist" about
+   * `**\/dist/**` or `**\/vendor/**` — all realistic rule scopes — and
+   * `absent` carries no advice, so the caller then falls back to a cause list
+   * beginning "a path segment is misspelled".
+   */
+  const pruned: string[] = []
   let budget = budgetLimit
   let exhausted = false
 
@@ -134,8 +159,16 @@ function build(project: ArchProject, budgetLimit: number): DiskSet {
       // `Dirent.isDirectory()` is false for a symlink under `withFileTypes`,
       // so symlink loops are impossible by construction. Do not "fix" this
       // with `statSync`, which follows them.
+      //
+      // The cost: a symlinked source directory — pnpm and yarn workspaces
+      // create them — is recorded as a file, so a glob naming it classifies
+      // `no-typescript`. Wrong, but wrong in the direction that only weakens a
+      // message; following the link risks a walk that never terminates.
       if (entry.isDirectory()) {
-        if (PRUNE.has(entry.name)) continue
+        if (PRUNE.has(entry.name)) {
+          pruned.push(full)
+          continue
+        }
         dirs.push(full)
         walk(full)
       } else {
@@ -178,7 +211,12 @@ function build(project: ArchProject, budgetLimit: number): DiskSet {
       // Never `everything.some(isMatch)` — picomatch reads the array index as
       // its second argument and returns a truthy object from index 1 onwards.
       const matched = everything.filter((candidate) => isMatch(candidate))
-      if (matched.length === 0) return 'absent'
+      if (matched.length === 0) {
+        // Not seen is not the same as not there.
+        return pruned.some((dir) => isMatch(dir) || glob.includes(dir.slice(root.length + 1)))
+          ? 'not-determined'
+          : 'absent'
+      }
       // Per GLOB, not per path: one glob routinely matches paths in both
       // categories — `**/tests/**` matched 44 directories of mixed kind on the
       // monorepo this was gated against. Any matched path holding TypeScript

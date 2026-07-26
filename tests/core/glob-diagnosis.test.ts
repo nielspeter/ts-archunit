@@ -10,7 +10,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, onTestFinished } from 'vitest'
 import { Project } from 'ts-morph'
 import { diagnoseGlob, syntacticFault, FAULT_ADVICE } from '../../src/core/glob-diagnosis.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
@@ -37,6 +37,25 @@ function emptyProject(tsConfigPath: string): ArchProject {
     _project: new Project({ useInMemoryFileSystem: true }),
     getSourceFiles: () => [],
   }
+}
+
+/**
+ * A throwaway directory that is cleaned up even when an assertion fails, and
+ * whose `.git` marker pins `discoverIdentityRoot` to it.
+ *
+ * Both matter. `fs.rmSync` as the last statement of a test leaks the tree on
+ * the failure path — which is the path these tests exist to take. And without
+ * the marker the root discovery walks ancestors looking for `.git`, a
+ * workspace marker or any `package.json`, so what gets walked depends on
+ * where the OS put the temp directory.
+ */
+function tempRoot(prefix: string): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+  onTestFinished(() => {
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+  fs.writeFileSync(path.join(root, '.git'), '')
+  return root
 }
 
 const site = (glob: string, kind: GlobSite['kind'] = 'file-path'): GlobSite => ({
@@ -120,7 +139,7 @@ describe('the disk set', () => {
     // The `docs/` case. A directory whose only TypeScript lives one level down
     // must not be reported as containing none — that is a false statement in
     // the one message whose entire defence is that it states only facts.
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-disk-'))
+    const root = tempRoot('archunit-disk-')
     fs.mkdirSync(path.join(root, 'docs', 'nested'), { recursive: true })
     fs.writeFileSync(path.join(root, 'docs', 'nested', 'config.ts'), 'export const x = 1\n')
     fs.mkdirSync(path.join(root, 'assets'), { recursive: true })
@@ -131,8 +150,6 @@ describe('the disk set', () => {
     expect(disk.classify('**/docs')).toBe('holds-typescript')
     expect(disk.classify('**/assets')).toBe('no-typescript')
     expect(disk.classify('**/not-a-real-directory')).toBe('absent')
-
-    fs.rmSync(root, { recursive: true, force: true })
   })
 
   it('degrades to not-determined above the entry budget', () => {
@@ -142,7 +159,7 @@ describe('the disk set', () => {
     // remove. Above the budget it must say "not determined" rather than
     // return a partial classification, which would be a confidently wrong
     // fact.
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-budget-'))
+    const root = tempRoot('archunit-budget-')
     fs.mkdirSync(path.join(root, 'src'), { recursive: true })
     for (let i = 0; i < 40; i++) {
       fs.writeFileSync(path.join(root, 'src', `f${String(i)}.ts`), 'export const x = 1\n')
@@ -154,22 +171,19 @@ describe('the disk set', () => {
     // ...and with headroom it answers for real, so the test is about the
     // budget rather than about the temp directory being unreadable.
     expect(buildDiskSet(project, 10_000).classify('**/src')).toBe('holds-typescript')
-
-    fs.rmSync(root, { recursive: true, force: true })
   })
 
   it('counts .d.ts as TypeScript', () => {
     // A `types/` directory of pure declarations reported "this path exists but
     // contains no TypeScript", which is false. They ARE TypeScript for the
     // question this set answers.
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-dts-'))
+    const root = tempRoot('archunit-dts-')
     fs.mkdirSync(path.join(root, 'types'), { recursive: true })
     fs.writeFileSync(path.join(root, 'types', 'global.d.ts'), 'declare const x: number\n')
     fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
     expect(diskSet(emptyProject(path.join(root, 'tsconfig.json'))).classify('**/types')).toBe(
       'holds-typescript',
     )
-    fs.rmSync(root, { recursive: true, force: true })
   })
 
   it('does not call an existing non-TypeScript file absent', () => {
@@ -177,20 +191,19 @@ describe('the disk set', () => {
     // .md or .json was reported as not existing — and `absent` carries no
     // advice, so the caller fell back to a cause list beginning "a path
     // segment is misspelled".
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-nonts-'))
+    const root = tempRoot('archunit-nonts-')
     fs.mkdirSync(path.join(root, 'notes'), { recursive: true })
     fs.writeFileSync(path.join(root, 'notes', 'readme.md'), '# hi')
     fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
     const disk = diskSet(emptyProject(path.join(root, 'tsconfig.json')))
     expect(disk.classify('**/notes/readme.md')).toBe('no-typescript')
     expect(disk.classify('**/notes/nothing-here.md')).toBe('absent')
-    fs.rmSync(root, { recursive: true, force: true })
   })
 
   it('classifies per GLOB, so a glob straddling both categories reports the tsconfig cause', () => {
     // One glob routinely matches paths of both kinds — `**/tests/**` matched
     // 44 directories of mixed kind on the monorepo this was gated against.
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-straddle-'))
+    const root = tempRoot('archunit-straddle-')
     fs.mkdirSync(path.join(root, 'pkg', 'a'), { recursive: true })
     fs.mkdirSync(path.join(root, 'pkg', 'b'), { recursive: true })
     fs.writeFileSync(path.join(root, 'pkg', 'a', 'index.ts'), 'export const x = 1\n')
@@ -200,7 +213,5 @@ describe('the disk set', () => {
     expect(diskSet(emptyProject(path.join(root, 'tsconfig.json'))).classify('**/pkg/*')).toBe(
       'holds-typescript',
     )
-
-    fs.rmSync(root, { recursive: true, force: true })
   })
 })

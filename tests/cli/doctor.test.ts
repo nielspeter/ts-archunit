@@ -12,15 +12,26 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { runDoctor } from '../../src/cli/commands/doctor.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '../..')
+const FIXTURE_TSCONFIG = path.join(repoRoot, 'tests/fixtures/modules/tsconfig.json')
+const REPO_TSCONFIG = path.join(repoRoot, 'tsconfig.json')
 let workDir: string
 
-/** A rule file importing the live source, so it exercises the real builders. */
-function writeRuleFile(name: string, body: string): string {
+/**
+ * A rule file importing the live source, so it exercises the real builders.
+ *
+ * `tsconfig` defaults to a small FIXTURE project. Pointing every case at the
+ * repository's own tsconfig loaded 430+ files through ts-morph inside a worker
+ * competing with 165 other test files: the first case took 1585ms against a
+ * 5000ms default timeout and flaked under load. A flake in a suite whose whole
+ * method is sabotage is worse than an ordinary one — it produces a red for the
+ * wrong reason, and next time it will produce a red that hides a real green.
+ */
+function writeRuleFile(name: string, body: string, tsconfig = FIXTURE_TSCONFIG): string {
   const file = path.join(workDir, name)
   fs.writeFileSync(
     file,
-    `import { project, modules } from '${repoRoot}/src/index.js'\n` +
-      `const p = project('${repoRoot}/tsconfig.json')\n` +
+    `import { project, modules } from ${JSON.stringify(repoRoot + '/src/index.js')}\n` +
+      `const p = project(${JSON.stringify(tsconfig)})\n` +
       `export default [\n${body}\n]\n`,
   )
   return file
@@ -40,16 +51,41 @@ describe('runDoctor', () => {
     // one nobody acts on.
     const file = writeRuleFile(
       'dead.rules.ts',
-      `  modules(p).that().resideInFolder('**/src/reslvers/**').should().notHaveDefaultExport().rule({ id: 'x/typo' }),`,
+      `  modules(p).that().resideInFolder('**/reslvers/**').should().notHaveDefaultExport().rule({ id: 'x/typo' }),`,
     )
-    const code = await runDoctor({ ruleFiles: [file], format: 'json' })
-    expect(code).toBe(1)
+    expect(await runDoctor({ ruleFiles: [file], format: 'json' })).toBe(1)
+    // BOTH exit paths, because they are separate `return` statements and only
+    // the json one was covered.
+    expect(await runDoctor({ ruleFiles: [file], format: 'terminal' })).toBe(1)
+  })
+
+  it('exits non-zero when a rule file throws at import', async () => {
+    // `loadRuleFiles` returns nothing when the import throws, so tolerating the
+    // error without this check turned a visible crash into exit 0 plus a clean
+    // bill of health.
+    const file = path.join(workDir, 'selfexec.rules.ts')
+    fs.writeFileSync(
+      file,
+      `import { project, modules } from ${JSON.stringify(repoRoot + '/src/index.js')}\n` +
+        `const p = project(${JSON.stringify(FIXTURE_TSCONFIG)})\n` +
+        `modules(p).that().resideInFolder('**/domain/**').should().notExist().check()\n` +
+        `export default []\n`,
+    )
+    expect(await runDoctor({ ruleFiles: [file], format: 'json' })).toBe(1)
+  })
+
+  it('exits non-zero on a rule file that exports no rules', async () => {
+    // The earlier guard checked `args.ruleFiles.length`, which is the wrong
+    // derivation: a file exporting `[]` reached the report and was called clean.
+    const file = path.join(workDir, 'empty.rules.ts')
+    fs.writeFileSync(file, 'export default []\n')
+    expect(await runDoctor({ ruleFiles: [file], format: 'json' })).toBe(1)
   })
 
   it('exits zero on a rule file with nothing wrong', async () => {
     const file = writeRuleFile(
       'clean.rules.ts',
-      `  modules(p).that().resideInFolder('**/src/core/**').should().notHaveDefaultExport().rule({ id: 'x/ok' }),`,
+      `  modules(p).that().resideInFolder('**/domain/**').should().notHaveDefaultExport().rule({ id: 'x/ok' }),`,
     )
     const code = await runDoctor({ ruleFiles: [file], format: 'json' })
     expect(code).toBe(0)
@@ -60,8 +96,8 @@ describe('runDoctor', () => {
     // ratchet against instead of fixing the findings.
     const file = writeRuleFile(
       'two.rules.ts',
-      `  modules(p).that().resideInFolder('**/src/nope-a/**').should().notHaveDefaultExport().rule({ id: 'x/a' }),\n` +
-        `  modules(p).that().resideInFolder('**/src/nope-b/**').should().notHaveDefaultExport().rule({ id: 'x/b' }),`,
+      `  modules(p).that().resideInFolder('**/nope-a/**').should().notHaveDefaultExport().rule({ id: 'x/a' }),\n` +
+        `  modules(p).that().resideInFolder('**/nope-b/**').should().notHaveDefaultExport().rule({ id: 'x/b' }),`,
     )
     const out: string[] = []
     const original = process.stderr.write.bind(process.stderr)
@@ -77,13 +113,15 @@ describe('runDoctor', () => {
     const text = out.join('')
     expect(text).toContain('x/a')
     expect(text).toContain('x/b')
-    expect(text).toContain('**/src/nope-a/**')
-    // Structural, not a guess at one phrasing. The previous form was
-    // `/\b2 (findings|problems|issues)\b/`, and appending the most natural
-    // spelling of the banned thing — "Total: 2 rules cannot enforce
-    // anything." — slipped straight through it.
-    expect(text).not.toMatch(/\d+\s+\w*\s*(finding|rule|glob|problem|issue)/i)
-    expect(text).not.toMatch(/\btotal\b/i)
+    expect(text).toContain('**/nope-a/**')
+    // Structural, so no phrasing can slip through. Two guesses at a wording
+    // already have: `/\b2 (findings|problems|issues)\b/` missed "Total: 2
+    // rules...", and the wider noun list missed "Summary: 2 items need
+    // attention." Every non-blank line belongs to a finding — three per
+    // finding, nothing else — so a total has nowhere to live. Derived from the
+    // rule file this test wrote, not pinned.
+    const lines = text.split('\n').filter((line) => line.trim() !== '')
+    expect(lines).toHaveLength(2 * 3)
   })
 
   it('states what the filesystem knows, and asserts no remedy for it', async () => {
@@ -95,6 +133,7 @@ describe('runDoctor', () => {
     const file = writeRuleFile(
       'excluded.rules.ts',
       `  modules(p).that().resideInFolder('**/examples/**').should().notHaveDefaultExport().rule({ id: 'x/excluded' }),`,
+      REPO_TSCONFIG,
     )
     const chunks: string[] = []
     const original = process.stdout.write.bind(process.stdout)

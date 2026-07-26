@@ -2,7 +2,7 @@ import picomatch from 'picomatch'
 import type { GlobSite } from './glob-site.js'
 import type { PathUniverse } from './path-universe.js'
 import { viewsFor } from './path-universe.js'
-import type { DiskSet } from './disk-set.js'
+import type { DiskSet, OnDisk } from './disk-set.js'
 
 /**
  * Why a glob matches nothing.
@@ -21,15 +21,6 @@ import type { DiskSet } from './disk-set.js'
  * acts on it.
  */
 export type GlobFault = 'dot-segment' | 'unanchored' | 'file-not-folder' | 'no-match'
-
-/**
- * What the filesystem says about a glob that the compiler's file set does not.
- *
- * Only populated for `no-match` — the other faults are syntactic and the disk
- * has nothing to add. `not-determined` is the honest answer above the walk's
- * entry budget.
- */
-export type OnDisk = 'holds-typescript' | 'no-typescript' | 'absent' | 'not-determined'
 
 export interface GlobDiagnosis {
   readonly fault: GlobFault

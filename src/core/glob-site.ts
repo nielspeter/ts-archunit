@@ -83,7 +83,11 @@ export interface DeclaredGlob {
   readonly kind: GlobKind
   /** Defaults to `'positive'`. A negative site can never be dead — see `GlobNode`. */
   readonly polarity?: 'positive' | 'negative'
-  /** Defaults to `'absolute'`. Affects the message only. */
+  /**
+   * Defaults to `'absolute'`. **Affects the verdict** — see `GlobBase`. An
+   * unanchored glob is dead for `'absolute'` and correct for a base whose
+   * entry point rewrites or relativises it.
+   */
   readonly base?: GlobBase
 }
 

@@ -52,9 +52,9 @@ function isDeadChild(child: GlobNode | GlobLeaf<GlobSite>, universe: PathUnivers
  * 2. **Against the universe** — anchored, well-formed, and nothing there.
  *
  * The syntactic check is not redundant, and leaving it out was a live false
- * green caught by a test: the universe carries a tsconfig-relative view, so
- * that `base` can stay message-only for satisfiability — and `'src/domain/**'`
- * matches `src/domain` in THAT view while matching nothing at runtime, where
+ * green caught by a test: the universe carries a tsconfig-relative view so
+ * that a wrong `base` cannot make a glob look UNmatched — and `'src/domain/**'`
+ * matches `src/domain` in that view while matching nothing at runtime, where
  * `resideInFolder` reads absolute paths. Unanchored globs are the commonest
  * real mistake and the entire subject of the 0.18.1 release, so a design that
  * quietly calls them satisfiable defeats its own purpose.

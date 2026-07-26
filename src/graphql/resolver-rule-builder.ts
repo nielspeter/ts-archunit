@@ -90,9 +90,11 @@ export class ResolverRuleBuilder extends TerminalBuilder {
   /**
    * The discovery glob, if `resolvers()` supplied it.
    *
-   * `tsconfig-relative`: these globs are resolved against the tsconfig
-   * directory, not matched against absolute paths. That affects the wording
-   * of a message only — the verdict is taken against the union of views.
+   * `tsconfig-relative` is load-bearing, not cosmetic: it is what exempts this
+   * glob from the anchor check, because `resolvers(p, 'src/resolvers/**')` — the
+   * spelling in this class's own example — is correct as written. Declared
+   * `'absolute'` it would be reported unanchored, telling the author to break a
+   * working rule.
    */
   override globs(): readonly GlobNode[] {
     if (this.glob === undefined) return []
