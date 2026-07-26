@@ -60,16 +60,23 @@ export function isAnchored(glob: string): boolean {
 export function syntacticFault(
   glob: string,
   kind: GlobSite['kind'],
+  base: GlobSite['base'] = 'absolute',
 ): 'dot-segment' | 'unanchored' | undefined {
   // A './' anywhere — not just leading — makes the glob unmatchable, and
   // adding '**/' in front of it does not help ('**/./src/**' still matches
-  // nothing).
+  // nothing). True for every base.
   if (/(?:^|\/)\.\//.test(glob)) return 'dot-segment'
+
   // Exempt for the kinds that are not paths: after the bug 0014 fix,
   // `notImportFrom('fastify')` is a working rule and `isAnchored('fastify')`
   // is false.
   const isPathKind = kind === 'file-path' || kind === 'parent-dir'
-  if (isPathKind && !isAnchored(glob)) return 'unanchored'
+
+  // And exempt for the bases where a relative glob is the CORRECT spelling.
+  // `slices().matching()` strips and re-adds the anchor, and `resolvers()`
+  // resolves against the tsconfig directory; telling either of them to anchor
+  // would be telling the user to break a working rule.
+  if (isPathKind && base === 'absolute' && !isAnchored(glob)) return 'unanchored'
   return undefined
 }
 
@@ -90,7 +97,7 @@ export function diagnoseGlob(
   universe: PathUniverse,
   diskSet?: DiskSet,
 ): GlobDiagnosis {
-  const syntactic = syntacticFault(site.glob, site.kind)
+  const syntactic = syntacticFault(site.glob, site.kind, site.base)
   if (syntactic) return { fault: syntactic }
 
   // A `parent-dir` glob that matches a FILE and no directory is the

@@ -54,6 +54,11 @@ export abstract class SmellBuilder extends TerminalBuilder {
     return this
   }
 
+  /** The project this detector was built against. See `RuleBuilder.getProject`. */
+  getProject(): ArchProject {
+    return this.project
+  }
+
   /**
    * The globs this detector was scoped with.
    *

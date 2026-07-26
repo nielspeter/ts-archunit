@@ -9,6 +9,7 @@ import { runCheck } from './commands/check.js'
 import { runBaseline } from './commands/baseline.js'
 import { runExplain } from './commands/explain.js'
 import { runInit } from './commands/init.js'
+import { runDoctor } from './commands/doctor.js'
 import { watchAndRerun } from './watch.js'
 
 function getVersion(): string {
@@ -233,6 +234,15 @@ export async function run(args: string[]): Promise<void> {
     await handleBaseline(ruleFiles, values.output ?? 'arch-baseline.json')
   } else if (command === 'explain') {
     await handleExplain(ruleFiles, values.markdown, values.format)
+  } else if (command === 'doctor') {
+    // Experimental and deliberately absent from HELP_TEXT: removing a
+    // documented command later is its own breaking change, and `doctor`'s life
+    // after R3 has not been decided. Hidden is what defers that decision.
+    const code = await runDoctor({
+      ruleFiles,
+      format: values.format === 'json' ? 'json' : 'terminal',
+    })
+    if (code !== 0) process.exitCode = code
   } else {
     console.error(`Error: Unknown command "${command}". Use --help for usage.`)
     process.exitCode = 1

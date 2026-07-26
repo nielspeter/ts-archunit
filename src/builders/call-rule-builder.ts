@@ -239,14 +239,6 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
   // --- Public accessors (used by plan 0015 within()) ---
 
   /**
-   * Get the underlying ArchProject.
-   * Used by within() to create scoped builders.
-   */
-  getProject(): ArchProject {
-    return this.project
-  }
-
-  /**
    * Get the ArchCall elements that match the current predicate chain.
    * Used by within() to extract callbacks from matched calls.
    */

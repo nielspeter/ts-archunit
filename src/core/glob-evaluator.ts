@@ -3,6 +3,7 @@ import type { GlobLeaf, GlobNode, GlobSite } from './glob-site.js'
 import { isGlobNode, isOpaqueGlob } from './glob-site.js'
 import type { PathUniverse } from './path-universe.js'
 import { viewsFor } from './path-universe.js'
+import { syntacticFault } from './glob-diagnosis.js'
 
 /**
  * Whether a glob tree can never match anything in this project.
@@ -44,6 +45,20 @@ function isDeadChild(child: GlobNode | GlobLeaf<GlobSite>, universe: PathUnivers
 /**
  * Whether one site's glob matches nothing in the project.
  *
+ * Two independent ways to be dead, and both are needed:
+ *
+ * 1. **Syntactically** — `'src/domain/**'` on a predicate that matches
+ *    absolute paths can never match, whatever the project contains.
+ * 2. **Against the universe** — anchored, well-formed, and nothing there.
+ *
+ * The syntactic check is not redundant, and leaving it out was a live false
+ * green caught by a test: the universe carries a tsconfig-relative view, so
+ * that `base` can stay message-only for satisfiability — and `'src/domain/**'`
+ * matches `src/domain` in THAT view while matching nothing at runtime, where
+ * `resideInFolder` reads absolute paths. Unanchored globs are the commonest
+ * real mistake and the entire subject of the 0.18.1 release, so a design that
+ * quietly calls them satisfiable defeats its own purpose.
+ *
  * Only `file-path` and `parent-dir` are checkable; `viewsFor` returns no views
  * for the others, and a site with no views is never dead.
  */
@@ -51,6 +66,7 @@ export function isDeadSite(site: GlobSite, universe: PathUniverse): boolean {
   if ((site.polarity ?? 'positive') === 'negative') return false
   const views = viewsFor(universe, site.kind)
   if (views.length === 0) return false
+  if (syntacticFault(site.glob, site.kind, site.base) !== undefined) return true
   const isMatch = picomatch(site.glob)
   // Never `view.some(isMatch)` — picomatch reads the array index as its
   // second argument and returns a truthy object from index 1 onwards.

@@ -175,6 +175,28 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   }
 
   /**
+   * The project this rule was built against.
+   *
+   * Used by `within()` to create scoped builders, and by `doctor` to find the
+   * project to compare globs against — which must be the one the rules
+   * actually ran on, not one the CLI guessed at.
+   */
+  getProject(): ArchProject {
+    return this.project
+  }
+
+  /**
+   * Whether this rule asserts anything about the elements it selected.
+   *
+   * `.that()...` with no `.should()` selects a set and then says nothing about
+   * it, so it can never fail — proposal 019. Exposed as a method because
+   * `_conditions` is protected and `doctor` must not duck-type a private name.
+   */
+  assertsSomething(): boolean {
+    return this._conditions.length > 0
+  }
+
+  /**
    * The root's collection hook. `evaluate()` is this builder's pipeline —
    * filter by predicates, run conditions, add the empty-selector finding —
    * and the root's terminal methods do the rest.

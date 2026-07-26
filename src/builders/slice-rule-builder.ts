@@ -83,6 +83,11 @@ export class SliceRuleBuilder extends TerminalBuilder {
     return this
   }
 
+  /** The project this rule was built against. See `RuleBuilder.getProject`. */
+  getProject(): ArchProject {
+    return this.project
+  }
+
   /**
    * The discovery globs this rule was scoped with.
    *
