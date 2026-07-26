@@ -99,6 +99,34 @@ export function resideInFolder<T extends Located>(glob: string): Predicate<T> {
   }
 }
 
+/**
+ * Matches modules whose file path matches the given glob.
+ *
+ * Similar to resideInFile but semantically clearer for modules —
+ * "modules that have path matching" vs "elements that reside in file".
+ *
+ * Lives here, beside `resideInFile`/`resideInFolder`, rather than in
+ * `predicates/module.ts`: it is an **identity** predicate, and identity
+ * predicates are legitimately single-glob — you match one location pattern,
+ * not a blacklist. The `api/no-single-glob-predicates` dogfood rule bans
+ * single-glob predicates in `module.ts` precisely because a module predicate
+ * like `importFrom`/`notImportFrom` must be variadic, and it carved out
+ * identity predicates by name in a comment. Moving the function makes that
+ * carve-out the rule's own scope instead of a comment beside it — exclusion by
+ * construction (ADR-008 rule 3). No public API change: `src/index.ts`
+ * re-exports it under the same name, and there is no `./predicates` subpath.
+ *
+ * @example
+ * modules(p).that().havePathMatching('** /services/*.ts')
+ */
+export function havePathMatching(glob: string): Predicate<SourceFile> {
+  const isMatch = picomatch(glob)
+  return {
+    description: `have path matching "${glob}"`,
+    test: (sourceFile) => isMatch(sourceFile.getFilePath()),
+  }
+}
+
 // --- Export predicates ---
 
 /**

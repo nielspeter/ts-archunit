@@ -59,7 +59,15 @@ const lines = fs.readFileSync(target, 'utf-8').split('\n')
 
 const sites = []
 lines.forEach((line, index) => {
-  for (const match of line.matchAll(/\.?(\w+)\(\s*'([^']*\*[^']*)'/g)) {
+  // Skip comments. A rule file legitimately quotes a broken glob as a
+  // counter-example — the JSDoc in `tests/archunit/arch-rules.test.ts` does
+  // exactly that — and counting it inflates the site total and would print a
+  // DEAD line for a comment from a differently-named checkout. This is the
+  // same code-fence problem the plan sizes for the R2b markdown scanner, and
+  // the third time this script has been wrong about which strings are globs.
+  const text = line.trim()
+  if (text.startsWith('*') || text.startsWith('//')) return
+  for (const match of text.matchAll(/\.?(\w+)\(\s*'([^']*\*[^']*)'/g)) {
     const kind = TARGET_BY_SELECTOR[match[1]]
     if (kind === undefined) continue
     sites.push({ selector: match[1], glob: match[2], kind, line: index + 1 })

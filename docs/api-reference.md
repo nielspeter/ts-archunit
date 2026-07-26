@@ -96,7 +96,7 @@ Available on all entry points via `.that()`.
 | `importFrom`             | `importFrom(...globs)` or `importFrom(globs[], options)`       | Module imports from files matching glob. Options: `{ ignoreTypeImports }`.         |
 | `predicateNotImportFrom` | `notImportFrom(...globs)` or `notImportFrom(globs[], options)` | Module does not import from files matching glob. Options: `{ ignoreTypeImports }`. |
 | `exportSymbolNamed`      | `exportSymbolNamed(name: string)`                              | Module exports a symbol with the name.                                             |
-| `havePathMatching`       | `havePathMatching(re: RegExp)`                                 | Module file path matches regex.                                                    |
+| `havePathMatching`       | `havePathMatching(glob: string)`                               | Module file path matches the glob.                                                 |
 
 ## Class Predicates
 

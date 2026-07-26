@@ -9,8 +9,8 @@ import {
   importFrom as importFromPredicate,
   notImportFrom as notImportFromPredicate,
   exportSymbolNamed as exportSymbolNamedPredicate,
-  havePathMatching as havePathMatchingPredicate,
 } from '../predicates/module.js'
+import { havePathMatching as havePathMatchingPredicate } from '../predicates/identity.js'
 import {
   onlyImportFrom as onlyImportFromCondition,
   notImportFrom as notImportFromCondition,

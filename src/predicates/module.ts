@@ -84,20 +84,3 @@ export function exportSymbolNamed(name: string): Predicate<SourceFile> {
     test: (sourceFile) => sourceFile.getExportedDeclarations().has(name),
   }
 }
-
-/**
- * Matches modules whose file path matches the given glob.
- *
- * Similar to resideInFile but semantically clearer for modules —
- * "modules that have path matching" vs "elements that reside in file".
- *
- * @example
- * modules(p).that().havePathMatching('** /services/*.ts')
- */
-export function havePathMatching(glob: string): Predicate<SourceFile> {
-  const isMatch = picomatch(glob)
-  return {
-    description: `have path matching "${glob}"`,
-    test: (sourceFile) => isMatch(sourceFile.getFilePath()),
-  }
-}
