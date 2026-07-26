@@ -1,9 +1,18 @@
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
+import type { GlobNode } from '../core/glob-site.js'
+import { globAnyOf, stampGlobs } from '../core/glob-site.js'
+import type { GlobFault } from '../core/glob-diagnosis.js'
+import { FAULT_ADVICE, GLOB_DOCS, syntacticFault } from '../core/glob-diagnosis.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { Slice, SliceDefinition } from '../models/slice.js'
-import { resolveByMatching, resolveByDefinition, matchingGlobPrefix } from '../models/slice.js'
+import {
+  resolveByMatching,
+  resolveByDefinition,
+  matchingGlobPrefix,
+  matchingGlobPattern,
+} from '../models/slice.js'
 import {
   beFreeOfCycles as beFreeOfCyclesCondition,
   respectLayerOrder as respectLayerOrderCondition,
@@ -24,55 +33,6 @@ type DiscoverySource =
       readonly mode: 'assignedFrom'
       readonly entries: readonly { readonly name: string; readonly glob: string }[]
     }
-
-/**
- * Whether a glob can already match an absolute path, so the `**\/` hint would be
- * a no-op (or worse). Covers POSIX-absolute and Windows drive-absolute globs as
- * well as an explicit globstar.
- */
-function isAnchored(glob: string): boolean {
-  return glob.startsWith('**/') || glob.startsWith('/') || /^[A-Za-z]:\//.test(glob)
-}
-
-/** Where the glob conventions these messages talk about are documented. */
-const DISCOVERY_DOCS = 'https://nielspeter.github.io/ts-archunit/slices'
-
-/** Why one `assignedFrom()` glob matched nothing. */
-type GlobFault = 'dot-segment' | 'unanchored' | 'no-match'
-
-/**
- * Diagnose a single glob. Each fault has a *different* fix, so they are reported
- * separately — a message that lumps them together (or reports only the first kind
- * it finds) sends the caller through repeated failing runs, and was how every
- * earlier version of this guard ended up stating a remedy that did not apply.
- */
-function diagnoseGlob(glob: string): GlobFault {
-  // A './' anywhere — not just leading — makes the glob unmatchable, and adding
-  // '**/' in front of it does not help ('**/./src/**' still matches nothing).
-  if (/(?:^|\/)\.\//.test(glob)) return 'dot-segment'
-  if (!isAnchored(glob)) return 'unanchored'
-  return 'no-match'
-}
-
-/**
- * Only two faults name a cause, and only because the fix is a transformation that
- * can be verified: removing `./`, and adding the `**\/` anchor. Everything else
- * falls into `no-match`, which lists likely causes WITHOUT asserting one.
- *
- * That restraint is deliberate. Earlier revisions asserted a specific cause here —
- * "the directory does not exist", "append `/**`" — and each was false on a
- * reachable input (a glob targeting a file, a directory whose name ends in `]`,
- * a path that plainly existed). Under ADR-008 a confidently wrong cause is worse
- * than an honest list: the agent acts on it.
- */
-const FAULT_ADVICE: Readonly<Record<GlobFault, string>> = {
-  'dot-segment':
-    'a "./" segment never occurs in an absolute file path — remove it and anchor instead ("./src/x/**" -> "**/src/x/**")',
-  unanchored:
-    'these are matched against ABSOLUTE file paths, so a project-relative glob matches nothing — prefix these with "**/"',
-  'no-match':
-    'these are anchored but matched no file. Common causes: the glob names a directory rather than the files inside it (append "/**"), a path segment is misspelled, or the directory holds no source files',
-}
 
 /**
  * Rule builder for slice-level architecture rules.
@@ -126,6 +86,59 @@ export class SliceRuleBuilder extends TerminalBuilder {
     this._discovery = { mode: 'assignedFrom', entries }
     this._slices = resolveByDefinition(this.project, definition)
     return this
+  }
+
+  /** The project this rule was built against. See `RuleBuilder.getProject`. */
+  getProject(): ArchProject {
+    return this.project
+  }
+
+  /**
+   * The discovery globs this rule was scoped with.
+   *
+   * `assignedFrom` fans out into one slice per entry, so each entry is its own
+   * tree: one dead layer glob is one empty slice, and folding them into an
+   * `any` node would say "no fault unless every slice is empty" — a false
+   * green. This is the same reason a preset's option list is not an `any`
+   * node.
+   *
+   * `matching()` needs no `base` special case, because it declares the glob
+   * `parseMatchingGlob` produces rather than the one the author wrote — and
+   * that one is already anchored. Declaring the author's spelling and
+   * exempting it via `base` was the earlier design, and it reported every
+   * nested-layout rule as dead while looking correct on a flat fixture.
+   */
+  override globs(): readonly GlobNode[] {
+    if (!this._discovery) return []
+    if (this._discovery.mode === 'matching') {
+      // Declare the glob picomatch is given, not the one the author wrote.
+      // `parseMatchingGlob` strips './' and '**/', normalises a trailing
+      // slash, and appends '*/**' — so the author's spelling is matched
+      // against nothing at runtime and declaring it reports every correct
+      // nested-layout rule as dead. `origin` keeps the spelling, which is what
+      // the reader needs to find the line.
+      const authored = this._discovery.glob
+      // `resolveByMatching` bails before matching anything when the glob has no
+      // literal directory prefix ('*', '**', 'src'), because the slice name is
+      // the segment after that prefix and there is none. Decidable from the
+      // glob alone, so declare a glob that cannot match rather than let the
+      // pre-flight stay silent about a rule the runtime guard will fail.
+      const unresolvable = matchingGlobPrefix(authored) === ''
+      return [
+        stampGlobs(
+          globAnyOf([unresolvable ? NEVER_MATCHES : matchingGlobPattern(authored)], 'file-path'),
+          'discovery',
+          () => `matching("${authored}")`,
+        ),
+      ]
+    }
+    return this._discovery.entries.map((entry) =>
+      stampGlobs(
+        globAnyOf([entry.glob], 'file-path'),
+        'discovery',
+        (g) => `assignedFrom({ ${entry.name}: "${g.glob}" })`,
+      ),
+    )
   }
 
   /**
@@ -254,7 +267,7 @@ export class SliceRuleBuilder extends TerminalBuilder {
       line: 0,
       message,
       because: this._reason,
-      docs: DISCOVERY_DOCS,
+      docs: GLOB_DOCS,
       bypassFilters: true,
     }
   }
@@ -346,7 +359,12 @@ export class SliceRuleBuilder extends TerminalBuilder {
     const FAULT_ORDER: readonly GlobFault[] = ['dot-segment', 'unanchored', 'no-match']
     const groups = FAULT_ORDER.map((fault) => ({
       fault,
-      list: entries.filter((entry) => diagnoseGlob(entry.glob) === fault),
+      // Syntactic only: this message is built while explaining why EVERY
+      // slice is empty, so "matched no file" is already established and the
+      // useful split is between the two causes with a verifiable fix.
+      list: entries.filter(
+        (entry) => (syntacticFault(entry.glob, 'file-path') ?? 'no-match') === fault,
+      ),
     })).filter((group) => group.list.length > 0)
 
     const clauses = groups.map((group) => {
@@ -381,3 +399,10 @@ export class SliceRuleBuilder extends TerminalBuilder {
 export function slices(p: ArchProject): SliceRuleBuilder {
   return new SliceRuleBuilder(p)
 }
+
+/**
+ * A glob no path can match, for declaring a discovery that cannot resolve for
+ * a reason the glob itself does not express. Anchored, so it is reported as
+ * `no-match` rather than as a syntax fault whose remedy would be nonsense.
+ */
+const NEVER_MATCHES = '**/\u0000never-matches'

@@ -1,4 +1,5 @@
 import type { ArchViolation } from './violation.js'
+import type { DeclaredGlobs } from './glob-site.js'
 
 /**
  * Context passed to conditions during evaluation.
@@ -55,4 +56,10 @@ export interface Condition<T> {
    * @returns Violations for elements that don't satisfy the condition
    */
   evaluate(elements: T[], context: ConditionContext): ArchViolation[]
+
+  /**
+   * The path globs this condition matches against, if any. See
+   * `Predicate.globs` — same contract, stamped with `position: 'condition'`.
+   */
+  readonly globs?: DeclaredGlobs
 }

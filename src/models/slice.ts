@@ -129,6 +129,23 @@ export function matchingGlobPrefix(glob: string): string {
 }
 
 /**
+ * The glob `matching()` actually hands to picomatch.
+ *
+ * Exposed for glob diagnosis (plan 0069), which must declare **the string the
+ * matcher receives** — the same rule `GlobKind` states for what a glob is
+ * matched against. Declaring the author's spelling instead makes the whole
+ * mechanism wrong for this entry point: `'src/features/*'` is rewritten to
+ * `'**\/src/features/**\/*'`-shaped, so the author's string matches nothing in
+ * either view and every nested-layout `matching()` rule — the shape the docs
+ * teach — is reported dead. It also made `'./src/features/*'`, which
+ * `parseMatchingGlob` deliberately supports, report a `dot-segment` fault with
+ * a remedy that would break a working rule.
+ */
+export function matchingGlobPattern(glob: string): string {
+  return parseMatchingGlob(glob).fullGlob
+}
+
+/**
  * Resolve slices by matching a glob pattern against source file paths.
  *
  * The segment following the glob's literal prefix names each slice. That segment

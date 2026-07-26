@@ -1,6 +1,7 @@
 import { Node } from 'ts-morph'
 import picomatch from 'picomatch'
 import type { Predicate } from '../core/predicate.js'
+import { globNode } from '../core/glob-site.js'
 import type { ArchCall } from '../models/arch-call.js'
 
 /**
@@ -102,6 +103,10 @@ export function withArgMatching(index: number, pattern: string | RegExp): Predic
 export function withStringArg(index: number, glob: string): Predicate<ArchCall> {
   const isMatch = picomatch(glob)
   return {
+    // `literal`: this glob is matched against a string literal in the source,
+    // not a path. Declared anyway so `doctor` can tell "declares nothing" from
+    // "declares something that is legitimately not path-checkable".
+    globs: globNode({ glob, kind: 'literal' }),
     description: `with string argument ${String(index)} matching '${glob}'`,
     test: (call) => {
       const args = call.getArguments()

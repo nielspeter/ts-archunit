@@ -7,7 +7,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
-import type { Located, Predicate } from '../../src/index.js'
+import type { GlobSite, Located, Predicate } from '../../src/index.js'
+import { isDeadSite } from '../../src/core/glob-evaluator.js'
+import { pathUniverse } from '../../src/core/path-universe.js'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
 import { noAnyProperties, noTypeAssertions } from '../../src/rules/typescript.js'
 import {
@@ -90,6 +92,118 @@ describe('rule scope (bug 0011)', () => {
     expect(fromCompiler.length).toBeGreaterThan(0)
     expect(fromDisk.length).toBeGreaterThan(0)
     expect(fromCompiler).toEqual(fromDisk.sort())
+  })
+
+  it('no glob written in this file can ever match', () => {
+    // The guard that closes bug 0011: reverting `api/no-single-glob-predicates`
+    // to its vacuous `resideInFolder('**/src/predicates/module**')` scope left
+    // all 165 test files green, because the two guards beside this one cannot
+    // see it — the file-set check only covers `inProjectSrc()`, and the name
+    // ban only bans one string.
+    //
+    // Every path glob in this file goes through the SHIPPED evaluator, so this
+    // cannot drift from what `doctor` would say, and it does not depend on what
+    // the checkout is called.
+    //
+    // Residual, stated rather than hidden: only single-line literals at a
+    // recognised call site are extracted. A glob held in a `const`, or split
+    // across lines by prettier, is invisible here — undecidable from source
+    // text. The real closure is handing the rule objects themselves to
+    // `diagnose()`, which needs the 36 rules built as values first.
+    const KIND: Record<string, 'parent-dir' | 'file-path'> = {
+      resideInFolder: 'parent-dir',
+      resideInFile: 'file-path',
+      havePathMatching: 'file-path',
+      inFolder: 'file-path',
+      matching: 'file-path',
+      assignedFrom: 'file-path',
+      layer: 'file-path',
+    }
+    /** Selectors whose globs are deliberately not path-checkable. */
+    const EXEMPT = new Set([
+      'importFrom',
+      'notImportFrom',
+      'importFromCondition',
+      'notImportFromCondition',
+      'onlyImportFrom',
+      'onlyHaveTypeImportsFrom',
+      'withStringArg',
+      'excluding',
+      'ignorePaths',
+      'describe',
+      'it',
+      'toEqual',
+      'toContain',
+      'rule',
+      'because',
+      'test',
+      // String methods in this file's own guards, not selectors.
+      'startsWith',
+      'endsWith',
+      'includes',
+    ])
+
+    // The fixture corpus is built to VIOLATE these rules, so a glob matching
+    // only a fixture path enforces nothing about src/ — bug 0011's shape one
+    // level down, and the sibling guard's own comment already warns about it.
+    const all = pathUniverse(p)
+    const keep = (candidate: string): boolean => !/(^|\/)tests\/fixtures\//.test(candidate)
+    const universe = {
+      filePaths: all.filePaths.filter(keep),
+      parentDirs: all.parentDirs.filter(keep),
+      tsconfigRelativeFilePaths: all.tsconfigRelativeFilePaths.filter(keep),
+      tsconfigRelativeParentDirs: all.tsconfigRelativeParentDirs.filter(keep),
+    }
+
+    const dead: string[] = []
+    const unclassified: string[] = []
+    fs.readFileSync(import.meta.filename, 'utf-8')
+      .split('\n')
+      .forEach((line, index) => {
+        const text = line.trim()
+        if (text.startsWith('*') || text.startsWith('//')) return
+        const check = (selector: string, glob: string, kind: 'parent-dir' | 'file-path'): void => {
+          const site: GlobSite = {
+            glob,
+            kind,
+            position: 'selector',
+            origin: `${selector}("${glob}")`,
+          }
+          if (isDeadSite(site, universe)) dead.push(`${String(index + 1)}: ${site.origin}`)
+        }
+
+        // A call: `.resideInFolder('**/src/x/**')`.
+        for (const match of text.matchAll(/\.(\w+)\(\s*'([^']*\*[^']*)'/g)) {
+          const selector = match[1] ?? ''
+          const glob = match[2]
+          if (glob === undefined || EXEMPT.has(selector)) continue
+          const kind = KIND[selector]
+          if (kind === undefined) {
+            // Fail CLOSED. Skipping an unrecognised selector silently is how a
+            // dead glob gets through — "I cannot check this" is a finding, not
+            // a reason to move on.
+            unclassified.push(`${String(index + 1)}: ${selector}('${glob}')`)
+            continue
+          }
+          check(selector, glob, kind)
+        }
+
+        // A map entry: `core: '**/src/core/**'` inside `assignedFrom({...})`.
+        // The old regex required a call prefix, so the six globs in the
+        // slice-definition rule were checked by nothing at all — and that rule
+        // is the one whose globs name every layer of this codebase.
+        for (const match of text.matchAll(/(?:^|[{,])\s*(\w+)\s*:\s*'([^']*\*[^']*)'/g)) {
+          const key = match[1] ?? ''
+          const glob = match[2]
+          if (glob === undefined || EXEMPT.has(key)) continue
+          // `assignedFrom` is the only map-of-globs shape here, and it declares
+          // `file-path`.
+          check(`assignedFrom({ ${key}: … })`, glob, 'file-path')
+        }
+      })
+
+    expect(unclassified).toEqual([])
+    expect(dead).toEqual([])
   })
 
   it('no rule scopes by the name of the checkout directory', () => {

@@ -33,6 +33,28 @@ export type { FormatOptions } from './core/format.js'
 // Core — custom predicate/condition factories
 export { definePredicate, defineCondition } from './core/define.js'
 
+// Glob declaration model (plan 0069). Exported because a user-written
+// predicate must be able to declare its globs — otherwise it is permanently
+// opaque, and any `or()` containing it can never be diagnosed.
+export type {
+  DeclaredGlob,
+  DeclaredGlobs,
+  GlobBase,
+  GlobKind,
+  GlobNode,
+  GlobPosition,
+  GlobSite,
+  GlobTree,
+  OpaqueGlob,
+} from './core/glob-site.js'
+export { combineGlobs, globAnyOf, globNode, negateGlobs, stampGlobs } from './core/glob-site.js'
+
+// In-process diagnostics (plan 0069 R2a). The vitest-facing half of `doctor`:
+// rules written inside tests are a co-equal documented path, and a CLI-only
+// diagnostic would leave half the users unable to measure before R3.
+export type { DiagnosableRule, DiagnosticFinding } from './core/diagnose.js'
+export { diagnose } from './core/diagnose.js'
+
 // Identity predicates
 export type { Named, Located, Exportable } from './predicates/index.js'
 export {

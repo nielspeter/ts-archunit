@@ -84,7 +84,7 @@ export function resolvers(p: ArchProject, glob: string): ResolverRuleBuilder {
     const filePath = sf.getFilePath()
     return picomatchFilter(filePath, glob, extractRootDir(p.tsConfigPath))
   })
-  return new ResolverRuleBuilder(sourceFiles)
+  return new ResolverRuleBuilder(sourceFiles, glob, p)
 }
 
 // --- Re-exports ---

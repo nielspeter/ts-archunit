@@ -4,6 +4,8 @@ import type { ArchProject } from '../core/project.js'
 import type { PairCondition } from '../core/pair-condition.js'
 import type { ConditionContext } from '../core/condition.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
+import type { GlobNode } from '../core/glob-site.js'
+import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 
 /**
@@ -53,8 +55,8 @@ function computePairs(
  *
  * @example
  * crossLayer(project)
- *   .layer('routes', 'src/routes/**')
- *   .layer('schemas', 'src/schemas/**')
+ *   .layer('routes', '**\/src/routes/**')
+ *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('Route', '') === b.getBaseName().replace('Schema', ''))
  *   .forEachPair()
  *   .should(haveMatchingCounterpart())
@@ -96,7 +98,7 @@ export class CrossLayerBuilder {
       if (left && right) allPairs.push(...computePairs(left, right, fn))
     }
 
-    return new MappedCrossLayerBuilder(layers, allPairs)
+    return new MappedCrossLayerBuilder(layers, allPairs, this.project)
   }
 }
 
@@ -108,13 +110,14 @@ export class MappedCrossLayerBuilder {
   constructor(
     private readonly layers: Layer[],
     private readonly pairs: LayerPair[],
+    private readonly project?: ArchProject,
   ) {}
 
   /**
    * Iterate over each matched pair. Returns a builder for attaching conditions.
    */
   forEachPair(): PairConditionBuilder {
-    return new PairConditionBuilder(this.layers, this.pairs)
+    return new PairConditionBuilder(this.layers, this.pairs, this.project)
   }
 }
 
@@ -125,13 +128,14 @@ export class PairConditionBuilder {
   constructor(
     private readonly layers: Layer[],
     private readonly pairs: LayerPair[],
+    private readonly project?: ArchProject,
   ) {}
 
   /**
    * Attach a pair condition to evaluate against matched pairs.
    */
   should(condition: PairCondition): PairFinalBuilder {
-    return new PairFinalBuilder(this.layers, this.pairs, condition)
+    return new PairFinalBuilder(this.layers, this.pairs, condition, this.project)
   }
 }
 
@@ -139,12 +143,42 @@ export class PairConditionBuilder {
  * Terminal builder — call `.check()`, `.warn()`, or `.because()`.
  */
 export class PairFinalBuilder extends TerminalBuilder {
+  /**
+   * @param project - Optional so the constructor stays source-compatible; the
+   *   chain always supplies it. Without it `doctor` cannot check this rule's
+   *   layer globs and has to report that it could not, which is honest but
+   *   useless — and used to be silent.
+   */
   constructor(
     private readonly layers: Layer[],
     private readonly pairs: LayerPair[],
     private readonly condition: PairCondition,
+    private readonly project?: ArchProject,
   ) {
     super()
+  }
+
+  /** The project this rule was built against. See `RuleBuilder.getProject`. */
+  getProject(): ArchProject | undefined {
+    return this.project
+  }
+
+  /**
+   * The layer globs, one tree each.
+   *
+   * Per layer rather than one `any` node, for the same reason as
+   * `assignedFrom`: a dead glob means that layer is empty, and every pair
+   * involving it is silently unchecked. Folding them together would report a
+   * fault only when EVERY layer was empty.
+   */
+  override globs(): readonly GlobNode[] {
+    return this.layers.map((layer) =>
+      stampGlobs(
+        globAnyOf([layer.pattern], 'file-path'),
+        'discovery',
+        (g) => `layer("${layer.name}", "${g.glob}")`,
+      ),
+    )
   }
 
   protected collectViolations() {
@@ -169,8 +203,8 @@ export class PairFinalBuilder extends TerminalBuilder {
  *
  * @example
  * crossLayer(project)
- *   .layer('routes', 'src/routes/**')
- *   .layer('schemas', 'src/schemas/**')
+ *   .layer('routes', '**\/src/routes/**')
+ *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('-route', '') === b.getBaseName().replace('-schema', ''))
  *   .forEachPair()
  *   .should(haveMatchingCounterpart())

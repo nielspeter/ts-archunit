@@ -94,3 +94,45 @@ describe('run', () => {
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("not valid for 'explain'"))
   })
 })
+
+describe('doctor (experimental, hidden)', () => {
+  it('reaches runDoctor rather than the unknown-command arm', async () => {
+    // `exitCode` is 1 either way — the unknown-command arm also sets it — so
+    // asserting the code is another false green. The MESSAGE is what
+    // distinguishes "dispatched" from "not a command", and renaming the
+    // dispatch arm left the whole suite green before this test existed.
+    const written: string[] = []
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      written.push(args.map(String).join(' '))
+    })
+    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      written.push(String(chunk))
+      return true
+    })
+    try {
+      await run(['doctor'])
+    } finally {
+      writeSpy.mockRestore()
+      errorSpy.mockRestore()
+    }
+    const output = written.join('')
+    expect(output).not.toContain('Unknown command')
+    expect(output).toContain('no rule files')
+  })
+
+  it('is absent from --help, because it is experimental', async () => {
+    // Removing a documented command later is its own breaking change, so
+    // `doctor` stays out of the help text until its life after R3 is decided.
+    const written: string[] = []
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      written.push(String(chunk))
+      return true
+    })
+    try {
+      await run(['--help'])
+    } finally {
+      writeSpy.mockRestore()
+    }
+    expect(written.join('')).not.toContain('doctor')
+  })
+})

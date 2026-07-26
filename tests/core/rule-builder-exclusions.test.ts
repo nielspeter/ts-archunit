@@ -196,6 +196,43 @@ describe('.excluding()', () => {
     warnSpy.mockRestore()
   })
 
+  it('not leaked BACK from a fork onto the shared selection', () => {
+    // The other direction, and the one nothing tested. `should()` forks, so
+    // two rules derived from one selection must not see each other's
+    // exclusions. `fork()` shallow-copies every field, so the exclusion array
+    // is shared by reference unless something replaces it — and "preserved
+    // across fork" above passes just as happily when it IS shared.
+    //
+    // Plan 0069 moved that copy into `TerminalBuilder.adoptFilterState`, and
+    // reverting it to a plain assignment turns this red and nothing else.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const selection = new TestRuleBuilder(stubProject, elements)
+      .that()
+      .withPredicate(nameMatches(/Service$/))
+
+    // First rule excludes UserService...
+    try {
+      selection.should().withCondition(alwaysFail()).excluding('UserService').check()
+      expect.unreachable('should have thrown')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ArchRuleError)
+    }
+
+    // ...the second must still see it.
+    try {
+      selection.should().withCondition(alwaysFail()).check()
+      expect.unreachable('should have thrown')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ArchRuleError)
+      if (error instanceof ArchRuleError) {
+        const names = error.violations.map((v) => v.element)
+        expect(names).toContain('UserService')
+        expect(names).toContain('OrderService')
+      }
+    }
+    warnSpy.mockRestore()
+  })
+
   it('silent() exclusion suppresses unused-exclusion warning through builder chain', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const builder = new TestRuleBuilder(stubProject, elements)
