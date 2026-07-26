@@ -3,17 +3,10 @@ import type { SourceFile, ImportDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { isTypeOnlyImport } from '../core/import-options.js'
+import { importCandidates, matchedCandidate } from '../core/import-candidates.js'
 
 export type { ImportOptions } from '../core/import-options.js'
 import type { ImportOptions } from '../core/import-options.js'
-
-/**
- * Resolve an import declaration to an absolute path or raw specifier.
- */
-function resolveImportPath(decl: ImportDeclaration): string {
-  const resolved = decl.getModuleSpecifierSourceFile()
-  return resolved ? resolved.getFilePath() : decl.getModuleSpecifierValue()
-}
 
 /**
  * Create a violation for a source file with a specific offending import.
@@ -35,8 +28,9 @@ function importViolation(
 }
 
 /**
- * Every import in the module must resolve to a path matching at least one of the globs.
- * Imports that don't match any glob produce violations.
+ * Every import in the module must match at least one of the globs — against its
+ * resolved path or, for a non-relative specifier, the specifier as written.
+ * Imports that match no glob produce violations.
  *
  * @example
  * modules(p)
@@ -62,8 +56,9 @@ export function onlyImportFrom(
       for (const sf of sourceFiles) {
         for (const decl of sf.getImportDeclarations()) {
           if (ignoreType && isTypeOnlyImport(decl)) continue
-          const importPath = resolveImportPath(decl)
-          if (!matchers.some((m) => m(importPath))) {
+          const candidates = importCandidates(decl)
+          const importPath = candidates[0]
+          if (matchedCandidate(candidates, matchers) === undefined) {
             violations.push(
               importViolation(
                 sf,
@@ -81,7 +76,8 @@ export function onlyImportFrom(
 }
 
 /**
- * No import in the module may resolve to a path matching any of the globs.
+ * No import in the module may match any of the globs — against its resolved
+ * path or, for a non-relative specifier, the specifier as written.
  * Imports that match a glob produce violations.
  *
  * @example
@@ -108,8 +104,8 @@ export function notImportFrom(
       for (const sf of sourceFiles) {
         for (const decl of sf.getImportDeclarations()) {
           if (ignoreType && isTypeOnlyImport(decl)) continue
-          const importPath = resolveImportPath(decl)
-          if (matchers.some((m) => m(importPath))) {
+          const importPath = matchedCandidate(importCandidates(decl), matchers)
+          if (importPath !== undefined) {
             violations.push(
               importViolation(
                 sf,
@@ -158,8 +154,7 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
       for (const sf of sourceFiles) {
         const hasMatch = sf.getImportDeclarations().some((decl) => {
           if (ignoreType && isTypeOnlyImport(decl)) return false
-          const importPath = resolveImportPath(decl)
-          return matchers.some((m) => m(importPath))
+          return matchedCandidate(importCandidates(decl), matchers) !== undefined
         })
         if (!hasMatch) {
           violations.push({
@@ -238,8 +233,8 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
         for (const decl of sf.getImportDeclarations()) {
-          const importPath = resolveImportPath(decl)
-          if (matchers.some((m) => m(importPath)) && !isTypeOnlyImport(decl)) {
+          const importPath = matchedCandidate(importCandidates(decl), matchers)
+          if (importPath !== undefined && !isTypeOnlyImport(decl)) {
             violations.push(
               importViolation(
                 sf,

@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import {
-  importFrom,
-  notImportFrom,
-  exportSymbolNamed,
-  havePathMatching,
-} from '../../src/predicates/module.js'
+import { importFrom, notImportFrom, exportSymbolNamed } from '../../src/predicates/module.js'
+import { havePathMatching } from '../../src/predicates/identity.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/modules')
 const tsconfigPath = path.join(fixturesDir, 'tsconfig.json')

@@ -4,7 +4,10 @@
  * These rules enforce our own ADRs on our own codebase.
  * Uses .rule() metadata for educational violation messages.
  */
-import { describe, it } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import { describe, it, expect } from 'vitest'
+import type { Located, Predicate } from '../../src/index.js'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
 import { noAnyProperties, noTypeAssertions } from '../../src/rules/typescript.js'
 import {
@@ -19,13 +22,105 @@ import { noEmptyBodies, noStubComments } from '../../src/rules/hygiene.js'
 
 const p = project('tsconfig.json')
 
+/**
+ * This project's own `src/`, derived from the tsconfig's location rather than
+ * matched by a glob.
+ *
+ * Thirteen rules below used to scope with `resideInFolder('**\/ts-archunit/src/**')`,
+ * which requires the *checkout directory* to be named `ts-archunit` — not a
+ * property of this repository. From a git worktree, a clone into `arch/`, or a
+ * renamed folder, that glob selected 0 modules, 0 functions and 0 classes and
+ * all thirteen passed while enforcing nothing (bug 0011). Measured: it matches
+ * 14 parent directories here and **0** with the checkout renamed.
+ *
+ * Two obvious replacements are both wrong, and both were measured:
+ *
+ * - `'**\/src/**'` also matches `tests/fixtures/**\/src/**` — the corpus built
+ *   to *violate* these very rules. It reds 13 rules on 89 hits, every one a
+ *   fixture.
+ * - `` `${dirname(p.tsConfigPath)}/src/**` `` passes here and returns to 0
+ *   subjects at any checkout path containing glob metacharacters, because
+ *   picomatch reads `My (work)/` as an extglob. It reproduces the bug it closes.
+ *
+ * So this is a prefix test, not a glob: a path either starts with this
+ * project's src directory or it does not, and no character in the checkout
+ * path can change that. ADR-008 rule 5 — the derivation is the tsconfig's own
+ * resolved location, which is independent of what anyone named the folder.
+ */
+const SRC_PREFIX = path.dirname(path.resolve('tsconfig.json')).replaceAll('\\', '/') + '/src/'
+
+function inProjectSrc<T extends Located>(): Predicate<T> {
+  return {
+    description: `reside in this project's src/ ("${SRC_PREFIX}")`,
+    test: (element) => element.getSourceFile().getFilePath().startsWith(SRC_PREFIX),
+  }
+}
+
+// ─── The scope of every rule below, guarded ─────────────────────────
+//
+// Ask ADR-008's question of this file: what would these 36 rules do if their
+// scope selected nothing? Pass — all of them, silently. That is bug 0011, and
+// it went unnoticed from the day the rules were written. A green suite is
+// therefore not evidence that the suite is enforcing anything, so the scope
+// gets its own guard with an INDEPENDENT derivation: ts-morph's module graph
+// on one side, a filesystem walk on the other. A bug that empties one cannot
+// empty the other.
+
+describe('rule scope (bug 0011)', () => {
+  it('inProjectSrc() selects exactly the TypeScript on disk under src/', () => {
+    const fromCompiler = modules(p)
+      .that()
+      .satisfy(inProjectSrc())
+      .subjects()
+      .map((sourceFile) => sourceFile.getFilePath())
+      .sort()
+
+    const fromDisk: string[] = []
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name).replaceAll('\\', '/')
+        if (entry.isDirectory()) walk(full)
+        else if (/\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts')) fromDisk.push(full)
+      }
+    }
+    walk(SRC_PREFIX)
+
+    // Both non-empty, or the comparison is two empty sets agreeing — which is
+    // precisely the false green this test exists to catch.
+    expect(fromCompiler.length).toBeGreaterThan(0)
+    expect(fromDisk.length).toBeGreaterThan(0)
+    expect(fromCompiler).toEqual(fromDisk.sort())
+  })
+
+  it('no rule scopes by the name of the checkout directory', () => {
+    // The original defect was not "a wrong glob" but "a glob that encodes the
+    // folder name", which is a property of the machine, not the repository.
+    // Renaming the checkout is enough to silence any rule written that way, so
+    // ban the shape rather than the one string that happened to be used.
+    const checkoutName = path.basename(path.dirname(path.resolve('tsconfig.json')))
+    const source = fs.readFileSync(import.meta.filename, 'utf-8')
+    const offending = source
+      .split('\n')
+      .map((line, index) => ({ text: line.trim(), number: index + 1 }))
+      // Comments are excluded deliberately: the JSDoc above quotes the banned
+      // glob as the counter-example, and that is the most useful line in the
+      // file. A leading `*` or `//` is not a comment parser — it is enough for
+      // this file's style, and a false negative here only means the ban misses
+      // a glob someone hid inside a trailing comment, which no rule executes.
+      .filter(({ text }) => !text.startsWith('*') && !text.startsWith('//'))
+      .filter(({ text }) => /'[^']*\*[^']*'/.test(text) && text.includes(checkoutName))
+
+    expect(offending.map((o) => `${String(o.number)}: ${o.text}`)).toEqual([])
+  })
+})
+
 // ─── ADR-005: No any types, no type assertions ──────────────────────
 
 describe('ADR-005: Type Safety', () => {
   it('source classes must not have any-typed properties', () => {
     classes(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noAnyProperties())
       .rule({
@@ -40,7 +135,7 @@ describe('ADR-005: Type Safety', () => {
   it('source classes must not use type assertions in methods', () => {
     classes(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noTypeAssertions())
       .rule({
@@ -60,7 +155,7 @@ describe('ADR-004: ESM', () => {
   it('no require() calls in source', () => {
     classes(p)
       .that()
-      .resideInFolder('**/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .notContain(call('require'))
       .rule({
@@ -75,7 +170,7 @@ describe('ADR-004: ESM', () => {
   it('no require() in source functions', () => {
     functions(p)
       .that()
-      .resideInFolder('**/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .notContain(call('require'))
       .rule({
@@ -93,7 +188,7 @@ describe('ADR-002: ts-morph as AST engine', () => {
   it('source must not import typescript compiler API directly', () => {
     modules(p)
       .that()
-      .resideInFolder('**/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .notImportFromCondition('**/node_modules/typescript/**')
       .rule({
@@ -113,7 +208,7 @@ describe('Code Quality', () => {
   it('no eval()', () => {
     classes(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noEval())
       .rule({
@@ -126,7 +221,7 @@ describe('Code Quality', () => {
   it('no generic Error', () => {
     classes(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noGenericErrors())
       .rule({
@@ -157,7 +252,7 @@ describe('Code Quality', () => {
       .that()
       .haveNameMatching(/^(modules|classes|functions|types|slices|project)$/)
       .and()
-      .resideInFolder('**/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .beExported()
       .rule({
@@ -370,7 +465,7 @@ describe('Hygiene', () => {
   it('source functions must not have empty bodies', () => {
     functions(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noEmptyBodies())
       .rule({
@@ -383,7 +478,7 @@ describe('Hygiene', () => {
   it('source functions must not have stub comments', () => {
     functions(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noStubComments())
       .rule({
@@ -396,7 +491,7 @@ describe('Hygiene', () => {
   it('source functions must not use eval', () => {
     functions(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(functionNoEval())
       .rule({ id: 'security/no-eval-fn' })
@@ -406,7 +501,7 @@ describe('Hygiene', () => {
   it('source functions must not throw generic Error (excluding argument validation)', () => {
     functions(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(functionNoGenericErrors())
       .excluding(
@@ -436,7 +531,7 @@ describe('Hygiene', () => {
   it('source modules must not contain eval', () => {
     modules(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(moduleNoEval())
       .rule({ id: 'security/no-eval-module' })
@@ -446,7 +541,7 @@ describe('Hygiene', () => {
   it('source functions must not use JSON.parse (excluding CLI and baseline)', () => {
     functions(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(functionNoJsonParse())
       .excluding(
@@ -492,7 +587,7 @@ describe('Hygiene', () => {
   it('modules must not have default exports (except index)', () => {
     modules(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .and()
       .haveNameMatching(/^(?!index\.ts$)/)
       .should()
@@ -511,7 +606,7 @@ describe('No console.log in Source', () => {
   it('source classes must not call console.log', () => {
     classes(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .satisfy(noConsoleLog())
       .rule({
@@ -525,7 +620,7 @@ describe('No console.log in Source', () => {
   it('source functions must not call console.log', () => {
     functions(p)
       .that()
-      .resideInFolder('**/ts-archunit/src/**')
+      .satisfy(inProjectSrc())
       .should()
       .notContain(call('console.log'))
       .rule({
@@ -560,11 +655,21 @@ describe('API Consistency', () => {
     // Regression guard for the .notImportFrom() variadic bug.
     // Module predicates like importFrom/notImportFrom should accept ...globs
     // so users can write .notImportFrom('fastify', 'knex', 'bullmq').
-    // Note: identity predicates (resideInFile, resideInFolder) are legitimately
-    // single-glob — you match one location pattern, not a blacklist.
+    //
+    // Identity predicates (resideInFile, resideInFolder, havePathMatching) are
+    // legitimately single-glob — you match one location pattern, not a
+    // blacklist. That carve-out used to live in a comment here while the scope
+    // covered them anyway; now it IS the scope, because those predicates live
+    // in identity.ts and this rule names module.ts (bug 0011, plan 0069 R-any).
+    //
+    // resideInFile, not resideInFolder: resideInFolder matches the DIRECTORY
+    // portion of the path, so '**/src/predicates/module**' matched 1 file and
+    // 0 directories and this rule selected nothing, everywhere, since it was
+    // written. Widening to '**/src/predicates/**' is not the fix either — it
+    // would red on identity.ts's own single-glob predicates.
     functions(p)
       .that()
-      .resideInFolder('**/src/predicates/module**')
+      .resideInFile('**/src/predicates/module.ts')
       .and()
       .areExported()
       .and()

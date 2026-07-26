@@ -5,6 +5,7 @@ export {
   haveNameEndingWith,
   resideInFile,
   resideInFolder,
+  havePathMatching,
   areExported,
   areNotExported,
 } from './identity.js'

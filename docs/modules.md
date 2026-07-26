@@ -32,12 +32,12 @@ modules(p)
 
 All identity predicates (`haveNameMatching`, `resideInFolder`, `areExported`, etc.) work on modules. In addition, module-specific predicates let you filter by import relationships and exported symbols. Use these in the `.that()` clause to narrow down which modules the rule applies to.
 
-| Predicate                 | Description                                         | Example                                   |
-| ------------------------- | --------------------------------------------------- | ----------------------------------------- |
-| `importFrom(glob)`        | Module imports from files matching the glob         | `.that().importFrom('**/database/**')`    |
-| `notImportFrom(glob)`     | Module does not import from files matching the glob | `.that().notImportFrom('**/legacy/**')`   |
-| `exportSymbolNamed(name)` | Module exports a symbol with the given name         | `.that().exportSymbolNamed('handler')`    |
-| `havePathMatching(re)`    | Module file path matches a regex                    | `.that().havePathMatching(/\.service\./)` |
+| Predicate                 | Description                                         | Example                                       |
+| ------------------------- | --------------------------------------------------- | --------------------------------------------- |
+| `importFrom(glob)`        | Module imports from files matching the glob         | `.that().importFrom('**/database/**')`        |
+| `notImportFrom(glob)`     | Module does not import from files matching the glob | `.that().notImportFrom('**/legacy/**')`       |
+| `exportSymbolNamed(name)` | Module exports a symbol with the given name         | `.that().exportSymbolNamed('handler')`        |
+| `havePathMatching(glob)`  | Module file path matches the glob                   | `.that().havePathMatching('**/*.service.ts')` |
 
 ## Available Conditions
 

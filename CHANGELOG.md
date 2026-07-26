@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`notImportFrom('fastify')` now matches an installed fastify** ([bug 0014](./bugs/0014-bare-package-import-globs-match-nothing.md)). Import globs were matched against the resolved path **or** the raw specifier, never both — so a package that resolves, which is every package you actually depend on, could only be matched by its `node_modules` path. The documented way to ban a dependency worked exclusively on dependencies you had not installed. Measured against this repo's own source: `notImportFrom('picomatch')` reported **0** violations while 15 files imported it. It now reports 15, the same as the path-glob form `'**/picomatch/**'`.
+
+  Each import now contributes **both** its resolved absolute path and — for non-relative specifiers only — the specifier as written; a glob matches the import if it matches either. Relative specifiers are deliberately excluded: `'../services/*'` is an unanchored glob that correctly matches nothing against an absolute path, and matching it against the raw string would make relative globs silently half-work.
+
+  This unblocks `layeredArchitecture({ restrictedPackages })`, whose whole documented purpose — "glob → list of npm package name patterns" — was inoperable for installed packages.
+
+### Upgrading
+
+This changes results in **two directions**, and the second is easy to miss.
+
+**Bans get louder (green → red).** `notImportFrom`, `notImportFromCondition` and `onlyHaveTypeImportsFrom` now match bare package names, so a ban you wrote against an installed package starts reporting. Those findings are real: the rule was enforcing nothing before.
+
+**Allowlists get quieter (red → green).** `onlyImportFrom`, `dependOn` and the `importFrom`/`notImportFrom` **predicates** violate when _no_ matcher matches, so extra candidates can only reduce violations. If you worked around this bug by allowlisting `'**/node_modules/fastify/**'`, that keeps working — both candidates are tested — but an allowlist that was red purely because a bare name could not match is now green. Check any `onlyImportFrom` whose violation count drops.
+
+**Baselines are unaffected.** Violation messages interpolate the resolved path first and fall back to the specifier only when the resolved path did not match, so every finding that existed before this release keeps its message and therefore its `hashViolation` identity. A test asserts that equivalence across this repo's whole import corpus.
+
+**Docs corrected.** `docs/slices.md` and `docs/troubleshooting.md` described the old fallback accurately and drew the wrong conclusion from it — that a bare package name "works as written". It did not, unless the package was absent. The 0.18.1 entry below contains the same error; it is left as written, since it was true of that release's behaviour in the same misleading way.
+
 ## [0.19.0] - 2026-07-25
 
 Makes `withBaseline()` work across machines, and makes three collectors see the

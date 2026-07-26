@@ -41,6 +41,7 @@ export {
   haveNameEndingWith,
   resideInFile,
   resideInFolder,
+  havePathMatching,
   areExported,
   areNotExported,
 } from './predicates/index.js'
@@ -59,7 +60,6 @@ export {
   importFrom,
   notImportFrom as predicateNotImportFrom,
   exportSymbolNamed,
-  havePathMatching,
 } from './predicates/module.js'
 
 // Dependency conditions
