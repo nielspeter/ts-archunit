@@ -318,6 +318,14 @@ export class CorrespondenceBuilder extends TerminalBuilder {
           `if an empty side is valid here.`,
         meta,
       ),
+      // Its own remedy, overriding what `baseViolation` copied from the rule's
+      // metadata (bug 0021). `baseViolation` is shared with real violations, where
+      // inheriting the author's `suggestion` is correct — so the override has to be
+      // here, and the guard in `execute-rule.ts` cannot reach it.
+      suggestion:
+        `Fix the '${sideName}' selector so it matches at least one subject, or call ` +
+        `.allowEmpty('${sideName}') if an empty side is valid here.`,
+      docs: undefined,
       // Config-level meta-finding: no source file to attribute to, so it must
       // survive diff-aware/baseline or the guard re-greens under standard CI.
       bypassFilters: true,

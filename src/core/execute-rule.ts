@@ -134,8 +134,26 @@ export function applyFilters(
       ...v,
       ruleId: v.ruleId ?? meta?.id,
       because: v.because ?? ctx.reason ?? meta?.because,
-      suggestion: v.suggestion ?? meta?.suggestion,
-      docs: v.docs ?? meta?.docs,
+      // A `bypassFilters` finding reports that the rule enforces NOTHING, so the
+      // author's `suggestion` cannot be its remedy: that text describes how to fix
+      // a real violation of the rule, and the formatter renders `suggestion` under
+      // `Fix:` — the field an agent obeys. Pairing a configuration message with an
+      // unrelated `Fix:` is a false remedy by juxtaposition (bug 0021), and it is
+      // ADR-008 rule 2: a failure may not assert a cause it cannot verify.
+      //
+      // `SliceRuleBuilder.metaViolation` argued exactly this in a comment and
+      // omitted both fields — and was overridden here, one layer up, so the
+      // omission had no effect in any shipped version. Measured: a finding reading
+      // "resolved no slices" printed "Split the cycle by extracting a shared
+      // module." as its Fix:.
+      //
+      // `ruleId` and `because` stay. Neither asserts a remedy: the id says WHICH
+      // rule enforces nothing, which is the first thing the reader needs, and
+      // `because` states why the rule exists, which is context rather than a
+      // claim about this finding's cause. A producer that wants a remedy sets its
+      // own — `metaViolation` sets `docs: GLOB_DOCS`, which is about the fault.
+      suggestion: v.bypassFilters ? v.suggestion : (v.suggestion ?? meta?.suggestion),
+      docs: v.bypassFilters ? v.docs : (v.docs ?? meta?.docs),
     }))
   }
 

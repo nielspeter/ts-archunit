@@ -6,16 +6,25 @@
 
 ## Description
 
-`src/core/rule-builder.ts:371` guards the empty-condition case:
+`src/core/rule-builder.ts:378` guards the empty-condition case:
 
 ```ts
 if (this._conditions.length === 0 && this._phase === 'predicate') {
   console.warn(`[ts-archunit] Rule '${ruleId}' has predicates but no conditions. …`)
 ```
 
-`should()` sets the phase to `'condition'` (`:71-75` → `fork._phase = 'condition'` at `:73`). So every rule that reached the condition phase — which is every rule spelled `.should()` — fails the `_phase === 'predicate'` test, and the warning is unreachable for it.
+`should()` sets the phase to `'condition'` (`:71-75` → `fork._phase = 'condition'` at `:76`). So every rule that reached the condition phase — which is every rule spelled `.should()` — fails the `_phase === 'predicate'` test, and the warning is unreachable for it.
 
-The condition that survives is the narrow one its comment describes: a predicate-only method called after `.should()`, which resets the phase to `'predicate'` (`:54`). The general case the message text names — "has predicates but no conditions" — is silent.
+**Corrected 2026-07-28, by measurement.** The original text here said the surviving case was "a predicate-only method called after `.should()`, which resets the phase". That is inverted: `that()` is the only writer of `_phase` besides `should()`, and predicate-only methods do not touch it. Measured on `tests/fixtures/poc`:
+
+```
+.that().pred.check()               [no should()]      1 warning,  no throw
+.that().pred.should().areAsync().check()              0 warnings, no throw   <- the documented mistake, fully silent
+.that().pred.should().that().check()                  1 warning,  no throw
+.that().pred.should().check()                         0 warnings, no throw   <- this bug's headline
+```
+
+So the shape the guard's own message names is the _most_ silent of the four, and what still warns is a selection that never reached `.should()` — a shape this bug did not originally mention, and whose remedy differs again. Four shapes, four remedies; see [plan 0070](../plans/0070-a-rule-must-assert-something.md).
 
 ## Reproduction
 
@@ -51,7 +60,7 @@ Two parts, and the second matters more than the first:
 1. Drop the `_phase` term. A rule with subjects and no conditions asserts nothing regardless of which phase it stopped in.
 2. Make it **fail**, not warn — this is proposal 019's ask, and it is a configuration finding (plan 0067 / R3a): not excludable, not downgradable to `warn`, bypassing diff and baseline. A warning here is worth nothing: ADR-008 rule 1 exists because the primary consumer does not read them.
 
-`plans/ROADMAP.md` currently describes proposal 019 as replacing "`console.warn(...) + return []` at five sites … All five are still there." That sentence is what hid this: it treats the warn as a working-but-too-quiet mechanism. For the main case it is not too quiet, it is absent.
+[Proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md) describes this shape as `console.warn(...) + return []` sites that are "still there". That framing is what hid this: it treats the warn as a working-but-too-quiet mechanism. For the main case it is not too quiet, it is **absent**. (The count is four, not the five the proposal claimed; `plans/ROADMAP.md` was corrected in v0.21.0.)
 
 ## Guard this needs
 
@@ -68,6 +77,6 @@ Asserting on `console.warn` being called is not a guard. Under the current behav
 
 **This is a precondition for R3b, and it inverts one of R3b's assumptions.** R3b absorbs proposal 019 ("rules that enforce nothing must fail") and its inventory counts the `console.warn(...) + return []` sites as the places to convert. Building on that inventory would produce a guard that fires only in the phase where the problem does not occur — a false green of exactly the shape the glob work spent four review rounds eliminating.
 
-R3b's empty-**selector** half and this empty-**condition** half are the two directions of one property: _a rule must have something to check, and something to check it against._ Neither is currently enforced, and this one has no `doctor` coverage either — `diagnose()` reports `conditions: 0` as a diagnostic, which is the measuring instrument, not the gate.
+R3b's empty-**selector** half and this empty-**condition** half are the two directions of one property: _a rule must have something to check, and something to check it against._ Neither is currently enforced, and this one has no `doctor` coverage either — `diagnose()` reports `kind: 'no-condition'` as a diagnostic, which is the measuring instrument, not the gate.
 
 See also [bug 0020](./0020-should-twice-silently-drops-the-first-assertion.md), which is how a rule reaches this state without the author omitting anything.
