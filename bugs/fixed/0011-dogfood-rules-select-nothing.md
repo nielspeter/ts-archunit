@@ -1,6 +1,7 @@
 # Bug 0011: 14 of our own dogfood rules select nothing
 
 **Reported:** 2026-07-25
+**Fixed:** 2026-07-26
 **Found in:** all versions through v0.18.1
 **Severity:** High — most of this project's ADR enforcement on itself is conditionally or permanently vacuous, and one rule has never fired since it was written, hiding a live violation.
 

@@ -1,6 +1,7 @@
 # Bug 0010: Violation identity embeds absolute paths — baselines never match in CI
 
 **Reported:** 2026-07-25
+**Fixed:** 2026-07-25
 **Found in:** all versions through v0.18.1
 **Severity:** High — `withBaseline()`, the documented adoption path, is non-functional for every affected rule. It fails _silently_: the baseline is written, the run is green locally, and CI reports the full finding set as new.
 
@@ -257,7 +258,7 @@ That project also does not call `withBaseline()` anywhere, so the format change
 cannot regress it — the fix removes a blocker rather than repairing something in
 use.
 
-**Adoption, end to end** — the question [proposal 018](../proposals/018-adoptable-discovery-surface.md)
+**Adoption, end to end** — the question [proposal 018](../../proposals/018-adoptable-discovery-surface.md)
 was parked on:
 
 ```
@@ -326,7 +327,7 @@ with `.git` present, delete `.git`, load → **0 findings reported as new**.
 
 ## Notes
 
-Found while reviewing [proposal 018](../proposals/018-adoptable-discovery-surface.md),
+Found while reviewing [proposal 018](../../proposals/018-adoptable-discovery-surface.md),
 which set out to explain why the discovery surface is unused and turned out to have
 found a straight bug. 018 retains the strategic question; this is the mechanical
 defect underneath it, and it is a precondition for that work.

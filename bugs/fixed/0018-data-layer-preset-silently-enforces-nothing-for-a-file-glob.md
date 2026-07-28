@@ -35,7 +35,7 @@ satisfied by the bug. It would pass with `requireTypedErrors` entirely broken.
 Apply ADR-008's question: _what would this test do if `dataLayerIsolation`
 enforced nothing at all?_ Pass.
 
-Worse, plan 0069's [appendix](../plans/0069-appendix-vacuous-tests.md) classified
+Worse, plan 0069's [appendix](../../plans/0069-appendix-vacuous-tests.md) classified
 that test as **legitimate** on the stated grounds that it was "a generated preset
 rule that does not apply to the given options". Measured, the rule _does_ apply
 and does generate — it just selects nothing. So the classification concealed a
