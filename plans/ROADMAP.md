@@ -1,8 +1,8 @@
 # ts-archunit Roadmap
 
-**Version:** 0.19.0 · **Tests:** 2204 across 159 files · **Updated:** 2026-07-25
+**Version:** 0.21.0 · **Tests:** 2363 across 169 files · **Updated:** 2026-07-28
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
-**Plans:** 59 completed (`completed/`) · 3 open (below) · proposals in `../proposals/` ·
+**Plans:** 59 completed (`completed/`) · 4 open (below) · proposals in `../proposals/` ·
 open defects in `../bugs/`
 
 > Conventions: a plan is **READY** when its design is settled and it can be built as
@@ -35,36 +35,49 @@ API surface, not how to build it.
 ## Open defects
 
 Measured and reproduced. Full write-ups in `../bugs/`; fixed ones move to
-`../bugs/fixed/` with a `**Fixed:**` date, so this table lists only what is
-still open.
+`../bugs/fixed/`, so this table lists only what is still open.
 
-| Bug                                                                                                             | State                                                                                                                                                                                                               |
-| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red                    | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix.                                                                    |
-| [0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) — `only*` conditions pass on ∅ | **Open.** An allowlist condition is ∀ over the subject's edges, so a subject with no edges satisfies it. Same vacuity class as plan 0069, one layer down: the selector matches, the condition has nothing to check. |
+A `**Fixed:**` date is the convention going forward, not a property of the
+directory: 6 of the 16 files in `bugs/fixed/` carry one (0001-0009 predate it).
+Nothing enforces it, which by this project's own standard makes it a stated
+invariant without a guard — so the location, not the header, is what this table
+relies on.
+
+| Bug                                                                                                                  | State                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red                         | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix.                                                                                                                                                                                                                       |
+| [0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) — `only*` conditions pass on ∅      | **Open.** An allowlist condition is ∀ over the subject's edges, so a subject with no edges satisfies it. Same vacuity class as plan 0069, one layer down: the selector matches, the condition has nothing to check.                                                                                                                                                    |
+| [0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md) — a rule with no condition passes silently  | **Open.** `.should()` with no condition method reports nothing and warns nothing: the guard at `rule-builder.ts` is gated on `_phase === 'predicate'` and `should()` sets the phase to `'condition'`, so it cannot fire for the case its own message names. **Precondition for R3b**, whose proposal-019 half would otherwise be built on that unreachable warn.       |
+| [0020](../bugs/0020-should-twice-silently-drops-the-first-assertion.md) — `should()` twice drops the first assertion | **Open.** `.should().notExist().should().beExported()` reports 0; `notExist` alone reports 4. `fork()` clears the condition list, so an assertion the author wrote is discarded with no output. Five other builders accumulate instead. Ships with R3b; the decision is **accumulate**, because clear is the only direction that can produce a rule asserting nothing. |
 
 ### Fixed
 
-| Bug                                                                                                                                   | Landed                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0010](../bugs/fixed/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths                                    | v0.19.0, after a review round found two criticals in the fix itself.                                                                                                                                                                                                                                            |
-| [0011](../bugs/fixed/0011-dogfood-rules-select-nothing.md) — dogfood rules select nothing (17, not the 14 filed)                      | v0.20.0. Fixed by rescoping the rules, not by the bespoke mechanism it originally proposed — see below.                                                                                                                                                                                                         |
-| [0013](../bugs/fixed/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals                                    | v0.19.0. `resolvers()`, both smells and two presets could not see handler-map functions.                                                                                                                                                                                                                        |
-| [0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) — bare package globs match nothing                              | v0.20.0. `notImportFrom('fastify')` compared the glob to the _resolved_ path, so it matched only when the package was NOT installed.                                                                                                                                                                            |
-| [0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) — a held selection was mutated                                   | Unreleased. 40 chain methods across 12 classes returned `this` after mutating it, so a held selection lost subjects and later rules passed. Nine of those classes were outside `RuleBuilder`'s hierarchy, and the GraphQL pair forked in neither `that()` nor `should()` — the shape `docs/graphql.md` teaches. |
-| [0018](../bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md) — a preset enforced nothing for a file glob | v0.20.0. `repositories`/`shared`/layer globs went to `resideInFolder`, which reads the parent directory, so a file glob matched nothing.                                                                                                                                                                        |
+| Bug                                                                                                                                   | Landed                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [0010](../bugs/fixed/0010-violation-identity-embeds-absolute-paths.md) — identity embeds abs paths                                    | v0.19.0, after a review round found two criticals in the fix itself.                                                                                                                                                                                                                                         |
+| [0011](../bugs/fixed/0011-dogfood-rules-select-nothing.md) — dogfood rules select nothing (17, not the 14 filed)                      | v0.20.0. Fixed by rescoping the rules, not by the bespoke mechanism it originally proposed — see below.                                                                                                                                                                                                      |
+| [0013](../bugs/fixed/0013-resolvers-cannot-see-resolvers.md) — collectors blind to object literals                                    | v0.19.0. `resolvers()`, both smells and two presets could not see handler-map functions.                                                                                                                                                                                                                     |
+| [0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) — bare package globs match nothing                              | v0.20.0. `notImportFrom('fastify')` compared the glob to the _resolved_ path, so it matched only when the package was NOT installed.                                                                                                                                                                         |
+| [0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) — a held selection was mutated                                   | v0.21.0. 40 chain methods across 12 classes returned `this` after mutating it, so a held selection lost subjects and later rules passed. Nine of those classes were outside `RuleBuilder`'s hierarchy, and the GraphQL pair forked in neither `that()` nor `should()` — the shape `docs/graphql.md` teaches. |
+| [0018](../bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md) — a preset enforced nothing for a file glob | v0.20.0. `repositories`/`shared`/layer globs went to `resideInFolder`, which reads the parent directory, so a file glob matched nothing.                                                                                                                                                                     |
 
-**0011 no longer needs its own mechanism.** It originally proposed a file-set
-identity assertion. The 0067-C measurement supersedes that: running the
-empty-selector flip from a checkout **not** named `ts-archunit` produces 23
-failures against 10 from a correctly-named one, and the 13-failure delta is
-exactly these rules. Whatever fixes the class fixes them, so 0011 is now
-waiting on the 0067-C decision rather than on work of its own.
+**0011 was fixed by rescoping, not by a mechanism** — kept here for the 0067-C
+rationale, which still stands. It originally proposed a file-set identity
+assertion. The 0067-C measurement superseded that: running the empty-selector
+flip from a checkout **not** named `ts-archunit` produced 23 failures against 10
+from a correctly-named one, and the 13-failure delta was exactly these rules.
+That is the argument for fixing the class rather than the instances, and it is
+why R3b still subsumes this even though the rules themselves were rescoped in
+v0.20.0. An earlier version of this paragraph ended "0011 is now waiting on the
+0067-C decision" while the table above recorded it as shipped — the same
+table-versus-prose contradiction the Open/Fixed split was written to remove.
 
 **Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) got
-cheaper.** It replaces `console.warn(...) + return []` at five sites — a rule
-that has subjects but no conditions asserts nothing and passes. All five are
-still there. But 0014 merged the two builder hierarchies into one root, so the
+cheaper.** It replaces `console.warn(...) + return []` at four sites — a rule
+that has subjects but no conditions asserts nothing and passes. All four are
+still there, and [bug 0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md)
+is the finding that the main one **cannot fire**: it is gated on
+`_phase === 'predicate'`, which `should()` has already left. But 0014 merged the two builder hierarchies into one root, so the
 fix is now a single implementation on `TerminalBuilder` instead of five copies,
 and it composes with the census's `conditions: 0`, which already reports the
 state without failing on it.
@@ -103,7 +116,8 @@ state without failing on it.
 
 | Version    | Theme                                                                                                    |
 | ---------- | -------------------------------------------------------------------------------------------------------- |
-| **0.19.0** | Portable violation identity (`withBaseline()` works across checkouts); three collectors see handler maps |
+| **0.21.0** | A held builder is immutable — 40 chain methods across 12 classes are copy-on-write ⚠️ behaviour          |
+| **0.20.0** | `doctor` / `diagnose()` and the glob declaration model; config findings cannot be downgraded             |
 | **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps |
 | **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable              |
 | **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking         |

@@ -90,7 +90,7 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
 
   protected getElements(): ArchFunction[] {
     // _collectionOptions survives `.should()` forks via RuleBuilder.fork()'s
-    // Object.assign(fork, this) — verified by the named-selection test.
+    // shallowClone in TerminalBuilder.copy — verified by the named-selection test.
     return this.project
       .getSourceFiles()
       .flatMap((sf) => collectFunctions(sf, this._collectionOptions))

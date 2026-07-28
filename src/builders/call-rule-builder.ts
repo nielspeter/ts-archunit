@@ -67,8 +67,8 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
    * so the eight `archCall.getName()` sites in `src/conditions/call.ts`
    * can build identity-keyed violation strings.
    *
-   * Survives `fork()` via `Object.assign(fork, this)` in the base class
-   * (primitive field; no explicit copy needed). See plan 0057.
+   * Survives a copy via `shallowClone` in `TerminalBuilder.copy` (a primitive
+   * field, so no `copy()` override is needed). See plan 0057.
    */
   protected _identifyByArgument?: number
 

@@ -5,9 +5,10 @@
  * deriving two rules from it must give two independent rules — the shape
  * `docs/core-concepts.md`, `docs/classes.md` and `docs/graphql.md` all teach.
  *
- * The bug was filed against `RuleBuilder.that()` alone. It was wider: seven
- * more builders held their own mutable state, and five of them are not in
- * `RuleBuilder`'s hierarchy at all, so a fix there could not reach them. The
+ * The bug was filed against `RuleBuilder.that()` alone. Measured by the
+ * structural guard below, it was **40 methods across 12 classes**, and **9 of
+ * those classes are outside `RuleBuilder`'s hierarchy**, so a fix there could
+ * not have reached them. The
  * leaks that matter most are the ones that turn a later rule GREEN —
  * `SmellBuilder.ignorePaths` (inherit an ignore, skip the files),
  * `CorrespondenceBuilder.allowEmpty` (inherit an opt-out from the empty-side
@@ -26,13 +27,19 @@
  */
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { Project, Node, SyntaxKind } from 'ts-morph'
-import type { ClassDeclaration, MethodDeclaration } from 'ts-morph'
+import { Project } from 'ts-morph'
+import {
+  copiesContainer,
+  mutatedInPlace,
+  mutatesThenReturnsThis,
+} from '../helpers/builder-mutation-scan.js'
 import { project } from '../../src/core/project.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { byName, correspondence } from '../../src/builders/correspondence-builder.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
+import { calls } from '../../src/builders/call-rule-builder.js'
+import { call } from '../../src/helpers/matchers.js'
 import { tsconfig } from '../../src/tsconfig/index.js'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
 import { smells } from '../../src/smells/index.js'
@@ -97,20 +104,38 @@ describe('a held builder is immutable — behavioural', () => {
     const p = load('slices')
     const held = slices(p).matching('src/')
 
-    // `bad` depends upward, so respectLayerOrder fires; these slices are
-    // acyclic, so beFreeOfCycles does not. Under the bug the second rule
-    // carried both conditions and reported the first rule's violations too.
-    const cyclesOnly = held.should().beFreeOfCycles().violations()
-    const orderOnly = held
-      .should()
-      .respectLayerOrder('controllers', 'services', 'domain', 'bad')
-      .violations()
-    expect(orderOnly.length).toBeGreaterThan(0)
-    expect(held.should().beFreeOfCycles().violations()).toHaveLength(cyclesOnly.length)
-    // Re-deriving the order rule reports the same count, not double.
+    // Both conditions fire on this fixture, and each reports exactly ONE
+    // violation — feature-a <-> feature-b is a cycle, and `bad` depends upward.
+    // So the elements are the only thing that distinguishes them; a count
+    // assertion is 1 === 1 either way. The earlier version of this test
+    // compared `held.should().beFreeOfCycles()` to its own previous count,
+    // which is ADR-008 rule 5's anti-pattern: a derivation agreeing with
+    // itself. It also claimed the fixture was acyclic, which it is not.
+    const cycles = ['[feature-a, feature-b]']
+    const order = ['leaky-controller.ts']
+
     expect(
-      held.should().respectLayerOrder('controllers', 'services', 'domain', 'bad').violations(),
-    ).toHaveLength(orderOnly.length)
+      held
+        .should()
+        .beFreeOfCycles()
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(cycles)
+    expect(
+      held
+        .should()
+        .respectLayerOrder('controllers', 'services', 'domain', 'bad')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(order)
+    // Re-deriving each reports only its own finding, not the union.
+    expect(
+      held
+        .should()
+        .beFreeOfCycles()
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(cycles)
   })
 
   it('SliceRuleBuilder: re-discovery does not edit the held selection', () => {
@@ -151,16 +176,126 @@ describe('a held builder is immutable — behavioural', () => {
 
   it('SmellBuilder: inFolder() and minLines() do not accumulate on the held builder', () => {
     const p = project(fixtures('smells/duplicate-bodies'))
-    const held = smells.duplicateBodies(p).withMinSimilarity(0.8)
+    // The threshold is set ONCE, on the held builder. The earlier version of
+    // this test re-specified `minLines(3)` on every read, which overwrote a
+    // leaked `_minLines` before it could be observed — the same defect already
+    // documented for `requires()` below, surviving one test over. And it
+    // called `inFolder` on `held.minLines(3)` rather than on `held`, so a
+    // leaked folder scope landed on the intermediate copy and was invisible.
+    // Measured: reverting either method failed no behavioural test.
+    const held = smells.duplicateBodies(p).withMinSimilarity(0.8).minLines(3)
+    const baseline = held.violations().length
+    expect(baseline).toBeGreaterThan(0)
 
-    // A folder glob matching nothing scopes the detector to nothing.
-    expect(held.minLines(3).inFolder('**/no-such-dir/**').violations()).toHaveLength(0)
-    // The held builder never had a folder scope, so it still finds everything.
-    expect(held.minLines(3).violations().length).toBeGreaterThan(0)
-    // And a threshold set on a derived builder did not stick to the held one:
-    // minLines(1000) finds nothing, minLines(3) still does.
+    // A folder glob matching nothing scopes the detector to nothing — called
+    // directly on `held`, so a leak would land on `held` itself.
+    expect(held.inFolder('**/no-such-dir/**').violations()).toHaveLength(0)
+    expect(held.violations()).toHaveLength(baseline)
+
+    // A threshold nothing can meet, likewise on `held`, with no re-set after.
     expect(held.minLines(1000).violations()).toHaveLength(0)
-    expect(held.minLines(3).violations().length).toBeGreaterThan(0)
+    expect(held.violations()).toHaveLength(baseline)
+
+    // And the flag setters, whose leaks change what a LATER detector sees.
+    // `ignoreTests` and `groupByFolder` are the false-green direction: an
+    // inherited ignore narrows the population silently.
+    expect(held.ignoreTests().violations().length).toBeLessThanOrEqual(baseline)
+    expect(held.violations()).toHaveLength(baseline)
+    expect(held.groupByFolder().violations().length).toBeGreaterThan(0)
+    expect(held.violations()).toHaveLength(baseline)
+  })
+
+  it('DuplicateBodiesBuilder: withMinSimilarity() does not stick to the held detector', () => {
+    const p = project(fixtures('smells/duplicate-bodies'))
+    const held = smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8)
+    const baseline = held.violations().length
+    expect(baseline).toBeGreaterThan(0)
+
+    // A threshold no pair can meet. Set on a derived detector only — and never
+    // re-set afterwards, or a leak is overwritten before it can be seen.
+    expect(held.withMinSimilarity(1.01).violations()).toHaveLength(0)
+    expect(held.violations()).toHaveLength(baseline)
+  })
+
+  it('InconsistentSiblingsBuilder: forPattern() does not stick to the held detector', () => {
+    const p = project(fixtures('smells/inconsistent-siblings'))
+    // The detector reports nothing at all without a pattern, so the held one
+    // must carry a working pattern for this to be falsifiable.
+    const held = smells.inconsistentSiblings(p).minLines(2).forPattern(call('this.extractCount'))
+    const baseline = held.violations().length
+    expect(baseline).toBeGreaterThan(0)
+
+    // An impossible pattern silences the detector — the false-green direction.
+    // Inherited, it would silence every later detector off the same builder.
+    expect(held.forPattern(call('definitelyNotCalledAnywhere')).violations()).toHaveLength(0)
+    expect(held.violations()).toHaveLength(baseline)
+  })
+
+  it('CallRuleBuilder: identifiedByArg() does not stick to the held selection', () => {
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    tsMorphProject.createSourceFile(
+      'routes.ts',
+      `declare const app: { post(p: string, h: unknown): void }
+       declare const handler: unknown
+       app.post("/auth/token", handler)
+       app.post("/users", handler)`,
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/virtual/tsconfig.json',
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+    const held = calls(p).that().onObject('app').and().withMethod('post')
+
+    // `identifiedByArg` folds an argument into the violation element, so a leak
+    // shows in the element text rather than in the count.
+    const elements = (b: typeof held): string[] =>
+      b
+        .should()
+        .notExist()
+        .violations()
+        .map((v) => v.element)
+
+    expect(elements(held)).toEqual(['app.post', 'app.post'])
+    expect(elements(held.identifiedByArg(0))).toEqual([
+      'app.post("/auth/token")',
+      'app.post("/users")',
+    ])
+    // The held selection still reports the unfolded elements.
+    expect(elements(held)).toEqual(['app.post', 'app.post'])
+  })
+
+  it('RuleBuilder: deriving a rule off a held RULE leaves the held rule asserting (fork)', () => {
+    // `should()` forks, and `fork()` clears the condition list. If that fork
+    // shared state with its parent, deriving a second rule would clear the
+    // HELD rule's conditions in place — turning a rule that asserted something
+    // into one that asserts nothing, silently. Measured: sabotaging
+    // `fork()`'s copy fails 0 of 2340 tests without this probe.
+    const p = load('poc')
+    const rule = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+      .notExist()
+    expect(rule.violations()).toHaveLength(4)
+
+    rule.should().beExported()
+    expect(rule.violations()).toHaveLength(4)
+  })
+
+  it('RuleBuilder: a second condition off a held post-should() rule does not stack', () => {
+    // The `copy()` override must carry BOTH lists. Dropping the `_conditions`
+    // line is also 0 of 2340 without this: two conditions off one held rule
+    // would share the array and accumulate.
+    const p = load('poc')
+    const rule = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+      .notExist()
+    expect(rule.violations()).toHaveLength(4)
+    expect(rule.should().beExported().violations()).toHaveLength(0)
+    expect(rule.violations()).toHaveLength(4)
   })
 
   it('CorrespondenceBuilder: a leaked allowEmpty would hide an empty side', () => {
@@ -220,19 +355,37 @@ describe('a held builder is immutable — behavioural', () => {
 })
 
 describe('a held builder is immutable — structural', () => {
+  // One repo load, shared. Two `new Project` calls over this repo's 454 files
+  // cost ~330ms each in isolation and 10-12s under full parallelism, which is
+  // how both of these tests came to fail on timeout in a run where nothing was
+  // wrong. See the note in vitest.config.ts on why a flaky guard is worse than
+  // a slow one here.
+  let repoProject: Project | undefined
+  const repo = (): Project => {
+    repoProject ??= new Project({
+      tsConfigFilePath: path.resolve(import.meta.dirname, '../../tsconfig.json'),
+    })
+    return repoProject
+  }
+
   /**
    * `src/` must contain no method that mutates its own state and then returns
    * `this`. Derived from the source text, so it holds for builders this file
-   * has never heard of — and it would have caught all eight original sites,
-   * which is how the five beyond the bug report were found.
+   * has never heard of — and pointed at the pre-fix source it names all 40
+   * offending methods, which is how the 9 classes beyond the bug report were
+   * found.
+   *
+   * The detector itself lives in `tests/helpers/builder-mutation-scan.ts` and
+   * is driven from fixtures by `builder-mutation-scan.test.ts`. It has to be:
+   * an assertion that this returns `[]` holds both when `src/` is clean and
+   * when the detector is broken, and the first version of this guard WAS
+   * broken — it required the pre-fix spelling `this._x.push(...)` and matched
+   * 0 of 32 candidate fields once every call site said `next._x.push(...)`.
    */
   it('no chain method mutates its own state and returns this', () => {
-    const repo = new Project({
-      tsConfigFilePath: path.resolve(import.meta.dirname, '../../tsconfig.json'),
-    })
     const offenders: string[] = []
 
-    for (const sf of repo.getSourceFiles('src/**/*.ts')) {
+    for (const sf of repo().getSourceFiles('src/**/*.ts')) {
       for (const cls of sf.getClasses()) {
         for (const method of cls.getMethods()) {
           const site = mutatesThenReturnsThis(method)
@@ -276,16 +429,14 @@ describe('a held builder is immutable — structural', () => {
    * The earlier version of this test asserted that no `copy()` override
    * returns `this`. It passed with every fix reverted, because with the fix
    * gone there are no overrides to be wrong — a guard that is satisfied by the
-   * absence of the thing it guards. This version fails there: eight fields are
-   * mutated in place and nothing copies them.
+   * absence of the thing it guards. This version fails there: pointed at the
+   * pre-fix source it names 12 fields that are mutated in place with nothing
+   * copying them.
    */
   it('every in-place-mutated container field is copied for the clone', () => {
-    const repo = new Project({
-      tsConfigFilePath: path.resolve(import.meta.dirname, '../../tsconfig.json'),
-    })
     const unguarded: string[] = []
 
-    for (const sf of repo.getSourceFiles('src/**/*.ts')) {
+    for (const sf of repo().getSourceFiles('src/**/*.ts')) {
       for (const cls of sf.getClasses()) {
         const body = cls.getText()
         for (const field of cls.getProperties()) {
@@ -315,87 +466,3 @@ describe('a held builder is immutable — structural', () => {
     ).toEqual([])
   })
 })
-
-/** True if any method in the class calls a mutator on `this.<field>`. */
-function mutatedInPlace(cls: ClassDeclaration, field: string): boolean {
-  const MUTATORS = ['push', 'add', 'set', 'unshift', 'splice', 'delete', 'clear', 'sort']
-  return cls.getDescendantsOfKind(SyntaxKind.CallExpression).some((call) => {
-    const callee = call.getExpression()
-    if (!Node.isPropertyAccessExpression(callee)) return false
-    if (!MUTATORS.includes(callee.getName())) return false
-    const target = callee.getExpression()
-    return (
-      Node.isPropertyAccessExpression(target) &&
-      Node.isThisExpression(target.getExpression()) &&
-      target.getName() === field
-    )
-  })
-}
-
-/**
- * True if the class text contains an assignment that builds one instance's
- * container from another's — `x._field = [...y._field]`, `new Set(y._field)`,
- * `{ ...y._field }`. Text-based on purpose: the two spellings differ only in
- * which side is `this`, and both are correct.
- */
-function copiesContainer(classText: string, field: string): boolean {
-  const assignment = new RegExp(`\\.${field}\\s*=\\s*([^\\n;]*)`, 'g')
-  for (const match of classText.matchAll(assignment)) {
-    const rhs = match[1] ?? ''
-    if (rhs.includes(`.${field}`) && /\[\.\.\.|new Set\(|new Map\(|\{ \.\.\./.test(rhs)) {
-      return true
-    }
-  }
-  return false
-}
-
-/**
- * The offending mutation in a method that ends by returning `this`, or
- * `undefined` if there is none.
- *
- * Deliberately only looks at `this._field` writes: `this._field = x`,
- * `this._field.push(...)`, `.add(...)`, `.set(...)`, and compound assignment.
- * A write through a local alias would slip past — accepted, because the point
- * is to catch the idiom a builder author reaches for, and the behavioural
- * probes cover the builders that exist today.
- */
-function mutatesThenReturnsThis(method: MethodDeclaration): string | undefined {
-  const body = method.getBody()
-  if (!body || !Node.isBlock(body)) return undefined
-
-  const statements = body.getStatements()
-  const last = statements[statements.length - 1]
-  if (!last || !Node.isReturnStatement(last)) return undefined
-  const returned = last.getExpression()
-  if (!returned || !Node.isThisExpression(returned)) return undefined
-
-  for (const statement of statements.slice(0, -1)) {
-    for (const expr of statement.getDescendantsOfKind(SyntaxKind.BinaryExpression)) {
-      const left = expr.getLeft()
-      if (!ownStateAccess(left)) continue
-      const op = expr.getOperatorToken().getKind()
-      if (op === SyntaxKind.EqualsToken || op === SyntaxKind.PlusEqualsToken) {
-        return `assigns ${left.getText()}`
-      }
-    }
-    for (const call of statement.getDescendantsOfKind(SyntaxKind.CallExpression)) {
-      const callee = call.getExpression()
-      if (!Node.isPropertyAccessExpression(callee)) continue
-      if (!['push', 'add', 'set', 'unshift', 'delete', 'clear'].includes(callee.getName())) continue
-      if (!ownStateAccess(callee.getExpression())) continue
-      return `calls ${callee.getText()}()`
-    }
-  }
-  return undefined
-}
-
-/** True for `this._field` and `this._field.nested`. */
-function ownStateAccess(node: Node): boolean {
-  let current: Node | undefined = node
-  while (Node.isPropertyAccessExpression(current)) {
-    const target = current.getExpression()
-    if (Node.isThisExpression(target)) return current.getName().startsWith('_')
-    current = target
-  }
-  return false
-}

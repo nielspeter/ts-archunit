@@ -37,21 +37,28 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm (Trusted Publishing via OIDC)
-        run: npm publish --provenance --access public
-
-      # Create GitHub Release with changelog entry
+      # Extract the release notes BEFORE publishing, and fail if there are none.
+      # npm versions are immutable, so every check that can fail must run on
+      # this side of `npm publish`. This step used to sit after it, with a
+      # fallback that wrote "No changelog entry for vX.Y.Z." into the release
+      # body — turning a missing entry into a silent success on an
+      # unrecoverable release. Measured against a CHANGELOG whose top section
+      # was still `## [Unreleased]`: the awk matched 0 lines and the fallback
+      # fired.
       - name: Extract changelog for this version
         id: changelog
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          # Extract the section for this version from CHANGELOG.md
           NOTES=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
-          # Write to file for the release body (handles multiline)
           echo "$NOTES" > /tmp/release-notes.txt
           if [ ! -s /tmp/release-notes.txt ]; then
-            echo "No changelog entry for v${VERSION}." > /tmp/release-notes.txt
+            echo "Error: CHANGELOG.md has no '## [${VERSION}]' section." >&2
+            echo "Rename the [Unreleased] heading to [${VERSION}] before tagging." >&2
+            exit 1
           fi
+
+      - name: Publish to npm (Trusted Publishing via OIDC)
+        run: npm publish --provenance --access public
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
