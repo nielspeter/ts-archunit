@@ -286,6 +286,16 @@ export class SliceRuleBuilder extends TerminalBuilder {
       line: 0,
       message,
       because: this._reason,
+      // Its own remedy, not the rule author's (bug 0021). Deliberately generic:
+      // the specific, per-branch diagnosis is already in `message`, where
+      // `emptyDiscoveryMessage` derives it and — per the comment there — each
+      // branch is reachable only when its advice is actually true. Restating that
+      // in `suggestion` would mean two texts to keep in agreement, which is the
+      // drift this project keeps paying for. So the `Fix:` line names the two
+      // actions that hold in every branch and points at the diagnosis.
+      suggestion:
+        'A slice rule that discovers nothing cannot enforce anything: correct the cause ' +
+        'named in the message, or remove the rule.',
       docs: GLOB_DOCS,
       bypassFilters: true,
     }

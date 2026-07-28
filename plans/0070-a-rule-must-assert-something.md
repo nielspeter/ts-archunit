@@ -6,7 +6,7 @@
 **Closes:** [bug 0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../bugs/0020-should-twice-silently-drops-the-first-assertion.md).
 **Splits from:** [plan 0069](./0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
 **Absorbs:** [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md), except its override-key ask — see Out of scope.
-**Blocked by:** [bug 0021](../bugs/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md). This plan's finding would print the rule author's unrelated `Fix:` line until that is fixed.
+**Unblocked:** [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) is fixed. It took four changes, not the one predicted: three producers copied the metadata themselves and never reached the `execute-rule.ts` guard. §3's requirement — that this plan's finding carries its own remedy — is now the established pattern rather than a new one.
 
 ## Corrections carried into draft 2
 
@@ -91,7 +91,7 @@ selector, add one condition per configured entry — yields **zero conditions wh
 configured list is empty**. A user writing their own preset over their own config hits it,
 and their fix is neither "add a condition" nor "delete the rule": it is _don't generate the
 rule when there is nothing to assert_. The message must say so, or the finding asserts a
-remedy that does not apply — ADR-008 rule 2, which is what [bug 0021](../bugs/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) is already about.
+remedy that does not apply — ADR-008 rule 2, which is what [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) was about.
 
 ## Mechanism
 
@@ -147,11 +147,12 @@ is a claim, so test item 6 makes it one a test can refuse.
 ### 3. The finding, and its message
 
 Same shape as `emptySelectionViolation()` (`:338`), which carries `because`, `suggestion` and
-`docs`. **This one must not**, and neither should the other five config findings — [bug 0021](../bugs/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md).
-`SliceRuleBuilder.metaViolation` already argues the case in a comment ("a false remedy by
-juxtaposition") and is defeated by `execute-rule.ts:132-139`. This plan does not ship until
-that is fixed, because otherwise the `Fix:` line on "this rule asserts nothing" is whatever
-the author wrote about something else.
+`docs`. **This one must not**, and as of [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) none of the others do either — every config finding now carries its own remedy, and `execute-rule.ts` no longer enriches one.
+`SliceRuleBuilder.metaViolation` argued the case in a comment ("a false remedy by
+juxtaposition") and was defeated by `execute-rule.ts` one layer up — fixed in bug 0021, which
+also had to give three producers their own remedy, because removing the inherited one failed
+the repo's "no violation reaches the user without a remedy" invariant. This plan's finding
+inherits that pattern rather than establishing it.
 
 The message branches on the state table and states the subject count. Draft 1 called the count
 an open question on the grounds that only `RuleBuilder` knows it. That was wrong: schema and
@@ -236,7 +237,7 @@ a forced one — the argument already written into this project's v0.21.0 entry.
 **0.22.0 — the instrument. Nothing fails.**
 
 - `assertsSomething()` on the root and all six hooks; `describeRule()` on the three;
-  corrected advice text in `diagnose.ts` and `docs/cli.md`; bug 0021.
+  corrected advice text in `diagnose.ts` and `docs/cli.md`. (Bug 0021 shipped ahead of this.)
 - A CHANGELOG notice in the shape 0.20.0 used: _"Run `doctor` now to find out what the next
   release will cost you."_
 - **Plus a pre-flight that works on the version the consumer already has**, because `doctor`

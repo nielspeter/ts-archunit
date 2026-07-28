@@ -347,8 +347,17 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
         'Selector matched 0 subjects, but .expectNonEmpty() requires at least one — ' +
         'likely a wrong glob or filter. If an empty match is valid here, remove .expectNonEmpty().',
       because: this._reason,
-      suggestion: this._metadata?.suggestion,
-      docs: this._metadata?.docs,
+      // Its own remedy, and only its own. The two actions below are the whole set
+      // for this finding, and both are true whichever way the selector is empty.
+      suggestion:
+        'Widen the selector until it matches at least one subject, or drop ' +
+        '.expectNonEmpty() if matching nothing is valid here.',
+      // No `suggestion`/`docs` from `this._metadata` (bug 0021). This finding says
+      // the selector matched nothing; the author's remedy is for a violation of the
+      // rule, and inheriting it prints an unrelated `Fix:`. The guard in
+      // `execute-rule.ts` cannot help here — this producer was copying the fields
+      // itself, which is why the two shipped config-finding producers disagreed
+      // about policy and the misleading one won.
       bypassFilters: true,
     }
   }

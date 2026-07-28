@@ -98,6 +98,12 @@ All fields are optional:
 | `suggestion` | How to fix a violation | `Fix: ...`                    |
 | `docs`       | Link to documentation  | `Docs: ...`                   |
 
+`id` and `because` appear on every finding the rule produces. `suggestion` and
+`docs` appear on **violations of the rule** only — a configuration finding, which
+reports that the rule enforces nothing, carries its own remedy instead. Your fix
+for "the cycle should be split" is not the fix for "this rule discovered no
+slices to look for cycles in", and the `Fix:` line is the one an agent obeys.
+
 ### `.because()` Shorthand
 
 For simple reasons without the full `.rule()` object:
