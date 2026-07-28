@@ -90,6 +90,21 @@ it('only new violations fail', () => {
 })
 ```
 
+## The pre-flight for this form
+
+`doctor` cannot load a file that imports a test runner, so for rules written inside
+`it()` bodies the pre-flight is the runtime itself: **a rule that asserts nothing warns
+on stderr** whenever it reaches a terminal (`.check()`, `.violations()`, `.warn()`).
+Run your normal test suite and read stderr — every `[ts-archunit] Rule '…': this rule …
+asserts nothing` line is a rule that a future release will fail instead of warn about.
+This reaches every authoring shape by construction: `it()` bodies, `checkAll([...])`
+arrays, rules built in loops, and presets.
+
+Note the per-file behaviour of a _self-executing_ rule file (one that calls `.check()`
+at module top level): the CLI's `check` command surfaces every finding in one run, but a
+throwing self-executing file stops at its first throw — which is one reason this page
+recommends leaving builders un-terminated in rule files.
+
 ## Converting between the two forms
 
 The forms differ only in how a rule is **terminated** and **run**. When you move a rule between them, swap both:

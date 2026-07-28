@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import { ScriptTarget, ModuleKind, ModuleResolutionKind } from 'ts-morph'
 import type { CompilerOptions } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
@@ -36,6 +37,25 @@ export class TsconfigBuilder extends TerminalBuilder {
     const next = this.copy()
     next._requirements = { ...this._requirements, ...spec }
     return next
+  }
+
+  override assertsSomething(): boolean {
+    return Object.keys(this._requirements).length > 0
+  }
+
+  override assertionAdvice(): string {
+    return (
+      'this rule has no requirements, so it asserts nothing and can never fail. Add ' +
+      '.requires({...}) with at least one compiler option, or delete the rule.'
+    )
+  }
+
+  /** Named by id or the fixed rule description, not 'unnamed' (plan 0070 §4). */
+  override describeRule(): RuleDescription {
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? RULE_DESCRIPTION,
+    }
   }
 
   protected collectViolations(): ArchViolation[] {

@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import type { SourceFile } from 'ts-morph'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
@@ -195,6 +196,25 @@ export class ResolverRuleBuilder extends TerminalBuilder {
     return clone
   }
 
+  override assertsSomething(): boolean {
+    return this._conditions.length > 0
+  }
+
+  override assertionAdvice(): string {
+    return (
+      'this rule has no condition, so it asserts nothing and can never fail. Add a ' +
+      'condition after .should(), e.g. contain(...), notContain(...) or useInsteadOf(...).'
+    )
+  }
+
+  /** Named by id or description, not 'unnamed' (plan 0070 §4). */
+  override describeRule(): RuleDescription {
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? this.buildRuleDescription(),
+    }
+  }
+
   protected collectViolations(): ArchViolation[] {
     const allElements = this.getElements()
 
@@ -203,15 +223,6 @@ export class ResolverRuleBuilder extends TerminalBuilder {
     )
 
     if (filtered.length === 0) {
-      return []
-    }
-
-    if (this._conditions.length === 0) {
-      const ruleId = this._metadata?.id ?? 'unnamed'
-      console.warn(
-        `[ts-archunit] Resolver rule '${ruleId}' has predicates but no conditions. ` +
-          `Did you forget to add a condition after .should()?`,
-      )
       return []
     }
 

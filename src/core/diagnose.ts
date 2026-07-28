@@ -30,6 +30,14 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * the rest take their condition as a constructor argument.
    */
   assertsSomething?: () => boolean
+  /**
+   * The remedy for this rule's assertion-less state. When present, `diagnose`
+   * reports it VERBATIM as the finding's advice, so the doctor and the runtime
+   * warning are the same string by construction (plan 0070) — they were
+   * measured diverging, and two texts for one state is a trust problem for an
+   * agent diffing them.
+   */
+  assertionAdvice?: () => string
   /** The project this rule was built against. */
   getProject?: () => ArchProject | undefined
 }
@@ -98,8 +106,14 @@ export function diagnose(
       findings.push({
         kind: 'no-condition',
         rule: name,
+        // The builder's own per-state remedy when it offers one — the same
+        // string the runtime prints — falling back to the generic form for a
+        // DiagnosableRule that predates the hook. The old fixed text here said
+        // "add a .should() clause", which is the wrong remedy for the main
+        // shape (the .should() is present; the condition is not).
         advice:
-          'this rule selects elements but asserts nothing about them, so it can never fail — add a .should() clause, or delete it',
+          rule.assertionAdvice?.() ??
+          'this rule asserts nothing, so it can never fail. Add an assertion, or delete the rule.',
       })
     }
 

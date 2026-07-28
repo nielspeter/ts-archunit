@@ -35,6 +35,14 @@ export function formatViolationsGitHub(
       if (v.docs) message += `. Docs: ${v.docs}`
 
       // GitHub annotation format: ::level file=path,line=N,title=T::message
+      //
+      // A configuration finding has no source location (file '', line 0), and
+      // `::error file=,line=0` is not a valid annotation — GitHub drops or
+      // misplaces it. Emit a run-level annotation instead, which renders on
+      // the workflow summary (plan 0070).
+      if (v.file === '') {
+        return `::${severity} title=${escapeGitHub(title)}::${escapeGitHub(message)}`
+      }
       return `::${severity} file=${relativePath},line=${String(v.line)},title=${escapeGitHub(title)}::${escapeGitHub(message)}`
     })
     .join('\n')

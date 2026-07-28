@@ -5,6 +5,13 @@ on:
     tags:
       - 'v*'
 
+# One publish at a time, never cancelled: two tags in quick succession with no
+# group means `latest` lands on whichever `npm publish` finishes last — and
+# plan 0070 ships 0.22.0 and 0.23.0 close together by design.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest

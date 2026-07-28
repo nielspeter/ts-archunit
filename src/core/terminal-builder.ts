@@ -128,7 +128,7 @@ export abstract class TerminalBuilder {
    * Does not throw — use for programmatic access (presets, aggregation).
    */
   violations(): ArchViolation[] {
-    const raw = this.collectViolations()
+    const raw = this.collectWithAssertionGuard()
     const filtered = applyFilters(raw, {
       reason: this._reason,
       metadata: this._metadata,
@@ -146,7 +146,7 @@ export abstract class TerminalBuilder {
    * @param options - Optional baseline, diff filtering, and output format
    */
   check(options?: CheckOptions): void {
-    const violations = this.collectViolations()
+    const violations = this.collectWithAssertionGuard()
     executeCheck(
       violations,
       {
@@ -166,7 +166,7 @@ export abstract class TerminalBuilder {
    * @param options - Optional baseline, diff filtering, and output format
    */
   warn(options?: CheckOptions): void {
-    const violations = this.collectViolations()
+    const violations = this.collectWithAssertionGuard()
     executeWarn(
       violations,
       {
@@ -202,6 +202,61 @@ export abstract class TerminalBuilder {
     } else {
       this.warn()
     }
+  }
+
+  /**
+   * Whether this rule asserts anything about what it selects (plan 0070).
+   *
+   * Concrete with a `true` default rather than abstract: both roots are public
+   * exports, so an abstract member is a compile break for an external subclass
+   * (the `globs()` argument). The default makes a new builder EXEMPT by
+   * default — the opposite polarity from `globs()`'s empty default, which only
+   * makes a builder invisible. The classification test in
+   * `tests/core/assertion-gate.test.ts` is what forces the decision for every
+   * exported builder.
+   *
+   * Public, not protected — `diagnose()` duck-types it through
+   * `DiagnosableRule`, and a protected member cannot satisfy a structural
+   * interface. Same forcing as `assertsSomething` on `RuleBuilder`, which was
+   * already shipped public.
+   */
+  assertsSomething(): boolean {
+    return true
+  }
+
+  /**
+   * The remedy for this builder's assertion-less state, as one string.
+   *
+   * This is the "one string, one place" channel: the runtime warning (0.22.0),
+   * the eventual failure message (0.23.0) and `diagnose()`'s advice all read
+   * it, so they cannot drift — plan 0070 round 2 measured the doctor and the
+   * runtime shipping two diverging texts for the same state.
+   *
+   * Public for the same `DiagnosableRule` duck-typing reason as
+   * `assertsSomething` — plan 0070 drafted this `protected`, and a protected
+   * member cannot satisfy the structural interface `diagnose()` consumes.
+   */
+  assertionAdvice(): string {
+    return 'this rule asserts nothing, so it can never fail. Add an assertion, or delete the rule.'
+  }
+
+  /**
+   * The assertion gate (plan 0070, bug 0019). Checked BEFORE running the rule:
+   * an assertion-less rule cannot produce a legitimate finding, running it
+   * costs a full AST walk, and one builder's `collectViolations()` throws —
+   * gate-first avoids all three.
+   *
+   * 0.22.0 behaviour: warn and proceed. This is the pre-flight instrument —
+   * it reaches every authoring shape by construction (vitest bodies,
+   * self-executing files, loops, presets), which no lexical scan does. 0.23.0
+   * replaces the warn with a configuration finding.
+   */
+  private collectWithAssertionGuard(): ArchViolation[] {
+    if (!this.assertsSomething()) {
+      const name = this.describeRule().rule || this.constructor.name
+      console.warn(`[ts-archunit] Rule '${name}': ${this.assertionAdvice()}`)
+    }
+    return this.collectViolations()
   }
 
   /**

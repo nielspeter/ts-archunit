@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import { Node } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
@@ -186,6 +187,26 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     const next = this.copy()
     next._distinctKeys.add(sideName)
     return next
+  }
+
+  override assertsSomething(): boolean {
+    return this._checkComplete || this._checkNoOrphans
+  }
+
+  override assertionAdvice(): string {
+    return (
+      'this correspondence asserts nothing: call .beComplete(), .haveNoOrphans(), or ' +
+      '.beBijective(). (In this version it also throws — the gate only warns until 0.23.0.)'
+    )
+  }
+
+  /** Named by id or by its sides, not 'unnamed' (plan 0070 §4). */
+  override describeRule(): RuleDescription {
+    const sides = this._sides.map((side) => side.name).join(' <-> ')
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? (sides ? `correspondence [${sides}]` : 'correspondence'),
+    }
   }
 
   protected collectViolations(): ArchViolation[] {

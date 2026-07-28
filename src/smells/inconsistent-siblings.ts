@@ -96,6 +96,17 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     return violations
   }
 
+  override assertsSomething(): boolean {
+    return this._pattern !== undefined
+  }
+
+  override assertionAdvice(): string {
+    return (
+      'this detector has no pattern, so it detects nothing and can never fail. Add ' +
+      '.forPattern(...), or use smells.duplicateBodies() for patternless duplicate detection.'
+    )
+  }
+
   protected detect(): ArchViolation[] {
     if (!this._pattern) return []
 

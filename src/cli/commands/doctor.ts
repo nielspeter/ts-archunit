@@ -44,17 +44,30 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
       // `doctor` — the pre-flight R3b's gate depends on — crashes on the
       // commonest legacy rule-file shape and abandons every remaining file,
       // so the gate cannot be run on the population it was invented for.
-      if (!(error instanceof ArchRuleError)) throw error
       // `loadRuleFiles` accumulates into a local array and returns it only
       // after its own loop, so when the import throws NOTHING from that file
       // survives. Saying "diagnosing what loaded" would be false, and
       // swallowing it silently turned a visible crash into `exit 0` plus a
       // clean bill of health — the ADR-008 rule 1 failure this command exists
       // to surface, committed by the command.
-      process.stderr.write(
-        `Error: ${file} executes its rules at import and threw, so none of it could be ` +
-          `diagnosed. Leave builders un-terminated in a rule file (see docs/running-in-tests).\n`,
-      )
+      //
+      // Two loud shapes (plan 0070 round 2): an ArchRuleError means the file
+      // self-executes a failing rule at import; anything else — measured, a
+      // raw TypeError from importing a vitest test file — used to crash the
+      // whole command and abandon every remaining file.
+      if (error instanceof ArchRuleError) {
+        process.stderr.write(
+          `Error: ${file} executes its rules at import and threw, so none of it could be ` +
+            `diagnosed. Leave builders un-terminated in a rule file (see docs/running-in-tests).\n`,
+        )
+      } else {
+        process.stderr.write(
+          `Error: ${file} could not be loaded (${error instanceof Error ? error.message : String(error)}), ` +
+            `so none of it could be diagnosed. A file that imports a test runner (vitest/jest) ` +
+            `cannot be loaded by doctor — run your test suite instead; the runtime emits the ` +
+            `same diagnostics as warnings.\n`,
+        )
+      }
       failedToLoad = true
     }
   }
