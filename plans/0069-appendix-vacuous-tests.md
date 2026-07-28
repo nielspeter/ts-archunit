@@ -50,7 +50,7 @@ The plan claimed **8**. It was wrong by more than 4×, and worse, nobody could h
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `core/rule-builder.ts:492` `is opt-in — an empty selector WITHOUT it stays green (default unchanged)` | Rewrite as part of R3b. It is not a defect; it is the contract test for the behaviour R3b changes, and it should be inverted rather than deleted so the new default is stated somewhere. |
 
-## C — genuine: the test believes it is checking something and is not (6)
+## C — genuine: the test believes it is checking something and is not (6) — **all fixed**
 
 These are the real find. Each has a name or a comment that promises enforcement, and a body that asserts on nothing.
 
@@ -66,6 +66,14 @@ These are the real find. Each has a name or a comment that promises enforcement,
 The last one is the useful one. It was written by someone who had spent a week on exactly this failure mode, in the change that fixed a neighbouring instance of it, and it still went in. That is the argument for the mechanism rather than for more care.
 
 ---
+
+## Status
+
+**The six in C are fixed** (2026-07-26), and the population is 35 → 30. The remaining 30 are the 26 in A, the 1 in B, and three follow-on empty rules inside tests that now assert something real beside them.
+
+Two of the six turned out to be a **library** defect rather than a test defect — see [bug 0016](../bugs/0016-narrowing-a-named-selection-mutates-it.md). `named selection reuse works` was demonstrating that it does not: narrowing a named selection mutates it, so the second rule lost the subject it was written for. `inherits all FunctionRuleBuilder predicates and conditions` had the same shape twice over — its `contain()` assertion ran on the set that its own `areAsync()` filter had already emptied.
+
+Neither would have been found by reading. Both surfaced from the measurement.
 
 ## What R3b has to do
 

@@ -478,8 +478,24 @@ describe('type matchers — isString, isNumber, isBoolean, isStringLiteral, isUn
 
   describe('extendType() predicate', () => {
     it('finds interfaces extending Entity', () => {
-      // domain.ts: Order extends nothing. But options.ts: interface Order extends Entity in modules.
-      // In poc fixture, let's check that no type extends a nonexistent base
+      // `Order extends Entity` lives in the MODULES fixture, not the poc one
+      // this describe uses — which is why the original body quietly became
+      // `extendType('NonExistentBase')` with a comment recording the author
+      // losing track. It then asserted that an empty selection produces no
+      // violations, under a name promising the opposite.
+      const modulesProject = loadProject(modulesTsconfig)
+      const found = types(modulesProject).that().extendType('Entity').subjects()
+      expect(found.map((t) => t.getName())).toContain('Order')
+
+      // And the condition actually runs over that non-empty set.
+      expect(() => {
+        types(modulesProject).that().extendType('Entity').should().notExist().check()
+      }).toThrow(ArchRuleError)
+    })
+
+    it('a nonexistent base selects nothing, and notExist is satisfied', () => {
+      // The assertion the old test actually made, kept — but named for what it
+      // does, and no longer standing in for a positive case.
       expect(() => {
         types(p).that().extendType('NonExistentBase').should().notExist().check()
       }).not.toThrow()

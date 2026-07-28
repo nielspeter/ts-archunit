@@ -197,15 +197,27 @@ describe('bug 0014 — bare package specifiers', () => {
     })
 
     it('permits the package inside the layer that owns it', () => {
-      const rules = layeredArchitecture(archProject, {
-        layers: { app: '**/app/**', services: '**/services/**' },
-        // The importing file IS the whole allowed set here, so nothing to report.
-        restrictedPackages: { '**/bare-imports/src/**': ['picomatch'] },
-      })
-      const violations = rules
-        .flatMap((rule) => rule.violations())
-        .filter((v) => v.ruleId === 'preset/layered/restricted-packages')
-      expect(violations).toEqual([])
+      // Written in the commit that FIXED bug 0014, and vacuous: the allowed
+      // glob covered every file, so the preset generated a rule with no
+      // subjects and `[]` violations was trivially true. It would have passed
+      // with restrictedPackages entirely broken.
+      //
+      // Now it is two-sided. The same package and the same importer, with only
+      // the allowed layer moved — so a pass on the second half means the rule
+      // ran and found nothing, not that it had nothing to run over.
+      const restrictedTo = (allowed: string) =>
+        layeredArchitecture(archProject, {
+          layers: { app: '**/app/**', services: '**/services/**' },
+          restrictedPackages: { [allowed]: ['picomatch'] },
+        })
+          .flatMap((rule) => rule.violations())
+          .filter((v) => v.ruleId === 'preset/layered/restricted-packages')
+
+      // Positive control: the importer is NOT in `app/`, so it is reported.
+      expect(restrictedTo('**/app/**').length).toBeGreaterThan(0)
+
+      // And permitted once the allowed layer is the one holding the import.
+      expect(restrictedTo('**/bare-imports/src')).toEqual([])
     })
   })
 

@@ -51,17 +51,22 @@ describe('ScopedFunctionRuleBuilder', () => {
       .and()
       .withStringArg(0, '/api/users')
 
-    const scoped = new ScopedFunctionRuleBuilder(selection)
+    // The unfiltered scope must be non-empty, or "inherits all predicates" is
+    // asserted over nothing — which is what it was.
+    expect(new ScopedFunctionRuleBuilder(selection).subjects().length).toBeGreaterThan(0)
 
-    // areAsync() is a FunctionRuleBuilder predicate; it should work
-    // The callback is NOT async, so filtering to async should yield no elements
-    expect(() => {
-      scoped.that().areAsync().should().notExist().check()
-    }).not.toThrow()
+    // areAsync() is a FunctionRuleBuilder predicate; it reaches scoped
+    // functions. Asserted on the subject set, both outcomes: the callback is
+    // not async, so the filter empties the set — which the previous version
+    // checked by running a rule over that empty set and watching it not throw,
+    // true however the predicate behaves.
+    expect(new ScopedFunctionRuleBuilder(selection).that().areAsync().subjects()).toHaveLength(0)
 
-    // contain() is a FunctionRuleBuilder condition; it should work
+    // contain() is a FunctionRuleBuilder condition; it should work — on a
+    // FRESH builder. Reusing the one narrowed by `areAsync()` above ran this
+    // over the emptied set, so it asserted nothing (bug 0016).
     expect(() => {
-      scoped.should().contain(call('handleError')).check()
+      new ScopedFunctionRuleBuilder(selection).should().contain(call('handleError')).check()
     }).not.toThrow()
   })
 
