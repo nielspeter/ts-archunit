@@ -91,6 +91,21 @@ describe('classes() entry point integration', () => {
           .acceptParameterOfType(matching(/DatabaseClient/))
           .check()
       }).not.toThrow()
+
+      // A failure mode, not just a subject. Sabotaging the condition to never
+      // report anything leaves the assertion above green, so it proves the rule
+      // ran but not that the condition discriminates. Same subjects, a type
+      // none of them accepts.
+      expect(() => {
+        classes(p)
+          .that()
+          .haveNameStartingWith('Repo')
+          .and()
+          .resideInFile('**/members.ts')
+          .should()
+          .acceptParameterOfType(matching(/NoSuchTypeAnywhere/))
+          .check()
+      }).toThrow(ArchRuleError)
     })
   })
 

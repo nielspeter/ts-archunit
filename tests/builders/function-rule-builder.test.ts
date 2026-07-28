@@ -184,15 +184,19 @@ describe('FunctionRuleBuilder', () => {
         .haveNameMatching(/^parse/)
       expect(parsers.subjects().map((f) => f.getName())).toContain('parseConfig')
 
-      expect(() => {
-        parsers.should().beExported().check()
-      }).not.toThrow()
-
-      // Second rule from the same selection: the selection is intact.
-      expect(parsers.subjects().map((f) => f.getName())).toContain('parseConfig')
+      // Throwing rule FIRST. The reverse order cannot detect a leak: carrying a
+      // passing condition into the second rule changes nothing either way.
+      // (`.should() forks the builder for named selections` below is the
+      // dedicated guard; this ordering just stops THIS test from being a
+      // weaker duplicate of it.)
       expect(() => {
         parsers.should().notExist().check()
       }).toThrow(ArchRuleError)
+
+      // Second rule off the same selection, unaffected by the first.
+      expect(() => {
+        parsers.should().beExported().check()
+      }).not.toThrow()
     })
 
     it('narrowing a named selection MUTATES it (bug 0016)', () => {
