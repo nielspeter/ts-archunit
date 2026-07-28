@@ -1,4 +1,8 @@
 import type { ArchViolation } from '../core/violation.js'
+import type { Predicate } from '../core/predicate.js'
+import type { Located } from '../predicates/identity.js'
+import { resideInFile, resideInFolder } from '../predicates/identity.js'
+import { or } from '../core/combinators.js'
 import type { RuleMetadata } from '../core/rule-metadata.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 
@@ -90,4 +94,28 @@ export function validateOverrides(
       )
     }
   }
+}
+
+/**
+ * Match a user-supplied glob against the file path **or** its parent directory.
+ *
+ * Preset options name a location — `repositories`, `shared`, a layer glob — and
+ * both spellings are natural: `'**\/repositories/**'` and
+ * `'**\/repositories/repo.ts'`. `resideInFolder` reads only the parent
+ * directory, so a preset that used it directly silently enforced **nothing**
+ * for a file glob: measured, `dataLayerIsolation({ repositories:
+ * '**\/repositories/bad-repo.ts' })` generated its two rules and reported 0
+ * violations on a fixture named `bad-repo` (bug 0018).
+ *
+ * The fix is to make the natural spelling work rather than to fail on it — the
+ * principle bug 0014 settled on, and 0067-C reached independently. `or()` is
+ * the right combinator for the glob model too: the declaration is dead only
+ * when **both** readings are, which is what `doctor` will report on it.
+ *
+ * Internal to presets on purpose. A user writing their own rule chooses
+ * `resideInFile` or `resideInFolder` knowing which they mean; a preset option
+ * has to accept whichever its caller wrote.
+ */
+export function atPath<T extends Located>(glob: string): Predicate<T> {
+  return or(resideInFile<T>(glob), resideInFolder<T>(glob))
 }

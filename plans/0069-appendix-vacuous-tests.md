@@ -18,30 +18,30 @@ Rows are keyed by **test name**, not `file:line`. The first version's line numbe
 
 Conditions that assert **cardinality** — `notExist()` — plus tests written to check that a selector matches nothing. **R3b must not fail these.** See the discriminator below for why that phrase had to be narrowed.
 
-| Test                                                                                                | Why it is fine                                                                                   |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `builders/call-rule-builder.ts:106` `.notExist() passes when no calls match`                        | states the contract                                                                              |
-| `builders/call-rule-builder.ts:183` `.resideInFolder() filters by folder glob`                      | two halves; the empty half is the negative control                                               |
-| `builders/calls-identified-by-arg.ts:95` `test #14 — identity scope`                                | negative case, with a positive control in the same test                                          |
-| `builders/jsx-rule-builder.ts:26` `passes when no banned HTML elements exist`                       | states the contract                                                                              |
-| `builders/jsx-rule-builder.ts:306` `passes any rule`                                                | a file with no JSX at all                                                                        |
-| `builders/module-rule-builder.ts:40` `.resideInFolder() filters modules by folder`                  | two halves; the empty half is the negative control                                               |
-| `builders/type-rule-builder.ts:104` `resideInFolder with nonexistent folder matches nothing`        | states the contract                                                                              |
-| `builders/type-rule-builder.ts:145` `extendType with nonexistent base matches nothing`              | states the contract                                                                              |
-| `integration/advanced-features.ts:122` `custom predicate that matches nothing…`                     | states the contract                                                                              |
-| `integration/advanced-features.ts:325` `notExist — non-existent classes…`                           | states the contract                                                                              |
-| `integration/call-entry-point.ts:141` `onObject("db").notExist() in route files`                    | a real architectural assertion satisfied by emptiness                                            |
-| `integration/class-type-predicates.ts:348` `no interfaces extend BaseService`                       | ditto                                                                                            |
-| `integration/coverage-gaps.ts:89` `importFrom with no matches produces no violations`               | states the contract                                                                              |
-| `integration/coverage-gaps.ts:153` `no module exports a nonexistent symbol`                         | states the contract                                                                              |
-| `integration/coverage-gaps.ts:1339` `.notExist() — asserts no matching modules exist`               | states the contract                                                                              |
-| `integration/function-rules.ts:71` `no function has more than 5 parameters`                         | a real assertion satisfied by emptiness                                                          |
-| `integration/function-rules.ts:221` `functions in a non-existent folder should pass trivially`      | says so in the title                                                                             |
-| `integration/function-rules.ts:280` `exported async functions with unreachable name should pass`    | says so in the title                                                                             |
-| `integration/function-rules.ts:464` `private methods with too many params should not exist`         | a real assertion satisfied by emptiness                                                          |
-| `integration/metrics.ts:113` `haveCyclomaticComplexity filters then asserts`                        | ditto                                                                                            |
-| `integration/metrics.ts:206` `haveComplexity with high threshold finds nothing`                     | says so in the title                                                                             |
-| `archunit/arch-rules.ts:768` `module predicate functions must not accept a single "glob" parameter` | selects 0 **because R-any moved `havePathMatching` out of scope** — the rule working as intended |
+| Test                                                                                | Why it is fine                                                                                   |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `.should().notExist().check() passes when no calls match`                           | states the contract                                                                              |
+| `.resideInFolder() filters by folder glob`                                          | two halves; the empty half is the negative control                                               |
+| `test #14 — identity scope: predicates stay on bare callee (with positive control)` | negative case, with a positive control in the same test                                          |
+| `passes when no banned HTML elements exist`                                         | states the contract                                                                              |
+| `passes any rule`                                                                   | a file with no JSX at all                                                                        |
+| `.resideInFolder() filters modules by folder`                                       | two halves; the empty half is the negative control                                               |
+| `resideInFolder with nonexistent folder matches nothing`                            | states the contract                                                                              |
+| `extendType with nonexistent base matches nothing`                                  | states the contract                                                                              |
+| `custom predicate that matches nothing yields no violations`                        | states the contract                                                                              |
+| `notExist — non-existent classes do not produce violations`                         | states the contract                                                                              |
+| `calls(p).that().onObject("db").should().notExist() in route files`                 | a real architectural assertion satisfied by emptiness                                            |
+| `no interfaces extend BaseService (they extend other interfaces)`                   | ditto                                                                                            |
+| `importFrom with no matches produces no violations`                                 | states the contract                                                                              |
+| `no module exports a nonexistent symbol`                                            | states the contract                                                                              |
+| `.notExist() — asserts no matching modules exist`                                   | states the contract                                                                              |
+| `no function has more than 5 parameters`                                            | a real assertion satisfied by emptiness                                                          |
+| `functions in a non-existent folder should pass trivially`                          | says so in the title                                                                             |
+| `exported async functions with unreachable name should pass`                        | says so in the title                                                                             |
+| `private methods with too many params should not exist`                             | a real assertion satisfied by emptiness                                                          |
+| `haveCyclomaticComplexity filters then asserts`                                     | ditto                                                                                            |
+| `haveComplexity with high threshold finds nothing`                                  | says so in the title                                                                             |
+| `module predicate functions must not accept a single "glob" parameter`              | selects 0 **because R-any moved `havePathMatching` out of scope** — the rule working as intended |
 
 ## B — asserts the current default, and R3b invalidates it by design (5)
 

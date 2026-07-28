@@ -1,6 +1,7 @@
 # Bug 0018: `dataLayerIsolation({ repositories: '<a file glob>' })` enforces nothing
 
 **Reported:** 2026-07-26
+**Fixed:** 2026-07-26
 **Found in:** all versions through v0.19.0
 **Severity:** High — a preset that silently certifies nothing, for a spelling of its own option that looks correct and that its own tests use.
 
@@ -48,7 +49,25 @@ instance `resideInFolder('**/src/predicates/module**')` — 1 file, 0 directorie
 The same fault is shipped in a preset, where the user did not write the
 `resideInFolder` call and cannot see it.
 
-## Suggested fix
+## Fixed
+
+`atPath(glob)` in `src/presets/shared.ts` — `or(resideInFile, resideInFolder)` —
+applied wherever a preset matches a **user-supplied** location option. Measured:
+
+```
+dataLayerIsolation({ repositories: '**/repositories/bad-repo.ts' })   0 -> 2 violations
+dataLayerIsolation({ repositories: '**/repositories/**' })            2 -> 2  (no regression)
+strictBoundaries({ shared: ['**/src/helpers/baseline.ts'] })         38 empty -> 76 with subjects
+strictBoundaries({ shared: ['**/src/helpers/**'] })                  unchanged
+```
+
+Internal to presets on purpose. A user writing their own rule chooses
+`resideInFile` or `resideInFolder` knowing which they mean; a preset option has
+to accept whichever its caller wrote. Making it public API would be new surface
+in a release already carrying two breaking changes — left as a possible
+follow-up, not done.
+
+## Suggested fix (as filed)
 
 The option is documented as naming repositories, and both a file glob and a
 directory glob are natural spellings, so the fix is to make the natural spelling
