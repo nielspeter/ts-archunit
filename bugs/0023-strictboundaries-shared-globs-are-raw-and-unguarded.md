@@ -34,8 +34,8 @@ folders: '**/no-such-feat/*'   ->  1 discovery finding, error  (the guard shared
 
 The false red's `Fix:` line then compounds it: the violation carries `no-cross-boundary`'s
 remedy, telling the user to move into the shared module **they are already importing from**.
-(That remedy has its own defect — bug 0017, the message-overclaim finding this review started
-from, pending filing.)
+(That remedy has its own defect —
+[bug 0017](./0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).)
 
 ## Why no test caught it
 
@@ -55,9 +55,9 @@ Two halves, mirroring what `folders` already has:
 Note the adjacent hazard found in the same review, for whoever implements: `boundaryPattern`
 feeds both the rule's _selector_ and its _allowance_ (`boundaries.ts:172-181`), and
 `assertDiscovered` checks `options.folders`, not the per-rule selector — so a future edit that
-narrows the pattern empties the selection silently. Bug 0017's guard fixture (pending filing)
-pins this with a positive identity assertion; this bug's guard should reuse that fixture
-rather than grow a second one.
+narrows the pattern empties the selection silently. Bug 0017's guard fixture pins this with a
+positive identity assertion; this bug's guard should reuse that fixture rather than grow a
+second one.
 
 ## Guard this needs
 
