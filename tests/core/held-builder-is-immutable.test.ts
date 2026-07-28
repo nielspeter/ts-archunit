@@ -220,6 +220,19 @@ describe('a held builder is immutable — behavioural', () => {
 })
 
 describe('a held builder is immutable — structural', () => {
+  // One repo load, shared. Two `new Project` calls over this repo's 454 files
+  // cost ~330ms each in isolation and 10-12s under full parallelism, which is
+  // how both of these tests came to fail on timeout in a run where nothing was
+  // wrong. See the note in vitest.config.ts on why a flaky guard is worse than
+  // a slow one here.
+  let repoProject: Project | undefined
+  const repo = (): Project => {
+    repoProject ??= new Project({
+      tsConfigFilePath: path.resolve(import.meta.dirname, '../../tsconfig.json'),
+    })
+    return repoProject
+  }
+
   /**
    * `src/` must contain no method that mutates its own state and then returns
    * `this`. Derived from the source text, so it holds for builders this file
@@ -227,12 +240,9 @@ describe('a held builder is immutable — structural', () => {
    * which is how the five beyond the bug report were found.
    */
   it('no chain method mutates its own state and returns this', () => {
-    const repo = new Project({
-      tsConfigFilePath: path.resolve(import.meta.dirname, '../../tsconfig.json'),
-    })
     const offenders: string[] = []
 
-    for (const sf of repo.getSourceFiles('src/**/*.ts')) {
+    for (const sf of repo().getSourceFiles('src/**/*.ts')) {
       for (const cls of sf.getClasses()) {
         for (const method of cls.getMethods()) {
           const site = mutatesThenReturnsThis(method)
@@ -280,12 +290,9 @@ describe('a held builder is immutable — structural', () => {
    * mutated in place and nothing copies them.
    */
   it('every in-place-mutated container field is copied for the clone', () => {
-    const repo = new Project({
-      tsConfigFilePath: path.resolve(import.meta.dirname, '../../tsconfig.json'),
-    })
     const unguarded: string[] = []
 
-    for (const sf of repo.getSourceFiles('src/**/*.ts')) {
+    for (const sf of repo().getSourceFiles('src/**/*.ts')) {
       for (const cls of sf.getClasses()) {
         const body = cls.getText()
         for (const field of cls.getProperties()) {
