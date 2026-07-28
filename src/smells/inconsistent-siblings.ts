@@ -23,8 +23,9 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
 
   /** The pattern that most siblings should follow. */
   forPattern(matcher: ExpressionMatcher): this {
-    this._pattern = matcher
-    return this
+    const next = this.copy()
+    next._pattern = matcher
+    return next
   }
 
   /** Check if a source file contains any function matching the pattern. */

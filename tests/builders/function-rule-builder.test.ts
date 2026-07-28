@@ -199,24 +199,57 @@ describe('FunctionRuleBuilder', () => {
       }).not.toThrow()
     })
 
-    it('narrowing a named selection MUTATES it (bug 0016)', () => {
-      // Pinned, not endorsed. The previous version of the test above used this
-      // form under the name "named selection reuse works", and its second rule
-      // asked for `parseConfig` — which the first rule had already narrowed
-      // away. It asserted `.not.toThrow()` over an empty set and so certified
-      // the feature for as long as it existed.
-      //
-      // Update this test when bug 0016 is fixed; do not delete it.
+    it('narrowing a named selection does NOT mutate it (bug 0016)', () => {
+      // This test was a PIN on the defect: `should()` forked but `that()` did
+      // not, so narrowing a held selection edited it in place and the next rule
+      // off it silently lost subjects. It is now the regression guard.
       const parsers = functions(p)
         .that()
         .haveNameMatching(/^parse/)
       expect(parsers.subjects()).toHaveLength(4)
 
-      parsers
+      const orders = parsers.that().haveNameMatching(/Order$/)
+
+      // Guard 1 — the discriminator. Two narrowings of one selection are two
+      // different sets, each correct. Under the bug the second was the
+      // intersection of both and came back empty.
+      expect(
+        orders
+          .subjects()
+          .map((f) => f.getName())
+          .sort(),
+      ).toEqual(['parseBarOrder', 'parseBazOrder', 'parseFooOrder'])
+      expect(
+        parsers
+          .that()
+          .haveNameMatching(/^parseConfig$/)
+          .subjects()
+          .map((f) => f.getName()),
+      ).toEqual(['parseConfig'])
+
+      // Guard 3 — the original is untouched after a derived rule has run.
+      orders.should().notExist().violations()
+      expect(parsers.subjects()).toHaveLength(4)
+    })
+
+    it('an exclusion does not leak onto the selection it came from (bug 0016)', () => {
+      // Worse than lost subjects: this one silently SUPPRESSES violations in
+      // every later rule off the same selection.
+      const parsers = functions(p)
         .that()
-        .haveNameMatching(/Order$/)
-        .violations()
-      expect(parsers.subjects().map((f) => f.getName())).not.toContain('parseConfig')
+        .haveNameMatching(/^parse/)
+      const withoutOrders = parsers.excluding(/Order$/)
+
+      expect(withoutOrders.should().notExist().violations()).toHaveLength(1)
+      expect(parsers.should().notExist().violations()).toHaveLength(4)
+    })
+
+    it('the documented repeated-.should() form is unaffected (no regression)', () => {
+      const parsers = functions(p)
+        .that()
+        .haveNameMatching(/^parse/)
+      expect(parsers.should().notExist().violations()).toHaveLength(4)
+      expect(parsers.should().notExist().violations()).toHaveLength(4)
     })
   })
 

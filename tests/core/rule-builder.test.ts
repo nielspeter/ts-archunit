@@ -217,12 +217,19 @@ describe('RuleBuilder', () => {
   })
 
   describe('.asSeverity()', () => {
-    it('is non-terminal — sets severity, returns this, does not throw or warn', () => {
+    it('is non-terminal — sets severity, does not throw or warn', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const builder = new TestRuleBuilder(stubProject, elements)
       const configured = builder.should().withCondition(alwaysFail('bad'))
       const chained = configured.asSeverity('warn')
-      expect(chained).toBe(configured)
+
+      // A COPY, not `this` — since bug 0016 a held builder is immutable. What
+      // the contract needs is that it is non-terminal (nothing executed) and
+      // that the severity took effect, not that the same object came back.
+      expect(chained).not.toBe(configured)
+      expect(chained.violations().every((v) => v.severity === 'warn')).toBe(true)
+      // ...and the original is untouched, which is the whole point.
+      expect(configured.violations().every((v) => v.severity === 'error')).toBe(true)
       expect(warnSpy).not.toHaveBeenCalled()
       warnSpy.mockRestore()
     })

@@ -173,3 +173,42 @@ describe('ResolverRuleBuilder — resolver maps (bug 0013)', () => {
     ])
   })
 })
+
+describe('ResolverRuleBuilder — a held selection is immutable (bug 0016)', () => {
+  const p = loadTestProject()
+
+  // Same hierarchy, same defect as SchemaRuleBuilder: this builder extends
+  // TerminalBuilder directly, so `RuleBuilder`'s copy-on-write did not reach
+  // it. Both assertions below are on rules that MUST fail.
+
+  it('a second rule off a held resolver set is not narrowed by the first', () => {
+    const all = resolvers(p, 'src/**/*.resolver.ts')
+
+    // Rule 1 narrows to User-returning resolvers, which do use the loader.
+    expect(() =>
+      all.that().resolveFieldReturning(/User/).should().contain(call('loader.load')).check(),
+    ).toThrow(ArchRuleError)
+
+    // Rule 2 must still see the whole set. Under the bug it saw
+    // /User/ ∩ /QueryResult/ = ∅ and passed.
+    expect(() =>
+      all
+        .that()
+        .resolveFieldReturning(/QueryResult/)
+        .should()
+        .contain(call('loader.load'))
+        .check(),
+    ).toThrow(ArchRuleError)
+  })
+
+  it('a second condition off a held resolver set does not stack with the first', () => {
+    const all = resolvers(p, 'src/**/*.resolver.ts')
+    const first = all.should().contain(call('loader.load')).violations()
+    const second = all.should().contain(call('loader.load')).violations()
+
+    // Identical rules report identically. A leaked condition would double the
+    // second count; a leaked predicate would empty it.
+    expect(first.length).toBeGreaterThan(0)
+    expect(second).toHaveLength(first.length)
+  })
+})

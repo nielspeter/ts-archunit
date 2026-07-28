@@ -89,10 +89,15 @@ function applyRestrictedPackages(
 
   const builders: RuleBuilderLike[] = []
   for (const [pkg, allowedLayers] of packageToAllowed) {
-    // Modules NOT in any allowed layer must not import this package
-    const builder = modules(p).that()
+    // Modules NOT in any allowed layer must not import this package.
+    //
+    // `builder = builder.satisfy(...)`, not a bare call: since bug 0016 a
+    // builder is immutable, so discarding the return discards the predicate.
+    // This was the only site in the codebase relying on the old mutation, and
+    // it is the reason the fix is a behaviour change rather than a refactor.
+    let builder = modules(p).that()
     for (const allowedGlob of allowedLayers) {
-      builder.satisfy(not(resideInFolderPredicate<SourceFile>(allowedGlob)))
+      builder = builder.satisfy(not(resideInFolderPredicate<SourceFile>(allowedGlob)))
     }
 
     builders.push(

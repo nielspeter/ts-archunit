@@ -50,8 +50,9 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * Explicitly resets phase to 'predicate' — defensive against `.should().that()` misuse.
    */
   that(): this {
-    this._phase = 'predicate'
-    return this
+    const next = this.copy()
+    next._phase = 'predicate'
+    return next
   }
 
   /**
@@ -106,8 +107,9 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * subject set (plan 0064); the finding bypasses diff/baseline (plan 0067).
    */
   expectNonEmpty(): this {
-    this._requireNonEmpty = true
-    return this
+    const next = this.copy()
+    next._requireNonEmpty = true
+    return next
   }
 
   // --- Terminal methods ---
@@ -218,8 +220,9 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * `.haveNameMatching()`, `.extend()`, etc.
    */
   protected addPredicate(predicate: Predicate<T>): this {
-    this._predicates.push(predicate)
-    return this
+    const next = this.copy()
+    next._predicates.push(predicate)
+    return next
   }
 
   /**
@@ -227,8 +230,9 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * `.notContain()`, `.notExist()`, etc.
    */
   protected addCondition(condition: Condition<T>): this {
-    this._conditions.push(condition)
-    return this
+    const next = this.copy()
+    next._conditions.push(condition)
+    return next
   }
 
   /**
@@ -246,17 +250,25 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * Override only when a field needs a deep copy, or the constructor performs
    * validation/derivation that a shallow copy would skip.
    */
+  /**
+   * An independent copy, carrying **both** lists. See `TerminalBuilder.copy`.
+   *
+   * `fork()` below clears the conditions because it exists for `should()`;
+   * this one must not, or `.should().beExported().that().areAsync()` would
+   * silently drop `beExported` — a rule that asserted something turned into
+   * one that asserts nothing, by the fix for a bug about rules that assert
+   * nothing.
+   */
+  protected override copy(): this {
+    const clone = super.copy()
+    clone._predicates = [...this._predicates]
+    clone._conditions = [...this._conditions]
+    return clone
+  }
+
   protected fork(): this {
-    // Object.create/getPrototypeOf return untyped — casts unavoidable at JS interop boundary
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const proto: object = Object.getPrototypeOf(this)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const fork: this = Object.create(proto)
-    Object.assign(fork, this)
-    fork._predicates = [...this._predicates]
+    const fork = this.copy()
     fork._conditions = []
-    fork.adoptFilterState(this)
-    fork._metadata = this._metadata ? { ...this._metadata } : undefined
     fork._reason = fork._metadata?.because ?? this._reason
     return fork
   }

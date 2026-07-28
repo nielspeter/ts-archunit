@@ -45,8 +45,8 @@ function isObjectType(type: GraphQLTypeLike): type is GraphQLObjectTypeLike {
  * ```
  */
 export class SchemaRuleBuilder extends TerminalBuilder {
-  private readonly _predicates: Predicate<SchemaElement>[] = []
-  private readonly _conditions: Condition<SchemaElement>[] = []
+  private _predicates: Predicate<SchemaElement>[] = []
+  private _conditions: Condition<SchemaElement>[] = []
 
   constructor(private readonly loaded: LoadedSchema) {
     super()
@@ -58,32 +58,36 @@ export class SchemaRuleBuilder extends TerminalBuilder {
    * Filter to only Query root type fields.
    */
   queries(): this {
-    this._predicates.push(queriesPredicate())
-    return this
+    const next = this.copy()
+    next._predicates.push(queriesPredicate())
+    return next
   }
 
   /**
    * Filter to only Mutation root type fields.
    */
   mutations(): this {
-    this._predicates.push(mutationsPredicate())
-    return this
+    const next = this.copy()
+    next._predicates.push(mutationsPredicate())
+    return next
   }
 
   /**
    * Filter to object types matching the given name pattern.
    */
   typesNamed(pattern: RegExp | string): this {
-    this._predicates.push(typesNamedPredicate(pattern))
-    return this
+    const next = this.copy()
+    next._predicates.push(typesNamedPredicate(pattern))
+    return next
   }
 
   /**
    * Filter to fields returning a list of the given type.
    */
   returnListOf(typeName: string | RegExp): this {
-    this._predicates.push(returnListOfPredicate(typeName))
-    return this
+    const next = this.copy()
+    next._predicates.push(returnListOfPredicate(typeName))
+    return next
   }
 
   // --- Chain methods ---
@@ -122,16 +126,18 @@ export class SchemaRuleBuilder extends TerminalBuilder {
    * Assert that types have all listed fields.
    */
   haveFields(...names: string[]): this {
-    this._conditions.push(haveFieldsCondition(...names))
-    return this
+    const next = this.copy()
+    next._conditions.push(haveFieldsCondition(...names))
+    return next
   }
 
   /**
    * Assert that fields accept all listed arguments.
    */
   acceptArgs(...names: string[]): this {
-    this._conditions.push(acceptArgsCondition(...names))
-    return this
+    const next = this.copy()
+    next._conditions.push(acceptArgsCondition(...names))
+    return next
   }
 
   /**
@@ -140,11 +146,28 @@ export class SchemaRuleBuilder extends TerminalBuilder {
    * @param resolverFileTexts - Map of file paths to source text
    */
   haveMatchingResolver(resolverFileTexts: ReadonlyMap<string, string>): this {
-    this._conditions.push(haveMatchingResolverCondition(resolverFileTexts))
-    return this
+    const next = this.copy()
+    next._conditions.push(haveMatchingResolverCondition(resolverFileTexts))
+    return next
   }
 
   // --- Evaluation ---
+
+  /**
+   * An independent copy, carrying both lists.
+   *
+   * This builder does not extend `RuleBuilder`, so it does not inherit that
+   * class's override — and neither `that()` nor `should()` forked here at all,
+   * which made the bug 0016 leak worse on this hierarchy than on the main one:
+   * a held `schema()` selection accumulated every predicate and condition of
+   * every rule derived from it. `docs/graphql.md` teaches exactly that shape.
+   */
+  protected override copy(): this {
+    const clone = super.copy()
+    clone._predicates = [...this._predicates]
+    clone._conditions = [...this._conditions]
+    return clone
+  }
 
   protected collectViolations(): ArchViolation[] {
     const allElements = this.getElements()

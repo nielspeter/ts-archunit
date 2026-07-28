@@ -26,8 +26,9 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
 
   /** Set the AST similarity threshold. Default: 0.85. */
   withMinSimilarity(threshold: number): this {
-    this._minSimilarity = threshold
-    return this
+    const next = this.copy()
+    next._minSimilarity = threshold
+    return next
   }
 
   protected detect(): ArchViolation[] {

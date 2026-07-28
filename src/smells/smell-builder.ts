@@ -32,26 +32,30 @@ export abstract class SmellBuilder extends TerminalBuilder {
    * from the string a matcher is applied to rather than from the method name.
    */
   inFolder(glob: string): this {
-    this._folders.push(glob)
-    return this
+    const next = this.copy()
+    next._folders.push(glob)
+    return next
   }
 
   /** Ignore functions/files shorter than N lines. Default: 5. */
   minLines(n: number): this {
-    this._minLines = n
-    return this
+    const next = this.copy()
+    next._minLines = n
+    return next
   }
 
   /** Exclude test files (*.test.ts, *.spec.ts, __tests__/**). */
   ignoreTests(): this {
-    this._ignoreTests = true
-    return this
+    const next = this.copy()
+    next._ignoreTests = true
+    return next
   }
 
   /** Exclude files matching the given glob patterns. */
   ignorePaths(...globs: string[]): this {
-    this._ignorePaths.push(...globs)
-    return this
+    const next = this.copy()
+    next._ignorePaths.push(...globs)
+    return next
   }
 
   /** The project this detector was built against. See `RuleBuilder.getProject`. */
@@ -91,8 +95,23 @@ export abstract class SmellBuilder extends TerminalBuilder {
 
   /** Group violation output by directory. */
   groupByFolder(): this {
-    this._groupByFolder = true
-    return this
+    const next = this.copy()
+    next._groupByFolder = true
+    return next
+  }
+
+  /**
+   * An independent copy, carrying both scope lists.
+   *
+   * Without this, `ignorePaths()` on a copy would push into the array the
+   * original still points at — and a leaked *ignore* is a false green: the
+   * next detector off the same held builder would silently skip those files.
+   */
+  protected override copy(): this {
+    const clone = super.copy()
+    clone._folders = [...this._folders]
+    clone._ignorePaths = [...this._ignorePaths]
+    return clone
   }
 
   /** Delegate to detect() for the terminal builder pipeline. */

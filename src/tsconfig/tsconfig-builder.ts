@@ -27,10 +27,15 @@ export class TsconfigBuilder extends TerminalBuilder {
    * Each present key must equal the project's resolved value (strict-family
    * flags are resolved through `strict: true` the way tsc resolves them).
    * Multiple `.requires()` calls merge additively; later keys win on conflict.
+   *
+   * Copy-on-write (bug 0016): a held `tsconfig(p)` is not edited by this call.
+   * No `copy()` override is needed because the merge builds a fresh object
+   * rather than mutating the inherited reference.
    */
   requires(spec: Partial<CompilerOptions>): this {
-    this._requirements = { ...this._requirements, ...spec }
-    return this
+    const next = this.copy()
+    next._requirements = { ...this._requirements, ...spec }
+    return next
   }
 
   protected collectViolations(): ArchViolation[] {

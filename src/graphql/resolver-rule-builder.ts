@@ -56,8 +56,8 @@ export function resolveFieldReturning(pattern: RegExp | string): Predicate<ArchF
  * ```
  */
 export class ResolverRuleBuilder extends TerminalBuilder {
-  private readonly _predicates: Predicate<ArchFunction>[] = []
-  private readonly _conditions: Condition<ArchFunction>[] = []
+  private _predicates: Predicate<ArchFunction>[] = []
+  private _conditions: Condition<ArchFunction>[] = []
 
   /**
    * @param sourceFiles - The resolver files, already filtered by `resolvers()`.
@@ -113,8 +113,9 @@ export class ResolverRuleBuilder extends TerminalBuilder {
    * Filter to resolver functions for fields returning types matching the pattern.
    */
   resolveFieldReturning(pattern: RegExp | string): this {
-    this._predicates.push(resolveFieldReturning(pattern))
-    return this
+    const next = this.copy()
+    next._predicates.push(resolveFieldReturning(pattern))
+    return next
   }
 
   // --- Chain methods ---
@@ -153,27 +154,46 @@ export class ResolverRuleBuilder extends TerminalBuilder {
    * Assert that the resolver body contains at least one match.
    */
   contain(matcher: ExpressionMatcher): this {
-    this._conditions.push(functionContain(matcher))
-    return this
+    const next = this.copy()
+    next._conditions.push(functionContain(matcher))
+    return next
   }
 
   /**
    * Assert that the resolver body does NOT contain any match.
    */
   notContain(matcher: ExpressionMatcher): this {
-    this._conditions.push(functionNotContain(matcher))
-    return this
+    const next = this.copy()
+    next._conditions.push(functionNotContain(matcher))
+    return next
   }
 
   /**
    * Assert: must NOT contain 'bad' AND must contain 'good'.
    */
   useInsteadOf(bad: ExpressionMatcher, good: ExpressionMatcher): this {
-    this._conditions.push(functionUseInsteadOf(bad, good))
-    return this
+    const next = this.copy()
+    next._conditions.push(functionUseInsteadOf(bad, good))
+    return next
   }
 
   // --- Evaluation ---
+
+  /**
+   * An independent copy, carrying both lists.
+   *
+   * This builder does not extend `RuleBuilder`, so it does not inherit that
+   * class's override — and neither `that()` nor `should()` forked here at all,
+   * which made the bug 0016 leak worse on this hierarchy than on the main one:
+   * a held `schema()` selection accumulated every predicate and condition of
+   * every rule derived from it. `docs/graphql.md` teaches exactly that shape.
+   */
+  protected override copy(): this {
+    const clone = super.copy()
+    clone._predicates = [...this._predicates]
+    clone._conditions = [...this._conditions]
+    return clone
+  }
 
   protected collectViolations(): ArchViolation[] {
     const allElements = this.getElements()
