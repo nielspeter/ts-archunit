@@ -13,6 +13,12 @@ your rules **select**.
 
 ### Fixed
 
+- **A configuration finding now carries its own remedy, not the rule author's** ([bug 0021](./bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)). A finding reading `matching("src/nowhere/") resolved no slices` printed **`Fix: Split the cycle by extracting a shared module.`** — your remedy for a real violation of the rule, attached to a finding reporting that the rule never ran. `suggestion` renders as `Fix:`, which is the line an agent obeys, so this was a failure asserting a cause it could not verify.
+
+  Every configuration finding — empty selector, empty slice discovery, empty correspondence side — now states the fix for _its own_ fault. Your `.rule({ suggestion, docs })` still reaches every real violation, unchanged; `id` and `because` still reach configuration findings too, because neither claims to be a remedy.
+
+  If you parse `check --format json` and rely on `suggestion` being present and equal to your own text on **every** finding, it is now the finding's own text on the configuration ones.
+
 - **A held builder is immutable** ([bug 0016](./bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md)). Every chain method now returns a copy instead of editing the builder in place, so holding a selection in a variable and deriving several rules from it does what it reads like:
 
   ```typescript
