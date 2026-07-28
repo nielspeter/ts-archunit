@@ -43,18 +43,18 @@ held    = slices(p).matching('src/').should().respectLayerOrder('controllers','s
   held.should().beFreeOfCycles().violations() ['leaky-controller.ts', '[feature-a, feature-b]']
 ```
 
-One source shape, two behaviours, decided by which entry point you used. Before [bug 0016](./fixed/0016-narrowing-a-named-selection-mutates-it.md) this was invisible — everything mutated *and* accumulated, so the divergence was buried in the leak. Fixing 0016 is what made it stable and observable.
+One source shape, two behaviours, decided by which entry point you used. Before [bug 0016](./fixed/0016-narrowing-a-named-selection-mutates-it.md) this was invisible — everything mutated _and_ accumulated, so the divergence was buried in the leak. Fixing 0016 is what made it stable and observable.
 
 ## Which direction is safe
 
 The two failure modes are not symmetric, and that is the whole decision:
 
-| | Failure mode | Direction |
-| --- | --- | --- |
-| **Clear** (`RuleBuilder`) | An assertion the author wrote is discarded; the rule can reach zero conditions | **silent green** |
-| **Accumulate** (the other five) | A derived rule reports the held rule's finding as its own | **loud red** |
+|                                 | Failure mode                                                                   | Direction        |
+| ------------------------------- | ------------------------------------------------------------------------------ | ---------------- |
+| **Clear** (`RuleBuilder`)       | An assertion the author wrote is discarded; the rule can reach zero conditions | **silent green** |
+| **Accumulate** (the other five) | A derived rule reports the held rule's finding as its own                      | **loud red**     |
 
-Conditions AND together and violations union, so accumulate can only ever assert *more*. It cannot produce a rule that asserts nothing. Clear can, and does.
+Conditions AND together and violations union, so accumulate can only ever assert _more_. It cannot produce a rule that asserts nothing. Clear can, and does.
 
 Under ADR-008 there is no contest: a misattributed finding is read, investigated and fixed in one pass; a dropped assertion is never read at all.
 
@@ -65,7 +65,7 @@ Accumulate everywhere — remove `fork._conditions = []`, which collapses `fork(
 Three things make this smaller than it looks:
 
 - **`fork()`'s stated purpose is already served.** Its docstring said it exists "to support named selections without mutation". That is what `copy()` does as of bug 0016. The clearing is a vestige of the era when `should()` forking was the only protection against a held selection being edited in place.
-- **The fluent path is unaffected.** `should()` on a builder with zero conditions makes the clearing a no-op, so every ordinary chain behaves identically. The divergence needs a held builder that already carries a condition — post-0016, that means holding a *rule*, not a selection.
+- **The fluent path is unaffected.** `should()` on a builder with zero conditions makes the clearing a no-op, so every ordinary chain behaves identically. The divergence needs a held builder that already carries a condition — post-0016, that means holding a _rule_, not a selection.
 - **The "I want a fresh assertion off the same subjects" case has a correct spelling already**: hold the selection, before `.should()`. Bug 0016 is what made that safe, and it is the form `docs/core-concepts.md` and `docs/classes.md` already teach.
 
 ## Guard this needs

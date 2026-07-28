@@ -62,7 +62,7 @@ The guard must be built on the **fluent** form, because that is the form that is
 - A rule with subjects and one real condition still passes — or the guard is satisfied by failing everything.
 - The finding is refused by `.excluding()` and by `asSeverity('warn')`, per R3a.
 
-Asserting on `console.warn` being called is not a guard. Under the current behaviour it is not called, so a test that asserts the warning fires would already be red; a test that asserts it does *not* fire would pin the bug.
+Asserting on `console.warn` being called is not a guard. Under the current behaviour it is not called, so a test that asserts the warning fires would already be red; a test that asserts it does _not_ fire would pin the bug.
 
 ## Relationship to plan 0069
 

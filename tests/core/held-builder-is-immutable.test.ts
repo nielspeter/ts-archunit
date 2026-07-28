@@ -5,9 +5,10 @@
  * deriving two rules from it must give two independent rules — the shape
  * `docs/core-concepts.md`, `docs/classes.md` and `docs/graphql.md` all teach.
  *
- * The bug was filed against `RuleBuilder.that()` alone. It was wider: seven
- * more builders held their own mutable state, and five of them are not in
- * `RuleBuilder`'s hierarchy at all, so a fix there could not reach them. The
+ * The bug was filed against `RuleBuilder.that()` alone. Measured by the
+ * structural guard below, it was **40 methods across 12 classes**, and **9 of
+ * those classes are outside `RuleBuilder`'s hierarchy**, so a fix there could
+ * not have reached them. The
  * leaks that matter most are the ones that turn a later rule GREEN —
  * `SmellBuilder.ignorePaths` (inherit an ignore, skip the files),
  * `CorrespondenceBuilder.allowEmpty` (inherit an opt-out from the empty-side
@@ -370,8 +371,16 @@ describe('a held builder is immutable — structural', () => {
   /**
    * `src/` must contain no method that mutates its own state and then returns
    * `this`. Derived from the source text, so it holds for builders this file
-   * has never heard of — and it would have caught all eight original sites,
-   * which is how the five beyond the bug report were found.
+   * has never heard of — and pointed at the pre-fix source it names all 40
+   * offending methods, which is how the 9 classes beyond the bug report were
+   * found.
+   *
+   * The detector itself lives in `tests/helpers/builder-mutation-scan.ts` and
+   * is driven from fixtures by `builder-mutation-scan.test.ts`. It has to be:
+   * an assertion that this returns `[]` holds both when `src/` is clean and
+   * when the detector is broken, and the first version of this guard WAS
+   * broken — it required the pre-fix spelling `this._x.push(...)` and matched
+   * 0 of 32 candidate fields once every call site said `next._x.push(...)`.
    */
   it('no chain method mutates its own state and returns this', () => {
     const offenders: string[] = []
@@ -420,8 +429,9 @@ describe('a held builder is immutable — structural', () => {
    * The earlier version of this test asserted that no `copy()` override
    * returns `this`. It passed with every fix reverted, because with the fix
    * gone there are no overrides to be wrong — a guard that is satisfied by the
-   * absence of the thing it guards. This version fails there: eight fields are
-   * mutated in place and nothing copies them.
+   * absence of the thing it guards. This version fails there: pointed at the
+   * pre-fix source it names 12 fields that are mutated in place with nothing
+   * copying them.
    */
   it('every in-place-mutated container field is copied for the clone', () => {
     const unguarded: string[] = []

@@ -225,10 +225,13 @@ describe('RuleMetadata', () => {
       docs: 'https://example.com/slice',
     })
 
-    // A COPY, not `this` — a held builder is immutable since bug 0016, and
-    // `.rule()` leaking an id was the worst version of that bug: baselines,
-    // `--rule` filters and `overrides` are all keyed on it, so a later rule
-    // off the same selection inherited an id it never declared.
+    // A COPY, not `this` — a held builder is immutable since bug 0016. A
+    // leaked id matters because inline exclusion comments are matched against
+    // it (`execute-rule.ts` gates the comment scan on `metadata.id`) and a
+    // preset's severity `overrides` are keyed on it, so a later rule inherited
+    // a suppression channel it never opted into. NOT baselines: those hash the
+    // rule description. An earlier version of this comment said baselines and
+    // a `--rule` filter were keyed on the id; there is no `--rule` flag.
     expect(result).not.toBe(builder)
     expect(result.describeRule().id).toBe('slice/test')
     expect(builder.describeRule().id).toBeUndefined()

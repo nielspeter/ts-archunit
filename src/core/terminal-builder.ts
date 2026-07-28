@@ -241,7 +241,17 @@ export abstract class TerminalBuilder {
    * second rule silently inherited `Legacy` and reported on a subset — or on
    * nothing, and then passed. Same for `.excluding()`, which leaked a
    * suppression into every later rule off the same selection, and `.rule()`,
-   * which leaked an id that baselines and `--rule` filters are keyed on.
+   * which leaked the id that `// ts-archunit-exclude <id>` comments are matched
+   * against (`execute-rule.ts` gates the whole comment scan on `metadata.id`)
+   * and that a preset's severity `overrides` are keyed on — so a later rule
+   * inherited a suppression channel it never opted into.
+   *
+   * Not baselines: `hashViolation` keys on the rule *description*, never on
+   * `metadata.id`. An earlier version of this docstring said baselines and a
+   * `--rule` filter were keyed on the id. Neither is true, and `--rule` does
+   * not exist — the only occurrences of it in the repo were three copies of
+   * this sentence. ADR-008 rule 2: a failure may not assert a cause it cannot
+   * verify, and that includes naming a flag the CLI does not have.
    *
    * Cost is one object per chain link, against a ts-morph walk. Irrelevant.
    */
@@ -255,11 +265,12 @@ export abstract class TerminalBuilder {
   /**
    * Give this builder independent copies of another's filter state.
    *
-   * `RuleBuilder.fork()` shallow-copies every field, so without this a fork
-   * would share its parent's exclusion array by reference and `.excluding()`
-   * on one would silently mutate the other. The copy lives here rather than in
-   * `fork()` because these fields are private to this class — the knowledge of
-   * what needs deep-copying belongs where the fields do.
+   * `copy()` shallow-copies every field, so without this a copy would share
+   * its parent's exclusion array by reference and `.excluding()` on one would
+   * silently mutate the other. The copy lives here rather than inline in
+   * `copy()` because the knowledge of what needs duplicating belongs with the
+   * fields — the same reason every other state-holding class overrides
+   * `copy()` instead of `copy()` knowing about their fields.
    */
   protected adoptFilterState(source: TerminalBuilder): void {
     this._exclusions = [...source._exclusions]

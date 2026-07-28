@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.21.0] - 2026-07-28
+
+A behaviour change, so a minor rather than a patch — `^0.20.0` would have
+resolved a patch silently into every consumer's CI, and this one changes what
+your rules **select**.
 
 ### Fixed
 
-- **A held builder is immutable** (bug 0016). Every chain method now returns a copy instead of editing the builder in place, so holding a selection in a variable and deriving several rules from it does what it reads like:
+- **A held builder is immutable** ([bug 0016](./bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md)). Every chain method now returns a copy instead of editing the builder in place, so holding a selection in a variable and deriving several rules from it does what it reads like:
 
   ```typescript
   const repositories = classes(p).that().extend('BaseRepository')
@@ -17,11 +21,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   repositories.should().beExported().check() // still ALL repositories
   ```
 
-  Before this, the second rule silently inherited the first rule's narrowing and reported on a subset — or, when the two narrowings were disjoint, on nothing, and then **passed**. The same leak applied to `.excluding()` (a suppression leaked into every later rule off the same selection), `.rule()` (an id that baselines and `--rule` filters are keyed on), `.expectNonEmpty()` and `smells.*.ignorePaths()` (an inherited _ignore_ is invisible and turns a later rule green).
+  Before this, the second rule silently inherited the first rule's narrowing and reported on a subset — or, when the two narrowings were disjoint, on nothing, and then **passed**.
 
-  The bug was reported against `RuleBuilder.that()`. It was wider: eight methods across nine classes, five of them outside `RuleBuilder`'s hierarchy — `SliceRuleBuilder`, `SmellBuilder`, `CorrespondenceBuilder`, `TsconfigBuilder`, `CrossLayerBuilder` — plus both GraphQL builders, which forked in neither `that()` nor `should()` and so accumulated every predicate and condition of every rule derived from one held schema.
+  The same leak applied to `.excluding()` (a suppression leaked into every later rule off the same selection), `.rule()` (a leaked rule id, which makes an inline `// ts-archunit-exclude <id>` comment suppress a rule that never declared that id, and changes which preset `overrides` entry applies), `.expectNonEmpty()` (a leaked non-vacuity opt-in), `smells.*.ignorePaths()` / `.ignoreTests()` / `.withMinSimilarity()` / `.forPattern()` (an inherited _ignore_ or threshold is invisible and turns a later detector green), `calls().identifiedByArg()` (leaked call-identity folding), `correspondence().allowEmpty()` (a leaked opt-out from the empty-side guard) and `crossLayer().layer()` (an extra layer changes which pairs `mapping()` compares).
 
-  The fluent form is unaffected, and so is the repeated-`.should()` reuse the docs already taught. If you have a rule that discards a chain method's return value and expects the change to have stuck — `b.that().extend('X')` on one line, `b.should()...` on the next — it no longer does; use the returned builder.
+  The bug was reported against `RuleBuilder.that()`. Measured by a source sweep — now a test — it was **40 methods across 12 classes**, and **9 of those classes are outside `RuleBuilder`'s hierarchy**, so a fix there could not have reached them: `SliceRuleBuilder`, `SmellBuilder`, `DuplicateBodiesBuilder`, `InconsistentSiblingsBuilder`, `CorrespondenceBuilder`, `TsconfigBuilder`, `CrossLayerBuilder`, and both GraphQL builders — which forked in neither `that()` nor `should()`, and so accumulated every predicate _and_ condition of every rule derived from one held schema.
+
+### Upgrading — your rules may now select different subjects
+
+This release changes what some rules **check**, in both directions, with no code change on your part.
+
+1. **Regenerate your baseline.** Baseline identity is a hash of the rule's _description_ — its predicate and condition text ([`hashViolation`](./src/helpers/baseline.ts)) — not of `.rule({ id })`. A rule that was inheriting a leaked predicate had that predicate in its description, so its hash changes here and previously-baselined findings resurface as **new**. Delete and re-record the baseline as your first step, before reading any new findings. If your baseline stops matching entirely, the "unmatched baseline" finding will suggest a repository-root mismatch; on this upgrade that advice is wrong, and the cause is this change.
+
+2. **Expect new findings — that is the fix working.** Any rule that was silently narrowed by a leak now evaluates its full selection. A rule that had been narrowed to nothing was passing while checking nothing; it now checks something and may fail. Those failures are real violations you have not seen before, not regressions in your code.
+
+3. **If you use the GraphQL entry point, re-run and read both directions.** `docs/graphql.md` teaches deriving several rules from one held `schemaFromSDL()` / `resolvers()` result, and that hierarchy forked nowhere — so the second and third rule off a held schema received the intersection of every earlier predicate (usually empty, therefore passing) _and_ every earlier condition. Violation counts can now go **up** (rules that were selecting nothing) or **down** (rules that were red because of a neighbouring rule's condition). A count dropping there is not a fix; it means that rule was previously reporting someone else's finding.
+
+4. **Find the one shape that breaks: a discarded return value.** The fluent form is unaffected, and so is the repeated-`.should()` reuse the docs already taught. What no longer works is discarding a chain method's result and expecting the change to have stuck:
+
+   ```typescript
+   const b = classes(p).that()
+   b.extend('BaseRepository') // return value discarded — now a no-op
+   b.should().beExported().check() // applies to ALL classes
+   ```
+
+   TypeScript will not flag this, so run `npx ts-archunit doctor <your rule files>` after upgrading. It reports rules that select elements but assert nothing, and rules whose globs cannot match — which is what a dropped `.should()...` or a dropped predicate turns into. One production site in this repo depended on that idiom (`src/presets/layered.ts`); `grep` found none in the docs.
 
 ## [0.20.0] - 2026-07-28
 

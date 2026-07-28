@@ -45,7 +45,10 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   // --- Chain methods (grammar transitions) ---
 
   /**
-   * Begin the predicate phase. Returns `this` for chaining.
+   * Begin the predicate phase. Returns a COPY, per bug 0016 — a held selection
+   * is never edited by narrowing it. Every ordinary chain is unaffected,
+   * because the copy is what the chain continues on; what changed is that
+   * `held.that()...` no longer reaches back into `held`.
    * Purely a readability marker — `.that().haveNameMatching(...)` reads like English.
    * Explicitly resets phase to 'predicate' — defensive against `.should().that()` misuse.
    */
@@ -242,15 +245,6 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   protected abstract getElements(): T[]
 
   /**
-   * Create a fork of this builder with the same predicates but empty conditions.
-   * Used by `.should()` to support named selections without mutation.
-   *
-   * `Object.assign(fork, this)` copies plain param-property fields (e.g.
-   * `FunctionRuleBuilder._collectionOptions`), so those need no override.
-   * Override only when a field needs a deep copy, or the constructor performs
-   * validation/derivation that a shallow copy would skip.
-   */
-  /**
    * An independent copy, carrying **both** lists. See `TerminalBuilder.copy`.
    *
    * `fork()` below clears the conditions because it exists for `should()`;
@@ -266,6 +260,19 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
     return clone
   }
 
+  /**
+   * A copy with the conditions cleared. Used by `.should()`.
+   *
+   * The clearing is all that distinguishes this from `copy()` — its original
+   * job, "support named selections without mutation", is what `copy()` does as
+   * of bug 0016. And the clearing is a defect in its own right
+   * ([bug 0020](../../bugs/0020-should-twice-silently-drops-the-first-assertion.md)):
+   * a second `.should()` on a builder that already carries a condition
+   * discards it, so `.should().notExist().should().beExported()` enforces only
+   * the second and loses four findings with no output. Measured. It ships with
+   * R3b, because the rule it produces — zero conditions — must fail before the
+   * silent drop can be turned into an over-report.
+   */
   protected fork(): this {
     const fork = this.copy()
     fork._conditions = []
