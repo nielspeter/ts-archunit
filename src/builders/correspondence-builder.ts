@@ -100,11 +100,11 @@ function keyedFromKeys(keys: KeysSource): Map<string, unknown[]> {
  *   .check()
  */
 export class CorrespondenceBuilder extends TerminalBuilder {
-  private readonly _sides: Side[] = []
+  private _sides: Side[] = []
   private _checkComplete = false
   private _checkNoOrphans = false
-  private readonly _allowEmpty = new Set<string>()
-  private readonly _distinctKeys = new Set<string>()
+  private _allowEmpty = new Set<string>()
+  private _distinctKeys = new Set<string>()
 
   // `_project` is accepted for API symmetry with the other entry points
   // (modules/classes/…); correspondence's sides carry their own project.
@@ -117,17 +117,34 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   /** Add a side from an already-derived key set (pre-normalized). */
   side(name: string, keys: KeysSource): this
   side<T>(name: string, source: RuleBuilder<T> | KeysSource, keyFn?: KeyFn<T>): this {
+    const next = this.copy()
     if (source instanceof RuleBuilder) {
       if (!keyFn) {
         throw new TypeError(
           `correspondence side '${name}' from a selection requires a keyFn (subject -> key).`,
         )
       }
-      this._sides.push({ name, materialize: () => keyedFromSelection(source, keyFn) })
+      next._sides.push({ name, materialize: () => keyedFromSelection(source, keyFn) })
     } else {
-      this._sides.push({ name, materialize: () => keyedFromKeys(source) })
+      next._sides.push({ name, materialize: () => keyedFromKeys(source) })
     }
-    return this
+    return next
+  }
+
+  /**
+   * An independent copy, carrying the sides and both opt-out sets.
+   *
+   * `collectViolations` throws unless there are exactly two sides, so a leaked
+   * `_sides` push does not fail silently here — but a leaked `_allowEmpty`
+   * does: it is the opt-out from the empty-side guard, and inheriting it turns
+   * a later rule's vacuous side green.
+   */
+  protected override copy(): this {
+    const clone = super.copy()
+    clone._sides = [...this._sides]
+    clone._allowEmpty = new Set(this._allowEmpty)
+    clone._distinctKeys = new Set(this._distinctKeys)
+    return clone
   }
 
   /** Optional readability markers — the assertion terminals may be called directly. */
@@ -140,30 +157,35 @@ export class CorrespondenceBuilder extends TerminalBuilder {
 
   /** Every key of the first side must have a match in the second (A ⊆ B). */
   beComplete(): this {
-    this._checkComplete = true
-    return this
+    const next = this.copy()
+    next._checkComplete = true
+    return next
   }
   /** Every key of the second side must have a source in the first (B ⊆ A). */
   haveNoOrphans(): this {
-    this._checkNoOrphans = true
-    return this
+    const next = this.copy()
+    next._checkNoOrphans = true
+    return next
   }
   /** Both directions — the two key sets must be identical. */
   beBijective(): this {
-    this._checkComplete = true
-    this._checkNoOrphans = true
-    return this
+    const next = this.copy()
+    next._checkComplete = true
+    next._checkNoOrphans = true
+    return next
   }
 
   /** Permit a named side to be empty (opt out of the non-vacuity guard). */
   allowEmpty(sideName: string): this {
-    this._allowEmpty.add(sideName)
-    return this
+    const next = this.copy()
+    next._allowEmpty.add(sideName)
+    return next
   }
   /** Fail if a side maps two distinct subjects to one key (over-normalization guard). */
   distinctKeysOn(sideName: string): this {
-    this._distinctKeys.add(sideName)
-    return this
+    const next = this.copy()
+    next._distinctKeys.add(sideName)
+    return next
   }
 
   protected collectViolations(): ArchViolation[] {

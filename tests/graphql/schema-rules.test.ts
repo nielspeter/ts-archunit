@@ -227,3 +227,60 @@ describe('SchemaRuleBuilder — chain methods', () => {
     }).not.toThrow()
   })
 })
+
+describe('SchemaRuleBuilder — a held selection is immutable (bug 0016)', () => {
+  // docs/graphql.md teaches holding a `schemaFromSDL()` result and deriving
+  // several rules from it. This hierarchy forked in NEITHER `that()` nor
+  // `should()`, so rule 2 inherited rule 1's predicate: two name patterns that
+  // cannot both match, an empty selection, and a pass however broken the schema.
+  //
+  // Every assertion below is on a rule that MUST fail. A guard whose rules
+  // pass is satisfied by the bug it guards against.
+
+  it('a second rule off a held schema is not narrowed by the first', () => {
+    const s = schemaFromSDL(fullSDL)
+
+    // Rule 1 narrows to User and passes — User has every field named.
+    expect(() =>
+      s
+        .that()
+        .typesNamed(/^User$/)
+        .should()
+        .haveFields('id', 'name')
+        .check(),
+    ).not.toThrow()
+
+    // Rule 2 asks about a DIFFERENT type, and must fail: BadCollection has
+    // only `items`. Under the bug its selection was User ∩ BadCollection = ∅.
+    expect(() =>
+      s
+        .that()
+        .typesNamed(/^BadCollection$/)
+        .should()
+        .haveFields('total')
+        .check(),
+    ).toThrow(ArchRuleError)
+  })
+
+  it('a second rule off a held schema does not inherit the first condition', () => {
+    const s = schemaFromSDL(fullSDL)
+    const collections = s.that().typesNamed(/Collection$/)
+
+    // Only BadCollection lacks `total`, so exactly one violation — not two,
+    // which is what a leaked second copy of the same condition would report.
+    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
+    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
+  })
+
+  it('narrowing a held schema leaves the original selection whole', () => {
+    const s = schemaFromSDL(fullSDL)
+    const collections = s.that().typesNamed(/Collection$/)
+    const bad = collections.that().typesNamed(/^Bad/)
+
+    expect(bad.should().haveFields('total').violations()).toHaveLength(1)
+    // The original still covers all three Collection types; the two good ones
+    // satisfy it, so the count is unchanged rather than zero.
+    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
+    expect(collections.should().haveFields('nothing').violations()).toHaveLength(3)
+  })
+})

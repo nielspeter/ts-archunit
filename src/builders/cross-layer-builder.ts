@@ -7,6 +7,7 @@ import type { Layer, LayerPair } from '../models/cross-layer.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
+import { shallowClone } from '../core/shallow-clone.js'
 
 /**
  * Resolve a layer by matching its glob against the project's source files.
@@ -63,7 +64,7 @@ function computePairs(
  *   .check()
  */
 export class CrossLayerBuilder {
-  private readonly _layerDefs: Array<{ name: string; pattern: string }> = []
+  private _layerDefs: Array<{ name: string; pattern: string }> = []
 
   constructor(private readonly project: ArchProject) {}
 
@@ -72,8 +73,25 @@ export class CrossLayerBuilder {
    * At least two layers must be defined before calling `.mapping()`.
    */
   layer(name: string, pattern: string): this {
-    this._layerDefs.push({ name, pattern })
-    return this
+    const next = this.copy()
+    next._layerDefs.push({ name, pattern })
+    return next
+  }
+
+  /**
+   * An independent copy, carrying the layer definitions (bug 0016).
+   *
+   * This class does not extend {@link TerminalBuilder} — it produces a rule
+   * rather than being one — so it does not inherit that class's `copy()`. It
+   * still needs copy-on-write for the same reason: a held `crossLayer(p)`
+   * accumulated a layer per `.layer()` call across every rule derived from it,
+   * and `mapping()` pairs *consecutive* layers, so an extra layer silently
+   * changes which pairs a later rule compares.
+   */
+  private copy(): this {
+    const clone = shallowClone(this)
+    clone._layerDefs = [...this._layerDefs]
+    return clone
   }
 
   /**

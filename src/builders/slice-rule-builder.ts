@@ -48,7 +48,7 @@ type DiscoverySource =
 export class SliceRuleBuilder extends TerminalBuilder {
   private _slices: Slice[] = []
   private _discovery?: DiscoverySource
-  private readonly _conditions: Condition<Slice>[] = []
+  private _conditions: Condition<Slice>[] = []
 
   constructor(private readonly project: ArchProject) {
     super()
@@ -65,9 +65,10 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * // Slices: auth, billing, orders, etc.
    */
   matching(glob: string): this {
-    this._discovery = { mode: 'matching', glob }
-    this._slices = resolveByMatching(this.project, glob)
-    return this
+    const next = this.copy()
+    next._discovery = { mode: 'matching', glob }
+    next._slices = resolveByMatching(this.project, glob)
+    return next
   }
 
   /**
@@ -83,9 +84,10 @@ export class SliceRuleBuilder extends TerminalBuilder {
    */
   assignedFrom(definition: SliceDefinition): this {
     const entries = Object.entries(definition).map(([name, glob]) => ({ name, glob }))
-    this._discovery = { mode: 'assignedFrom', entries }
-    this._slices = resolveByDefinition(this.project, definition)
-    return this
+    const next = this.copy()
+    next._discovery = { mode: 'assignedFrom', entries }
+    next._slices = resolveByDefinition(this.project, definition)
+    return next
   }
 
   /** The project this rule was built against. See `RuleBuilder.getProject`. */
@@ -142,6 +144,20 @@ export class SliceRuleBuilder extends TerminalBuilder {
   }
 
   /**
+   * An independent copy, carrying the condition list and the resolved slices.
+   *
+   * `_slices` is replaced wholesale by both discovery methods, so only the
+   * condition array needs its own copy — but it is listed here anyway, because
+   * the next person to add a field will read this method, not the two callers.
+   */
+  protected override copy(): this {
+    const clone = super.copy()
+    clone._slices = [...this._slices]
+    clone._conditions = [...this._conditions]
+    return clone
+  }
+
+  /**
    * Begin the condition phase. Returns `this` for chaining.
    */
   should(): this {
@@ -159,8 +175,9 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * Assert that no circular dependencies exist between slices.
    */
   beFreeOfCycles(): this {
-    this._conditions.push(beFreeOfCyclesCondition())
-    return this
+    const next = this.copy()
+    next._conditions.push(beFreeOfCyclesCondition())
+    return next
   }
 
   /**
@@ -170,8 +187,9 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * @param layers - Ordered layer names from highest to lowest
    */
   respectLayerOrder(...layers: string[]): this {
-    this._conditions.push(respectLayerOrderCondition(...layers))
-    return this
+    const next = this.copy()
+    next._conditions.push(respectLayerOrderCondition(...layers))
+    return next
   }
 
   /**
@@ -180,8 +198,9 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * @param sliceNames - Names of forbidden dependency targets
    */
   notDependOn(...sliceNames: string[]): this {
-    this._conditions.push(notDependOnCondition(...sliceNames))
-    return this
+    const next = this.copy()
+    next._conditions.push(notDependOnCondition(...sliceNames))
+    return next
   }
 
   protected collectViolations(): ArchViolation[] {

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **A held builder is immutable** (bug 0016). Every chain method now returns a copy instead of editing the builder in place, so holding a selection in a variable and deriving several rules from it does what it reads like:
+
+  ```typescript
+  const repositories = classes(p).that().extend('BaseRepository')
+  repositories.that().haveNameEndingWith('Legacy').should().notExist().check()
+  repositories.should().beExported().check() // still ALL repositories
+  ```
+
+  Before this, the second rule silently inherited the first rule's narrowing and reported on a subset — or, when the two narrowings were disjoint, on nothing, and then **passed**. The same leak applied to `.excluding()` (a suppression leaked into every later rule off the same selection), `.rule()` (an id that baselines and `--rule` filters are keyed on), `.expectNonEmpty()` and `smells.*.ignorePaths()` (an inherited _ignore_ is invisible and turns a later rule green).
+
+  The bug was reported against `RuleBuilder.that()`. It was wider: eight methods across nine classes, five of them outside `RuleBuilder`'s hierarchy — `SliceRuleBuilder`, `SmellBuilder`, `CorrespondenceBuilder`, `TsconfigBuilder`, `CrossLayerBuilder` — plus both GraphQL builders, which forked in neither `that()` nor `should()` and so accumulated every predicate and condition of every rule derived from one held schema.
+
+  The fluent form is unaffected, and so is the repeated-`.should()` reuse the docs already taught. If you have a rule that discards a chain method's return value and expects the change to have stuck — `b.that().extend('X')` on one line, `b.should()...` on the next — it no longer does; use the returned builder.
+
 ## [0.20.0] - 2026-07-28
 
 ### Added

@@ -218,13 +218,19 @@ describe('RuleMetadata', () => {
 
   it('SliceRuleBuilder supports .rule() method', () => {
     const builder = new SliceRuleBuilder(stubProject)
-    // Verify .rule() is callable and returns the builder for chaining
     const result = builder.rule({
       id: 'slice/test',
       because: 'slice reason',
       suggestion: 'slice suggestion',
       docs: 'https://example.com/slice',
     })
-    expect(result).toBe(builder)
+
+    // A COPY, not `this` — a held builder is immutable since bug 0016, and
+    // `.rule()` leaking an id was the worst version of that bug: baselines,
+    // `--rule` filters and `overrides` are all keyed on it, so a later rule
+    // off the same selection inherited an id it never declared.
+    expect(result).not.toBe(builder)
+    expect(result.describeRule().id).toBe('slice/test')
+    expect(builder.describeRule().id).toBeUndefined()
   })
 })

@@ -175,8 +175,9 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
    * @param index — zero-based argument index to fold into the identity.
    */
   identifiedByArg(index: number): this {
-    this._identifyByArgument = index
-    return this
+    const next = this.copy()
+    next._identifyByArgument = index
+    return next
   }
 
   // --- Condition methods ---

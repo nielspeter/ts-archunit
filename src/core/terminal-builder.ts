@@ -7,6 +7,7 @@ import type { RuleDescription } from './rule-description.js'
 import type { SilentExclusion } from './silent-exclusion.js'
 import { isSilent } from './silent-exclusion.js'
 import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
+import { shallowClone } from './shallow-clone.js'
 
 /**
  * The single root of every rule builder.
@@ -39,8 +40,9 @@ export abstract class TerminalBuilder {
    * Included in violation messages when `.check()` throws.
    */
   because(reason: string): this {
-    this._reason = reason
-    return this
+    const next = this.copy()
+    next._reason = reason
+    return next
   }
 
   /**
@@ -50,11 +52,12 @@ export abstract class TerminalBuilder {
    * If `metadata.because` is set, it also sets the reason (same as `.because()`).
    */
   rule(metadata: RuleMetadata): this {
-    this._metadata = metadata
+    const next = this.copy()
+    next._metadata = metadata
     if (metadata.because) {
-      this._reason = metadata.because
+      next._reason = metadata.because
     }
-    return this
+    return next
   }
 
   /**
@@ -93,15 +96,16 @@ export abstract class TerminalBuilder {
    * .excluding('Asset.getImageUrl', /\/legacy\//, /generated/)
    */
   excluding(...patterns: (string | RegExp | SilentExclusion)[]): this {
+    const next = this.copy()
     for (const p of patterns) {
       if (isSilent(p)) {
-        this._exclusions.push(p.pattern)
-        this._silentIndices.add(this._exclusions.length - 1)
+        next._exclusions.push(p.pattern)
+        next._silentIndices.add(next._exclusions.length - 1)
       } else {
-        this._exclusions.push(p)
+        next._exclusions.push(p)
       }
     }
-    return this
+    return next
   }
 
   /**
@@ -182,8 +186,9 @@ export abstract class TerminalBuilder {
    * Distinct from the terminal `.severity()` below, which executes immediately.
    */
   asSeverity(level: 'error' | 'warn'): this {
-    this._severity = level
-    return this
+    const next = this.copy()
+    next._severity = level
+    return next
   }
 
   /**
@@ -218,6 +223,33 @@ export abstract class TerminalBuilder {
    */
   globs(): readonly GlobNode[] {
     return []
+  }
+
+  /**
+   * An independent copy of this builder.
+   *
+   * **A held selection is immutable** (bug 0016). Every method that adds to a
+   * builder returns a copy instead of mutating `this`, so
+   *
+   * ```ts
+   * const repositories = classes(p).that().extend('BaseRepository')
+   * repositories.that().haveNameEndingWith('Legacy').should().notExist().check()
+   * repositories.should().beExported().check()   // still ALL repositories
+   * ```
+   *
+   * works. Before this, narrowing a held selection edited it in place: the
+   * second rule silently inherited `Legacy` and reported on a subset — or on
+   * nothing, and then passed. Same for `.excluding()`, which leaked a
+   * suppression into every later rule off the same selection, and `.rule()`,
+   * which leaked an id that baselines and `--rule` filters are keyed on.
+   *
+   * Cost is one object per chain link, against a ts-morph walk. Irrelevant.
+   */
+  protected copy(): this {
+    const clone = shallowClone(this)
+    clone.adoptFilterState(this)
+    clone._metadata = this._metadata ? { ...this._metadata } : undefined
+    return clone
   }
 
   /**
