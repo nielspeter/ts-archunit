@@ -40,7 +40,7 @@ to `.check()`_ — is wrong on the facts, three times over:
 | Make findings fail instead of warn | **No API needed.** `SmellBuilder extends TerminalBuilder`, and `overrides: { 'preset/agent/no-copy-paste': 'error' }` works **today**. Undocumented, that is all. |
 | Agent-first messages on the smells | **Already shipped** for `agentGuardrails` (`id`/`because`/`suggestion`/`imperative`). Only `strictBoundaries` lacks them — 3 lines.                               |
 | A shrink-only **count** ratchet    | **ADR-008 rule 5 forbids it**: "compare identities… not integers." A budget is green when one duplicate is deleted and another appears.                           |
-| Ratchet-stable identity            | **A real bug, and worse than measured** → extracted to [bug 0010](../bugs/0010-violation-identity-embeds-absolute-paths.md).                                      |
+| Ratchet-stable identity            | **A real bug, and worse than measured** → extracted to [bug 0010](../bugs/fixed/0010-violation-identity-embeds-absolute-paths.md).                                |
 
 The flip-checklist corroborates the diagnosis being wrong. Across 13 rules that stay
 advisory **by design** in that project, the stated blockers were: reachability (4),
@@ -55,7 +55,7 @@ identity embedded **absolute file paths**, so a baseline generated locally match
 accept existing debt, did not work for this surface at all. Measured across two
 checkouts of one commit: 1006 findings each side, **0 shared identities**.
 
-That is [bug 0010](../bugs/0010-violation-identity-embeds-absolute-paths.md), fixed on
+That is [bug 0010](../bugs/fixed/0010-violation-identity-embeds-absolute-paths.md), fixed on
 its own merits — it broke every `strictBoundaries` user's baseline too, so it was never
 a discovery-surface concern. The spike also closed three further instabilities that
 move identity without moving the checkout (file-walk order, derived population counts,

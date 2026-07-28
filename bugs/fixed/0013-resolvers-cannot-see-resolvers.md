@@ -1,6 +1,7 @@
 # Bug 0013: three of four function collectors are blind to object-literal functions
 
 **Reported:** 2026-07-25
+**Fixed:** 2026-07-25
 **Found in:** all versions through v0.18.1
 **Severity:** High — the GraphQL entry point selects the helper functions sitting beside the resolvers and none of the resolvers themselves, and both smell detectors are blind to the same shape. Every rule written with `resolvers()` passes on the wrong subjects, and the discovery surface under-reports.
 

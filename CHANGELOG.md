@@ -41,13 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **`notImportFrom('fastify')` now matches an installed fastify** ([bug 0014](./bugs/0014-bare-package-import-globs-match-nothing.md)). Import globs were matched against the resolved path **or** the raw specifier, never both — so a package that resolves, which is every package you actually depend on, could only be matched by its `node_modules` path. The documented way to ban a dependency worked exclusively on dependencies you had not installed. Measured against this repo's own source: `notImportFrom('picomatch')` reported **0** violations while 15 files imported it. It now reports 15, the same as the path-glob form `'**/picomatch/**'`.
+- **`notImportFrom('fastify')` now matches an installed fastify** ([bug 0014](./bugs/fixed/0014-bare-package-import-globs-match-nothing.md)). Import globs were matched against the resolved path **or** the raw specifier, never both — so a package that resolves, which is every package you actually depend on, could only be matched by its `node_modules` path. The documented way to ban a dependency worked exclusively on dependencies you had not installed. Measured against this repo's own source: `notImportFrom('picomatch')` reported **0** violations while 15 files imported it. It now reports 15, the same as the path-glob form `'**/picomatch/**'`.
 
   Each import now contributes **both** its resolved absolute path and — for non-relative specifiers only — the specifier as written; a glob matches the import if it matches either. Relative specifiers are deliberately excluded: `'../services/*'` is an unanchored glob that correctly matches nothing against an absolute path, and matching it against the raw string would make relative globs silently half-work.
 
   This unblocks `layeredArchitecture({ restrictedPackages })`, whose whole documented purpose — "glob → list of npm package name patterns" — was inoperable for installed packages.
 
-- **A preset no longer silently enforces nothing when you name a file instead of a folder** ([bug 0018](./bugs/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)). `repositories`, `shared` and the layer globs were matched against the file's **parent directory**, so a glob naming a file could never match — the preset generated its rules and checked nothing. Measured: `dataLayerIsolation({ repositories: '**/repositories/bad-repo.ts' })` reported **0** violations on a file that violates both its rules. It now reports 2. Directory globs are unchanged.
+- **A preset no longer silently enforces nothing when you name a file instead of a folder** ([bug 0018](./bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)). `repositories`, `shared` and the layer globs were matched against the file's **parent directory**, so a glob naming a file could never match — the preset generated its rules and checked nothing. Measured: `dataLayerIsolation({ repositories: '**/repositories/bad-repo.ts' })` reported **0** violations on a file that violates both its rules. It now reports 2. Directory globs are unchanged.
 
 ### Upgrading — `.warn()` can now throw
 
@@ -73,8 +73,8 @@ This changes results in **two directions**, and the second is easy to miss.
 
 Makes `withBaseline()` work across machines, and makes three collectors see the
 handler-map idiom they were blind to. Both were found by adopting 0.18.x on a
-real codebase; see [bug 0010](./bugs/0010-violation-identity-embeds-absolute-paths.md)
-and [bug 0013](./bugs/0013-resolvers-cannot-see-resolvers.md). Pre-1.0, so the
+real codebase; see [bug 0010](./bugs/fixed/0010-violation-identity-embeds-absolute-paths.md)
+and [bug 0013](./bugs/fixed/0013-resolvers-cannot-see-resolvers.md). Pre-1.0, so the
 behavioural changes ship in a minor.
 
 ### Fixed
