@@ -1,4 +1,4 @@
-# Bug 0017: `dataLayerIsolation({ repositories: '<a file glob>' })` enforces nothing
+# Bug 0018: `dataLayerIsolation({ repositories: '<a file glob>' })` enforces nothing
 
 **Reported:** 2026-07-26
 **Found in:** all versions through v0.19.0
