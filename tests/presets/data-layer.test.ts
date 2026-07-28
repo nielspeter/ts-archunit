@@ -39,7 +39,35 @@ describe('dataLayerIsolation preset', () => {
     expect(violatedIds(rules)).toContain('preset/data/typed-errors')
   })
 
-  it('passes when only good repo and baseClass not specified', () => {
+  it('a FILE glob for repositories enforces the rules (bug 0018)', () => {
+    // `repositories` went straight to `resideInFolder`, which reads the parent
+    // directory, so a file glob could never match: the preset generated its
+    // rules and reported 0 violations on a fixture named `bad-repo`. The old
+    // version of this test passed `good-repo.ts` and asserted `[]`, which an
+    // empty selection satisfies — it would have passed with the whole preset
+    // broken, and plan 0069's appendix filed it as legitimate on that basis.
+    const violations = dataLayerIsolation(p, {
+      repositories: '**/repositories/bad-repo.ts',
+      requireTypedErrors: true,
+      baseClass: 'BaseRepository',
+    }).flatMap((r) => r.violations())
+    expect(violations.length).toBeGreaterThan(0)
+  })
+
+  it('a DIRECTORY glob still enforces them (no regression)', () => {
+    const violations = dataLayerIsolation(p, {
+      repositories: '**/repositories/**',
+      requireTypedErrors: true,
+      baseClass: 'BaseRepository',
+    }).flatMap((r) => r.violations())
+    expect(violations.length).toBeGreaterThan(0)
+  })
+
+  it('passes for a good repo named by a file glob', () => {
+    // The original assertion, kept — but now meaningful, because the file glob
+    // actually selects the class. Guarded against emptiness by the two cases
+    // above: if `atPath()` selected nothing this would still be `[]`, so it is
+    // not load-bearing on its own.
     const rules = dataLayerIsolation(p, {
       repositories: '**/repositories/good-repo.ts',
       requireTypedErrors: true,

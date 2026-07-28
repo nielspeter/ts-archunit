@@ -76,7 +76,6 @@ describe('within()', () => {
   })
 
   it('supports predicates on scoped functions', () => {
-    // The GET /api/users route callback is NOT async, so filtering for async should give no elements
     const routes = calls(p)
       .that()
       .onObject('app')
@@ -85,10 +84,25 @@ describe('within()', () => {
       .and()
       .withStringArg(0, '/api/users')
 
-    // No async callbacks in the match set --- areAsync() should filter to 0 elements
-    // With 0 elements, no violations are produced (empty set passes)
+    // The claim is that a FunctionRuleBuilder predicate reaches scoped
+    // functions. Asserted on the predicate's own two outcomes, because the
+    // original only exercised the empty one: `areAsync()` filters this
+    // callback out, so nothing about predicate support was tested.
+    // Both outcomes of the predicate, on subject sets rather than on whether a
+    // rule threw. The original asserted only that a rule over the EMPTY side
+    // did not throw, which is true however predicate support behaves.
+    expect(within(routes).functions().subjects().length).toBeGreaterThan(0)
+    expect(within(routes).functions().that().areAsync().subjects()).toHaveLength(0)
+
+    // And a predicate that DOES match still reaches the condition.
     expect(() => {
-      within(routes).functions().that().areAsync().should().contain(call('anything')).check()
+      within(routes)
+        .functions()
+        .that()
+        .satisfy({ description: 'every scoped function', test: () => true })
+        .should()
+        .contain(call('res.json'))
+        .check()
     }).not.toThrow()
   })
 

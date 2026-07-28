@@ -1,3 +1,4 @@
+import type { SourceFile } from 'ts-morph'
 import picomatch from 'picomatch'
 import type { ArchProject } from '../core/project.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
@@ -5,7 +6,7 @@ import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import { smells } from '../smells/index.js'
 import type { PresetBaseOptions } from './shared.js'
-import { collectRule, validateOverrides, assertDiscovered } from './shared.js'
+import { atPath, collectRule, validateOverrides, assertDiscovered } from './shared.js'
 
 export interface StrictBoundariesOptions extends PresetBaseOptions {
   /** Glob pattern for boundary folders (e.g., 'src/features/*') */
@@ -40,7 +41,11 @@ function applySharedIsolation(
     for (const dir of boundaryFolders) {
       builders.push(
         ...collectRule(
-          modules(p).that().resideInFolder(sharedGlob).should().notImportFrom(`${dir}/**`),
+          modules(p)
+            .that()
+            .satisfy(atPath<SourceFile>(sharedGlob))
+            .should()
+            .notImportFrom(`${dir}/**`),
           {
             id: 'preset/boundaries/shared-isolation',
             because:

@@ -1,9 +1,10 @@
+import type { ClassDeclaration } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { classes } from '../builders/class-rule-builder.js'
 import { newExpr } from '../helpers/matchers.js'
 import type { PresetBaseOptions } from './shared.js'
-import { collectRule, validateOverrides } from './shared.js'
+import { atPath, collectRule, validateOverrides } from './shared.js'
 
 export interface DataLayerIsolationOptions extends PresetBaseOptions {
   /** Glob pattern for repository files */
@@ -36,7 +37,7 @@ export function dataLayerIsolation(
   if (options.baseClass) {
     builders.push(
       ...collectRule(
-        classes(p).that().resideInFolder(options.repositories).should().extend(options.baseClass),
+        classes(p).that().satisfy(atPath(options.repositories)).should().extend(options.baseClass),
         {
           id: 'preset/data/extend-base',
           because:
@@ -57,7 +58,7 @@ export function dataLayerIsolation(
       ...collectRule(
         classes(p)
           .that()
-          .resideInFolder(options.repositories)
+          .satisfy(atPath<ClassDeclaration>(options.repositories))
           .should()
           .notContain(newExpr('Error')),
         {

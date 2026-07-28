@@ -193,18 +193,25 @@ describe('functions() entry point integration', () => {
   // 8. areNotExported predicate
   // ----------------------------------------------------------------
   describe('areNotExported predicate', () => {
-    it('non-exported functions should not exist (negative test — some exist)', () => {
-      // StrictOptions interface is not exported, and there could be unexported methods.
-      // BaseService.normalizeCount and BaseService.toError are protected methods in
-      // an exported class. However their isExported() delegates to the class being exported.
-      // Let's check: if all methods in exported classes count as exported AND all
-      // top-level functions are exported, then no unexported functions exist.
-      // Actually, StrictOptions is an interface, not a function. Let's verify behavior.
-      // If there are no unexported functions, the predicate filters to 0 elements
-      // and notExist passes trivially (0 violations).
-      expect(() => {
-        functions(p).that().areNotExported().should().notExist().check()
-      }).not.toThrow()
+    it('areNotExported selects nothing here, because every function is reachable from an export', () => {
+      // The old title claimed "(negative test — some exist)" while the body
+      // asserted `.not.toThrow()`, which requires that NONE exist. The two
+      // contradicted, and the comment was seven lines of the author reasoning
+      // toward the empty result and then accepting it. If `areNotExported()`
+      // always returned false, it passed.
+      //
+      // Measured: it selects 0. `isExported()` on a method delegates to its
+      // owning class, so `BaseService.normalizeCount` — `protected`, and the
+      // case the old comment was groping at — counts as exported. State that
+      // as the finding rather than dressing it as a negative test.
+      const notExported = functions(p).that().areNotExported().subjects()
+      expect(notExported).toHaveLength(0)
+
+      // The positive control the old test lacked: the predicate is not simply
+      // inert. Its complement selects the whole population.
+      const exported = functions(p).that().areExported().subjects()
+      expect(exported.length).toBeGreaterThan(0)
+      expect(functions(p).subjects()).toHaveLength(exported.length)
     })
   })
 

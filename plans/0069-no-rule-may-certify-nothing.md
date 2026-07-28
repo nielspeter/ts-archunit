@@ -70,7 +70,11 @@ Derivation status of each row, because two of the three are not yet reproducible
 
   That is the **blast radius, not the defect count**, and the distinction is the work R3b actually has to do. Most of the 35 are legitimate — `.notExist()` rules where zero subjects is the passing state, and tests whose entire point is an empty selection (`resideInFolder with nonexistent folder matches nothing`). But some are genuine, and one is a clean specimen: `tests/integration/coverage-gaps.test.ts:480` is named `finds interfaces extending Entity` and its body asserts that `extendType('NonExistentBase')` produces no violations. The name and the body disagree, the body asserts on an empty set, and its own comment records the author losing track mid-test.
 
-  **Classifying all 35 is a precondition for R3b**, not R3a. What can be asserted today is only that the previous figure was wrong by more than 4× and that nobody could have checked it.
+  **Classified 2026-07-26** in [the appendix](./0069-appendix-vacuous-tests.md), then corrected after review: **22** legitimate, **5** asserting the current default R3b inverts by design, **8** genuine. The first cut said 26/1/6 — it miscounted its own table by one, dropped one of the 35 tests entirely, and filed a **live shipped preset bug** ([0018](../bugs/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)) under legitimate.
+
+  The classification changed R3b's design, which the number alone could not have — and then review changed it again. "An empty selector fails **unless the condition is satisfied by emptiness**" turned out to be true of _every_ condition (∀ over ∅ is vacuous) and derivable from none of them. The workable rule is narrower: exempt only a condition that asserts **cardinality**, where zero subjects is the answer rather than the absence of one. `notExist()` is the only shipped condition of that kind, and the flag has to be declared rather than probed.
+
+  One of the six was written during this plan, in the commit that fixed bug 0014 — by someone who had spent a week on this exact failure mode. That is the argument for the mechanism rather than for more care.
 
 - **Row 3** — the adopting codebase, 2026-07-25. Not reproducible here by design.
 

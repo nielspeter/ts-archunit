@@ -175,30 +175,48 @@ describe('FunctionRuleBuilder', () => {
       }
     })
 
-    it('named selection reuse works', () => {
+    it('named selection reuse works — the documented form', () => {
+      // The form docs/core-concepts.md and docs/classes.md actually show:
+      // repeated `.should()`, which forks. This works, and now says so on a
+      // non-empty set rather than by not throwing over nothing.
       const parsers = functions(p)
         .that()
         .haveNameMatching(/^parse/)
+      expect(parsers.subjects().map((f) => f.getName())).toContain('parseConfig')
 
-      // Rule 1: parseXxxOrder should not exist
+      // Throwing rule FIRST. The reverse order cannot detect a leak: carrying a
+      // passing condition into the second rule changes nothing either way.
+      // (`.should() forks the builder for named selections` below is the
+      // dedicated guard; this ordering just stops THIS test from being a
+      // weaker duplicate of it.)
       expect(() => {
-        parsers
-          .that()
-          .haveNameMatching(/Order$/)
-          .should()
-          .notExist()
-          .check()
+        parsers.should().notExist().check()
       }).toThrow(ArchRuleError)
 
-      // Rule 2: parseConfig should exist and be exported
+      // Second rule off the same selection, unaffected by the first.
       expect(() => {
-        parsers
-          .that()
-          .haveNameMatching(/^parseConfig$/)
-          .should()
-          .beExported()
-          .check()
+        parsers.should().beExported().check()
       }).not.toThrow()
+    })
+
+    it('narrowing a named selection MUTATES it (bug 0016)', () => {
+      // Pinned, not endorsed. The previous version of the test above used this
+      // form under the name "named selection reuse works", and its second rule
+      // asked for `parseConfig` — which the first rule had already narrowed
+      // away. It asserted `.not.toThrow()` over an empty set and so certified
+      // the feature for as long as it existed.
+      //
+      // Update this test when bug 0016 is fixed; do not delete it.
+      const parsers = functions(p)
+        .that()
+        .haveNameMatching(/^parse/)
+      expect(parsers.subjects()).toHaveLength(4)
+
+      parsers
+        .that()
+        .haveNameMatching(/Order$/)
+        .violations()
+      expect(parsers.subjects().map((f) => f.getName())).not.toContain('parseConfig')
     })
   })
 
