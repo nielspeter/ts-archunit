@@ -1,9 +1,13 @@
 name: Update Context7 Docs
 
+# Manual only. The `release: published` trigger this used to carry could never
+# fire — the release is created by publish.yml with the default GITHUB_TOKEN,
+# and GitHub does not cascade workflow triggers from GITHUB_TOKEN events. Five
+# releases produced zero runs from it. Release-time indexing now lives in
+# publish.yml, which already has the release context; this remains for
+# re-indexing on demand without cutting a release.
 on:
-  release:
-    types: [published]
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch:
 
 jobs:
   update-docs:
@@ -18,7 +22,7 @@ jobs:
         id: context7
         uses: rennf93/upsert-context7@1.1
         with:
-          operation: ${{ github.event_name == 'release' && 'add' || 'refresh' }}
+          operation: refresh
 
       - name: Show result
         run: |

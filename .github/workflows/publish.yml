@@ -65,3 +65,29 @@ jobs:
         with:
           body_path: /tmp/release-notes.txt
           generate_release_notes: false
+
+      # Context7 indexing runs here rather than in its own workflow on
+      # `release: published`. That trigger never fired: the release above is
+      # created with the default GITHUB_TOKEN, and GitHub deliberately does not
+      # cascade workflow triggers from GITHUB_TOKEN events. Measured — five
+      # releases, and every context7 run in the repo's history was a manual
+      # workflow_dispatch. The docs had only ever been refreshed by hand.
+      #
+      # `continue-on-error` on purpose: the package is already published by this
+      # point, so a docs-service failure must not turn a successful, immutable
+      # release red. It surfaces in the step output instead.
+      - name: Add/Refresh Context7 Documentation
+        id: context7
+        continue-on-error: true
+        env:
+          # rennf93/upsert-context7@1.1 internally uses actions/setup-python@v5 (Node 20)
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: rennf93/upsert-context7@1.1
+        with:
+          operation: add
+
+      - name: Show Context7 result
+        run: |
+          echo "Success: ${{ steps.context7.outputs.success }}"
+          echo "Status: ${{ steps.context7.outputs.status-code }}"
+          echo "Message: ${{ steps.context7.outputs.message }}"
