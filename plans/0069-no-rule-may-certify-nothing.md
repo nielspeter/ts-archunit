@@ -1,6 +1,6 @@
 # Plan 0069 — No rule may certify nothing
 
-**Status:** DRAFT 7 — after `/review-proposal` round 6. **R-any and R1 are approved outright; product approves all six units; architect approves R2a/R2b/R3a/R3b conditional on corrections only.** No open design decisions remain in either review. Every round-6 item is settled below.
+**Status:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/0016-narrowing-a-named-selection-mutates-it.md) should land before R3b: its migration note says "these findings are true", and 0016 makes some of them false.
 **Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
 **Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md); closes [bug 0011](../bugs/0011-dogfood-rules-select-nothing.md).
 **Prerequisites:** [bug 0014](../bugs/0014-bare-package-import-globs-match-nothing.md) ships first, alone. The single-root refactor (`spike/0014-rule-census`, +456/−165) is **unmerged** and lands as its own commit with its own test pass.

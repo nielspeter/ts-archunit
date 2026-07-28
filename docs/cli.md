@@ -92,6 +92,37 @@ npx ts-archunit explain arch.rules.ts --format agent >> CLAUDE.md
 
 Outputs a structured description of every rule — id, description, because, suggestion — without executing them. `--format agent` emits an imperative "Do NOT … / MUST …" block (with a check-in-loop preamble and sentinel markers) for AI coding agents — see [AI Agents](/ai-agents). See [Explain Command](/explain) for use cases.
 
+### `doctor` — Report Rules That Enforce Nothing (experimental)
+
+```bash
+ts-archunit doctor arch.rules.ts
+```
+
+Reports which rules **cannot enforce anything**, without running them: a glob that can never match, and a rule that selects elements but asserts nothing about them.
+
+```
+demo/typo-in-glob
+  reside in folder matching "**/src/reslvers/**"  [selector]
+  no-match: these are anchored but matched no file. Common causes: the glob names a
+  directory rather than the files inside it (append "/**"), a path segment is
+  misspelled, or the directory holds no source files
+
+demo/excluded-by-tsconfig
+  reside in folder matching "**/examples/**"  [selector]
+  no-match: this path exists and contains TypeScript, but your tsconfig
+  include/exclude keeps it out of the project
+
+demo/no-condition
+  no-condition: this rule selects elements but asserts nothing about them, so it can
+  never fail — add a .should() clause, or delete it
+```
+
+It reports **identities, never totals** — which glob, in which rule, at which position. It **exits non-zero when it reports anything**, because an agent reads `exit 0` as "nothing to do".
+
+::: warning Experimental — do not wire it into a pipeline
+`doctor` is a diagnostic you invoke, not a build gate, and it is deliberately absent from `--help`: retiring a documented command later would be its own breaking change, and its future is undecided. Use [`diagnose()`](/api-reference#diagnostics-experimental) for the same thing inside a test.
+:::
+
 ## Options
 
 | Flag                | Short | Description                                                           |

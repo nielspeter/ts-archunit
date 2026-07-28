@@ -488,6 +488,61 @@ correspondence(p)
 | `defineConfig`      | `defineConfig(config: CliConfig): CliConfig` | Define CLI configuration file.                                   |
 | `resetProjectCache` | `resetProjectCache(): void`                  | Clear the project singleton cache. Used by watch mode and tests. |
 
+## Diagnostics (experimental)
+
+Report which rules **cannot enforce anything**, without running them. Nothing here fails a build — it is the measuring instrument for a future release that will make a rule which can never match fail.
+
+**Experimental.** The shape may change, and `ts-archunit doctor` is deliberately absent from `--help` because retiring a documented command is its own breaking change.
+
+| Export              | Signature                                                           | Description                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `diagnose`          | `diagnose(rules: RuleBuilderLike[], project?): DiagnosticFinding[]` | Report dead globs and condition-less rules. Reports identities, never totals. The project defaults to the one each rule was built against. |
+| `DiagnosticFinding` | type                                                                | `{ kind, rule, origin?, glob?, position?, fault?, onDisk?, advice }`                                                                       |
+| `DiagnosableRule`   | type                                                                | What `diagnose` can inspect. Any `RuleBuilderLike` qualifies.                                                                              |
+
+```typescript
+import { project, modules, diagnose } from '@nielspeter/ts-archunit'
+
+const p = project('tsconfig.json')
+const rules = [
+  modules(p).that().resideInFolder('**/src/reslvers/**').should().notHaveDefaultExport(),
+]
+
+// In a test, so rules written in vitest can be measured too:
+expect(diagnose(rules)).toEqual([])
+```
+
+Or from the command line:
+
+```bash
+ts-archunit doctor arch.rules.ts   # exits non-zero if it reports anything
+```
+
+### Declaring globs on a custom predicate
+
+A predicate that matches on a path can declare it, which is what makes it visible to `diagnose`. A predicate that declares nothing is simply invisible — nothing breaks.
+
+| Export                                                                       | Description                                                                                                                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DeclaredGlob`                                                               | `{ glob, kind, polarity?, base? }` — what a predicate declares. Deliberately cannot express `position`.                                     |
+| `GlobKind`                                                                   | `'file-path' \| 'parent-dir' \| 'import-target' \| 'specifier' \| 'literal'` — names **the string the matcher is applied to**, not the API. |
+| `globNode`, `globAnyOf`                                                      | Build a declaration from one glob, or from a variadic set (`any`).                                                                          |
+| `combineGlobs`, `negateGlobs`, `stampGlobs`                                  | For combinators and builders. `negateGlobs` is a full NNF push-down.                                                                        |
+| `GlobNode`, `GlobSite`, `GlobTree`, `GlobPosition`, `GlobBase`, `OpaqueGlob` | Supporting types.                                                                                                                           |
+
+```typescript
+import { globNode, type Predicate } from '@nielspeter/ts-archunit'
+import type { SourceFile } from 'ts-morph'
+
+function inGeneratedOutput(glob: string): Predicate<SourceFile> {
+  return {
+    description: `in generated output matching "${glob}"`,
+    globs: globNode({ glob, kind: 'file-path' }),
+    test: (sf) => sf.getFilePath().includes('/generated/'),
+  }
+}
+```
+
 ## Types (TypeScript)
 
 | Export                      | Kind | Description                                                                                       |

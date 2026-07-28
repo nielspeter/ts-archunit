@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.20.0] - 2026-07-28
+
+### Added
+
+- **`ts-archunit doctor <rule-files>`** — reports which of your rules cannot enforce anything, without running them: a glob that can never match, and a rule that selects elements but asserts nothing about them. Exits non-zero when it reports anything, because an agent reads `exit 0` as "nothing to do". **Experimental**, and deliberately absent from `--help` — removing a documented command later is its own breaking change, and its future is undecided. Do not wire it into a pipeline.
+- **`diagnose(rules)`** — the same thing in-process, for rules written inside vitest, which is a co-equal documented path. **Experimental**, and the shape may change: `diagnose(rules: RuleBuilderLike[]): DiagnosticFinding[]`, with `DiagnosticFinding` carrying `{ kind, rule, origin, glob, position, fault, onDisk?, advice }`. It reports identities, never totals.
+- **The glob declaration model** — `DeclaredGlob`, `GlobKind`, `GlobNode`, `globAnyOf`, `negateGlobs`, `stampGlobs` and friends. Exported so a **custom predicate can declare the globs it matches against**, which is what makes it visible to `doctor`. A predicate that declares nothing is simply invisible; nothing breaks. Also experimental.
+
+  Together these are the measuring instrument for a future release that will make a rule which can never match **fail**. Nothing fails yet. Run `doctor` now to find out what that release will cost you.
 
 ### Changed
 
@@ -21,7 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
   This unblocks `layeredArchitecture({ restrictedPackages })`, whose whole documented purpose — "glob → list of npm package name patterns" — was inoperable for installed packages.
 
-### Upgrading
+- **A preset no longer silently enforces nothing when you name a file instead of a folder** ([bug 0018](./bugs/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)). `repositories`, `shared` and the layer globs were matched against the file's **parent directory**, so a glob naming a file could never match — the preset generated its rules and checked nothing. Measured: `dataLayerIsolation({ repositories: '**/repositories/bad-repo.ts' })` reported **0** violations on a file that violates both its rules. It now reports 2. Directory globs are unchanged.
+
+### Upgrading — `.warn()` can now throw
 
 **`.warn()` can now throw.** Only for a configuration finding, never for an ordinary violation, and the thrown error carries **only** those findings — your ordinary violations are still logged exactly as before. `.severity('warn')` and `.asSeverity('warn')` reach the same place. `.violations()` remains the non-throwing programmatic surface.
 
@@ -29,9 +39,9 @@ There are five findings that trigger it, all pre-existing: empty selector (`.exp
 
 **One hazard worth knowing** if you have a self-executing rule file: `rule1.warn(); rule2.check()` used to evaluate both, because `.warn()` could not throw. If `rule1` now throws, module evaluation stops and `rule2` is never registered. The `export default [rule1, rule2]` shape is unaffected, and the CLI reports the truncation rather than absorbing it.
 
----
+### Upgrading — import globs now match bare package names
 
-The import-glob change below also changes results in **two directions**, and the second is easy to miss.
+This changes results in **two directions**, and the second is easy to miss.
 
 **Bans get louder (green → red).** `notImportFrom`, `notImportFromCondition` and `onlyHaveTypeImportsFrom` now match bare package names, so a ban you wrote against an installed package starts reporting. Those findings are real: the rule was enforcing nothing before.
 
