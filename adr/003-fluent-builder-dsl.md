@@ -107,7 +107,7 @@ classes(p).that().resideInFolder('src/repositories/**')
   .check()
 ```
 
-Developers who've used Java ArchUnit (like the mimer project's 80+ rules) can transfer their mental model directly.
+Developers who've used Java ArchUnit on a real codebase can transfer their mental model directly.
 
 **IDE-guided discovery:**
 
