@@ -16,7 +16,14 @@ Then fix the legacy violations down over time and regenerate the baseline to rat
 
 ## A rule I added isn't firing
 
-If a rule in `arch.rules.ts` seems to do nothing, check that it does **not** end in `.check()` (or `.warn()` / `.severity()`). In a CLI rule file, those terminals execute the rule immediately and return `undefined`, so the CLI silently skips it:
+Two different causes share this symptom:
+
+**The rule asserts nothing.** A selector with no condition after `.should()` — or a
+predicate like `areAsync()` used _after_ `.should()`, where it filters instead of
+asserting — can never fail. As of 0.22.0 the rule warns on stderr with the remedy for
+its exact shape (`[ts-archunit] Rule '…': …`); read that line first, it names the fix.
+
+**The rule never executes.** If a rule in `arch.rules.ts` seems to do nothing, check that it does **not** end in `.check()` (or `.warn()` / `.severity()`). In a CLI rule file, those terminals execute the rule immediately and return `undefined`, so the CLI silently skips it:
 
 ```typescript
 export default [
@@ -82,7 +89,12 @@ Expected. [`tsconfig()`](/config-rules) checks the resolved options object, whic
 
 ## Warnings show up but CI still passes
 
-That's by design. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
+That's by design for **severity** warnings. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
+
+One family is different: `[ts-archunit] Rule '…': this rule … asserts/detects nothing`
+lines are the assertion gate (0.22.0), and they are **not** ignorable by design — each
+names a rule that the next minor will fail instead of warn about. Fix them while they
+are still warnings.
 
 ## Still stuck?
 

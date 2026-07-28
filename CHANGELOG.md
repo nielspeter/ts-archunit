@@ -7,17 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.22.0] - 2026-07-28
 
-The measuring instrument for [plan 0070](./plans/0070-a-rule-must-assert-something.md): **a rule that asserts nothing now warns, everywhere, with the remedy for its own state.** Nothing fails in this release that did not fail before — 0.23.0 is the flip, and this is the release you measure on first.
+The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md): **a rule that asserts nothing now warns, everywhere, with the remedy for its own state.** No rule that passed before throws in this release — 0.23.0 is the flip, and this is the release you measure on first. (Two narrow tool-output changes are under Upgrading: `diagnose()` reports more, and `doctor`'s exit code covers more.)
 
 ### Added
 
-- **The assertion gate, warn form.** Every builder is checked at every terminal (`.check()`, `.violations()`, `.warn()`): if the rule asserts nothing, one warning is emitted — `[ts-archunit] Rule '<name>': <remedy>` — and the rule then behaves exactly as before. Seven assertion-less states are distinguished, each with its own remedy: a `.should()` with no condition after it; a **predicate** used after `.should()` (named in the message — `areAsync` filters subjects, it asserts nothing, and the fix is to move it, not to add it twice); a rule that never reached `.should()`; a bare entry point; `tsconfig()` with no `.requires()`; `smells.inconsistentSiblings()` with no `.forPattern()`; and a `correspondence()` with no assertion (which still throws as before — the warn precedes it).
+- **The assertion gate, warn form.** Every builder is checked at every terminal (`.check()`, `.violations()`, `.warn()`): the first time a rule instance that asserts nothing reaches one, a single warning is written **directly to stderr** — `[ts-archunit] Rule '<name>': <remedy>` — and the rule then behaves exactly as before. (Directly to stderr, not `console.warn`: vitest's default reporter drops intercepted console output from passing tests, and these rules pass by design — measured, the console channel was invisible in every CI configuration. Once per rule instance, not per call, so a held rule terminated in ten tests warns once.) Seven assertion-less states are distinguished, six remedy texts (the two never-reached-`.should()` shapes share one): a `.should()` with no condition after it; a **predicate** used after `.should()` (named in the message — `areAsync` filters subjects, it asserts nothing, and the fix is to move it, not to add it twice); a rule that never reached `.should()`; a bare entry point; `tsconfig()` with no `.requires()`; `smells.inconsistentSiblings()` with no `.forPattern()`; and a `correspondence()` with no assertion (which still throws as before — the warn precedes it).
 
-  **This is the pre-flight.** Run `ts-archunit check`, or your test suite, on 0.22.0 and read stderr: every gate warning is a rule that 0.23.0 will fail. It reaches every authoring shape by construction — vitest `it()` bodies, self-executing files, rules built in loops, presets — which no text search does. (A grep like `git grep -nP '\.should\(\)\s*\.(check|violations|warn)'` finds only the one shape where the terminal is adjacent to `.should()`; treat it as a hint, not a pre-flight.)
+  **This is the pre-flight.** Run `ts-archunit check`, or your test suite, on 0.22.0 and read stderr: every gate warning is a rule that 0.23.0 will fail. It reaches every authoring shape by construction — vitest `it()` bodies, self-executing files, rules built in loops, presets — which no text search does. (A grep — `git grep -nP '\.should\(\)\s*\.(check|violations|warn)'`, or `rg -U` where git lacks PCRE and for the multiline form — finds only the one shape where the terminal is adjacent to `.should()`; treat it as a hint, not a pre-flight.)
 
 - **`assertsSomething()` and `assertionAdvice()`** on every builder (public — `diagnose()` duck-types them). `diagnose()` / `doctor` now report `no-condition` for **all** builder families — previously only the six `RuleBuilder` entry points were visible, so slices, schemas, resolvers, tsconfig and correspondence rules reported clean while asserting nothing. The doctor's advice is now **the same string** the runtime prints, from one place, so the two can no longer drift.
 
-- **`describeRule()` on five more builders** (slices, schema, resolver, tsconfig, correspondence), so their findings and warnings are named by rule id or description instead of `unnamed`.
+- **`describeRule()` on six more builders** (slices, schema, resolver, tsconfig, correspondence, inconsistentSiblings), so their findings and warnings are named by rule id or description instead of `unnamed`. The slice name derives from the discovery (`slices().matching("src/")`), not from a description embedding every slice's file list. When a rule has `.rule({ id })`, the id IS the warning's name — it is the field the state-1 remedy tells you to read.
 
 ### Fixed
 
@@ -32,9 +32,10 @@ Nothing fails that didn't before. What changes visibly:
 
 1. **stderr gains warnings.** Each names a rule that 0.23.0 will fail. Fixing them now — add the condition, move the predicate, add `.requires()`/`.forPattern()`, or delete the rule — is the whole migration; every remedy is backward-compatible on this version.
 2. **`diagnose()` reports more.** Rules from slices/schema/resolver/tsconfig/correspondence builders that assert nothing now produce `no-condition` findings. If you pinned `diagnose()` output in tests, those pins change (two of this repo's own did).
-3. **`explain` names change** for the three builders that gained `describeRule()` — output that said `unnamed` now carries the rule description.
+3. **`explain` names change** for the six builders that gained `describeRule()` (slices, schema, resolver, tsconfig, correspondence, inconsistentSiblings) — output that said `unnamed` now carries the rule id or description.
 4. **`doctor`'s exit code** goes 1 on the newly visible states, for anyone who wired the experimental command into a pipeline despite the docs.
 5. Baseline identity is untouched — violation `rule` strings come from the condition context, not `describeRule()`.
+6. `assertsSomething()` and `assertionAdvice()` are new public methods on the exported base classes. An external subclass already declaring either name with an incompatible signature gets a compile error on this minor; one declaring neither is **exempt by default** (`assertsSomething()` returns `true`) — override it if your builder has an assertion-less state.
 
 ## [0.21.0] - 2026-07-28
 

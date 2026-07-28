@@ -439,6 +439,56 @@ suite plus this inventory, and report **caught-by-nothing as a number, which mus
 - The shipped TSDoc on `should()` (_"empty conditions"_) and on `fork()` — both become false in
   every editor hover; they change with the code, in the same commit.
 
+## Implementation notes — 0.22.0, as merged
+
+The instrument shipped with five deviations/corrections beyond draft 3, all found by the
+five-persona review of the implementation branch and each verified by measurement:
+
+- **The warn channel is `process.stderr.write`, not `console.warn`.** Vitest's default
+  reporter drops intercepted console output from PASSING tests, and this release fails
+  nothing by design — measured: 0 of 19 real gate firings visible in this repo's own
+  suite run, in every CI-relevant configuration. A child-process integration test
+  (`tests/cli/gate-visibility.test.ts`) pins delivery, not just the call; it fails under
+  the console channel (verified by sabotage).
+- **Once per builder instance**, not once per terminal call — a held rule terminated in
+  ten tests printed ten identical 346-character lines. The latch is not reset by
+  `copy()`.
+- **The warning's name prefers the rule id** (`describeRule().id ?? rule`) — the main
+  hierarchy's warning never printed the id while the state-1 advice branches on it, and
+  `doctor` named the same rule differently.
+- **`describeRule()` landed on six builders, not five** — `InconsistentSiblingsBuilder`
+  (the plan's own late-added seventh hook) had missed the naming pass and warned as
+  `unnamed`; and the slice name derives from the discovery, not from a description
+  embedding every slice's file list.
+- **`assertionAdvice()` is public**, not the drafted `protected` — a protected member
+  cannot satisfy the structural `DiagnosableRule` interface `diagnose()` consumes; the
+  plan's own §1 was internally contradictory and the review called the resolution
+  forced. The four warn-site deletions also moved from 0.23.0 into 0.22.0 (keeping them
+  would emit two warn texts for one state); the fifth deletion
+  (`inconsistent-siblings`' early return) and the correspondence `RangeError` removal
+  stay at 0.23.0 as planned, because the 0.22.0 gate warns and proceeds.
+
+**Deferred to 0.23.0, recorded so its implementer does not assume they shipped:**
+`execute-rule.ts`'s exclusion-refusal text still says "Fix the rule's selector instead"
+— it becomes cause-neutral at 0.23.0, where inventory item 4 pins it. The correspondence
+missing-assertion `RangeError` → finding conversion is 0.23.0. The 0.23.0 in-repo blast
+gains one row beyond the table above: `tests/smells/inconsistent-siblings.test.ts` ›
+"returns no violations when no pattern is set" pins the state the flip inverts. And
+`--format github`'s 10-annotations-per-step cap becomes relevant when config findings
+are common — a 35-finding run renders 10 and silently drops 25 from the annotation
+surface (raw log survives); the 0.23.0 note should say so.
+
+**Sabotage-matrix correction.** The 0.22.0 branch initially reported caught-by-nothing
+0 of 8; the review enumerated the surface properly and measured **11 reverts caught by
+nothing** — the deletion-equivalence pins for slice/schema/resolver did not exist (a
+fabricated violation on that path passed 2384/2384), the gate was pinned at one of
+three terminals, three `describeRule()` overrides and the resolver advice were
+deletable, the `format-github` branch and the doctor catch had no tests, and the test
+helper swallowed throws (a warn-then-throw sabotage passed 14 of 16). All eleven are
+now pinned, the helper reports `threw`, and the classification test discovers by
+prototype chain and compares owners by prototype identity. The lesson for 0.23.0's
+matrix: enumerate the reverts from the DIFF, not from memory of what was written.
+
 ## Documents amended on merge
 
 Round 2 found five stale cross-references draft 2 would have left. On merge, in the same PR:

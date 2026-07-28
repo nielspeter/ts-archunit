@@ -41,9 +41,9 @@ export function formatViolationsGitHub(
       // misplaces it. Emit a run-level annotation instead, which renders on
       // the workflow summary (plan 0070).
       if (v.file === '') {
-        return `::${severity} title=${escapeGitHub(title)}::${escapeGitHub(message)}`
+        return `::${severity} title=${escapeGitHubProperty(title)}::${escapeGitHub(message)}`
       }
-      return `::${severity} file=${relativePath},line=${String(v.line)},title=${escapeGitHub(title)}::${escapeGitHub(message)}`
+      return `::${severity} file=${relativePath},line=${String(v.line)},title=${escapeGitHubProperty(title)}::${escapeGitHub(message)}`
     })
     .join('\n')
 }
@@ -54,4 +54,15 @@ export function formatViolationsGitHub(
  */
 export function escapeGitHub(text: string): string {
   return text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+}
+
+/**
+ * Property values (e.g. `title=`) additionally need `,` and `:` escaped —
+ * the workflow-command parser splits the property list on commas, and rule
+ * descriptions legitimately contain both (`{a,b}` globs, prose). The
+ * run-level annotation for locationless findings made `title` the sole
+ * identity carrier, which is what surfaced this.
+ */
+function escapeGitHubProperty(text: string): string {
+  return escapeGitHub(text).replace(/,/g, '%2C').replace(/:/g, '%3A')
 }

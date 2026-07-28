@@ -57,8 +57,13 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           NOTES=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
+          # Test the VARIABLE, not the file: `echo "$NOTES" > file` writes a
+          # 1-byte newline when the section is missing, so `[ ! -s file ]` was
+          # false and the gate passed on an empty body — measured in review by
+          # dry-running a version with no section. npm publish is immutable;
+          # this test must fail closed.
           echo "$NOTES" > /tmp/release-notes.txt
-          if [ ! -s /tmp/release-notes.txt ]; then
+          if [ -z "$NOTES" ]; then
             echo "Error: CHANGELOG.md has no '## [${VERSION}]' section." >&2
             echo "Rename the [Unreleased] heading to [${VERSION}] before tagging." >&2
             exit 1

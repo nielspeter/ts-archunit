@@ -34,6 +34,10 @@ export abstract class TerminalBuilder {
   // kept `globs()` concrete rather than abstract.
   protected _exclusions: (string | RegExp)[] = []
   protected _silentIndices: Set<number> = new Set()
+  // The once-per-instance latch for the assertion-gate warning. Deliberately
+  // NOT reset by copy(): a copy of an already-warned builder describes the
+  // same authored rule, and repeating the identical line is noise, not signal.
+  private _warnedAssertionless = false
 
   /**
    * Attach a human-readable rationale to the rule.
@@ -252,9 +256,26 @@ export abstract class TerminalBuilder {
    * replaces the warn with a configuration finding.
    */
   private collectWithAssertionGuard(): ArchViolation[] {
-    if (!this.assertsSomething()) {
-      const name = this.describeRule().rule || this.constructor.name
-      console.warn(`[ts-archunit] Rule '${name}': ${this.assertionAdvice()}`)
+    if (!this.assertsSomething() && !this._warnedAssertionless) {
+      // Once per builder instance, not per terminal call: a held rule
+      // terminated in ten tests printed ten identical 346-character lines,
+      // which is what trains a reader to scroll past stderr — ADR-008's own
+      // failure mode, during the one release where reading these is the whole
+      // migration. A copy inherits the latch; a re-run is a new process.
+      this._warnedAssertionless = true
+      const d = this.describeRule()
+      // Prefer the rule id — diagnose() names by id, and the state-1 advice
+      // branches on "ruleId \"preset/...\"", so the one fact the remedy reads
+      // must be in the line. Review measured the id-less form drifting from
+      // doctor's naming for the whole main hierarchy.
+      const name = d.id ?? (d.rule || this.constructor.name)
+      // process.stderr.write, NOT console.warn: vitest's default reporter
+      // replays intercepted console output only for FAILING tests, and this
+      // release fails nothing by design — measured, console.warn from a
+      // passing test is invisible in every CI-relevant configuration, which
+      // made the pre-flight dark for exactly the audience it exists to warn.
+      // A direct stderr write bypasses the interception and is displayed.
+      process.stderr.write(`[ts-archunit] Rule '${name}': ${this.assertionAdvice()}\n`)
     }
     return this.collectViolations()
   }

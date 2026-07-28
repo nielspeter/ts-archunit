@@ -194,10 +194,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   }
 
   override assertionAdvice(): string {
-    return (
-      'this correspondence asserts nothing: call .beComplete(), .haveNoOrphans(), or ' +
-      '.beBijective(). (In this version it also throws — the gate only warns until 0.23.0.)'
-    )
+    return 'this correspondence asserts nothing: call .beComplete(), .haveNoOrphans(), or .beBijective().'
   }
 
   /** Named by id or by its sides, not 'unnamed' (plan 0070 §4). */

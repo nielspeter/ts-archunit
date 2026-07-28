@@ -61,17 +61,28 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
             `diagnosed. Leave builders un-terminated in a rule file (see docs/running-in-tests).\n`,
         )
       } else {
+        // The remedy is CONDITIONAL: this branch fires for any load failure —
+        // a syntax error, a missing dependency — and asserting "this imports a
+        // test runner" unconditionally would be a false cause (ADR-008 rule 2,
+        // caught in review). The error message is the evidence; the test-runner
+        // sentence is offered as the common case, not stated as the cause.
         process.stderr.write(
           `Error: ${file} could not be loaded (${error instanceof Error ? error.message : String(error)}), ` +
-            `so none of it could be diagnosed. A file that imports a test runner (vitest/jest) ` +
-            `cannot be loaded by doctor — run your test suite instead; the runtime emits the ` +
-            `same diagnostics as warnings.\n`,
+            `so none of it could be diagnosed. If this file imports a test runner (vitest/jest), ` +
+            `doctor cannot load it — run your test suite instead; the runtime writes the same ` +
+            `diagnostics to stderr.\n`,
         )
       }
       failedToLoad = true
     }
   }
 
+  // A load failure is a REPORT, and this command's contract is "exits
+  // non-zero when it reports anything". Review measured the mixed case —
+  // one broken file, one clean file, zero findings — printing the error and
+  // then exiting 0 with a clean bill of health: exactly the "exit 0 plus
+  // silence" this command exists to prevent, reintroduced by the catch that
+  // fixed the crash. Every exit path below folds `failedToLoad` in.
   if (failedToLoad && rules.length === 0) return 1
 
   // Nothing to diagnose is not the same as nothing wrong. The earlier guard
@@ -85,11 +96,18 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   const findings = diagnose(rules)
 
   if (args.format === 'json') {
-    process.stdout.write(JSON.stringify({ findings }, null, 2) + '\n')
-    return findings.length > 0 ? 1 : 0
+    process.stdout.write(JSON.stringify({ findings, failedToLoad }, null, 2) + '\n')
+    return findings.length > 0 || failedToLoad ? 1 : 0
   }
 
   if (findings.length === 0) {
+    if (failedToLoad) {
+      process.stderr.write(
+        'No findings in the rules that loaded — but at least one file could not be ' +
+          'loaded (see above), so this is not a clean bill of health.\n',
+      )
+      return 1
+    }
     process.stderr.write('No rules that cannot enforce anything.\n')
     return 0
   }

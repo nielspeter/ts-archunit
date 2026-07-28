@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import picomatch from 'picomatch'
 import path from 'node:path'
 import type { SourceFile } from 'ts-morph'
@@ -98,6 +99,14 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
 
   override assertsSomething(): boolean {
     return this._pattern !== undefined
+  }
+
+  /** Named by id or by the API that builds it — the inherited version says 'unnamed'. */
+  override describeRule(): RuleDescription {
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? 'smells.inconsistentSiblings()',
+    }
   }
 
   override assertionAdvice(): string {

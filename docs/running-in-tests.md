@@ -94,10 +94,13 @@ it('only new violations fail', () => {
 
 `doctor` cannot load a file that imports a test runner, so for rules written inside
 `it()` bodies the pre-flight is the runtime itself: **a rule that asserts nothing warns
-on stderr** whenever it reaches a terminal (`.check()`, `.violations()`, `.warn()`).
-Run your normal test suite and read stderr — every `[ts-archunit] Rule '…': this rule …
-asserts nothing` line is a rule that a future release will fail instead of warn about.
-This reaches every authoring shape by construction: `it()` bodies, `checkAll([...])`
+on stderr** the first time it reaches a terminal (`.check()`, `.violations()`,
+`.warn()`) — once per rule, not once per call. Run your normal test suite and read the
+output: every `[ts-archunit] Rule '…'` line is a rule that a future release will fail
+instead of warn about. The warning is written directly to `process.stderr`, so it
+appears even under reporters that swallow `console` output from passing tests —
+vitest's default reporter does exactly that, and these rules pass by design. This
+reaches every authoring shape by construction: `it()` bodies, `checkAll([...])`
 arrays, rules built in loops, and presets.
 
 Note the per-file behaviour of a _self-executing_ rule file (one that calls `.check()`

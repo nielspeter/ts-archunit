@@ -210,7 +210,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * it, so it can never fail — proposal 019. Exposed as a method because
    * `_conditions` is protected and `doctor` must not duck-type a private name.
    */
-  assertsSomething(): boolean {
+  override assertsSomething(): boolean {
     return this._conditions.length > 0
   }
 
@@ -235,7 +235,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
           : 'are predicates, which filter'
       return (
         `this rule asserts nothing: ${names} ${verb} subjects rather than asserting ` +
-        'anything about them. Move it before .should(), then add a condition.'
+        `anything about them. Move ${this._misplaced.length === 1 ? 'it' : 'them'} before .should(), then add a condition.`
       )
     }
     return (

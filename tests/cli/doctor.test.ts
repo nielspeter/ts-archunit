@@ -153,3 +153,82 @@ describe('runDoctor', () => {
     expect(JSON.stringify(parsed)).not.toContain('add it to your tsconfig')
   })
 })
+
+describe('files that cannot be loaded (plan 0070, 0.22.0)', () => {
+  it('a non-ArchRuleError load failure is reported, not a crash', async () => {
+    // Review measured a raw TypeError (a vitest test file) crashing the whole
+    // command and abandoning every remaining file.
+    const file = path.join(workDir, 'throws-typeerror.mjs')
+    fs.writeFileSync(file, `throw new TypeError('vitest runner not available')\n`)
+    const stderr: string[] = []
+    const original = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      stderr.push(String(chunk))
+      return true
+    }
+    let code: number
+    try {
+      code = await runDoctor({ ruleFiles: [file], format: 'terminal' })
+    } finally {
+      process.stderr.write = original
+    }
+    expect(code).toBe(1)
+    expect(stderr.join('')).toContain('could not be loaded')
+    // The remedy is conditional — this file does NOT import a test runner, so
+    // the message may offer the test-runner case but must not assert it.
+    expect(stderr.join('')).toContain('If this file imports a test runner')
+  })
+
+  it('MIXED case: a load failure plus a clean file still exits non-zero', async () => {
+    // The regression review measured: error on stderr, then "No rules that
+    // cannot enforce anything.", exit 0 — a clean bill of health after
+    // reporting that a whole file went undiagnosed.
+    const broken = path.join(workDir, 'broken.rules.ts')
+    fs.writeFileSync(broken, `throw new TypeError('boom')\n`)
+    const clean = writeRuleFile(
+      'clean-with-condition.rules.ts',
+      `  modules(p).that().resideInFolder('**/domain/**').should().notHaveDefaultExport(),`,
+    )
+    const stderr: string[] = []
+    const original = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      stderr.push(String(chunk))
+      return true
+    }
+    let code: number
+    try {
+      code = await runDoctor({ ruleFiles: [broken, clean], format: 'terminal' })
+    } finally {
+      process.stderr.write = original
+    }
+    expect(code).toBe(1)
+    expect(stderr.join('')).not.toContain('No rules that cannot enforce anything.')
+  })
+
+  it('MIXED case, JSON format: exit non-zero and the payload records the failure', async () => {
+    // The sabotage matrix found the text-path fix alone leaves the JSON path
+    // reverting silently: a JSON consumer saw clean findings + exit 0 while
+    // stderr (which JSON consumers do not read) carried the error.
+    const broken = path.join(workDir, 'broken-json.rules.ts')
+    fs.writeFileSync(broken, `throw new TypeError('boom')\n`)
+    const clean = writeRuleFile(
+      'clean-json.rules.ts',
+      `  modules(p).that().resideInFolder('**/domain/**').should().notHaveDefaultExport(),`,
+    )
+    const stdout: string[] = []
+    const original = process.stdout.write.bind(process.stdout)
+    process.stdout.write = (chunk: string | Uint8Array): boolean => {
+      stdout.push(String(chunk))
+      return true
+    }
+    let code: number
+    try {
+      code = await runDoctor({ ruleFiles: [broken, clean], format: 'json' })
+    } finally {
+      process.stdout.write = original
+    }
+    expect(code).toBe(1)
+    const payload: unknown = JSON.parse(stdout.join(''))
+    expect(payload).toMatchObject({ failedToLoad: true })
+  })
+})

@@ -141,7 +141,9 @@ describe('RuleMetadata', () => {
       }),
     ]
     const output = formatViolationsGitHub(violations)
-    expect(output).toContain('title=Architecture Violation: repo/typed-errors')
+    // ':' is escaped in property values as of 0.22.0 (workflow-command spec);
+    // the rendered title still reads "Architecture Violation: repo/typed-errors".
+    expect(output).toContain('title=Architecture Violation%3A repo/typed-errors')
   })
 
   it('JSON format includes all metadata fields', () => {
