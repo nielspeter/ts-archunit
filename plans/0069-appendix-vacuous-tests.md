@@ -101,7 +101,85 @@ Four implementation constraints, so R3b does not rediscover them:
 1. **The 8 in C are fixed.** Two turned out to be library defects rather than test defects — bugs 0016 and 0018.
 2. **Invert the 5 in B** so the new default is stated somewhere.
 3. **Leave the 22 in A alone.** They are the specification of the discriminator above.
-4. **Decide what a preset does.** `strictBoundaries` emits 37 rules and `layeredArchitecture` generates per-layer rules; R3b as drafted would fail every generated rule that does not apply to the options a user set — a rule they never wrote, with a remedy they cannot apply. This needs a decision, and at minimum a Known exposure.
-5. **Decide the user-side escape hatch.** R3b's Upgrading section offers `workspace([...])` and "delete the rule", both assuming the fault is a path glob. Neither reaches a legitimately-empty name, decorator or type predicate — a tripwire on `haveDecorator('Deprecated')` before anyone uses it. CHANGELOG 0.18.1 set the bar for reinstating a withdrawn guard as "each remedy is executable data **and an opt-out exists**"; as drafted R3b does not meet it.
+4. **Presets: one finding per option — decided 2026-07-26.** See below.
+5. **The escape hatch is `.expectEmpty()` — decided 2026-07-26.** See below.
 
 Items 4 and 5 were not visible from the number, and not visible from the first version of this classification either.
+
+---
+
+## Decision: a preset fault is attributed to the option, not to each generated rule
+
+**Decided 2026-07-26.** Recorded here because the measurement that produced it also refuted the concern it was raised to address.
+
+**What was claimed** (by me, from review): _"R3b would red preset rules for options the user never set — a rule they never wrote, with a remedy they cannot apply."_
+
+**What is measured.** Six preset configurations, this repo:
+
+| Config                                                   | Empty selectors                                                                         |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `recommended()`, `agentGuardrails({})`                   | 0                                                                                       |
+| `dataLayerIsolation` without `baseClass`                 | 0 — the preset does not emit the rule at all                                            |
+| `layeredArchitecture` with a layer glob matching nothing | 0 — it becomes an empty _slice_, which the shipped 0067-D discovery guard already fails |
+| `strictBoundaries` with `folders` matching nothing       | 0 — same                                                                                |
+
+Presets already handle an unset option by not generating a rule. **There was no exemption to argue about**, and the Known-exposure note this item asked for would have documented a hazard that does not exist.
+
+**The real shape**, which the same measurement found:
+
+```
+strictBoundaries({ folders: '**/src/*', shared: ['**/src/not-built-yet/**'] })
+  -> 77 rules, 38 with an empty selector, every one id preset/boundaries/shared-isolation
+
+layeredArchitecture({ typeImportsAllowed: ['<absent layer>'] })  -> 1
+dataLayerIsolation({ repositories: '<matches nothing>' })        -> 2
+```
+
+One wrong character in one option produces **38 identical findings**, one per discovered boundary folder — same id, same cause, same remedy. Every one of them is _true_, which is why exempting them is wrong; but a report shaped like that makes a one-line fix look like a 38-line disaster, and it contradicts this plan's own rule that `doctor` reports **identities, never totals**.
+
+**Decided:** a fault is deduplicated by `(rule id, offending glob)`, so the fan-out collapses to one finding that names **the option the user actually wrote**, with the number of generated rules it affects as context rather than as 38 rows.
+
+Two implementation consequences:
+
+- Presets must thread the **option name** into the site's `origin` (`shared: "**/src/not-built-yet/**"`, not `resideInFolder("…")`), or the message names a call the user never made.
+- The dedupe key is the glob, not the message: two different `shared` entries both matching nothing are two findings, because they are two edits.
+
+**Rejected:** one finding per generated rule (accurate and unusable); presets validating their own globs and throwing at generation (a second mechanism beside R3b, and it fires for rules the user would have overridden off); exempting preset-generated rules entirely — [bug 0018](../bugs/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md) is precisely a preset silently enforcing nothing, so that option designs the defect back in.
+
+---
+
+## Decision: `.expectEmpty()`, an assertion rather than a silencer
+
+**Decided 2026-07-26.**
+
+**The problem, measured.** Of the 22 legitimately-empty selections in category A, only about **one in eight** is emptied by a _glob_. The rest are emptied by `onObject`, `extendType`, `haveNameMatching`, `exportSymbolNamed`, `haveParameterCountGreaterThan` and `satisfy(<a metric>)`. So `doctor` cannot see them — there is no glob to declare — and R3b's three drafted remedies (_fix the glob_, _use `workspace([...])`_, _delete the rule_) all assume one. A user who writes
+
+```typescript
+classes(p).that().haveDecorator('Deprecated').should().beExported()
+```
+
+as a tripwire _before_ anything is deprecated gets a red with no applicable remedy at all.
+
+**The tension, in the project's own words.** CHANGELOG 0.18.1 set the bar for reinstating a withdrawn guard: _"once each remedy is executable data **and an opt-out exists**."_ This plan's Decisions section barred one: _"an opt-out is the first thing an agent adds on the first red, including the real typo."_ Every per-rule opt-out has that second property, so the question is whether one can be shaped so that adding it **wrongly still eventually fails**.
+
+**`.expectEmpty()` is that shape.** It asserts the selector matches nothing, and **fails if it ever matches something**:
+
+```typescript
+classes(p)
+  .that()
+  .haveDecorator('Deprecated')
+  .expectEmpty() // nothing is deprecated yet
+  .should()
+  .beExported()
+
+// the day someone deprecates a class:
+//   FAIL: .expectEmpty() asserted 0 subjects, found 1
+```
+
+An agent that reaches for it on a real typo gets a different failure the moment the typo is fixed, and in the meantime the intent is stated in the rule where a reader will see it — rather than in a baseline file, or nowhere. That is the difference between an assertion and a silencer, and it is the only property that distinguishes this from the `.allowEmpty()` the Decisions section rejected.
+
+It is also exactly symmetric with the shipped `.expectNonEmpty()`, which is the same idea in the other direction — and the two together mean **the empty/non-empty question is always answerable from the rule text**, which is what R3b needs for its message to be actionable.
+
+**Rejected:** `.allowEmpty()` — one word, silent forever, typo or not, and nothing revisits it; no opt-out at all — purest, but fails 0.18.1's own criterion and tells users to delete legitimate tripwires; making `bypassFilters` findings baselineable — reopens a deliberate decision, and a baselined guard is a silenced guard.
+
+**Note for R3b:** `.expectEmpty()` and `.expectNonEmpty()` on the same rule is a contradiction and must fail at build time, not silently pick one.
