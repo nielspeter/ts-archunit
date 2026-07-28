@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { calls } from '../../src/builders/call-rule-builder.js'
+import type { CallRuleBuilder } from '../../src/builders/call-rule-builder.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { call } from '../../src/helpers/matchers.js'
 import type { ArchProject } from '../../src/core/project.js'
@@ -164,36 +165,50 @@ app.post(ROUTES.AUTH, handler)
     expect(violations[0]!.message.startsWith('app.post ')).toBe(true)
   })
 
-  it('test #17 — _identifyByArgument is copied at fork (not aliased to upstream)', () => {
-    // RuleBuilder.fork() runs at .should() (rule-builder.ts:276 — Object.assign).
-    // CallRuleBuilder follows the standard fluent pattern: predicate methods
-    // including .identifiedByArg() MUTATE the builder and return `this`. So
-    // the fork's job is to snapshot the field value AT the moment .should()
-    // is called, then leave the forked rule untouched by later upstream
-    // mutations.
+  it('test #17 — a held selection does not carry a later identifiedByArg (bug 0016)', () => {
+    // This test used to pin the opposite contract: that `.identifiedByArg()`
+    // MUTATES the builder and returns `this`, and that `fork()` snapshots the
+    // field at `.should()`. Bug 0016 replaced mutation with copy-on-write, so
+    // the mutating call it relied on —
     //
-    // This test pins that property: fork copies by value, not by reference.
+    //   upstream.identifiedByArg(1)     // return value discarded
+    //
+    // — became a no-op statement. Deleting that line entirely left the test
+    // passing, so it asserted nothing about the property in its own name.
+    //
+    // Rewritten as the guard it wanted to be: two rules off one held selection,
+    // each with its own identity scope, asserted by element rather than by
+    // "contains a paren".
     const p = inMemoryProject(SAMPLE_ROUTES)
-
-    // Set identifiedByArg(0), then fork via .should() — fork must snapshot 0.
     const upstream = calls(p)
       .that()
       .onObject('app')
       .and()
       .withMethod(/^(get|post)$/)
-    const ruleA = upstream.identifiedByArg(0).should().notExist()
 
-    // Mutate the upstream builder AFTER the fork.
-    // Index 1 in our sample is `handler` (an identifier — non-literal),
-    // which would degrade `getName({withArgument: 1})` back to bare `app.post`.
-    // If fork aliased the field, ruleA.violations() would NOW emit bare names.
-    upstream.identifiedByArg(1)
+    const elements = (b: CallRuleBuilder): string[] =>
+      b
+        .should()
+        .notExist()
+        .violations()
+        .map((v) => v.element)
 
-    // If fork COPIED the primitive: ruleA still uses index=0 → enriched paths.
-    // If fork ALIASED: ruleA now sees index=1 → degrades to bare "app.post".
-    const ruleAViolations = ruleA.violations()
-    expect(ruleAViolations.length).toBeGreaterThan(0)
-    expect(ruleAViolations.every((v) => v.element.includes('('))).toBe(true)
+    // The held selection's own elements, BEFORE any identity scope is set.
+    // This is the discriminator, and getting it wrong is instructive: an
+    // earlier version of this rewrite asserted enriched-vs-bare using indexes
+    // 0 and 1, and passed under the mutating implementation too — each call
+    // mutated `upstream` and returned it, so every assertion still held. Only
+    // a value captured before the first call can tell the two apart.
+    const before = elements(upstream)
+    expect(before.every((e) => !e.includes('('))).toBe(true)
+
+    // Index 0 is the route literal, so identity is enriched.
+    const enriched = elements(upstream.identifiedByArg(0))
+    expect(enriched.every((e) => e.includes('("/'))).toBe(true)
+    expect(enriched).not.toEqual(before)
+
+    // The held selection was never given an identity scope, and still has none.
+    expect(elements(upstream)).toEqual(before)
   })
 
   it('test #18 — long literal: message elides > 80 chars, element verbatim', () => {
