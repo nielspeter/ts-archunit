@@ -44,7 +44,7 @@ point: _"console.warn is invisible to the agent consumer (ADR-008)"_.
 
 ## Update: one implementation, not five
 
-When this was written, the five sites lived in two unrelated class hierarchies,
+When this was written, the sites lived in two unrelated class hierarchies,
 so the fix meant five near-identical copies. `spike/0014-rule-census` merged
 them: `TerminalBuilder` is now the single root of every builder, and the
 `collectViolations()` hook is shared. The meta-finding can be emitted once, in
@@ -59,7 +59,7 @@ Worth stating the relationship plainly, since the two are easily confused:
 empty subjects.** A rule can be vacuous either way, and neither guard sees the
 other's case.
 
-All five sites are unchanged as of 0.19.0 — verified, not assumed.
+All the sites are unchanged as of 0.21.0 — verified, not assumed. **The count is four, not five**, re-measured 2026-07-28: `rule-builder.ts:378`, `slice-rule-builder.ts:234`, `schema-rule-builder.ts:183`, `resolver-rule-builder.ts:209`. The `correspondence-builder.ts` hit is a comment explaining why there deliberately is no warn there, and `execute-rule.ts:110` is a `catch { return [] }` on a file read.
 
 ## Proposal
 
