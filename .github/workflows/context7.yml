@@ -24,8 +24,18 @@ jobs:
         with:
           operation: refresh
 
-      - name: Show result
+      # Fails on a non-success outcome, for the same reason publish.yml's
+      # docs-index job does: this used to print `Success: false` and exit 0, so
+      # the remedy for a stale index was itself a green run that changed nothing.
+      # Nothing downstream depends on this workflow, so there is no release to
+      # protect here — it can simply be red.
+      - name: Show result, and fail if it did not succeed
+        if: always()
         run: |
           echo "Success: ${{ steps.context7.outputs.success }}"
           echo "Status: ${{ steps.context7.outputs.status-code }}"
           echo "Message: ${{ steps.context7.outputs.message }}"
+          if [ "${{ steps.context7.outputs.success }}" != "true" ]; then
+            echo "::error title=Context7 refresh failed::The docs index is unchanged. Status: ${{ steps.context7.outputs.status-code }} — a 4xx usually means the upstream API contract moved, so check rennf93/upsert-context7 for a newer version before re-running."
+            exit 1
+          fi
