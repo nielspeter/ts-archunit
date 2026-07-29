@@ -189,8 +189,23 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     return next
   }
 
+  /**
+   * Wrong arity counts as asserting nothing, **whatever assertion was chosen**.
+   *
+   * `.beComplete()` on a one-sided correspondence cannot assert anything: there
+   * is no second side to compare against, so the call is a claim about a
+   * comparison that does not exist. Reading only the assertion flags let that
+   * pair through the gate and into `collectViolations()`, where the arity check
+   * throws a `RangeError` — and until bug 0025 that error escaped the CLI and
+   * dropped every remaining rule file's findings.
+   *
+   * So the same fault now reports the same way whether or not an assertion was
+   * chosen, and `assertionAdvice()` below already names the right remedy for it
+   * (another `.side(...)`, never `.beComplete()`). The arity throw stays as an
+   * invariant on `collectViolations()`, unreachable through the terminals.
+   */
   override assertsSomething(): boolean {
-    return this._checkComplete || this._checkNoOrphans
+    return this._sides.length === 2 && (this._checkComplete || this._checkNoOrphans)
   }
 
   override assertionAdvice(): string {
@@ -217,6 +232,14 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   }
 
   protected collectViolations(): ArchViolation[] {
+    // Unreachable through `.check()` / `.warn()` / `.violations()` as of the
+    // bug-0025 fix: `assertsSomething()` above is false for wrong arity, so the
+    // gate reports it as a configuration finding before this method is called.
+    // Kept as the invariant it always was — this method indexes `_sides[0]` and
+    // `_sides[1]` non-null below, and a direct subclass caller deserves the
+    // named error rather than an undefined read. Do not treat it as the answer
+    // to "what happens with the wrong number of sides": the loud answer is the
+    // gate, and if this ever throws again through a terminal, the gate is gone.
     if (this._sides.length !== 2) {
       throw new RangeError(
         `correspondence() requires exactly two .side(...) calls; got ${String(this._sides.length)}.`,

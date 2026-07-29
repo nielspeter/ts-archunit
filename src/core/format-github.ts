@@ -37,8 +37,17 @@ export function formatViolationsGitHub(
       let message = v.because ? `${v.message} (${v.because})` : v.message
       // The annotation body opens with `message`, so a remedy identical to it is
       // already there — see `remedyRepeatsMessage`.
-      if (v.suggestion && !remedyRepeatsMessage(v)) message += `. Fix: ${v.suggestion}`
-      if (v.docs) message += `. Docs: ${v.docs}`
+      //
+      // `join` rather than a bare `'. '`: this format is the one that
+      // concatenates the parts into a single line, and a message already ending
+      // in punctuation got a second period — `…(reading 'config').. Fix: …`,
+      // measured on the real CLI once a producer wrote a well-punctuated
+      // message. The rich and plain formats put `Fix:` on its own line and never
+      // had the problem.
+      const join = (text: string): string => (/[.!?]$/.test(text) ? ' ' : '. ')
+      if (v.suggestion && !remedyRepeatsMessage(v))
+        message += `${join(message)}Fix: ${v.suggestion}`
+      if (v.docs) message += `${join(message)}Docs: ${v.docs}`
 
       // GitHub annotation format: ::level file=path,line=N,title=T::message
       //

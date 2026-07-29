@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatViolations, formatViolationsPlain } from '../../src/core/format.js'
+import { formatViolationsGitHub } from '../../src/core/format-github.js'
 import { makeViolation } from '../support/test-rule-builder.js'
 
 /** Shorthand with format-test defaults (avoids repeating them everywhere). */
@@ -117,11 +118,53 @@ describe('formatViolations', () => {
     expect(result).toContain(codeFrame)
   })
 
+  it('prints the message for a LOCATED violation, not only the location', () => {
+    // The default surface dropped it for every ordinary violation: the location
+    // slot rendered `file:line — element` and `message` was rendered nowhere, so
+    // the single most specific sentence about the fault never reached the reader.
+    // `formatViolationsPlain` had always printed it, which is how the two
+    // formatters came to disagree about what a violation is.
+    //
+    // Both derivations asserted, because that disagreement is the actual defect.
+    const violations = [mv({ message: 'contains call to parseInt' })]
+    expect(formatViolations(violations)).toContain('contains call to parseInt')
+    expect(formatViolationsPlain(violations)).toContain('contains call to parseInt')
+    // And the location is still there — this is an addition, not a replacement.
+    expect(formatViolations(violations)).toContain(':42')
+    expect(formatViolations(violations)).toContain('MyService.getTotal')
+  })
+
   it('respects codeFrames: false option', () => {
     const codeFrame = '  > 42 | const x = parseInt(y)'
     const violations = [mv({ codeFrame })]
     const result = formatViolations(violations, undefined, { codeFrames: false })
     expect(result).not.toContain(codeFrame)
+  })
+})
+
+describe('formatViolationsGitHub sentence joins', () => {
+  it('does not double the period when the message already ends in one', () => {
+    // This is the one format that concatenates message and remedy onto a single
+    // line, so it owns the punctuation between them. Measured on the real CLI:
+    // `…(reading 'config').. Fix: …`, as soon as a producer wrote a
+    // well-punctuated message.
+    const out = formatViolationsGitHub([
+      mv({ message: 'This rule file could not be evaluated.', suggestion: 'Fix the error.' }),
+    ])
+    expect(out).toContain('evaluated. Fix: Fix the error.')
+    // Asserted on the message BODY, not the whole annotation: the fixture's file
+    // is outside the cwd, so `path.relative` puts plenty of legitimate `..` in
+    // the `file=` property. A blanket `not.toContain('..')` failed on those and
+    // would have read as the fix not working.
+    const body = out.slice(out.indexOf('::', 2) + 2)
+    expect(body).not.toContain('..')
+  })
+
+  it('still inserts a period when the message does not end in one', () => {
+    const out = formatViolationsGitHub([
+      mv({ message: 'contains call to parseInt', suggestion: 'Use extractCount()' }),
+    ])
+    expect(out).toContain('parseInt. Fix: Use extractCount()')
   })
 })
 

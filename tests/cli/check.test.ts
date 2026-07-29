@@ -61,9 +61,71 @@ describe('runCheck', () => {
     expect(stderr).toHaveBeenCalled() // still surfaced, just non-failing
   })
 
-  it('re-throws non-ArchRuleError errors from import', async () => {
+  it('REVERSED (bug 0025): a non-ArchRuleError becomes a finding, never a re-throw', async () => {
+    // This test pinned the defect. Re-throwing escaped the per-file loop, so no
+    // report was written, no exit code was returned, and every finding already
+    // collected in the run was discarded — measured with two rule files, where
+    // one malformed rule silenced the other file's four real violations and
+    // printed a raw Node stack trace with node_modules paths in their place.
+    vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     mockLoadRuleFiles.mockRejectedValue(new TypeError('unexpected error'))
-    await expect(runCheck(baseArgs)).rejects.toThrow(TypeError)
+    const code = await runCheck(baseArgs)
+    expect(code).toBe(1)
+  })
+
+  it('a throwing rule file does not silence the other files (bug 0025)', async () => {
+    // The property the re-throw broke, asserted by IDENTITY rather than by a
+    // count: the surviving file's own violation has to be in the report, not
+    // just "two findings were produced".
+    const reported: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      reported.push(String(chunk))
+      return true
+    })
+    mockLoadRuleFiles
+      .mockRejectedValueOnce(new TypeError('boom from file A'))
+      .mockResolvedValueOnce([{ violations: () => [v({ element: 'SurvivorFromB' })] }])
+    const code = await runCheck({ ...baseArgs, ruleFiles: ['a.rules.ts', 'b.rules.ts'] })
+    const output = reported.join('')
+    expect(output).toContain('SurvivorFromB')
+    expect(output).toContain('boom from file A')
+    expect(output).toContain('a.rules.ts')
+    expect(code).toBe(2)
+  })
+
+  it('a throwing rule does not silence its siblings in the SAME file (bug 0025)', async () => {
+    // Per-BUILDER, not merely per-file. One catch around the whole file would
+    // pass the test above and still lose nineteen sibling rules out of twenty —
+    // the loop over builders is right there, so the finer boundary is free.
+    const reported: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      reported.push(String(chunk))
+      return true
+    })
+    mockLoadRuleFiles.mockResolvedValue([
+      {
+        violations: () => {
+          throw new RangeError('malformed rule')
+        },
+      },
+      { violations: () => [v({ element: 'SiblingSurvived' })] },
+    ])
+    const code = await runCheck(baseArgs)
+    const output = reported.join('')
+    expect(output).toContain('SiblingSurvived')
+    expect(output).toContain('malformed rule')
+    expect(code).toBe(2)
+  })
+
+  it('the rule-file failure is a configuration finding, so nothing can silence it', async () => {
+    // A rule file that could not run enforced nothing, which is not a violation
+    // to grade or to accept into a baseline. Asserted through the machinery
+    // rather than by reading the flag back: `--changed` with no diff filters
+    // ordinary findings out and must not filter this one.
+    vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+    mockLoadRuleFiles.mockRejectedValue(new TypeError('unloadable'))
+    const code = await runCheck({ ...baseArgs, changed: true })
+    expect(code).toBe(1)
   })
 
   it('captures violations from a preset that throws ArchRuleError on import (fallback)', async () => {

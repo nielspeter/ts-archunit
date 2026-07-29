@@ -1,6 +1,7 @@
 # Bug 0025: a non-`ArchRuleError` from one rule file drops every finding in the run
 
 **Reported:** 2026-07-29
+**Fixed:** 2026-07-29 (v0.24.0)
 **Found in:** all versions through v0.23.0
 **Severity:** High — one malformed rule silences every other rule in the same CLI run, and
 the output is a raw Node stack trace with `node_modules` paths. It reds rather than greens,
@@ -70,3 +71,41 @@ does.
 - Sabotage in both directions: with the per-file catch removed it must fail, and with the
   throwing fixture made to throw `ArchRuleError` instead it must still pass — otherwise it
   is measuring the ordinary path, not the boundary.
+
+## How it was fixed
+
+Both halves, in v0.24.0:
+
+**The fault class, at the CLI boundary.** `runCheck` and `runBaseline` now catch at the **two**
+boundaries that can fail independently — loading (per file, the only attribution available) and
+evaluating (per builder, so one malformed rule does not take its siblings in the same file down
+with it). A non-`ArchRuleError` becomes one configuration finding naming the rule file, via a
+single `failureOrViolations` shared by both commands; the two had a copy each of the
+`ArchRuleError` half and had already diverged on everything else.
+
+**The known producer, at its source.** `CorrespondenceBuilder.assertsSomething()` now returns
+`false` for the wrong number of sides regardless of which assertion was chosen. `.beComplete()`
+on a one-sided correspondence cannot assert anything — there is no second side to compare
+against — so the arity fault reports identically whether or not an assertion is present, through
+the assertion gate, with the remedy `assertionAdvice()` already had for it (another `.side(...)`,
+never `.beComplete()`). The `RangeError` stays on `collectViolations()` as the invariant it
+always was, unreachable through every terminal.
+
+Measured end to end on the real CLI: two rule files, the first a one-sided `correspondence()`
+with `.beComplete()`, the second with four real violations. Before, a raw `RangeError` stack
+trace and zero findings. After, five findings and exit 1.
+
+## Found while fixing it
+
+Three defects the fix walked into, each measured on the real CLI rather than reasoned about:
+
+- **The rich terminal formatter never printed a located violation's `message`** — for _every_
+  ordinary violation, not just this finding. The location slot rendered `file:line — element`
+  and the message was rendered nowhere, while `formatViolationsPlain` had always printed it, so
+  the two formatters disagreed about what a violation is. Nothing failed when it was fixed,
+  because nothing pinned it either way.
+- **`--format github` doubled the period** between a message ending in punctuation and its
+  `Fix:` clause. Pre-existing, and invisible until a producer wrote a well-punctuated message.
+- **The finding named its own path four times** — in `rule`, `element`, the location line and
+  the remedy — and the location line runs it through `path.relative(cwd, …)`, so a rule file
+  outside the cwd printed as `../../../../../../private/tmp/…`.

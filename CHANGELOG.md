@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.24.0] - 2026-07-29
+
+**One malformed rule no longer silences the run.** [Bug 0025](./bugs/fixed/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md): `ts-archunit check` caught `ArchRuleError` and re-threw everything else, so any other error escaped the per-file loop and terminated the process — no report written, no exit code returned, and every finding already collected discarded. Measured on the real CLI: two rule files, the first holding a one-sided `correspondence()` with `.beComplete()`, the second holding four real violations. Before, a raw Node stack trace with `node_modules` paths and **zero** findings. After, five findings and exit 1.
+
+A minor rather than a patch: a run that used to crash now reports, and `^0.23.0` would have resolved a patch silently into every consumer's CI.
+
+### Changed
+
+- **A rule file that cannot be evaluated is a configuration finding, not a crash.** It names the file, carries the error text as evidence, and the rest of the run still reports. Caught at the **two** boundaries that fail independently — loading (per file, the only attribution there is) and evaluating (per **builder**, so one malformed rule does not take its nineteen siblings in the same file down with it). Like every configuration finding it is `error` severity whatever the rule asked for, refused by `.excluding()`, and skipped by baseline and diff: a rule file that could not run enforced nothing, and that is not something to accept into a baseline.
+
+  Its remedy is deliberately **conditional** — this fires for a syntax error, a missing dependency or a misconfigured builder alike, and asserting one cause for all of them is the ADR-008 rule 2 defect. The error message is the evidence; the builder sentence is offered as the common case.
+
+  If you relied on `runCheck` rejecting so a wrapper script could catch it, it now resolves with a non-zero count instead. `ts-archunit baseline` gains the same treatment, where it matters twice over: a re-throw left **no baseline file at all**, so one malformed rule made the command unusable rather than producing a partial baseline you could finish.
+
+- **`correspondence()` with the wrong number of sides is a finding whether or not an assertion was chosen.** `.beComplete()` on a one-sided correspondence cannot assert anything — there is no second side to compare against — so `assertsSomething()` now returns `false` for wrong arity regardless, and the fault reports through the assertion gate with the remedy it already had (another `.side(...)`, never `.beComplete()`). v0.23.0 fixed only the no-assertion branch and disclosed this one as still throwing; that asymmetry is gone. **If you catch `RangeError` around `correspondence()`, it now arrives as an `ArchRuleError` configuration finding.**
+
+### Fixed
+
+Three output defects, each found by running the real CLI while fixing the above rather than by reading the code:
+
+- **The default terminal format never printed a located violation's `message`** — for _every_ ordinary violation, not only new findings. The location slot rendered `file:line — element` and the message, the one sentence saying what is actually wrong, was rendered nowhere. `formatViolationsPlain` had always printed it, so the two formatters disagreed about what a violation is. Output gains one line per violation; nothing failed when this was fixed, because nothing pinned it either way.
+- **`--format github` doubled the period** between a message ending in punctuation and its `Fix:` clause (`…(reading 'config').. Fix: …`). This is the one format that concatenates the parts onto a single line, so it owns the punctuation between them.
+- **A rule-file failure named its own path four times** — in `rule`, in `element`, in the location line and in the remedy — and the location line runs it through `path.relative(cwd, …)`, so a rule file outside the cwd printed as `../../../../../../private/tmp/…`.
+
+### Upgrading — 0.24.0
+
+Nothing to do. A run that previously crashed now reports and exits non-zero; a run that was already green stays green. Two behaviours to know about if you script around the CLI: `runCheck`/`runBaseline` no longer reject on an unexpected error from a rule file, and violation output is one line longer per violation.
+
 ## [0.23.0] - 2026-07-29
 
 The flip [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md) measured for: **a rule that asserts nothing now fails.** 0.22.0 gave you the instrument to find these; this release stops them from certifying anything.
