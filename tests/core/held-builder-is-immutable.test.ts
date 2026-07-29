@@ -283,19 +283,49 @@ describe('a held builder is immutable — behavioural', () => {
     expect(rule.violations()).toHaveLength(4)
   })
 
-  it('RuleBuilder: a second condition off a held post-should() rule does not stack', () => {
-    // The `copy()` override must carry BOTH lists. Dropping the `_conditions`
-    // line is also 0 of 2340 without this: two conditions off one held rule
-    // would share the array and accumulate.
+  it('RuleBuilder: a second .should() ACCUMULATES, and the held rule is untouched (bug 0020)', () => {
+    // REPLACED at 0.23.0. Through 0.22.0 this asserted `toHaveLength(0)` for
+    // the derived rule, pinning `fork()`'s condition-clearing — which silently
+    // discarded an assertion the author wrote (bug 0020). Two things are being
+    // pinned now, and the discriminator is the MESSAGE, not the count: two
+    // conditions over one selection iterate the same filtered set, so their
+    // elements are identical by construction, and a count of 8 is produced by
+    // both a correct `copy()` and one sharing the array.
     const p = load('poc')
-    const rule = functions(p)
+    const sel = functions(p)
       .that()
       .haveNameMatching(/^parse/)
-      .should()
-      .notExist()
-    expect(rule.violations()).toHaveLength(4)
-    expect(rule.should().beExported().violations()).toHaveLength(0)
-    expect(rule.violations()).toHaveLength(4)
+    const held = sel.should().notExist()
+    const kinds = (b: typeof held): string[] =>
+      [
+        ...new Set(b.violations().map((v) => (/not exist/.test(v.message) ? 'notExist' : 'other'))),
+      ].sort()
+
+    // `notExist` and `beAsync` both fire on all four parsers with
+    // distinguishable messages — `beExported` yields 0 here, which is why the
+    // earlier version's count assertion could not discriminate.
+    const derived = held.should().beAsync()
+    expect(derived.violations()).toHaveLength(8)
+    expect(kinds(derived)).toEqual(['notExist', 'other'])
+
+    // The held rule still asserts exactly its own condition.
+    expect(held.violations()).toHaveLength(4)
+    expect(kinds(held)).toEqual(['notExist'])
+  })
+
+  it('RuleBuilder: a second .should() matches .andShould() exactly (bug 0020)', () => {
+    // The equivalence the CHANGELOG claims. `.andShould()` is the canonical
+    // spelling and stays so; a second `.should()` is now the same thing.
+    const p = load('poc')
+    const sel = (): ReturnType<typeof functions> =>
+      functions(p)
+        .that()
+        .haveNameMatching(/^parse/)
+    const viaShould = sel().should().notExist().should().beAsync().violations()
+    const viaAndShould = sel().should().notExist().andShould().beAsync().violations()
+    expect(viaShould.map((v) => v.message).sort()).toEqual(
+      viaAndShould.map((v) => v.message).sort(),
+    )
   })
 
   it('CorrespondenceBuilder: a leaked allowEmpty would hide an empty side', () => {

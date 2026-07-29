@@ -121,11 +121,19 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
   }
 
   protected detect(): ArchViolation[] {
-    if (!this._pattern) return []
+    // Unreachable at runtime as of 0.23.0: the assertion gate reports a
+    // patternless detector as a configuration finding before `detect()` is
+    // called (bug 0019), so `_pattern` is always set by the time we get here.
+    // The branch stays only because strict null checks need the narrowing —
+    // hence the local, which the rest of the method reads instead of the field.
+    // Do not treat it as the answer to "what happens with no pattern": the loud
+    // answer is the gate, and if this ever returns `[]` again the gate is gone.
+    const pattern = this._pattern
+    if (!pattern) return []
 
     const filesByFolder = this.groupFilesByFolder()
     const ruleDescription = this.describe()
-    const patternDesc = this._pattern.description
+    const patternDesc = pattern.description
 
     const folderEntries = [...filesByFolder.entries()]
     if (this._groupByFolder) {
@@ -137,7 +145,7 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     for (const [folder, files] of folderEntries) {
       if (files.length < 2) continue
 
-      const { matching, nonMatching } = this.partitionByPattern(files, this._pattern)
+      const { matching, nonMatching } = this.partitionByPattern(files, pattern)
       const total = matching.length + nonMatching.length
       if (total === 0) continue
       if (matching.length / total < MAJORITY_THRESHOLD) continue

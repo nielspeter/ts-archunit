@@ -20,7 +20,14 @@ import {
  * NOT grounds to fail — see `unmatchedBaselineFinding`, which fires on the
  * measurement instead.
  */
-const HASH_VERSION = 2
+// 3 as of 0.23.0. Accumulate (bug 0020) changes `buildRuleDescription()` for
+// any rule derived off a held rule, and the description is hashed — so those
+// entries no longer match. Without the bump, `matched === 0` fires the
+// unmatched-baseline finding whose text asserts "generated against a different
+// repository root": a false cause, in the release about findings that assert
+// causes they cannot verify. With it, the version-mismatch branch is true and
+// its remedy (regenerate) is the right one.
+const HASH_VERSION = 3
 
 /**
  * A single entry in the baseline file.

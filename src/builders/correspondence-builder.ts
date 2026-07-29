@@ -222,11 +222,12 @@ export class CorrespondenceBuilder extends TerminalBuilder {
         `correspondence() requires exactly two .side(...) calls; got ${String(this._sides.length)}.`,
       )
     }
-    if (!this._checkComplete && !this._checkNoOrphans) {
-      throw new RangeError(
-        'correspondence() requires an assertion: .beComplete(), .haveNoOrphans(), or .beBijective().',
-      )
-    }
+    // No missing-assertion throw here: the assertion gate reports it as a
+    // configuration finding before `collectViolations()` runs (bug 0019), which
+    // is why the gate is placed ahead of this method — a `RangeError` from here
+    // escaped the CLI's `ArchRuleError`-only catch and dropped every remaining
+    // rule file. The sides-count check below stays: wrong arity is a different
+    // fault from a missing assertion, and its remedy is another `.side(...)`.
 
     const sideA = this._sides[0]!
     const sideB = this._sides[1]!

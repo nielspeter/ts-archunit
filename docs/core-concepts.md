@@ -123,6 +123,8 @@ classes(p) // 1. entry point: class declarations
   .check() // 4. execute
 ```
 
+The grammar is a contract, not a convention: **step 3 is required**. A rule that stops at step 2 — or that puts a predicate where a condition belongs — asserts nothing about the code it selected, so it can never fail. Since 0.23.0 that is a [configuration finding](/violation-reporting#a-rule-must-assert-something) and fails the build, with no way to downgrade it. Predicates narrow; conditions assert; a rule needs both.
+
 ## Predicates
 
 Predicates filter which elements a rule applies to. They go between `.that()` and `.should()`.
@@ -200,6 +202,14 @@ classes(p)
   .andShould()
   .notContain(call('parseInt'))
   .check()
+```
+
+Conditions **accumulate**: every condition in the chain is asserted, and each one that fails reports its own violations. Calling `.should()` a second time on the same chain adds to the assertions rather than replacing them — so the rule below checks both, and neither can be lost by reordering.
+
+```typescript
+const repos = classes(p).that().extend('BaseRepository')
+
+repos.should().beExported().should().notContain(call('parseInt')).check() // both asserted
 ```
 
 ## Named Selections

@@ -63,6 +63,7 @@ Enum-backed options (`target`, `module`, `moduleResolution`) are compared by val
 - **`extends` is resolved.** The rule sees the fully-merged options, so a strict flag inherited from a base config counts.
 - **Arrays and objects are deep-compared** (`lib`, `types`, `paths`), not reference-compared.
 - **`.requires()` merges.** Multiple calls accumulate; later keys win on conflict.
+- **A bare `tsconfig(p)` fails.** With no `.requires()` there is nothing to assert, so since 0.23.0 the rule reports a [configuration finding](/violation-reporting#a-rule-must-assert-something) instead of passing silently. Give it at least one requirement, or don't include it in the rule set.
 - **`workspace()` asserts the primary tsconfig.** A workspace uses the alphabetically-first tsconfig's compiler options, so `tsconfig(ws)` asserts against that one config. For per-package strictness in a mixed monorepo, load the package directly: `tsconfig(project('./packages/x/tsconfig.json'))`.
 - **Violations reference the config file, not a specific line.** The resolved options are a flat object with no source position, so each violation points at the tsconfig path (line 1), not the offending JSON line.
 

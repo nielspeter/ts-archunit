@@ -335,9 +335,27 @@ describe('tsconfig() — value comparison and messages', () => {
     expect(v).toHaveLength(0)
   })
 
-  it('an empty spec produces no violations', () => {
-    expect(tsconfig(mk({})).requires({}).violations()).toHaveLength(0)
-    expect(tsconfig(mk({})).violations()).toHaveLength(0)
+  it('an empty spec IS a violation — it asserts nothing (bug 0019)', () => {
+    // REVERSED at 0.23.0. This test previously asserted 0 violations for both
+    // shapes, pinning the assertion-less state as correct behaviour — which is
+    // the false green plan 0070 exists to close. `requires({})` merges zero
+    // keys, so it is the same state as never calling it.
+    for (const rule of [tsconfig(mk({})).requires({}), tsconfig(mk({}))]) {
+      const v = rule.violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]?.bypassFilters).toBe(true)
+      expect(v[0]?.message).toContain('.requires(')
+    }
+  })
+
+  it('the remedy remediates: adding .requires({...}) clears the finding', () => {
+    // ADR-008 rule 2's behavioural corollary — a remedy asserted only by its
+    // words is a same-derivation check.
+    expect(
+      tsconfig(mk({ strict: true }))
+        .requires({ strict: true })
+        .violations(),
+    ).toEqual([])
   })
 
   it('emits the full violation shape (file, line, rule)', () => {

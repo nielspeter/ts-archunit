@@ -1,14 +1,15 @@
 # Plan 0070 — a rule must assert something, and every assertion you write is kept
 
-**State:** DRAFT 3, **0.22.0 implemented** (built, unmerged, untagged) — reviewed twice as a plan, then twice more as code. Round 1 (architect + product) replaced the mechanism's
+**State:** DONE — **0.22.0** shipped the instrument, **0.23.0** shipped the flip. Reviewed twice
+as a plan, then twice more as code. Round 1 (architect + product) replaced the mechanism's
 location; round 2 (five personas, mechanism implemented in throwaway worktrees, 28-revert
 sabotage matrix) replaced the mechanism's **message contract** and its ordering. The
-diagnosis and the state table have survived both rounds unchanged.
+diagnosis and the state table survived every round unchanged.
 **Priority:** Highest open item, ahead of R3b. Both defects are live in v0.21.0 and both are silent.
 **Effort:** One root gate, one new advice hook, seven `assertsSomething()` hooks, two new
 `RuleBuilder` fields, five deletions, `describeRule()` on six builders, and the guards.
 Two releases. **See Implementation notes for what 0.22.0 actually shipped.**
-**Closes:** [bug 0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../bugs/0020-should-twice-silently-drops-the-first-assertion.md).
+**Closes:** [bug 0019](../bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md).
 **Splits from:** [plan 0069](./0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
 **Absorbs:** [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
 including its central ask, the **deletion** of the four `console.warn + return []` sites, which
@@ -401,8 +402,8 @@ it against draft 2's inventory: 5 of 28 reverts survived everything. Those five 
    understanding and agree even when it is wrong — bug 0017 is a remedy that reads perfectly and
    reproduces the violation it claims to fix, and bug 0021 is a remedy that could not apply at
    all. Both were rated High. These seven are mechanical (`add a condition`, `move the predicate
-   before .should()`, `add .requires({...})`, `add .forPattern(...)`, `add .beComplete()`, `add
-   the missing .side(...)`, `add .should()` + a condition), so there is no excuse for any of them
+before .should()`, `add .requires({...})`, `add .forPattern(...)`, `add .beComplete()`, `add
+the missing .side(...)`, `add .should()` + a condition), so there is no excuse for any of them
    being unverified. This is also the pin that would have caught the correspondence arity remedy
    naming an assertion, which shipped in 0.22.0 and was found by review rather than by a test.
 4. **Through the machinery, not the flag:** the finding survives a `withBaseline` replay built

@@ -475,6 +475,26 @@ describe('RuleBuilder', () => {
 
   describe('.expectNonEmpty() (F4 / plan 0067 — non-vacuity opt-in)', () => {
     it('fails with a bypass-flagged meta-finding when the selector matches nothing', () => {
+      // The rule carries a condition, which any real `.expectNonEmpty()` rule
+      // has. Without one, 0.23.0's assertion gate reports the missing assertion
+      // first — see the ordering test below.
+      const v = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+        .expectNonEmpty()
+        .should()
+        .withCondition(alwaysFail('unreachable'))
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.bypassFilters).toBe(true)
+      expect(v[0]!.message).toMatch(/expectNonEmpty|0 subjects/)
+    })
+
+    it('a rule with NO condition reports the missing assertion, not the empty selector', () => {
+      // Gate-first ordering, pinned from the side that decides it (plan 0070
+      // item 5). An assertion-less rule cannot fail whatever its selector does,
+      // so the missing assertion is the root cause; the selector fault
+      // resurfaces once there is something to assert — which the test above is.
       const v = new TestRuleBuilder(stubProject, elements)
         .that()
         .withPredicate(nameMatches(/^NothingMatches$/))
@@ -482,7 +502,8 @@ describe('RuleBuilder', () => {
         .violations()
       expect(v).toHaveLength(1)
       expect(v[0]!.bypassFilters).toBe(true)
-      expect(v[0]!.message).toMatch(/expectNonEmpty|0 subjects/)
+      expect(v[0]!.message).not.toMatch(/expectNonEmpty|0 subjects/)
+      expect(v[0]!.message).toMatch(/asserts nothing|never reached/)
     })
 
     it('stays green when the selector matches at least one subject', () => {

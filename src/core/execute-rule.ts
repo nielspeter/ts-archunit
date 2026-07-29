@@ -84,7 +84,7 @@ export function applyFilters(
         console.warn(
           `[ts-archunit] Exclusion '${String(pattern)}' in rule '${ruleId}' matched a ` +
             `configuration finding, which cannot be excluded — that finding reports the ` +
-            `rule enforces nothing. Fix the rule's selector instead.`,
+            `rule enforces nothing. Fix the fault it names instead.`,
         )
       } else if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
         console.warn(

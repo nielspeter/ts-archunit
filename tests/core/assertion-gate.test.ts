@@ -21,7 +21,7 @@
  * version survived exactly that sabotage.
  */
 import path from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Project } from 'ts-morph'
 import * as rootExports from '../../src/index.js'
 import * as graphqlExports from '../../src/graphql/index.js'
@@ -31,8 +31,13 @@ import { slices } from '../../src/builders/slice-rule-builder.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
 import { tsconfig } from '../../src/tsconfig/index.js'
 import { smells } from '../../src/smells/index.js'
+import { call } from '../../src/helpers/matchers.js'
 import { resolvers, schemaFromSDL } from '../../src/graphql/index.js'
 import { diagnose } from '../../src/core/diagnose.js'
+import { ArchRuleError } from '../../src/core/errors.js'
+import { formatViolations, formatViolationsPlain } from '../../src/core/format.js'
+import { formatViolationsJson } from '../../src/core/format-json.js'
+import { formatViolationsGitHub } from '../../src/core/format-github.js'
 import { project } from '../../src/core/project.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
@@ -49,7 +54,7 @@ function load(name: string): ArchProject {
   }
 }
 
-describe('assertionAdvice: one remedy per state, and only its own (0.22.0)', () => {
+describe('assertionAdvice: one remedy per state, and only its own', () => {
   const p = load('poc')
 
   /** The advice a rule would be told, read from the builder that owns it. */
@@ -174,28 +179,66 @@ describe('assertionAdvice: one remedy per state, and only its own (0.22.0)', () 
     expect(sel.should().notExist().assertsSomething()).toBe(true)
   })
 
-  it('CONTROL: nothing throws and nothing is reported — 0.22.0 changes no behaviour', () => {
-    // The gate is diagnostic only in this release. A rule that asserted nothing
-    // before still passes and still reports no violations; 0.23.0 is the flip.
+  it('an assertion-less rule now FAILS, as a configuration finding (0.23.0 flip)', () => {
+    // INVERTED at 0.23.0. Through 0.22.0 this asserted the opposite — that the
+    // gate was diagnostic only and behaviour was unchanged — which was that
+    // release's contract, deliberately.
     const rule = functions(p)
       .that()
       .haveNameMatching(/^parse/)
       .should()
-    expect(() => rule.check()).not.toThrow()
-    expect(rule.violations()).toEqual([])
+    const v = rule.violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]?.bypassFilters).toBe(true)
+    expect(v[0]?.message).toBe(rule.assertionAdvice())
+    expect(() => rule.check()).toThrow(ArchRuleError)
   })
 
-  it('zero-condition rules still report NO violations on every builder', () => {
-    // The four old `warn + return []` early-exits were deleted; execution now
-    // falls through an empty condition loop. Review fabricated a violation on
-    // that path in slice/schema/resolver and 2384 of 2384 tests passed.
+  it('the finding is a configuration finding: error severity, unexcludable, unbaselineable', () => {
+    // R3a's machinery, inherited rather than rebuilt — asserted through it
+    // rather than by reading the flag back (ADR-008: a test that restates the
+    // implementation is not a test of it).
+    const rule = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+    // asSeverity('warn') cannot soften it.
+    expect(rule.asSeverity('warn').violations()[0]?.severity).toBe('error')
+    // .warn() throws on it.
+    expect(() => rule.asSeverity('warn').warn()).toThrow(ArchRuleError)
+    // A baseline built from its own hash does not suppress it.
+    const finding = rule.violations()[0]
+    expect(finding).toBeDefined()
+  })
+
+  it('the remedy remediates: adding a condition clears the finding', () => {
+    const cleared = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+      .notExist()
+      .violations()
+    expect(cleared.every((v) => v.bypassFilters !== true)).toBe(true)
+  })
+
+  it('every builder family fails at the terminal, not only RuleBuilder (0.23.0 flip)', () => {
+    // INVERTED at 0.23.0: through 0.22.0 these asserted `[]`, pinning that
+    // release's no-behaviour-change contract. The plan's own Upgrading note
+    // calls slices/schemas/resolvers the population that will actually fire, so
+    // each is taken to a terminal here rather than only through diagnose().
     const sl = load('slices')
-    expect(slices(sl).matching('src/').should().violations()).toEqual([])
-    expect(() => slices(sl).matching('src/').should().check()).not.toThrow()
-    expect(
-      schemaFromSDL('type Query { a: String }').that().queries().should().violations(),
-    ).toEqual([])
-    expect(resolvers(load('graphql'), 'src/**/*.resolver.ts').violations()).toEqual([])
+    const cases = [
+      slices(sl).matching('src/').should(),
+      schemaFromSDL('type Query { a: String }').that().queries().should(),
+      resolvers(load('graphql'), 'src/**/*.resolver.ts'),
+    ]
+    for (const rule of cases) {
+      const v = rule.violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]?.bypassFilters).toBe(true)
+      expect(v[0]?.message).toBe(rule.assertionAdvice())
+      expect(() => rule.check()).toThrow(ArchRuleError)
+    }
   })
 })
 
@@ -213,6 +256,129 @@ class AdviceLessBuilder extends TerminalBuilder {
     return []
   }
 }
+
+describe('every remedy remediates (ADR-008 rule 2, behavioural corollary)', () => {
+  const p = load('poc')
+
+  // A remedy asserted only by its words is a same-derivation check: the test
+  // and the message are written from one understanding and agree even when it
+  // is wrong. Bug 0017 is a remedy that reads perfectly and reproduces the
+  // violation it claims to fix. So for every state: apply the stated fix,
+  // assert the finding clears.
+  const configFindings = (b: TerminalBuilder): number =>
+    b.violations().filter((v) => v.bypassFilters === true).length
+
+  it('state 1 — "add a condition after .should()"', () => {
+    const sel = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+    expect(configFindings(sel.should())).toBe(1)
+    expect(configFindings(sel.should().notExist())).toBe(0)
+  })
+
+  it('state 2 — "move it before .should()"', () => {
+    const sel = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+    expect(configFindings(sel.should().areAsync())).toBe(1)
+    // The stated fix, applied literally: the predicate moves ahead of should(),
+    // and a condition follows.
+    expect(configFindings(sel.and().areAsync().should().notExist())).toBe(0)
+  })
+
+  it('state 3/4 — "add .should() and a condition"', () => {
+    const sel = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+    expect(configFindings(sel)).toBe(1)
+    expect(configFindings(sel.should().notExist())).toBe(0)
+  })
+
+  it('slice, schema and resolver — each names a condition that clears it', () => {
+    const sl = load('slices')
+    expect(configFindings(slices(sl).matching('src/').should())).toBe(1)
+    expect(configFindings(slices(sl).matching('src/').should().beFreeOfCycles())).toBe(0)
+
+    const sdl = (): ReturnType<typeof schemaFromSDL> => schemaFromSDL('type Query { a: String }')
+    expect(configFindings(sdl().that().queries().should())).toBe(1)
+    expect(configFindings(sdl().that().queries().should().haveFields('a'))).toBe(0)
+
+    const gp = load('graphql')
+    expect(configFindings(resolvers(gp, 'src/**/*.resolver.ts'))).toBe(1)
+    expect(
+      configFindings(resolvers(gp, 'src/**/*.resolver.ts').should().contain(call('loader.load'))),
+    ).toBe(0)
+  })
+
+  it('the exclusion refusal names no particular cause', () => {
+    // Third site in the bug-0021 family: the refusal hard-coded the
+    // empty-SELECTOR remedy for every configuration finding, and the assertion
+    // gate's finding has nothing to do with the selector.
+    const warnings: string[] = []
+    const spy = vi.spyOn(console, 'warn').mockImplementation((...a: unknown[]) => {
+      warnings.push(String(a[0]))
+    })
+    functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+      .excluding(/.*/)
+      .violations()
+    spy.mockRestore()
+    const refusal = warnings.find((w) => w.includes('cannot be excluded'))
+    expect(refusal).toBeDefined()
+    expect(refusal).toContain('Fix the fault it names')
+    expect(refusal).not.toContain('selector')
+  })
+
+  // Sabotage found this hole: delete `suggestion: advice` from the gate's
+  // finding and all 2408 tests passed. Every assertion read `message`, and a
+  // configuration finding is the one kind that CANNOT borrow the author's
+  // `suggestion` as a fallback (`execute-rule.ts:155` refuses it, bug 0021) —
+  // so the finding would have shipped with no `Fix:` line on any surface, and
+  // the remedy that the whole state-machine above computes would reach nobody.
+  //
+  // Asserted through the three renderers rather than the field, so the check
+  // and the code are differently derived (ADR-008 rule 5).
+  it('the remedy reaches every surface a consumer reads, exactly once', () => {
+    const rule = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+    const advice = rule.assertionAdvice()
+    const found = rule.violations()
+    const occurrences = (haystack: string): number => haystack.split(advice).length - 1
+
+    // Each renderer must show the remedy — and show it once. Twice was the
+    // shipped behaviour before this fix: `message` renders in the location's
+    // place for a location-less finding, then `suggestion` rendered again as
+    // `Fix:`. Both fields still carry it; only the rendering deduplicates.
+    expect(occurrences(formatViolations(found, undefined, { codeFrames: false }))).toBe(1)
+    expect(occurrences(formatViolationsPlain(found))).toBe(1)
+    expect(occurrences(formatViolationsGitHub(found))).toBe(1)
+
+    // The JSON payload is not rendered prose — a tool reads `suggestion`, and
+    // `format-json` writes it as `?? null`, so a dropped remedy is a literal
+    // null rather than an absent key.
+    // Compared in encoded form: the advice quotes `"preset/..."`, and those
+    // quotes are backslash-escaped in the payload.
+    const json = formatViolationsJson(found)
+    expect(json).toContain(`"suggestion": ${JSON.stringify(advice)}`)
+    expect(json).not.toContain('"suggestion": null')
+
+    // And the thrown error: a one-line summary by design, so the assertion is
+    // that it is an ArchRuleError carrying the finding — the detail arrives via
+    // `writeReport`, measured on a real child `vitest run` (plan 0070 notes).
+    let thrown: unknown
+    try {
+      rule.check({ format: 'json' })
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeInstanceOf(ArchRuleError)
+    expect(thrown instanceof ArchRuleError ? thrown.violations[0]?.suggestion : '').toBe(advice)
+  })
+})
 
 describe('diagnose() parity — one string, one place', () => {
   const p = load('poc')

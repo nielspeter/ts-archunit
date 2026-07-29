@@ -151,4 +151,39 @@ describe('formatViolations for location-less config-level findings', () => {
     expect(result).toContain('MyService.getTotal')
     expect(result).toContain(':7')
   })
+
+  /**
+   * The two halves of `remedyRepeatsMessage` in this formatter, which is the one
+   * renderer that does NOT always print `message`.
+   *
+   * A location-less finding prints the message in the location's slot, so a
+   * remedy identical to it would print twice — that was the shipped output for
+   * every assertion-gate finding until it was measured (plan 0070). But a
+   * LOCATED violation never prints `message` here, so for it the `Fix:` line is
+   * the remedy's only appearance and must survive. Sabotage confirmed the
+   * asymmetry is load-bearing: dropping the `!v.file` half of the condition
+   * silently deleted the remedy from every located violation and 2408 tests
+   * still passed.
+   */
+  it('deduplicates the remedy only where the message was already printed', () => {
+    const locationless = formatViolations([
+      mv({ file: '', line: 0, message: REMEDY, suggestion: REMEDY }),
+    ])
+    expect(locationless.split(REMEDY).length - 1).toBe(1)
+
+    const located = formatViolations([
+      mv({ file: '/project/src/a.ts', line: 7, message: REMEDY, suggestion: REMEDY }),
+    ])
+    expect(located).toContain(`Fix: ${REMEDY}`)
+  })
+
+  it('keeps a Fix line that differs from the message on both shapes', () => {
+    const other = 'Use the shared helper.'
+    expect(
+      formatViolations([mv({ file: '', line: 0, message: REMEDY, suggestion: other })]),
+    ).toContain(`Fix: ${other}`)
+    expect(
+      formatViolations([mv({ file: '/project/src/a.ts', line: 7, suggestion: other })]),
+    ).toContain(`Fix: ${other}`)
+  })
 })

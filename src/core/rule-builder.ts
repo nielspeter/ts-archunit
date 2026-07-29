@@ -322,7 +322,6 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    */
   protected fork(): this {
     const fork = this.copy()
-    fork._conditions = []
     fork._reason = fork._metadata?.because ?? this._reason
     return fork
   }

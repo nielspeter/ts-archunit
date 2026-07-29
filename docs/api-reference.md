@@ -492,7 +492,9 @@ correspondence(p)
 
 ## Diagnostics (experimental)
 
-Report which rules **cannot enforce anything**, without running them. Nothing here fails a build — it is the measuring instrument for a future release that will make a rule which can never match fail.
+Report which rules **cannot enforce anything**, without running them.
+
+`diagnose()` itself returns findings rather than throwing — it is the surface for inspecting a rule set. Since 0.23.0 the underlying faults do fail a build when the rules actually run: a rule that [asserts nothing](/violation-reporting#a-rule-must-assert-something) is a configuration finding on every terminal. Use this to survey rules ahead of time, or in CI via `ts-archunit doctor`, which exits non-zero.
 
 **Experimental.** The shape may change, and `ts-archunit doctor` is deliberately absent from `--help` because retiring a documented command is its own breaking change.
 

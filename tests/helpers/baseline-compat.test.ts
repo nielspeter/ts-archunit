@@ -111,6 +111,30 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
     expect(withBaseline(file).filterNew([])).toEqual([])
   })
 
+  it('a v2 baseline (pre-0.23.0) is told to REGENERATE, not blamed on the root', () => {
+    // 0.23.0 bumped HASH_VERSION 2 -> 3 because accumulate (bug 0020) changes
+    // the hashed rule description for any rule derived off a held rule. Without
+    // the bump, `matched === 0` reaches the same-version branch, whose text
+    // asserts "generated against a different repository root" — a cause it
+    // cannot verify, in the release about exactly that. This pins the branch.
+    const root = scratch('.git')
+    const file = path.join(root, 'baseline.json')
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        generatedAt: '2026-07-28T00:00:00.000Z',
+        hashVersion: 2,
+        count: 1,
+        violations: [{ rule: 'r', file: 'a.ts', line: 1, hash: 'deadbeefdeadbeef' }],
+      }),
+    )
+    const meta = withBaseline(file)
+      .filterNew([pathFree])
+      .filter((v) => v.bypassFilters === true)
+    expect(meta[0]?.suggestion).toContain('Regenerate')
+    expect(meta[0]?.message).not.toContain('different repository root')
+  })
+
   it('tells the reader to upgrade, not regenerate, when the file is newer', () => {
     const root = scratch('.git')
     const file = path.join(root, 'baseline.json')

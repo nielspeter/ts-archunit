@@ -124,11 +124,58 @@ export abstract class TerminalBuilder {
   }
 
   /**
+   * A rule that asserts nothing about what it selects cannot fail, so it is
+   * reported as a configuration finding (bug 0019, plan 0070).
+   *
+   * **Gate-first**, ahead of `collectViolations()`, for three measured reasons:
+   * an assertion-less rule cannot produce a legitimate finding, so running it
+   * buys nothing but a full AST walk; `CorrespondenceBuilder.collectViolations`
+   * throws before returning, so a gate placed after it would never run for that
+   * builder and its `RangeError` would escape the CLI's `ArchRuleError`-only
+   * catch, dropping every remaining rule file; and the alternative ordering —
+   * let an existing `bypassFilters` finding win — only functions for rules that
+   * opted into `.expectNonEmpty()`, which is the opt-in this whole plan exists
+   * because nobody uses.
+   *
+   * The consequence, accepted: a rule with a dead glob AND no condition reports
+   * the missing assertion only. That is the right root cause — no selector
+   * makes an assertion-less rule capable of failing — and the selector fault
+   * resurfaces on the next run, once there is something to assert.
+   *
+   * `bypassFilters` makes it a configuration finding: `error` severity
+   * regardless of `.asSeverity('warn')`, refused by `.excluding()`, and skipped
+   * by diff and baseline. See `severityFor` and ADR-008 rule 1.
+   */
+  private collectWithAssertionGuard(): ArchViolation[] {
+    if (this.assertsSomething()) return this.collectViolations()
+
+    const described = this.describeRule()
+    const name = described.id ?? (described.rule || this.constructor.name)
+    const advice = this.assertionAdvice()
+    return [
+      {
+        rule: name,
+        ruleId: described.id,
+        element: name,
+        file: '',
+        line: 0,
+        message: advice,
+        // Its own remedy, never the author's (bug 0021): their `suggestion`
+        // describes how to fix a violation of the rule, and this finding says
+        // the rule cannot produce one.
+        suggestion: advice,
+        because: this._reason,
+        bypassFilters: true,
+      },
+    ]
+  }
+
+  /**
    * Execute the rule and return violations after exclusion filtering.
    * Does not throw — use for programmatic access (presets, aggregation).
    */
   violations(): ArchViolation[] {
-    const raw = this.collectViolations()
+    const raw = this.collectWithAssertionGuard()
     const filtered = applyFilters(raw, {
       reason: this._reason,
       metadata: this._metadata,
@@ -146,7 +193,7 @@ export abstract class TerminalBuilder {
    * @param options - Optional baseline, diff filtering, and output format
    */
   check(options?: CheckOptions): void {
-    const violations = this.collectViolations()
+    const violations = this.collectWithAssertionGuard()
     executeCheck(
       violations,
       {
@@ -166,7 +213,7 @@ export abstract class TerminalBuilder {
    * @param options - Optional baseline, diff filtering, and output format
    */
   warn(options?: CheckOptions): void {
-    const violations = this.collectViolations()
+    const violations = this.collectWithAssertionGuard()
     executeWarn(
       violations,
       {
@@ -235,10 +282,11 @@ export abstract class TerminalBuilder {
   /**
    * The remedy for this builder's assertion-less state, as one string.
    *
-   * This is the "one string, one place" channel: the runtime warning (0.22.0),
-   * the eventual failure message (0.23.0) and `diagnose()`'s advice all read
-   * it, so they cannot drift — plan 0070 round 2 measured the doctor and the
-   * runtime shipping two diverging texts for the same state.
+   * The "one string, one place" channel: `diagnose()`'s advice and the
+   * finding's message and `suggestion` all read this method, so the diagnostic
+   * a consumer runs before upgrading and the failure they get after cannot
+   * disagree — plan 0070 round 2 measured an earlier design shipping two
+   * diverging texts for one state.
    *
    * Public for the same `DiagnosableRule` duck-typing reason as
    * `assertsSomething` — plan 0070 drafted this `protected`, and a protected

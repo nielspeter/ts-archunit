@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.23.0] - 2026-07-29
+
+The flip [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md) measured for: **a rule that asserts nothing now fails.** 0.22.0 gave you the instrument to find these; this release stops them from certifying anything.
+
+A rule with no condition selects some code and then asserts nothing about it, so it can never fail — and it is counted as a passing test. A suite of them reports coverage that does not exist, which is worse than no rule at all: nobody goes looking for a guard they believe they already have. That is [ADR-008](https://github.com/nielspeter/ts-archunit/blob/main/adr/008-agent-first-failure-surfaces.md) rule 1 applied to the library's own output.
+
+### Changed
+
+- **All seven assertion-less shapes are now configuration findings and fail on every terminal** ([bug 0019](./bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md)). The finding carries the remedy for the shape you actually wrote — the table in 0.22.0's entry lists all seven — and there is **no way to downgrade it**: not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. Five of these were green before:
+
+  | Shape                                                                | Before                                 | Now                                               |
+  | -------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------- |
+  | `.should()` reached, no condition                                    | passed silently                        | fails — add a condition                           |
+  | a predicate after `.should()` (`areAsync()` filters, it asserts not) | passed silently                        | fails — the misplaced predicate is named          |
+  | never reached `.should()`                                            | passed silently                        | fails — add `.should()` and a condition           |
+  | `tsconfig(p)` with no `.requires()`                                  | passed silently (**pinned by a test**) | fails — add `.requires({...})`                    |
+  | `smells.inconsistentSiblings()` with no `.forPattern()`              | passed silently (**pinned by a test**) | fails — add `.forPattern(...)`                    |
+  | `correspondence()` with two sides and no assertion                   | threw `RangeError`                     | fails as an `ArchRuleError` configuration finding |
+  | `correspondence()` with the wrong number of sides, no assertion      | threw `RangeError`                     | configuration finding naming `.side(...)`         |
+
+  The two rows marked **pinned by a test** were reversals of a documented, tested contract, not bug fixes: a test in this repo asserted that each of those produced no violations. Both are retired, and this row is the notice.
+
+  Wrong arity **with** an assertion chosen still throws `RangeError` — measured. Adding `.beComplete()` does not fix a one-sided correspondence, so that fault keeps its own error and its own remedy. If you catch `RangeError` around `correspondence()`, the no-assertion cases now arrive as `ArchRuleError` instead.
+
+  The finding is raised **before** the rule runs. A rule with both a dead glob and no condition now reports the missing assertion only — the right root cause, since no selector makes an assertion-less rule capable of failing. The selector fault resurfaces on the next run, once there is something to assert.
+
+- **Conditions accumulate instead of clearing** ([bug 0020](./bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md)). A rule derived from a held rule kept the parent's predicates but silently dropped its conditions, so `parent.should().beExported()` followed by a derived `.should().notContain(...)` asserted only the second. Both are asserted now, and a second `.should()` on one chain behaves like `.andShould()`. If you built rules this way expecting the reset, those rules now report violations they previously discarded.
+
+- **Baseline hash version is now 3, so existing baseline files no longer match.** Accumulate changes the rule description for any rule derived off a held rule, and the description is hashed. Regenerate with `npx ts-archunit baseline <rules> --output arch-baseline.json` (the `arch:baseline` script `init` scaffolds), or `generateBaseline(...)` if you build it in-process, and commit the result. Without the bump every entry would silently miss and the unmatched-baseline finding would blame "a different repository root" — a false cause, in the release about findings that assert causes they cannot verify. With the bump you get the version-mismatch finding, whose remedy is the correct one.
+
+### Fixed
+
+- **A remedy identical to its message is no longer printed twice.** A configuration finding's fault and its remedy are one sentence, carried in both `message` and `suggestion` on purpose — a tool reads `suggestion`, a human reads the body. Every renderer printed the paragraph, then printed it again as `Fix:`. All three formatters (terminal, plain, GitHub annotations) now show it once; the fields are unchanged, so nothing a tool reads has moved. A located violation's `Fix:` line always prints, because that format never renders `message` for those.
+
+### Upgrading — 0.23.0
+
+**Silence → failure. Nobody had a runtime signal before**, so the safe order is to measure first:
+
+```bash
+npx ts-archunit doctor <your rule files>   # exits non-zero if it reports anything
+```
+
+For rules written inside a test body, `doctor` cannot load the file — call `diagnose([...])` on the builders directly, or collect them into an array and use `checkAll`. Every remedy `doctor` prints is backward-compatible with 0.22.0, so the whole migration can land **before** you upgrade.
+
+If a reported rule is a deliberate placeholder, delete it or comment it out. If it is generated from configuration, skip generating it when there is nothing to assert. If it comes from a preset (`ruleId "preset/..."`), report it to the preset's author — a preset rule that asserts nothing is a bug in the preset.
+
+Then regenerate baselines (above), and expect new violations from any rule that was silently dropping its parent's conditions.
+
 ## [0.22.0] - 2026-07-29
 
 The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md) is now complete: **`doctor` and `diagnose()` can see every rule that asserts nothing, and each one carries the remedy for its own shape.** No rule behaves differently in this release — 0.23.0 is the flip, and this is the release you measure on first.
@@ -32,7 +80,7 @@ The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archun
 - **`doctor` no longer crashes on a file it cannot load** (a vitest test file, a syntax error, a missing dependency) — it reports the file with the error as evidence and continues with the rest. The remedy is offered conditionally rather than asserted, because the same branch fires for causes that have nothing to do with test runners.
 - **`doctor` no longer exits 0 after reporting a problem.** With one unloadable file and one clean one it printed the error and then a clean bill of health, exit 0 — shipped in 0.21.0. Every exit path now folds the load failures in, and `--format json` emits its document on every path (it previously produced zero bytes on the commonest single-file failure, so `JSON.parse` threw).
 - **`--format github` emits valid annotations for findings with no source location.** A configuration finding has no file, and `::error file=,line=0` is not a valid annotation — GitHub dropped or misplaced it. Those are now run-level annotations that render on the workflow summary. Property values (`file=`, `title=`) are also escaped per the workflow-command spec, so a path or rule name containing `,` or `:` no longer truncates the annotation.
-- The old `console.warn(...) + return []` sites for condition-less rules are **removed** (proposal 019's ask). The `RuleBuilder` one could never fire for the commonest shape anyway — it was gated on a phase `.should()` had already left ([bug 0019](./bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md), which 0.23.0 closes).
+- The old `console.warn(...) + return []` sites for condition-less rules are **removed** (proposal 019's ask). The `RuleBuilder` one could never fire for the commonest shape anyway — it was gated on a phase `.should()` had already left ([bug 0019](./bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), which 0.23.0 closes).
 
 ### Upgrading — 0.22.0
 

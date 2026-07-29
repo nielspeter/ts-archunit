@@ -1,4 +1,5 @@
 import type { ArchViolation } from './violation.js'
+import { remedyRepeatsMessage } from './violation.js'
 import { bold, red, cyan, dim } from './ansi.js'
 import path from 'node:path'
 
@@ -35,7 +36,12 @@ function formatSingleViolation(
 
   const whyText = v.because ?? reason
   const whyLine = whyText ? `  ${dim('Why:')} ${whyText}` : ''
-  const fixLine = v.suggestion ? `  ${dim('Fix:')} ${v.suggestion}` : ''
+  // Suppressed only when the `location` slot above already printed this exact
+  // text — which happens for a location-less finding whose remedy is its
+  // message. A located violation never renders `message` here, so its `Fix:`
+  // line is the only place the remedy appears and must always print.
+  const remedyAlreadyShown = !v.file && remedyRepeatsMessage(v)
+  const fixLine = v.suggestion && !remedyAlreadyShown ? `  ${dim('Fix:')} ${v.suggestion}` : ''
   const docsLine = v.docs ? `  ${dim('Docs:')} ${v.docs}` : ''
 
   const parts = [counter, '', ruleLine, '', location]
@@ -74,8 +80,10 @@ export function formatViolations(
 /**
  * Format violations into a plain-text string (no ANSI codes).
  *
- * Used by ArchRuleError.message — error messages should be plain text
- * since they may be captured by test runners, serialized, or logged to files.
+ * Public export, for callers that aggregate violations themselves and need
+ * output free of ANSI codes — serialized, logged to a file, or embedded in
+ * another tool's report. `ArchRuleError.message` is a one-line summary and does
+ * not use this; the run's detail is written by `writeReport`.
  */
 export function formatViolationsPlain(violations: ArchViolation[], reason?: string): string {
   if (violations.length === 0) return ''
@@ -89,7 +97,9 @@ export function formatViolationsPlain(violations: ArchViolation[], reason?: stri
         `  [${String(i + 1)}/${String(violations.length)}] ${v.element}: ${v.message} (${v.file}:${String(v.line)})`,
       ]
       if (v.codeFrame) parts.push(v.codeFrame)
-      if (v.suggestion) parts.push(`  Fix: ${v.suggestion}`)
+      // This format always renders `message`, so a remedy identical to it is
+      // already shown — see `remedyRepeatsMessage`.
+      if (v.suggestion && !remedyRepeatsMessage(v)) parts.push(`  Fix: ${v.suggestion}`)
       return parts.join('\n')
     })
     .join('\n\n')
