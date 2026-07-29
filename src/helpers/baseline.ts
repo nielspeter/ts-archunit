@@ -102,7 +102,15 @@ export interface BaselineFile {
  * - **The checkout's absolute location** — see `root` below
  *
  * Does NOT survive:
- * - Rule description changes (rewording .because())
+ * - Rule DESCRIPTION changes — the assembled `that … should …` text, i.e. editing
+ *   the rule's predicates or conditions. **Not** `.because()`: that sets
+ *   `because`, which is not hashed. The old wording said "(rewording
+ *   .because())" and it was false — measured, two violations differing only in
+ *   `because` hash identically, and so do two differing only in `suggestion`.
+ *   The distinction is load-bearing: it is what makes correcting a preset's
+ *   remedy text a patch rather than a change that invalidates every consumer's
+ *   baseline (bug 0017, whose own defect was a remedy claiming something it
+ *   could not do — sitting in the docstring a compat auditor would check).
  * - Element renames (class renamed)
  * - Message text changes (condition wording updated)
  *

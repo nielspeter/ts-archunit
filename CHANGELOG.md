@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.25.0] - 2026-07-29
+
+**Two defects in `strictBoundaries()` — one that told you the wrong fix, one that told you nothing at all.** A minor rather than a patch: the second adds an error-severity finding that can turn a currently-green run red, and `^0.24.0` would have resolved a patch silently into every consumer's CI.
+
+**A preset's sanctioned `Fix:` line reproduced the violation it claimed to fix** ([bug 0017](./bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)). `strictBoundaries()`'s `no-cross-boundary` rule is folder-level — a boundary may import itself plus the configured `shared` globs, so **any** import from another boundary violates it, whichever file it names. Its metadata described entry-point-mediated access, a looser policy the rule does not implement, and told the reader to "import from the other boundary's entry point instead of reaching into its internals".
+
+Measured: `reporting → billing/index.ts` and `reporting → billing/internal.ts` fail **identically**. Applying the fix exactly produces the same violation with the same `Fix:` line, so an agent obeying it loops — edit, re-check, same failure — and its only exits are unsanctioned (baseline, exclude, disable).
+
+### Fixed
+
+- **The three strings on `no-cross-boundary` now describe the rule that exists.** The `suggestion` is **computed**, because no fixed text is right in both configurations: `shared` defaults to `[]`, which is legal, and there the old "move the shared piece into the shared module" named somewhere unreachable — measured, a boundary importing `src/shared/**` with `shared` unconfigured is itself a violation of this rule, so the sanctioned fix produced a _third_ finding. With `shared` configured the remedy now names the actual globs; with it empty it says so and points at `strictBoundaries({ shared })`.
+
+  **Behaviour is unchanged and this is baseline-free.** `hashViolation` is `rule::element::message`; `because` and `suggestion` are not hashed. Verified by replaying an old-text baseline against the new text: **0** new findings.
+
+- **A `strictBoundaries({ shared })` glob that matches nothing now says so** ([bug 0023](./bugs/fixed/0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)). `shared` globs go into `no-cross-boundary`'s allow list and are matched against absolute resolved file paths, so a spelling that matches no file creates **no allowance** — and reported nothing about it. The user found out through false reds on the exact code the preset's own docs tell them to write, carrying the `no-cross-boundary` remedy above, which told them to move into the shared module they were already importing from.
+
+  Measured, and note the middle two rows are indistinguishable from outside — same violation count, same silence:
+
+  | option                          | shared import | config findings               |
+  | ------------------------------- | ------------- | ----------------------------- |
+  | `shared: ['**/src/shared/**']`  | passes        | 0                             |
+  | `shared: ['src/shared/**']`     | **flagged**   | 0 → **1**                     |
+  | `shared: ['**/no-such-dir/**']` | **flagged**   | 0 → **1**                     |
+  | `folders: 'src/features/*'`     | —             | 1 (the guard `shared` lacked) |
+
+  New finding id: `preset/boundaries/shared-discovery`, error severity, unsuppressable — the same treatment `folders` has had since plan 0067. **This can turn a currently-green run red**, and when it does, that run was enforcing something other than what its config said: the allowance never existed. The finding names the glob and the spelling that works.
+
+  **Deliberately a guard and not normalization.** `folders` is not normalized either — its remedy states the absolute-path contract — and `atPath` (bug 0018) is about file-vs-folder globs, not relative-vs-absolute. Rewriting `shared` globs would have made one option on this preset accept a spelling the other rejects, which is a worse asymmetry than the one being fixed.
+
+- **`explain --format agent` printed an identical bullet once per boundary.** A preset generates one rule per configured folder with identical metadata, so six boundaries put the same line into your agent's system prompt six times — tokens on every request, and it reads as six different rules. Deduplicated on the bullet **text**, not the rule id: two rules can share an id and differ in imperative, and dropping one of those would silently delete a rule from the instructions.
+
+- **A docstring that would have made the above a breaking change.** `src/helpers/baseline.ts` claimed violation identity does not survive "rewording `.because()`". Measured false — two violations differing only in `because` hash identically, and so do two differing only in `suggestion`. It is the same defect shape as the bug itself (a claim about a mechanism that does not do what it says), sitting in exactly the place someone would check to decide whether this fix invalidates their baseline.
+
+### Changed
+
+- **`CHANGELOG.md` now ships inside the npm package.** Several releases require an action rather than merely describing one — 0.23.0 fails builds by design, 0.24.0 asks you to regenerate baselines — and those instructions were reachable only from GitHub. It is now readable at `node_modules/@nielspeter/ts-archunit/CHANGELOG.md`, which is where an agent inspecting the installed package looks. Adds ~30 kB to the tarball.
+
+### Upgrading — 0.25.0
+
+**If you committed `explain --format agent` output into an agent's system prompt, re-run it and replace the block.** `init` instructs users to do exactly that, so the old text is sitting in adopters' repositories as a _standing, proactive_ instruction:
+
+```
+- Do NOT import another boundary's internals — go through its entry point
+```
+
+An agent following it writes `import { x } from '../billing/index.js'`, and `check` then fails on the code the system prompt sanctioned — the guidance surface manufacturing the violations the enforcement surface reports. **Upgrading the package does not fix this on its own**: the committed block is a copy, and only re-running `explain` replaces it. The sentinel markers (`<!-- ts-archunit:start -->` / `<!-- ts-archunit:end -->`) delimit what to swap.
+
+**If you use `strictBoundaries({ shared })`, check your run.** A `shared` glob that never matched anything is now reported instead of silently creating no allowance, so a green run can go red here. That is the allowance having never existed rather than anything new in your code — the finding names the glob and the spelling that works (`'**/'`-prefixed, ending in `/**`).
+
+Nothing else to do. No enforcement changes, and existing baselines keep matching.
+
 ## [0.24.0] - 2026-07-29
 
 **Three bugs in how a finding is located and diagnosed, bundled** — 0025, 0026 and 0027 are one subsystem, and releasing them separately would have cost consumers three version bumps for one area.

@@ -20,6 +20,7 @@ export interface StrictBoundariesOptions extends PresetBaseOptions {
 }
 
 const RULE_IDS = [
+  'preset/boundaries/shared-discovery',
   'preset/boundaries/no-cycles',
   'preset/boundaries/no-cross-boundary',
   'preset/boundaries/shared-isolation',
@@ -147,6 +148,51 @@ export function strictBoundaries(
     }),
   )
 
+  // --- Discovery guard for `shared`, mirroring the one above for `folders` ---
+  //
+  // `shared` globs go RAW into `no-cross-boundary`'s allow list and are matched
+  // by picomatch against absolute resolved file paths. A glob that matches no
+  // file creates no allowance — and produced no finding at all, so the user
+  // learned about it only through false reds on the exact code the preset's own
+  // docs tell them to write. Measured on `boundaries-folder-level`:
+  //
+  //   shared: ['**/src/shared/**']    shared import passes, 0 config findings
+  //   shared: ['src/shared/**']       shared import FLAGGED, 0 config findings
+  //   shared: ['**/no-such-dir/**']   shared import FLAGGED, 0 config findings
+  //   folders: 'src/features/*'       0 rules,              1 config finding
+  //
+  // The last row is the contract `shared` was missing: `folders` fails loudly on
+  // a spelling that matches nothing, and the two options sat on one preset
+  // holding the caller to two different contracts (bug 0023). Note that the
+  // middle two rows are indistinguishable from outside — same violation count,
+  // no explanation — which is what the guard fixes.
+  //
+  // A GUARD, deliberately not normalization. `folders` is not normalized either;
+  // its remedy states the absolute-path contract and tells the caller how to
+  // spell it. Rewriting `shared` globs instead would make one option on this
+  // preset accept a spelling the other rejects, which is a worse asymmetry than
+  // the one being fixed.
+  //
+  // Matched against FILE paths, not `atPath`'s file-or-folder: the allow list is
+  // what this guard is about, and `onlyImportFrom` matches resolved file paths.
+  // `shared: ['**/src/shared']` — a folder glob with no `/**` — selects files for
+  // `shared-isolation` via `atPath` yet creates no allowance, so it is a genuine
+  // fault here and the guard must fire for it.
+  for (const sharedGlob of sharedGlobs) {
+    const matchesFile = picomatch(sharedGlob)
+    const matchedFiles = p.getSourceFiles().filter((sf) => matchesFile(sf.getFilePath()))
+    builders.push(
+      ...assertDiscovered(matchedFiles, {
+        id: 'preset/boundaries/shared-discovery',
+        glob: sharedGlob,
+        remedy:
+          `A shared glob is matched against absolute file paths, so '${sharedGlob}' matched no file and ` +
+          `creates no allowance — every import of it is reported as a cross-boundary violation. ` +
+          `Use a '**/'-prefixed glob ending in '/**' (e.g. '**/${sharedGlob.replace(/^[./]+/, '').replace(/\/\*\*$/, '')}/**') or the absolute project path.`,
+      }),
+    )
+  }
+
   // --- No cycles between boundaries ---
   if (Object.keys(sliceDef).length > 0) {
     builders.push(
@@ -181,11 +227,28 @@ export function strictBoundaries(
           .onlyImportFrom(...allowedGlobs),
         {
           id: 'preset/boundaries/no-cross-boundary',
+          // This rule is folder-level: the allow list is this boundary plus the
+          // shared globs, so ANY import from another boundary violates it,
+          // whichever file it names. The metadata used to describe
+          // entry-point-mediated access — a looser policy the rule does not
+          // implement — and its `Fix:` line said "import from the other
+          // boundary's entry point instead". Applied exactly, that reproduces
+          // the identical violation: measured, `reporting -> billing/index.ts`
+          // and `reporting -> billing/internal.ts` fail identically
+          // ([bug 0017](../../bugs/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)).
+          // An agent obeying it loops, and its only exits are unsanctioned.
           because:
-            'a direct import across boundaries bypasses the public surface each boundary is supposed to be reached through',
+            'boundaries may only depend on themselves and the shared modules — an import from another boundary couples the two, whichever file it names',
+          // COMPUTED, because no fixed string is right in both configurations.
+          // `shared` defaults to `[]`, which is legal, and there the "move it
+          // into the shared module" clause names somewhere that does not exist:
+          // measured, a boundary importing `src/shared/**` with `shared`
+          // unconfigured is itself a violation of this rule.
           suggestion:
-            "Import from the other boundary's entry point instead of reaching into its internals, or move the shared piece into the shared module.",
-          imperative: "Do NOT import another boundary's internals — go through its entry point",
+            sharedGlobs.length > 0
+              ? `Move the code both boundaries need into a shared folder (${sharedGlobs.join(', ')}), or remove the dependency on the other boundary.`
+              : 'No shared folders are configured — add one to strictBoundaries({ shared }) and move the code both boundaries need there, or remove the dependency on the other boundary.',
+          imperative: 'Do NOT import a file outside this boundary or its shared modules',
         },
         'error',
         overrides,

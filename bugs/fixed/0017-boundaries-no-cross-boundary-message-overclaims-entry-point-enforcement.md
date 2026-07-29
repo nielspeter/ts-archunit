@@ -1,6 +1,7 @@
 # Bug 0017: `strictBoundaries()`'s no-cross-boundary remedy cannot remediate, and its message overclaims entry-point enforcement
 
 **Reported:** 2026-07-28
+**Fixed:** 2026-07-29 (v0.25.0)
 **Found in:** v0.19.0 through v0.21.0 (current). Introduced by `6ef8ade` — the commit that
 bulk-added remedies to every preset rule; before it, preset rules carried no
 `because`/`suggestion` at all. The defect was introduced _by_ the ADR-008 remedy fix:
@@ -8,7 +9,7 @@ remedies were added without checking each against its condition.
 **Severity:** High — the sanctioned `Fix:` line, applied exactly, reproduces the identical
 violation. An agent obeying it loops: edit → re-check → same failure → same fix, and its only
 exits are unsanctioned (baseline, exclude, disable). This is the class
-[bug 0021](./fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) rated
+[bug 0021](./0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) rated
 High, on an error-severity finding in a preset — the one place the user cannot supply the
 remedy themselves. Draft 1 filed this Medium on the premise "the rule itself is not broken; the
 text merely overclaims"; measurement disproved the mitigating premise.
@@ -108,7 +109,7 @@ the entry-point/internal distinction.
   `src/helpers/baseline.ts:82` claims identity does not survive "rewording `.because()`" —
   false at HEAD, and itself a 0017-shaped overclaim sitting where a compat auditor would look.
 - **Two enforcement defects found during this bug's review are filed separately**, because they
-  are behaviour, not text: [bug 0022](./0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md)
+  are behaviour, not text: [bug 0022](../0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md)
   (`onlyImportFrom` is blind to `export … from` and `import()` — both cross this boundary
   unflagged, measured) and [bug 0023](./0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)
   (`shared` globs matched raw and guarded by nothing). The corrected message below is honest
@@ -168,3 +169,52 @@ satisfiable — measured, two of four sabotages (dead glob; selector narrowed) p
 The text-tripwire from draft 1 (grep the new strings for "entry point") is kept only if
 co-located with the behavioural guard and labelled a tripwire — a synonym passes it, and the
 identity guard is the real pin.
+
+## How it was fixed
+
+**v0.25.0.** Three strings in `src/presets/boundaries.ts`, behaviour unchanged, and the
+`suggestion` is **computed** because no fixed string is right in both configurations:
+
+- `because` — "boundaries may only depend on themselves and the shared modules — an import from
+  another boundary couples the two, whichever file it names"
+- `suggestion`, `shared` configured — names the actual globs: "Move the code both boundaries need
+  into a shared folder (`<sharedGlobs>`), or remove the dependency on the other boundary."
+- `suggestion`, `shared` empty — "No shared folders are configured — add one to
+  `strictBoundaries({ shared })` and move the code both boundaries need there, or remove the
+  dependency on the other boundary."
+- `imperative` — "Do NOT import a file outside this boundary or its shared modules"
+
+Everything the report asserted was re-measured rather than trusted, and all of it held:
+
+- **The remedy loop reproduces.** `reporting -> billing/index.ts` and
+  `reporting -> billing/internal.ts` fail identically, so "import from the entry point instead"
+  cannot ever satisfy the condition.
+- **With `shared` empty, the second clause is unexecutable too** — a boundary importing
+  `src/shared/**` with `shared` unconfigured is itself a violation of this rule, so the sanctioned
+  fix produced a _third_ finding. That is why the string is computed.
+- **Baseline-free.** An old-text baseline replayed against the new text produces **0** new
+  findings. `hashViolation` is `rule::element::message`; `because` and `suggestion` are not hashed.
+
+## Also fixed here
+
+- **The docstring that would have made this a breaking change.** `src/helpers/baseline.ts` claimed
+  identity does not survive "rewording `.because()`". Measured false — two violations differing
+  only in `because` hash identically, and so do two differing only in `suggestion`. It is a
+  0017-shaped defect (a claim about a mechanism that does not do what it says) sitting in exactly
+  the place a compat auditor would check to decide whether this fix breaks baselines.
+- **`explain --format agent` printed an identical bullet once per boundary.** A preset generates one
+  rule per configured folder with identical metadata, so six boundaries put the same line in the
+  agent's system prompt six times — tokens on every request, reading as six different rules.
+  Deduplicated on the bullet **text**, not the rule id, because two rules can share an id and
+  differ in imperative, and dropping one of those would silently delete a rule.
+
+## Guard
+
+`tests/presets/boundaries-folder-level.test.ts`, in its own fixture root, asserting by identity
+(`via-index.ts -> index.ts`, `via-internal.ts -> internal.ts`) with an explicit non-vacuity anchor,
+plus the remedy-remediates check the old text fails.
+
+**9 reverts, all caught** — including the two the report warned defeat the draft guard: a dead
+boundary glob and a selector narrowed to nothing, both of which satisfy "behaves identically for
+both imports" as `0 === 0`. Also caught: quietly adding every boundary's `index.ts` to the allow
+list, which would have made the _old_ message true and the rule useless.
