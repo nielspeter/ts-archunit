@@ -114,5 +114,5 @@ the baseline and `--changed` first — four CI cycles.
 bespoke output path bypassed the formatter, the JSON payload, the annotation surface and the exit
 code, and a five-persona review found a defect at each of those seams. The finding form reaches
 all four by construction. That withdrawal is what made the 0.23.0 gate cheap. It also uncovered
-[bug 0024](../0024-warn-terminal-is-invisible-inside-a-test-runner.md), which is the pre-existing
+[bug 0024](./0024-warn-terminal-is-invisible-inside-a-test-runner.md), which is the pre-existing
 half and remains open.
