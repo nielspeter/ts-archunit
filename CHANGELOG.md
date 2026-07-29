@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 **Two defects in `strictBoundaries()` — one that told you the wrong fix, one that told you nothing at all.** A minor rather than a patch: the second adds an error-severity finding that can turn a currently-green run red, and `^0.24.0` would have resolved a patch silently into every consumer's CI.
 
-**A preset's sanctioned `Fix:` line reproduced the violation it claimed to fix** ([bug 0017](./bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)). `strictBoundaries()`'s `no-cross-boundary` rule is folder-level — a boundary may import itself plus the configured `shared` globs, so **any** import from another boundary violates it, whichever file it names. Its metadata described entry-point-mediated access, a looser policy the rule does not implement, and told the reader to "import from the other boundary's entry point instead of reaching into its internals".
+**A preset's sanctioned `Fix:` line reproduced the violation it claimed to fix** ([bug 0017](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)). `strictBoundaries()`'s `no-cross-boundary` rule is folder-level — a boundary may import itself plus the configured `shared` globs, so **any** import from another boundary violates it, whichever file it names. Its metadata described entry-point-mediated access, a looser policy the rule does not implement, and told the reader to "import from the other boundary's entry point instead of reaching into its internals".
 
 Measured: `reporting → billing/index.ts` and `reporting → billing/internal.ts` fail **identically**. Applying the fix exactly produces the same violation with the same `Fix:` line, so an agent obeying it loops — edit, re-check, same failure — and its only exits are unsanctioned (baseline, exclude, disable).
 
@@ -19,7 +19,7 @@ Measured: `reporting → billing/index.ts` and `reporting → billing/internal.t
 
   **Behaviour is unchanged and this is baseline-free.** `hashViolation` is `rule::element::message`; `because` and `suggestion` are not hashed. Verified by replaying an old-text baseline against the new text: **0** new findings.
 
-- **A `strictBoundaries({ shared })` glob that matches nothing now says so** ([bug 0023](./bugs/fixed/0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)). `shared` globs go into `no-cross-boundary`'s allow list and are matched against absolute resolved file paths, so a spelling that matches no file creates **no allowance** — and reported nothing about it. The user found out through false reds on the exact code the preset's own docs tell them to write, carrying the `no-cross-boundary` remedy above, which told them to move into the shared module they were already importing from.
+- **A `strictBoundaries({ shared })` glob that matches nothing now says so** ([bug 0023](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)). `shared` globs go into `no-cross-boundary`'s allow list and are matched against absolute resolved file paths, so a spelling that matches no file creates **no allowance** — and reported nothing about it. The user found out through false reds on the exact code the preset's own docs tell them to write, carrying the `no-cross-boundary` remedy above, which told them to move into the shared module they were already importing from.
 
   Measured, and note the middle two rows are indistinguishable from outside — same violation count, same silence:
 
@@ -60,7 +60,7 @@ Nothing else to do. No enforcement changes, and existing baselines keep matching
 
 **Three bugs in how a finding is located and diagnosed, bundled** — 0025, 0026 and 0027 are one subsystem, and releasing them separately would have cost consumers three version bumps for one area.
 
-**One malformed rule no longer silences the run.** [Bug 0025](./bugs/fixed/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md): `ts-archunit check` caught `ArchRuleError` and re-threw everything else, so any other error escaped the per-file loop and terminated the process — no report written, no exit code returned, and every finding already collected discarded. Measured on the real CLI: two rule files, the first holding a one-sided `correspondence()` with `.beComplete()`, the second holding four real violations. Before, a raw Node stack trace with `node_modules` paths and **zero** findings. After, five findings and exit 1.
+**One malformed rule no longer silences the run.** [Bug 0025](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md): `ts-archunit check` caught `ArchRuleError` and re-threw everything else, so any other error escaped the per-file loop and terminated the process — no report written, no exit code returned, and every finding already collected discarded. Measured on the real CLI: two rule files, the first holding a one-sided `correspondence()` with `.beComplete()`, the second holding four real violations. Before, a raw Node stack trace with `node_modules` paths and **zero** findings. After, five findings and exit 1.
 
 A minor rather than a patch: a run that used to crash now reports, and `^0.23.0` would have resolved a patch silently into every consumer's CI.
 
@@ -72,13 +72,13 @@ A minor rather than a patch: a run that used to crash now reports, and `^0.23.0`
 
   If you relied on `runCheck` rejecting so a wrapper script could catch it, it now resolves with a non-zero count instead. `ts-archunit baseline` gains the same treatment, where it matters twice over: a re-throw left **no baseline file at all**, so one malformed rule made the command unusable rather than producing a partial baseline you could finish.
 
-- **A finding with no source location of its own now names the rule file it came from** ([bug 0026](./bugs/fixed/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md)). A configuration finding carries no location, because it reports a fault in the rule rather than in the code — so two identical vacuous rules in two rule files rendered as two identical paragraphs with nothing saying which to open. In a test the frame comes free from vitest; in the CLI, the golden-path default, nothing supplied it although the per-file loop knew and was discarding it.
+- **A finding with no source location of its own now names the rule file it came from** ([bug 0026](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md)). A configuration finding carries no location, because it reports a fault in the rule rather than in the code — so two identical vacuous rules in two rule files rendered as two identical paragraphs with nothing saying which to open. In a test the frame comes free from vitest; in the CLI, the golden-path default, nothing supplied it although the per-file loop knew and was discarding it.
 
   Stamped at that loop, with `line: 1` — the same choice `tsconfig()` makes for a fault belonging to a file rather than to a position in it. A violation that already has a location is untouched. `--format github` consequently emits a **file-level** annotation for these instead of one run-level line for the whole run.
 
   `doctor` gains the same attribution and prints the rule file first. It now diagnoses per rule file rather than flattening every file's rules into one array, which is what discarded the mapping. `DiagnosticFinding` gains an optional `ruleFile`; `diagnose()` never sets it, because it is handed rules rather than files and must not invent a path it cannot verify.
 
-- **An unmatched baseline entry can be diagnosed** ([bug 0027](./bugs/fixed/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)). A violation's identity includes the rule description, so editing a rule — or accumulating its conditions, which v0.23.0 made happen for a rule derived off a held rule — changes the identity of violations that did not change at all. Those entries stopped matching and their accepted violations reported as **new**, reading like fresh rot in application code, and the finding whose whole purpose is to explain this could not fire: it is gated on `matched === 0`, and this produces a partial miss.
+- **An unmatched baseline entry can be diagnosed** ([bug 0027](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)). A violation's identity includes the rule description, so editing a rule — or accumulating its conditions, which v0.23.0 made happen for a rule derived off a held rule — changes the identity of violations that did not change at all. Those entries stopped matching and their accepted violations reported as **new**, reading like fresh rot in application code, and the finding whose whole purpose is to explain this could not fire: it is gated on `matched === 0`, and this produces a partial miss.
 
   Baseline entries now record a `subject` hash — identity **without** the rule description — which is what separates the two cases that look identical from the outside:
 
@@ -119,13 +119,13 @@ Three behaviours to know about if you script around the CLI:
 
 ## [0.23.0] - 2026-07-29
 
-The flip [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md) measured for: **a rule that asserts nothing now fails.** 0.22.0 gave you the instrument to find these; this release stops them from certifying anything.
+The flip [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0070-a-rule-must-assert-something.md) measured for: **a rule that asserts nothing now fails.** 0.22.0 gave you the instrument to find these; this release stops them from certifying anything.
 
 A rule with no condition selects some code and then asserts nothing about it, so it can never fail — and it is counted as a passing test. A suite of them reports coverage that does not exist, which is worse than no rule at all: nobody goes looking for a guard they believe they already have. That is [ADR-008](https://github.com/nielspeter/ts-archunit/blob/main/adr/008-agent-first-failure-surfaces.md) rule 1 applied to the library's own output.
 
 ### Changed
 
-- **All seven assertion-less shapes are now configuration findings and fail on every terminal** ([bug 0019](./bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md)). The finding carries the remedy for the shape you actually wrote — the table in 0.22.0's entry lists all seven — and there is **no way to downgrade it**: not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. Five of these were green before:
+- **All seven assertion-less shapes are now configuration findings and fail on every terminal** ([bug 0019](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md)). The finding carries the remedy for the shape you actually wrote — the table in 0.22.0's entry lists all seven — and there is **no way to downgrade it**: not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. Five of these were green before:
 
   | Shape                                                                | Before                                                    | Now                                               |
   | -------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------- |
@@ -158,7 +158,7 @@ A rule with no condition selects some code and then asserts nothing about it, so
 
   The finding is raised **before** the rule runs. A rule with both a dead glob and no condition now reports the missing assertion only — the right root cause, since no selector makes an assertion-less rule capable of failing. The selector fault resurfaces on the next run, once there is something to assert.
 
-- **Conditions accumulate instead of clearing** ([bug 0020](./bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md)). A rule derived from a held rule kept the parent's predicates but silently dropped its conditions, so `parent.should().beExported()` followed by a derived `.should().notContain(...)` asserted only the second. Both are asserted now, and a second `.should()` on one chain behaves like `.andShould()`. A `satisfy(condition)` written **before** `.should()` is also retained rather than dropped. If you built rules this way expecting the reset, those rules now report violations they previously discarded.
+- **Conditions accumulate instead of clearing** ([bug 0020](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md)). A rule derived from a held rule kept the parent's predicates but silently dropped its conditions, so `parent.should().beExported()` followed by a derived `.should().notContain(...)` asserted only the second. Both are asserted now, and a second `.should()` on one chain behaves like `.andShould()`. A `satisfy(condition)` written **before** `.should()` is also retained rather than dropped. If you built rules this way expecting the reset, those rules now report violations they previously discarded.
 
 - **Some baseline entries stop matching — the ones for rules whose description changed.** A violation's identity is a hash of `rule::element::message`, and `rule` is the rule's description. Accumulate lengthens that description for the two shapes it changes: a rule derived off a held rule that already carried a condition, and a `satisfy(condition)` written **before** `.should()` (previously dropped, now retained and fired). Those entries hash differently, so an already-accepted violation is reported as new.
 
@@ -212,7 +212,7 @@ Then regenerate baselines (above), and expect new violations from any rule that 
 
 ## [0.22.0] - 2026-07-29
 
-The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md) is now complete: **`doctor` and `diagnose()` can see every rule that asserts nothing, and each one carries the remedy for its own shape.** No rule behaves differently in this release — 0.23.0 is the flip, and this is the release you measure on first.
+The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0070-a-rule-must-assert-something.md) is now complete: **`doctor` and `diagnose()` can see every rule that asserts nothing, and each one carries the remedy for its own shape.** No rule behaves differently in this release — 0.23.0 is the flip, and this is the release you measure on first.
 
 ### Added
 
@@ -237,7 +237,7 @@ The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archun
 - **`doctor` no longer crashes on a file it cannot load** (a vitest test file, a syntax error, a missing dependency) — it reports the file with the error as evidence and continues with the rest. The remedy is offered conditionally rather than asserted, because the same branch fires for causes that have nothing to do with test runners.
 - **`doctor` no longer exits 0 after reporting a problem.** With one unloadable file and one clean one it printed the error and then a clean bill of health, exit 0 — shipped in 0.21.0. Every exit path now folds the load failures in, and `--format json` emits its document on every path (it previously produced zero bytes on the commonest single-file failure, so `JSON.parse` threw).
 - **`--format github` emits valid annotations for findings with no source location.** A configuration finding has no file, and `::error file=,line=0` is not a valid annotation — GitHub dropped or misplaced it. Those are now run-level annotations that render on the workflow summary. Property values (`file=`, `title=`) are also escaped per the workflow-command spec, so a path or rule name containing `,` or `:` no longer truncates the annotation.
-- The old `console.warn(...) + return []` sites for condition-less rules are **removed** (proposal 019's ask). The `RuleBuilder` one could never fire for the commonest shape anyway — it was gated on a phase `.should()` had already left ([bug 0019](./bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), which 0.23.0 closes).
+- The old `console.warn(...) + return []` sites for condition-less rules are **removed** (proposal 019's ask). The `RuleBuilder` one could never fire for the commonest shape anyway — it was gated on a phase `.should()` had already left ([bug 0019](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), which 0.23.0 closes).
 
 ### Upgrading — 0.22.0
 
@@ -258,13 +258,13 @@ your rules **select**.
 
 ### Fixed
 
-- **A configuration finding now carries its own remedy, not the rule author's** ([bug 0021](./bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)). A finding reading `matching("src/nowhere/") resolved no slices` printed **`Fix: Split the cycle by extracting a shared module.`** — your remedy for a real violation of the rule, attached to a finding reporting that the rule never ran. `suggestion` renders as `Fix:`, which is the line an agent obeys, so this was a failure asserting a cause it could not verify.
+- **A configuration finding now carries its own remedy, not the rule author's** ([bug 0021](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)). A finding reading `matching("src/nowhere/") resolved no slices` printed **`Fix: Split the cycle by extracting a shared module.`** — your remedy for a real violation of the rule, attached to a finding reporting that the rule never ran. `suggestion` renders as `Fix:`, which is the line an agent obeys, so this was a failure asserting a cause it could not verify.
 
   Every configuration finding — empty selector, empty slice discovery, empty correspondence side — now states the fix for _its own_ fault. Your `.rule({ suggestion, docs })` still reaches every real violation, unchanged; `id` and `because` still reach configuration findings too, because neither claims to be a remedy.
 
   If you parse `check --format json` and rely on `suggestion` being present and equal to your own text on **every** finding, it is now the finding's own text on the configuration ones.
 
-- **A held builder is immutable** ([bug 0016](./bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md)). Every chain method now returns a copy instead of editing the builder in place, so holding a selection in a variable and deriving several rules from it does what it reads like:
+- **A held builder is immutable** ([bug 0016](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md)). Every chain method now returns a copy instead of editing the builder in place, so holding a selection in a variable and deriving several rules from it does what it reads like:
 
   ```typescript
   const repositories = classes(p).that().extend('BaseRepository')
@@ -282,7 +282,7 @@ your rules **select**.
 
 This release changes what some rules **check**, in both directions, with no code change on your part.
 
-1. **Regenerate your baseline.** Baseline identity is a hash of the rule's _description_ — its predicate and condition text ([`hashViolation`](./src/helpers/baseline.ts)) — not of `.rule({ id })`. A rule that was inheriting a leaked predicate had that predicate in its description, so its hash changes here and previously-baselined findings resurface as **new**. Delete and re-record the baseline as your first step, before reading any new findings. If your baseline stops matching entirely, the "unmatched baseline" finding will suggest a repository-root mismatch; on this upgrade that advice is wrong, and the cause is this change.
+1. **Regenerate your baseline.** Baseline identity is a hash of the rule's _description_ — its predicate and condition text ([`hashViolation`](https://github.com/nielspeter/ts-archunit/blob/main/src/helpers/baseline.ts)) — not of `.rule({ id })`. A rule that was inheriting a leaked predicate had that predicate in its description, so its hash changes here and previously-baselined findings resurface as **new**. Delete and re-record the baseline as your first step, before reading any new findings. If your baseline stops matching entirely, the "unmatched baseline" finding will suggest a repository-root mismatch; on this upgrade that advice is wrong, and the cause is this change.
 
 2. **Expect new findings — that is the fix working.** Any rule that was silently narrowed by a leak now evaluates its full selection. A rule that had been narrowed to nothing was passing while checking nothing; it now checks something and may fail. Those failures are real violations you have not seen before, not regressions in your code.
 
@@ -316,13 +316,13 @@ This release changes what some rules **check**, in both directions, with no code
 
 ### Fixed
 
-- **`notImportFrom('fastify')` now matches an installed fastify** ([bug 0014](./bugs/fixed/0014-bare-package-import-globs-match-nothing.md)). Import globs were matched against the resolved path **or** the raw specifier, never both — so a package that resolves, which is every package you actually depend on, could only be matched by its `node_modules` path. The documented way to ban a dependency worked exclusively on dependencies you had not installed. Measured against this repo's own source: `notImportFrom('picomatch')` reported **0** violations while 15 files imported it. It now reports 15, the same as the path-glob form `'**/picomatch/**'`.
+- **`notImportFrom('fastify')` now matches an installed fastify** ([bug 0014](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0014-bare-package-import-globs-match-nothing.md)). Import globs were matched against the resolved path **or** the raw specifier, never both — so a package that resolves, which is every package you actually depend on, could only be matched by its `node_modules` path. The documented way to ban a dependency worked exclusively on dependencies you had not installed. Measured against this repo's own source: `notImportFrom('picomatch')` reported **0** violations while 15 files imported it. It now reports 15, the same as the path-glob form `'**/picomatch/**'`.
 
   Each import now contributes **both** its resolved absolute path and — for non-relative specifiers only — the specifier as written; a glob matches the import if it matches either. Relative specifiers are deliberately excluded: `'../services/*'` is an unanchored glob that correctly matches nothing against an absolute path, and matching it against the raw string would make relative globs silently half-work.
 
   This unblocks `layeredArchitecture({ restrictedPackages })`, whose whole documented purpose — "glob → list of npm package name patterns" — was inoperable for installed packages.
 
-- **A preset no longer silently enforces nothing when you name a file instead of a folder** ([bug 0018](./bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)). `repositories`, `shared` and the layer globs were matched against the file's **parent directory**, so a glob naming a file could never match — the preset generated its rules and checked nothing. Measured: `dataLayerIsolation({ repositories: '**/repositories/bad-repo.ts' })` reported **0** violations on a file that violates both its rules. It now reports 2. Directory globs are unchanged.
+- **A preset no longer silently enforces nothing when you name a file instead of a folder** ([bug 0018](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)). `repositories`, `shared` and the layer globs were matched against the file's **parent directory**, so a glob naming a file could never match — the preset generated its rules and checked nothing. Measured: `dataLayerIsolation({ repositories: '**/repositories/bad-repo.ts' })` reported **0** violations on a file that violates both its rules. It now reports 2. Directory globs are unchanged.
 
 ### Upgrading — `.warn()` can now throw
 
@@ -348,8 +348,8 @@ This changes results in **two directions**, and the second is easy to miss.
 
 Makes `withBaseline()` work across machines, and makes three collectors see the
 handler-map idiom they were blind to. Both were found by adopting 0.18.x on a
-real codebase; see [bug 0010](./bugs/fixed/0010-violation-identity-embeds-absolute-paths.md)
-and [bug 0013](./bugs/fixed/0013-resolvers-cannot-see-resolvers.md). Pre-1.0, so the
+real codebase; see [bug 0010](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0010-violation-identity-embeds-absolute-paths.md)
+and [bug 0013](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0013-resolvers-cannot-see-resolvers.md). Pre-1.0, so the
 behavioural changes ship in a minor.
 
 ### Fixed
@@ -382,7 +382,7 @@ v2 hashing is byte-identical to v1 for any finding whose fields contain no path,
 
 If a baseline stops matching entirely you will get a finding saying so, with the counts and the likely cause, instead of a wall of "new" violations.
 
-**Not fixed: the size and complexity metrics.** `maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding — improving the code turns the build red. Regenerating does not help, and this release does not change it ([bug 0012](./bugs/0012-metric-findings-have-no-usable-ratchet.md)). Those rules remain effectively unbaselineable.
+**Not fixed: the size and complexity metrics.** `maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding — improving the code turns the build red. Regenerating does not help, and this release does not change it ([bug 0012](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0012-metric-findings-have-no-usable-ratchet.md)). Those rules remain effectively unbaselineable.
 
 **Green → red, on unchanged code.** Three collectors now see functions they previously could not, so rules that were quietly passing may start reporting:
 
@@ -395,7 +395,7 @@ If a baseline stops matching entirely you will get a finding saying so, with the
 ## [0.18.1] - 2026-07-25
 
 Fixes a family of glob defects in `slices()` and the agent-facing messages around
-them, found by adopting 0.18.0 on a real codebase. See [bug 0009](./bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md).
+them, found by adopting 0.18.0 on a real codebase. See [bug 0009](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md).
 
 ### Fixed
 
