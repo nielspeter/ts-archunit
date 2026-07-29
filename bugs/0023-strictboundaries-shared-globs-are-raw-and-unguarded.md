@@ -35,7 +35,7 @@ folders: '**/no-such-feat/*'   ->  1 discovery finding, error  (the guard shared
 The false red's `Fix:` line then compounds it: the violation carries `no-cross-boundary`'s
 remedy, telling the user to move into the shared module **they are already importing from**.
 (That remedy has its own defect —
-[bug 0017](./0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).)
+[bug 0017](./fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).)
 
 ## Why no test caught it
 

@@ -382,6 +382,13 @@ npx ts-archunit init   # scaffold config + rules + npm scripts
 
 Requires Node.js >= 24 and a `tsconfig.json`. Works with vitest (recommended) or jest.
 
+## Upgrading
+
+`CHANGELOG.md` ships **inside the package**, so it is readable at
+`node_modules/@nielspeter/ts-archunit/CHANGELOG.md` without a network round trip — which
+matters because several releases require an action rather than merely describing one. Each entry
+carries an **Upgrading** section naming what to run before you upgrade and what changes after.
+
 ## License
 
 MIT

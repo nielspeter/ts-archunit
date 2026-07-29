@@ -21,6 +21,44 @@ afterEach(() => {
 })
 
 describe('explain --format agent', () => {
+  it('prints an identical bullet ONCE, however many rules produce it', async () => {
+    // A preset generates one rule per configured folder with identical metadata
+    // — `strictBoundaries({ folders })` over six boundaries produces six
+    // `no-cross-boundary` rules — so the same bullet printed six times. This
+    // output gets committed into an agent's system prompt, where repetition is
+    // tokens on every request and reads as six different rules.
+    const out = await runAgent([
+      {
+        rule: 'r1',
+        id: 'preset/boundaries/no-cross-boundary',
+        imperative: 'Do NOT cross a boundary',
+      },
+      {
+        rule: 'r2',
+        id: 'preset/boundaries/no-cross-boundary',
+        imperative: 'Do NOT cross a boundary',
+      },
+      {
+        rule: 'r3',
+        id: 'preset/boundaries/no-cross-boundary',
+        imperative: 'Do NOT cross a boundary',
+      },
+    ])
+    expect(out.split('Do NOT cross a boundary').length - 1).toBe(1)
+  })
+
+  it('keeps DISTINCT bullets that share a rule id', async () => {
+    // Deduplicated on the bullet text, not the id: two rules can share an id and
+    // differ in imperative, and it is the line that would repeat. Dropping one
+    // of these would be silently deleting a rule from the agent's instructions.
+    const out = await runAgent([
+      { rule: 'r1', id: 'preset/boundaries/x', imperative: 'Do NOT cross a boundary' },
+      { rule: 'r2', id: 'preset/boundaries/x', imperative: 'Do NOT import test helpers' },
+    ])
+    expect(out).toContain('Do NOT cross a boundary')
+    expect(out).toContain('Do NOT import test helpers')
+  })
+
   it('wraps output in sentinel markers and includes the check-in-loop preamble', async () => {
     const out = await runAgent([{ rule: 'r', id: 'a/one', imperative: 'Do NOT do X' }])
     expect(out).toContain('<!-- ts-archunit:start -->')

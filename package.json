@@ -1,6 +1,6 @@
 {
   "name": "@nielspeter/ts-archunit",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "description": "Architecture testing for TypeScript",
   "type": "module",
   "exports": {
@@ -59,6 +59,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {

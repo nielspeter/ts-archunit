@@ -83,10 +83,23 @@ function outputAgent(descriptions: RuleDescription[]): void {
 
   for (const [group, rules] of groups) {
     lines.push(`### ${titleCase(group)}`, '')
+    // Deduplicated within the group. A preset generates one rule per configured
+    // folder — `strictBoundaries({ folders })` with six boundaries produces six
+    // `no-cross-boundary` rules carrying IDENTICAL metadata — so the same bullet
+    // printed six times. This output is meant to be committed into an agent's
+    // system prompt (`init` says so), where repetition is pure cost: it is
+    // tokens on every request and it reads as six different rules.
+    //
+    // The bullet TEXT is the key, not the rule id: two rules can share an id and
+    // differ in imperative, and it is the line that would repeat.
+    const seen = new Set<string>()
     for (const d of rules) {
       // The imperative is the self-contained rule statement; `because`/`suggestion`
       // live in the check --format json payload, so don't double them up here.
-      lines.push(`- ${d.imperative ?? (d.rule || 'Follow the architecture rule.')}`)
+      const bullet = d.imperative ?? (d.rule || 'Follow the architecture rule.')
+      if (seen.has(bullet)) continue
+      seen.add(bullet)
+      lines.push(`- ${bullet}`)
     }
     lines.push('')
   }

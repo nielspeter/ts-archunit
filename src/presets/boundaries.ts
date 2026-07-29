@@ -181,11 +181,28 @@ export function strictBoundaries(
           .onlyImportFrom(...allowedGlobs),
         {
           id: 'preset/boundaries/no-cross-boundary',
+          // This rule is folder-level: the allow list is this boundary plus the
+          // shared globs, so ANY import from another boundary violates it,
+          // whichever file it names. The metadata used to describe
+          // entry-point-mediated access — a looser policy the rule does not
+          // implement — and its `Fix:` line said "import from the other
+          // boundary's entry point instead". Applied exactly, that reproduces
+          // the identical violation: measured, `reporting -> billing/index.ts`
+          // and `reporting -> billing/internal.ts` fail identically
+          // ([bug 0017](../../bugs/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)).
+          // An agent obeying it loops, and its only exits are unsanctioned.
           because:
-            'a direct import across boundaries bypasses the public surface each boundary is supposed to be reached through',
+            'boundaries may only depend on themselves and the shared modules — an import from another boundary couples the two, whichever file it names',
+          // COMPUTED, because no fixed string is right in both configurations.
+          // `shared` defaults to `[]`, which is legal, and there the "move it
+          // into the shared module" clause names somewhere that does not exist:
+          // measured, a boundary importing `src/shared/**` with `shared`
+          // unconfigured is itself a violation of this rule.
           suggestion:
-            "Import from the other boundary's entry point instead of reaching into its internals, or move the shared piece into the shared module.",
-          imperative: "Do NOT import another boundary's internals — go through its entry point",
+            sharedGlobs.length > 0
+              ? `Move the code both boundaries need into a shared folder (${sharedGlobs.join(', ')}), or remove the dependency on the other boundary.`
+              : 'No shared folders are configured — add one to strictBoundaries({ shared }) and move the code both boundaries need there, or remove the dependency on the other boundary.',
+          imperative: 'Do NOT import a file outside this boundary or its shared modules',
         },
         'error',
         overrides,
