@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import picomatch from 'picomatch'
 import path from 'node:path'
 import type { SourceFile } from 'ts-morph'
@@ -94,6 +95,29 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
       })
     }
     return violations
+  }
+
+  override assertsSomething(): boolean {
+    return this._pattern !== undefined
+  }
+
+  /**
+   * Named by id or by what the detector checks — the inherited version says
+   * 'unnamed'. Uses `describe()` rather than a call-site locator for the same
+   * reason as `SliceRuleBuilder`: `explain --format agent` reads this field.
+   */
+  override describeRule(): RuleDescription {
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? this.describe(),
+    }
+  }
+
+  override assertionAdvice(): string {
+    return (
+      'this detector has no pattern, so it detects nothing and can never fail. Add ' +
+      '.forPattern(...), or use smells.duplicateBodies() for patternless duplicate detection.'
+    )
   }
 
   protected detect(): ArchViolation[] {

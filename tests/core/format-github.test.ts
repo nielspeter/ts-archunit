@@ -19,7 +19,9 @@ describe('formatViolationsGitHub', () => {
     const output = formatViolationsGitHub(violations)
     expect(output).toContain('::error file=')
     expect(output).toContain(',line=42,')
-    expect(output).toContain('title=Architecture Violation: test rule')
+    // ':' is escaped in property values as of 0.22.0 (workflow-command spec);
+    // the rendered annotation title still reads "Architecture Violation: …".
+    expect(output).toContain('title=Architecture Violation%3A test rule')
     expect(output).toContain('::bad call to parseInt')
   })
 
@@ -61,5 +63,44 @@ describe('formatViolationsGitHub', () => {
     expect(lines[0]).toMatch(/^::error/)
     expect(lines[1]).toMatch(/^::error/)
     expect(lines[2]).toMatch(/^::error/)
+  })
+})
+
+describe('locationless configuration findings (plan 0070)', () => {
+  // A config finding has file '' and line 0, and `::error file=,line=0` is not
+  // a valid annotation — GitHub drops or misplaces it. These render as
+  // run-level annotations instead. Review measured the branch as deletable
+  // with nothing failing; these pin it.
+
+  it('emits a run-level annotation with no file/line properties', () => {
+    const output = formatViolationsGitHub([mv({ file: '', line: 0 })])
+    expect(output).toMatch(/^::error title=/)
+    expect(output).not.toContain('file=')
+    expect(output).not.toContain('line=')
+  })
+
+  it('a located violation in the same batch keeps its file annotation', () => {
+    const output = formatViolationsGitHub([mv({ file: '', line: 0 }), mv({ line: 3 })])
+    const lines = output.split('\n')
+    expect(lines[0]).toMatch(/^::error title=/)
+    expect(lines[1]).toMatch(/^::error file=/)
+  })
+
+  it('escapes commas and colons in file=, which is a property value too', () => {
+    // The runner splits the property list on commas, so an unescaped path
+    // truncates the annotation onto a file that does not exist — measured.
+    const output = formatViolationsGitHub([mv({ file: 'src/a,b.ts', line: 3 })])
+    expect(output).toContain('file=src/a%2Cb.ts')
+    expect(output).not.toContain('file=src/a,b.ts')
+  })
+
+  it('escapes commas and colons in the title, which is the only identity carrier', () => {
+    const output = formatViolationsGitHub([
+      mv({ file: '', line: 0, ruleId: 'preset/layered: {a,b}' }),
+    ])
+    const title = output.slice(0, output.indexOf('::', 2))
+    expect(title).not.toContain(',')
+    expect(title).toContain('%2C')
+    expect(title).toContain('%3A')
   })
 })

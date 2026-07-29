@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
@@ -203,6 +204,36 @@ export class SliceRuleBuilder extends TerminalBuilder {
     return next
   }
 
+  override assertsSomething(): boolean {
+    return this._conditions.length > 0
+  }
+
+  override assertionAdvice(): string {
+    return (
+      'this rule has no condition, so it asserts nothing and can never fail. Add a ' +
+      'condition after .should(), e.g. beFreeOfCycles(), respectLayerOrder(...) or ' +
+      'notDependOn(...).'
+    )
+  }
+
+  /**
+   * Named by id when one is set, else by the rule description (plan 0070 §4).
+   * The inherited root version says 'unnamed' for every id-less rule, which
+   * made three of the assertion hooks unlocatable in a doctor report.
+   */
+  override describeRule(): RuleDescription {
+    // The rule's own description, not a call-site locator. An earlier revision
+    // derived a bounded name from `_discovery` so the withdrawn runtime
+    // warning would not carry ten filenames — but `explain --format agent`
+    // reads this field, and consumers commit that output into their agent's
+    // prompt, so bounding it stripped the condition (the only architectural
+    // imperative in the line) from every id-less slice rule.
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? this.buildRuleDescription(),
+    }
+  }
+
   protected collectViolations(): ArchViolation[] {
     // Discovery non-vacuity (ADR-008 / plan 0067): a slice selection that
     // resolved to no slices — or slices that matched no files — discovered
@@ -230,15 +261,6 @@ export class SliceRuleBuilder extends TerminalBuilder {
     // written for one input and emitted for all of them. They return once the
     // remedy is executable data and an opt-out exists, mirroring
     // `correspondence().allowEmpty(name)`.
-
-    if (this._conditions.length === 0) {
-      const ruleId = this._metadata?.id ?? 'unnamed'
-      console.warn(
-        `[ts-archunit] Slice rule '${ruleId}' has no conditions. ` +
-          `Did you forget to add a condition like beFreeOfCycles()?`,
-      )
-      return []
-    }
 
     const context: ConditionContext = {
       rule: this.buildRuleDescription(),

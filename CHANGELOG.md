@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] - 2026-07-29
+
+The measuring instrument for [plan 0070](https://github.com/nielspeter/ts-archunit/blob/main/plans/0070-a-rule-must-assert-something.md) is now complete: **`doctor` and `diagnose()` can see every rule that asserts nothing, and each one carries the remedy for its own shape.** No rule behaves differently in this release — 0.23.0 is the flip, and this is the release you measure on first.
+
+### Added
+
+- **`assertsSomething()` and `assertionAdvice()` on every builder**, so the diagnostic covers every family. Previously only the six `RuleBuilder` entry points were visible: slices, schemas, resolvers, `tsconfig()`, `correspondence()` and `smells.inconsistentSiblings()` all reported clean while asserting nothing. Seven assertion-less states are now distinguished, each with its own executable remedy:
+
+  | Shape                                                                             | Fix it names                                            |
+  | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
+  | `.should()` with no condition                                                     | add a condition                                         |
+  | a **predicate** used after `.should()` (`areAsync()` filters, it does not assert) | move it before `.should()` — the predicate is named     |
+  | a rule that never reached `.should()`                                             | add `.should()` and a condition                         |
+  | `tsconfig()` with no `.requires()`                                                | add `.requires({...})`                                  |
+  | `smells.inconsistentSiblings()` with no `.forPattern()`                           | add `.forPattern(...)`                                  |
+  | `correspondence()` with two sides and no assertion                                | `.beComplete()` / `.haveNoOrphans()` / `.beBijective()` |
+  | `correspondence()` with the wrong number of sides                                 | add the missing `.side(...)` — **not** an assertion     |
+
+  The advice comes from one method per builder, and `doctor` reports it verbatim, so the diagnostic and the eventual failure message cannot drift.
+
+- **`describeRule()` on six more builders** (slices, schema, resolver, tsconfig, correspondence, inconsistentSiblings), so their findings are named by rule id or description instead of `unnamed`.
+
+### Fixed
+
+- **`doctor` no longer crashes on a file it cannot load** (a vitest test file, a syntax error, a missing dependency) — it reports the file with the error as evidence and continues with the rest. The remedy is offered conditionally rather than asserted, because the same branch fires for causes that have nothing to do with test runners.
+- **`doctor` no longer exits 0 after reporting a problem.** With one unloadable file and one clean one it printed the error and then a clean bill of health, exit 0 — shipped in 0.21.0. Every exit path now folds the load failures in, and `--format json` emits its document on every path (it previously produced zero bytes on the commonest single-file failure, so `JSON.parse` threw).
+- **`--format github` emits valid annotations for findings with no source location.** A configuration finding has no file, and `::error file=,line=0` is not a valid annotation — GitHub dropped or misplaced it. Those are now run-level annotations that render on the workflow summary. Property values (`file=`, `title=`) are also escaped per the workflow-command spec, so a path or rule name containing `,` or `:` no longer truncates the annotation.
+- The old `console.warn(...) + return []` sites for condition-less rules are **removed** (proposal 019's ask). The `RuleBuilder` one could never fire for the commonest shape anyway — it was gated on a phase `.should()` had already left ([bug 0019](./bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md), which 0.23.0 closes).
+
+### Upgrading — 0.22.0
+
+No rule changes behaviour, and nothing new throws. Two tool outputs change:
+
+1. **`diagnose()` reports more.** Rules from the slice/schema/resolver/tsconfig/correspondence/smell builders that assert nothing now produce `no-condition` findings. If you pin `diagnose()` output in tests, those pins change (two of this repo's own did).
+2. **`explain` names change** for the six builders that gained `describeRule()` — output that said `unnamed` now carries the rule id or description. And `doctor`'s exit code covers the newly visible states, for anyone who wired the experimental command into a pipeline despite the docs.
+
+**To find what 0.23.0 will fail:** run `npx ts-archunit doctor <your rule files>`, or call `diagnose(rules)` in-process. For rules written inside a test body, `doctor` cannot load the file — pass the builders to `diagnose([...])` directly, or collect them into an array and use `checkAll`. Every remedy is backward-compatible on this version, so the whole migration can land before you upgrade again.
+
+`assertsSomething()` and `assertionAdvice()` are new public methods on the exported base classes. An external subclass already declaring either name with an incompatible signature gets a compile error on this minor; one declaring neither is **exempt by default** (`assertsSomething()` returns `true`) — override it if your builder has an assertion-less state.
+
 ## [0.21.0] - 2026-07-28
 
 A behaviour change, so a minor rather than a patch — `^0.20.0` would have

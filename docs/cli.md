@@ -113,8 +113,10 @@ demo/excluded-by-tsconfig
   include/exclude keeps it out of the project
 
 demo/no-condition
-  no-condition: this rule selects elements but asserts nothing about them, so it can
-  never fail — add a .should() clause, or delete it
+  no-condition: this rule reached .should() but no condition follows, so it asserts
+  nothing and can never fail. Add a condition after .should() — or, if this rule is
+  generated from configuration, skip generating it when there is nothing to assert;
+  if it comes from a preset (ruleId "preset/..."), report it to the preset's author
 ```
 
 It reports **identities, never totals** — which glob, in which rule, at which position. It **exits non-zero when it reports anything**, because an agent reads `exit 0` as "nothing to do".

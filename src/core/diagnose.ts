@@ -1,3 +1,4 @@
+import { TerminalBuilder } from './terminal-builder.js'
 import type { ArchProject } from './project.js'
 import type { GlobPosition, GlobSite } from './glob-site.js'
 import type { GlobFault } from './glob-diagnosis.js'
@@ -30,6 +31,14 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * the rest take their condition as a constructor argument.
    */
   assertsSomething?: () => boolean
+  /**
+   * The remedy for this rule's assertion-less state. When present, `diagnose`
+   * reports it VERBATIM as the finding's advice, so the doctor and the runtime
+   * warning are the same string by construction (plan 0070) — they were
+   * measured diverging, and two texts for one state is a trust problem for an
+   * agent diffing them.
+   */
+  assertionAdvice?: () => string
   /** The project this rule was built against. */
   getProject?: () => ArchProject | undefined
 }
@@ -98,8 +107,18 @@ export function diagnose(
       findings.push({
         kind: 'no-condition',
         rule: name,
-        advice:
-          'this rule selects elements but asserts nothing about them, so it can never fail — add a .should() clause, or delete it',
+        // The builder's own per-state remedy when it offers one — the same
+        // string the runtime prints — falling back to the generic form for a
+        // DiagnosableRule that predates the hook. The old fixed text here said
+        // "add a .should() clause", which is the wrong remedy for the main
+        // shape (the .should() is present; the condition is not).
+        // The builder's own per-state remedy. No literal fallback string here:
+        // an earlier revision hard-coded the generic text a second time, and a
+        // review measured either copy being rewritten with nothing failing —
+        // two strings in the mechanism whose stated purpose is one string, one
+        // place. A DiagnosableRule that predates the hook gets the base
+        // method's text, from the one place that owns it.
+        advice: rule.assertionAdvice?.() ?? TerminalBuilder.prototype.assertionAdvice.call(rule),
       })
     }
 
@@ -168,7 +187,7 @@ function describe(
 
 function ruleName(rule: DiagnosableRule): string {
   const described = rule.describeRule?.()
-  return described?.id ?? described?.rule ?? 'unnamed rule'
+  return (described?.id || described?.rule) ?? 'unnamed rule'
 }
 
 /** Whether the rule reached a terminal with no condition attached. */

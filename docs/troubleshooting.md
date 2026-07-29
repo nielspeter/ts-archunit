@@ -16,7 +16,15 @@ Then fix the legacy violations down over time and regenerate the baseline to rat
 
 ## A rule I added isn't firing
 
-If a rule in `arch.rules.ts` seems to do nothing, check that it does **not** end in `.check()` (or `.warn()` / `.severity()`). In a CLI rule file, those terminals execute the rule immediately and return `undefined`, so the CLI silently skips it:
+Two different causes share this symptom:
+
+**The rule asserts nothing.** A selector with no condition after `.should()` — or a
+predicate like `areAsync()` used _after_ `.should()`, where it filters instead of
+asserting — can never fail. Run `npx ts-archunit doctor <your rule files>`, or
+`diagnose(rules)` for rules written inside a test: as of 0.22.0 both name the exact
+shape and the fix for it.
+
+**The rule never executes.** If a rule in `arch.rules.ts` seems to do nothing, check that it does **not** end in `.check()` (or `.warn()` / `.severity()`). In a CLI rule file, those terminals execute the rule immediately and return `undefined`, so the CLI silently skips it:
 
 ```typescript
 export default [
@@ -82,7 +90,11 @@ Expected. [`tsconfig()`](/config-rules) checks the resolved options object, whic
 
 ## Warnings show up but CI still passes
 
-That's by design. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
+That's by design for **severity** warnings. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
+
+Separately, a rule that **asserts nothing** never reports at all — no violation, no
+warning — because there is nothing for it to check. `doctor` and `diagnose()` are what
+surface those (see above); the next minor turns them into failures.
 
 ## Still stuck?
 

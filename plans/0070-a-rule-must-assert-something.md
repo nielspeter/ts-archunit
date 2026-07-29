@@ -1,13 +1,13 @@
 # Plan 0070 — a rule must assert something, and every assertion you write is kept
 
-**State:** DRAFT 3 — reviewed twice. Round 1 (architect + product) replaced the mechanism's
+**State:** DRAFT 3, **0.22.0 implemented** (built, unmerged, untagged) — reviewed twice as a plan, then twice more as code. Round 1 (architect + product) replaced the mechanism's
 location; round 2 (five personas, mechanism implemented in throwaway worktrees, 28-revert
 sabotage matrix) replaced the mechanism's **message contract** and its ordering. The
 diagnosis and the state table have survived both rounds unchanged.
 **Priority:** Highest open item, ahead of R3b. Both defects are live in v0.21.0 and both are silent.
 **Effort:** One root gate, one new advice hook, seven `assertsSomething()` hooks, two new
-`RuleBuilder` fields, five deletions, `describeRule()` on five builders, and the guards.
-Two releases.
+`RuleBuilder` fields, five deletions, `describeRule()` on six builders, and the guards.
+Two releases. **See Implementation notes for what 0.22.0 actually shipped.**
 **Closes:** [bug 0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../bugs/0020-should-twice-silently-drops-the-first-assertion.md).
 **Splits from:** [plan 0069](./0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
 **Absorbs:** [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
@@ -133,9 +133,10 @@ assertsSomething(): boolean {
 
 // Protected: the advice channel. One string per state, produced by the builder that
 // knows its own states. diagnose() consumes it through DiagnosableRule, so the doctor
-// advice and the runtime message are the SAME string by construction — round 2 measured
-// draft 2 shipping two diverging texts for one state.
-protected assertionAdvice(): string {
+// advice and the failure message are the SAME string by construction — round 2 measured
+// draft 2 shipping two diverging texts for one state. PUBLIC as shipped, not protected:
+// a protected member cannot satisfy the structural interface diagnose() consumes.
+assertionAdvice(): string {
   return 'this rule asserts nothing, so it can never fail. Add an assertion, or delete the rule.'
 }
 
@@ -215,7 +216,7 @@ and inherits nothing — and the test that enforces that for the three existing 
 this one as its **fourth** (round 2's sabotage matrix showed the finding could lose all three
 fields with nothing failing).
 
-### 4. `describeRule()` on the five builders that lack it, with a fallback for the bare rule
+### 4. `describeRule()` on the builders that lack it, with a fallback for the bare rule
 
 `grep -rn describeRule src/` finds two definitions. Slice, schema and resolver expose their
 private `buildRuleDescription()`; `TsconfigBuilder` returns its module-level
@@ -275,7 +276,7 @@ tags in quick succession with no group means `latest` lands on whichever publish
 
 - `assertsSomething()` on the root and all seven hooks; `assertionAdvice()`; `describeRule()`
   on the five; the two advice-text corrections; `_reachedShould`/`_misplaced`.
-- **The gate emits `console.warn(assertionAdvice())` and then proceeds exactly as today.**
+- ~~**The gate emits a runtime warning and then proceeds exactly as today.**~~ **Withdrawn — see Implementation notes.**
   This — not a grep — is the pre-flight, and it is the round-2 customer's design: it reaches
   every authoring shape _by construction_ (vitest `it()` bodies, self-executing files, loops,
   presets, builder #14), which no lexical tool does. Round 2 measured the draft-2 grep reaching
@@ -292,7 +293,7 @@ tags in quick succession with no group means `latest` lands on whichever publish
   — the cheapest green (`toContain`) would destroy the only guard on `base`, which is exactly
   the ADR-008 an-agent-resolves-it-cheaply hazard, so the plan says it out loud.
 - A 0.22.0 Upgrading note (not just a notice): `diagnose()` reports more; `explain` output
-  changes for the three builders gaining `describeRule()`; `doctor`'s exit code goes 1 on
+  changes for the six builders gaining `describeRule()`; `doctor`'s exit code goes 1 on
   newly-visible states for anyone who wired it in despite the docs; stderr gains warnings that
   0.23.0 turns into failures. Baseline identity is untouched in 0.22.0 — `rule` comes from the
   condition context, not `describeRule()` (measured; recorded so nobody re-derives it).
@@ -439,7 +440,82 @@ suite plus this inventory, and report **caught-by-nothing as a number, which mus
 - The shipped TSDoc on `should()` (_"empty conditions"_) and on `fork()` — both become false in
   every editor hover; they change with the code, in the same commit.
 
-## Documents amended on merge
+## Implementation notes — 0.22.0, as implemented
+
+Reviewed twice as code after being reviewed twice as a plan. The second code review
+withdrew a mechanism this plan had specified, so read this section in preference to
+§Releases above where they disagree.
+
+**The runtime warning is withdrawn.** Draft 3's 0.22.0 emitted `assertionAdvice()` as a
+warning at every terminal. Shipped that way, it was measured to be invisible under
+vitest's default reporter (which drops intercepted console output from passing tests, and
+this release fails nothing by design), so it was changed to a direct `process.stderr`
+write — and that channel then produced, in one round: an EPIPE crash where `console.warn`
+had swallowed it, a once-per-instance latch that silenced a _derived_ rule in a
+_different_ assertion-less state, a name that dropped the rule id its own remedy tells
+the reader to look up, a `describeRule()` override that stripped the condition out of
+`explain --format agent` for every id-less slice rule, and no coverage at all in
+`check --format json` — the channel the library's own agent preamble tells agents to read.
+
+Five defects at five seams, all of them seams the library already has working code for.
+The warn path was bespoke: it bypassed the formatter, the JSON payload, the annotation
+surface and the exit code. So 0.22.0 ships **the instrument without the channel** —
+`assertsSomething()`, `assertionAdvice()`, `describeRule()`, and `diagnose()`/`doctor`
+parity — and 0.23.0's gate produces an `ArchViolation`, which reaches all four surfaces
+by construction and needs none of the withdrawn machinery.
+
+The consumer cost is stated rather than hidden: a rule written inside a test body has no
+zero-effort pre-flight, because `doctor` cannot load a file that imports a test runner.
+Those consumers call `diagnose([...])` directly, which `docs/running-in-tests.md` now
+shows. That is weaker than an automatic warning and stronger than a warning nobody sees.
+
+**Other deviations from draft 3, all forced and all measured:**
+
+- `assertionAdvice()` is **public**, not the drafted `protected` — a protected member
+  cannot satisfy the structural `DiagnosableRule` interface `diagnose()` consumes. §1's
+  own text was internally contradictory on this point.
+- The four `console.warn + return []` deletions moved from 0.23.0 into 0.22.0. With the
+  advice channel in place, keeping them meant two texts for one state.
+- `describeRule()` landed on **six** builders, not five: `InconsistentSiblingsBuilder`
+  (this plan's own late-added seventh hook) had missed the naming pass. Slice and smell
+  names stayed semantic rather than becoming call-site locators, because `explain` reads
+  the same field.
+- `diagnose()` falls back to `TerminalBuilder.prototype.assertionAdvice` rather than a
+  duplicated literal — an interim revision hard-coded the generic text a second time, in
+  the mechanism whose whole purpose is one string in one place.
+- `CorrespondenceBuilder.assertionAdvice()` branches on side count: with fewer than two
+  sides the fix is another `.side(...)`, and naming an assertion would be a remedy that
+  cannot apply.
+- `format-github` escapes `,` and `:` in **both** property values (`file=` and `title=`),
+  per the workflow-command spec — verified against `@actions/core`'s `escapeProperty` and
+  `actions/runner`'s `UnescapeProperty`.
+- `doctor` reports load failures as **identities** (`loadFailures: [{ file, error }]`),
+  not a boolean, and emits its JSON document on every exit path.
+
+**Deferred to 0.23.0, recorded so its implementer does not assume they shipped:**
+`execute-rule.ts`'s exclusion-refusal text still says "Fix the rule's selector instead" —
+it becomes cause-neutral at 0.23.0, where inventory item 4 pins it. The correspondence
+missing-assertion `RangeError` → finding conversion is 0.23.0. `inconsistent-siblings`'
+`if (!this._pattern) return []` stays until the flip. `tests/smells/inconsistent-siblings.test.ts`
+› "returns no violations when no pattern is set" pins a state the flip inverts — one more
+in-repo break than §Releases' table lists. And `--format github`'s ten-annotations-per-step
+cap becomes relevant when config findings are common: a 35-finding run renders ten and
+silently drops the rest from the annotation surface.
+
+**Also outstanding, filed separately:** `executeWarn` still uses `console.warn`
+(five sites), so `.warn()` inside a vitest test is invisible for the same reason the gate's
+warning was — pre-existing, out of this plan's scope, and now documented rather than left
+to be rediscovered.
+
+**Sabotage-matrix history, because the number moved twice.** The 0.22.0 branch first
+reported caught-by-nothing 0 of 8; a review enumerated the surface properly and measured
+**11 caught by nothing**. Those eleven were pinned and re-measured at 0 — and a second
+review then derived **65** reverts from the diff and found **9** still uncaught, six of
+them behavioural. The lesson, for 0.23.0's matrix: enumerate from the diff, verify each
+patch applies non-trivially, and read the verdict from the exit code — a `grep` over
+reporter output was itself the source of one false "all caught" pass.
+
+## Documents amended on merge## Documents amended on merge
 
 Round 2 found five stale cross-references draft 2 would have left. On merge, in the same PR:
 

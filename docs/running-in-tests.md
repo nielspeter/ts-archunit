@@ -90,6 +90,33 @@ it('only new violations fail', () => {
 })
 ```
 
+## The pre-flight for this form
+
+A rule that asserts nothing — a selector with no condition after `.should()`, or a
+predicate like `areAsync()` used _after_ `.should()`, where it filters instead of
+asserting — can never fail. A future release makes that a hard failure, so it is worth
+finding now.
+
+`doctor` cannot help here: it loads a rule file as a module, and a file that imports a
+test runner cannot be loaded that way. Use `diagnose()` in-process instead — same
+findings, same remedies, and it takes the builders you already have:
+
+```typescript
+import { diagnose } from '@nielspeter/ts-archunit'
+
+it('every architecture rule asserts something', () => {
+  const rules = [
+    classes(p).that().extend('BaseRepository').should().beExported(),
+    modules(p).that().resideInFolder('src/domain/**').should().notImportFrom('src/http/**'),
+  ]
+  expect(diagnose(rules)).toEqual([])
+})
+```
+
+That is itself an architecture rule about your architecture rules, and it fails with the
+specific remedy for whichever shape is wrong. The `checkAll([...])` form above already
+holds its rules in an array, so it can pass the same array to `diagnose()`.
+
 ## Converting between the two forms
 
 The forms differ only in how a rule is **terminated** and **run**. When you move a rule between them, swap both:

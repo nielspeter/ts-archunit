@@ -215,7 +215,12 @@ describe('diagnose', () => {
   it('a resolvers rule CAN name its project', () => {
     const rule = graphql.resolvers(p, 'src/nowhere-at-all/**')
     expect(rule.getProject()).toBe(p)
-    expect(diagnose([rule]).map((f) => f.kind)).toEqual(['dead-glob'])
+    // Exact identity, not membership: this rule is condition-less AND its glob
+    // is dead, and as of plan 0070's instrument release ResolverRuleBuilder
+    // implements `assertsSomething`, so BOTH findings appear — in this order.
+    // Weakening this to `toContain` is the cheap green the plan bans: it would
+    // stop pinning that no third finding appears.
+    expect(diagnose([rule]).map((f) => f.kind)).toEqual(['no-condition', 'dead-glob'])
   })
 
   it('diagnoses each rule against ITS OWN project, not the first one it finds', () => {
@@ -305,8 +310,12 @@ describe('kind, derived behaviourally rather than restated', () => {
     // glob from the anchor check, and removing that exemption tells every
     // `resolvers(p, 'src/…/**')` rule — the spelling in the API's own example —
     // to prefix `**/`, i.e. to break a working rule.
+    //
+    // The rule is condition-less, so plan 0070's instrument reports exactly
+    // one `no-condition` finding — asserted by exact kind list so this stays
+    // the only guard on `base`: any dead-glob finding here is still a failure.
     const rule = graphql.resolvers(self, 'src/graphql/**')
-    expect(diagnose([rule])).toEqual([])
+    expect(diagnose([rule]).map((f) => f.kind)).toEqual(['no-condition'])
   })
 
   it('matching: a file-shaped glob that DOES resolve slices is not reported', () => {

@@ -75,7 +75,7 @@ Asserting on `console.warn` being called is not a guard. Under the current behav
 
 ## Relationship to plan 0069
 
-**This is a precondition for R3b, and it inverts one of R3b's assumptions.** R3b absorbs proposal 019 ("rules that enforce nothing must fail") and its inventory counts the `console.warn(...) + return []` sites as the places to convert. Building on that inventory would produce a guard that fires only in the phase where the problem does not occur — a false green of exactly the shape the glob work spent four review rounds eliminating.
+**Closing via [plan 0070](../plans/0070-a-rule-must-assert-something.md)** (0.22.0 completes the diagnostic; 0.23.0 makes it fail). It was filed as an R3b precondition, and it inverted one of R3b's assumptions: R3b absorbs proposal 019 ("rules that enforce nothing must fail") and its inventory counts the `console.warn(...) + return []` sites as the places to convert. Building on that inventory would produce a guard that fires only in the phase where the problem does not occur — a false green of exactly the shape the glob work spent four review rounds eliminating.
 
 R3b's empty-**selector** half and this empty-**condition** half are the two directions of one property: _a rule must have something to check, and something to check it against._ Neither is currently enforced, and this one has no `doctor` coverage either — `diagnose()` reports `kind: 'no-condition'` as a diagnostic, which is the measuring instrument, not the gate.
 

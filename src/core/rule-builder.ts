@@ -36,6 +36,12 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   protected _predicates: Predicate<T>[] = []
   protected _conditions: Condition<T>[] = []
   protected _phase: 'predicate' | 'condition' = 'predicate'
+  // Plan 0070: state for the assertion-less remedies. `_phase` cannot carry
+  // either fact — `.should().that()` legally returns to the predicate phase,
+  // so `_phase === 'predicate'` does not mean `.should()` was never reached,
+  // and a predicate applied after `should()` leaves no other trace.
+  protected _reachedShould = false
+  protected _misplaced: string[] = []
   protected _requireNonEmpty = false
 
   constructor(protected readonly project: ArchProject) {
@@ -74,6 +80,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   should(): this {
     const fork = this.fork()
     fork._phase = 'condition'
+    fork._reachedShould = true
     return fork
   }
 
@@ -203,8 +210,40 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * it, so it can never fail — proposal 019. Exposed as a method because
    * `_conditions` is protected and `doctor` must not duck-type a private name.
    */
-  assertsSomething(): boolean {
+  override assertsSomething(): boolean {
     return this._conditions.length > 0
+  }
+
+  /**
+   * Three assertion-less states, three remedies (plan 0070). Branching on
+   * `_reachedShould`/`_misplaced`, never `_phase` — `.should().that()` lands
+   * in the predicate phase having reached `.should()`, and would be told a
+   * verifiable falsehood by any phase-derived message.
+   */
+  override assertionAdvice(): string {
+    if (!this._reachedShould) {
+      return (
+        'this rule never reached .should(), so it asserts nothing and can never fail. ' +
+        'Add .should() and a condition, or delete the rule.'
+      )
+    }
+    if (this._misplaced.length > 0) {
+      const names = this._misplaced.map((d) => `"${d}"`).join(', ')
+      const verb =
+        this._misplaced.length === 1
+          ? 'is a predicate, which filters'
+          : 'are predicates, which filter'
+      return (
+        `this rule asserts nothing: ${names} ${verb} subjects rather than asserting ` +
+        `anything about them. Move ${this._misplaced.length === 1 ? 'it' : 'them'} before .should(), then add a condition.`
+      )
+    }
+    return (
+      'this rule reached .should() but no condition follows, so it asserts nothing and can ' +
+      'never fail. Add a condition after .should() — or, if this rule is generated from ' +
+      'configuration, skip generating it when there is nothing to assert; if it comes from ' +
+      'a preset (ruleId "preset/..."), report it to the preset\'s author.'
+    )
   }
 
   /**
@@ -225,6 +264,13 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   protected addPredicate(predicate: Predicate<T>): this {
     const next = this.copy()
     next._predicates.push(predicate)
+    // A predicate-only method used after `.should()` (dual-use methods
+    // dispatch to conditions in that phase and never land here). Recorded so
+    // the assertion-less remedy can say "move it before .should()" — the one
+    // state whose fix is not "add a condition" (plan 0070, state 2).
+    if (next._phase === 'condition') {
+      next._misplaced.push(predicate.description)
+    }
     return next
   }
 
@@ -257,6 +303,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
     const clone = super.copy()
     clone._predicates = [...this._predicates]
     clone._conditions = [...this._conditions]
+    clone._misplaced = [...this._misplaced]
     return clone
   }
 
@@ -378,20 +425,6 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       if (this._requireNonEmpty) {
         return [this.emptySelectionViolation()]
       }
-      return []
-    }
-
-    // Step 3b: Warn if no conditions were added and phase is still 'predicate'
-    // — likely a predicate-only method was called after .should().
-    // Phase-aware methods dispatch correctly, so this only fires for predicate-only methods.
-    if (this._conditions.length === 0 && this._phase === 'predicate') {
-      const ruleId = this._metadata?.id ?? (this.buildRuleDescription() || 'unnamed')
-      console.warn(
-        `[ts-archunit] Rule '${ruleId}' has predicates but no conditions. ` +
-          `Did you use a predicate-only method after .should()? ` +
-          `Predicate-only methods (e.g. areExported, areAsync) filter elements; ` +
-          `use a condition method or .satisfy() after .should().`,
-      )
       return []
     }
 
