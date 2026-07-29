@@ -187,7 +187,20 @@ The server installs nothing; the line is erased; the rule certifies the runtime 
 
 **Not cosmetic — it is a baseline-correctness requirement, and it is free only in this release.**
 
-`hashViolation` is `rule::element::message`, and the message carries only basename + resolved target. Measured: `notImportFrom('**/src/core/**')` over `src/conditions/**` gives 47 findings with **39 distinct hashes — 8 colliding pairs (17%)**. `dependency.ts:5` (an import) and `:9` (a re-export of the same module) hash **identically**. Replaying a frozen 0.26.0 baseline against the widened build: 49 findings, 1 unbaselined — and **the re-export was absorbed by a pre-existing entry**, so it was never reported as new.
+`hashViolation` is `rule::element::message`, and the message carries only basename + resolved target — no line, no kind, no imported names.
+
+**Two distinct faults here, and draft 1's review conflated them. Only one is this release's to fix.**
+
+Measured on the _current_ build (`notImportFrom('**/src/core/**')` over `src/conditions/**`): 47 findings, **39 distinct hashes, 8 colliding pairs (17%)**. Every pair is **import/import** — a type-only and a runtime import of the same module in one file:
+
+```
+dependency.ts:5  import { isTypeOnlyImport } from '../core/import-options.js'
+dependency.ts:9  import type { ImportOptions } from '../core/import-options.js'
+```
+
+That is **pre-existing, within-kind, and per-kind verbs do not touch it** — both are `kind === 'import'`. It is filed separately (see Out of scope); do not let §4 claim to fix it.
+
+What §4 _does_ fix is the **new** kinds needing distinct identities from the `import` finding they would otherwise share a message with: a re-export of a module the file also imports produces byte-identical text today, so it would be absorbed by the existing baseline entry and never reported as new. Replaying a frozen 0.26.0 baseline against the widened build: 49 findings, 1 unbaselined — and **the re-export was absorbed by a pre-existing entry**, so it was never reported as new.
 
 That breaks the migration's core promise. It also gives every new finding a remedy that does not fit its line: measured on this repo, `src/core/index.ts:1` is `export type { Predicate } from './predicate.js'` and is reported as _"index.ts **imports** …/predicate.ts"_ with _"Invert the dependency … pass it in as a parameter"_ — nonsense for a re-exported type alias.
 
@@ -293,6 +306,7 @@ Name the move a team will otherwise find on their own: `.excluding('index.ts')` 
 
 - **The slice graph** (`slice-graph.ts:48,105`) — `beFreeOfCycles()`, `notDependOn()`, `respectLayerOrder()` stay static-only. Barrel re-export is _the_ classic cycle shape, so this is valuable, but a cycle finding is the hardest class to remedy and it is a different upgrade story. **The disclosure must be louder than a changelog line**: one sentence in `beFreeOfCycles()`'s JSDoc and in `layered/no-cycles` / `boundaries/no-cycles` metadata, because `strictBoundaries` will red on a barrel from one rule and stay silent on it from its sibling, in the same run. Rule metadata is read on every failure; a changelog is read once. The retrofit is cheap (both sites are resolved-file-only); the reds are not.
 - **`declare module './rel.js'`** — a real compile-time reference the binder routes to `moduleAugmentations`, so `getImportStringLiterals()` structurally cannot see it. State it as a hole, not a correct exclusion.
+- **The pre-existing within-kind hash collision** (§4). 17% of findings in the measured sample share a hash with a sibling, because the message carries neither the line nor the imported names. Two consequences, both independent of this release: you cannot accept one of a colliding pair into a baseline without the other, and if one is later fixed the survivor still matches the stale entry — so the baseline silently keeps accepting a violation that is no longer the one it recorded. Filed as its own bug; fixing it changes existing messages, which is exactly what this release's constraint forbids.
 - **Enforcing the `require` kind.** The kind is classified so it cannot be mistaken for an erased edge, and consumed by nothing. Enforcing it is a separate decision for two reasons: its visibility is **asymmetric by file type** — `import x = require('s')` is seen in `.ts`, bare `require('s')` only in `.js` under `allowJs` — and a coverage boundary decided by file extension is exactly what §3 refuses for `notHaveAliasedImports`. A project without `allowJs` would get partial CJS enforcement with no way to tell.
 - **An `includeReExports` option** — it reinstates two user-selectable definitions of "an import", and 0069 settled the principle: "an opt-out is the first thing an agent adds on the first red."
 - **Exporting `ModuleEdge`** — deferred, but note the cost honestly: `defineCondition()` is a public, documented, taught extension point, so every custom dependency condition in the wild will keep calling `getImportDeclarations()` and reproduce bug 0022 outside the package, where no future fix reaches it. §2's four-row trap table is the evidence they will get it wrong. Revisit in 0.28 rather than never.
