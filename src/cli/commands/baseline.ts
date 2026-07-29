@@ -1,8 +1,8 @@
 import { collectViolations } from '../../helpers/baseline-generator.js'
 import { generateBaseline } from '../../helpers/baseline.js'
-import { ArchRuleError } from '../../core/errors.js'
 import type { ArchViolation } from '../../core/violation.js'
 import { loadRuleFiles } from '../load-rules.js'
+import { failureOrViolations } from '../rule-file-failure.js'
 
 export interface BaselineArgs {
   ruleFiles: string[]
@@ -19,15 +19,24 @@ export async function runBaseline(args: BaselineArgs): Promise<number> {
   // throwing `.check()` at import surfaces its own violations without discarding
   // the other files' rules. (Presets no longer throw at import — returning form.)
   const violations: ArchViolation[] = []
+  const total = args.ruleFiles.length
   for (const file of args.ruleFiles) {
+    // Same two boundaries as `runCheck`, for the same reason (bug 0025). Here it
+    // matters twice over: a rethrow left NO baseline file at all, so one
+    // malformed rule made the whole command unusable rather than producing a
+    // partial baseline the user could finish.
+    let builders
     try {
-      const builders = await loadRuleFiles([file])
-      violations.push(...collectViolations(...builders))
+      builders = await loadRuleFiles([file])
     } catch (error: unknown) {
-      if (error instanceof ArchRuleError) {
-        violations.push(...error.violations)
-      } else {
-        throw error
+      violations.push(...failureOrViolations(file, error, total))
+      continue
+    }
+    for (const builder of builders) {
+      try {
+        violations.push(...collectViolations(builder))
+      } catch (error: unknown) {
+        violations.push(...failureOrViolations(file, error, total))
       }
     }
   }

@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { ArchRuleError } from '../../src/core/errors.js'
@@ -181,10 +183,42 @@ describe('correspondence()', () => {
       }).toThrow(ArchRuleError)
     })
 
-    it('throws when there are not exactly two sides', () => {
-      expect(() => {
-        correspondence(stubProject).side('a', ['x']).beComplete().check()
-      }).toThrow(/exactly two/)
+    it('wrong arity is a finding even WITH an assertion chosen (bug 0025)', () => {
+      // REVERSED from "throws when there are not exactly two sides". The
+      // RangeError was reachable through a terminal whenever an assertion was
+      // chosen, and it escaped the CLI's ArchRuleError-only catch and dropped
+      // every remaining rule file's findings — the sibling branch of the same
+      // fault 0.23.0 fixed for the no-assertion case, left behind because
+      // `assertsSomething()` read only the assertion flags.
+      //
+      // `.beComplete()` on one side cannot assert anything: there is no second
+      // side to compare against. So the fault reports identically either way.
+      const rule = correspondence(stubProject).side('a', ['x']).beComplete()
+      expect(rule.assertsSomething()).toBe(false)
+      const v = rule.violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]?.bypassFilters).toBe(true)
+      expect(v[0]?.message).toContain('1 side(s) and needs exactly two')
+      // The remedy is another side, NOT an assertion — it already has one, and
+      // naming `.beComplete()` here would leave the rule exactly as broken.
+      expect(v[0]?.message).toContain('.side(')
+      expect(v[0]?.message).not.toContain('.beComplete()')
+      expect(() => rule.check()).toThrow(ArchRuleError)
+      expect(() => rule.check()).not.toThrow(RangeError)
+    })
+
+    it('the arity invariant survives on collectViolations for a direct caller', () => {
+      // The throw is now unreachable through every terminal, so this asserts it
+      // is still THERE rather than that it fires: the method indexes _sides[0]
+      // and _sides[1] non-null, and a subclass calling it directly should get
+      // the named error rather than an undefined read. Reading the source is the
+      // only way to check a branch the terminals cannot reach — a test that
+      // called a terminal here would be measuring the gate instead.
+      const source = fs.readFileSync(
+        path.resolve(import.meta.dirname, '../../src/builders/correspondence-builder.ts'),
+        'utf-8',
+      )
+      expect(source).toContain('requires exactly two .side(...) calls')
     })
 
     it('reports a finding when no assertion is chosen (bug 0019, was a throw)', () => {

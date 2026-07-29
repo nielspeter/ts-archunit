@@ -3,9 +3,9 @@ import { withBaseline } from '../../helpers/baseline.js'
 import { diffAware } from '../../helpers/diff-aware.js'
 import type { OutputFormat } from '../../core/check-options.js'
 import type { ArchViolation } from '../../core/violation.js'
-import { ArchRuleError } from '../../core/errors.js'
 import { writeReport } from '../../core/execute-rule.js'
 import { loadRuleFiles } from '../load-rules.js'
+import { failureOrViolations } from '../rule-file-failure.js'
 
 export interface CheckArgs {
   ruleFiles: string[]
@@ -32,20 +32,28 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   const diff = args.changed ? diffAware(args.base) : undefined
 
   const collected: ArchViolation[] = []
+  const total = args.ruleFiles.length
   for (const file of args.ruleFiles) {
+    // TWO catches, at the two boundaries that can fail independently. Loading is
+    // per file and can only be attributed to the file; evaluating is per builder,
+    // so a single malformed rule must not take its twenty siblings in the same
+    // file down with it — which one catch around the whole file would do
+    // (bug 0025).
+    let builders
     try {
-      const builders = await loadRuleFiles([file], { fresh: args.fresh })
-      for (const builder of builders) {
-        collected.push(...builder.violations())
-      }
+      builders = await loadRuleFiles([file], { fresh: args.fresh })
     } catch (error: unknown) {
-      // Defensive: a user rule file that self-executes a throwing `.check()` at
-      // import surfaces its violations rather than crashing. (Presets no longer
-      // throw at import — they return builders.)
-      if (error instanceof ArchRuleError) {
-        collected.push(...error.violations)
-      } else {
-        throw error
+      // A user rule file that self-executes a throwing `.check()` at import
+      // surfaces its violations rather than crashing. (Presets no longer throw
+      // at import — they return builders.)
+      collected.push(...failureOrViolations(file, error, total))
+      continue
+    }
+    for (const builder of builders) {
+      try {
+        collected.push(...builder.violations())
+      } catch (error: unknown) {
+        collected.push(...failureOrViolations(file, error, total))
       }
     }
   }

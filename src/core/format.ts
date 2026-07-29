@@ -24,13 +24,17 @@ function formatSingleViolation(
 ): string {
   const counter = bold(red(`Architecture Violation [${String(index + 1)} of ${String(total)}]`))
   const ruleLine = `  ${dim('Rule:')} ${v.rule}`
-  // A config-level meta-finding (empty selector / empty discovery) has no source
-  // location: `path.relative(cwd, '')` renders as the cwd and ':0' is noise, while
-  // `message` carries the whole remedy. Show the message in the location's place —
-  // otherwise the remedy is invisible on the default surface, which is exactly
-  // where the agent consumer reads it (ADR-008).
+  // `message` is printed for BOTH shapes, and it used to be printed for neither
+  // — a located violation rendered only `file:line — element`, so the one
+  // sentence saying what is actually wrong was dropped from the default surface
+  // for every ordinary violation. Nothing failed when this was fixed, because
+  // nothing pinned it either way; `formatViolationsPlain` had always printed it,
+  // so the two formatters disagreed about what a violation IS.
+  //
+  // A config-level finding has no source location: `path.relative(cwd, '')`
+  // renders as the cwd and ':0' is noise, so it gets the message alone.
   const location = v.file
-    ? `  ${cyan(path.relative(cwd, v.file) + ':' + String(v.line))} ${dim('—')} ${v.element}`
+    ? `  ${v.message}\n  ${cyan(path.relative(cwd, v.file) + ':' + String(v.line))} ${dim('—')} ${v.element}`
     : `  ${v.message}`
   const codeLine = showCodeFrames && v.codeFrame ? `\n${v.codeFrame}` : ''
 
