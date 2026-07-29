@@ -117,7 +117,16 @@ export interface ModuleEdge {
   readonly line: number
   /** Erased at compile time, so no runtime dependency. Per-kind; see §2. */
   readonly typeOnly: boolean
-  /** Named bindings crossing the edge; empty for `export *`, `dynamic`, `require`. */
+  /**
+   * Named bindings crossing the edge, as written. **Empty for `export *`** — the
+   * names it contributes are only knowable by resolving the target and reading
+   * its exports, which would make this walk recursive and needs an answer for
+   * circular pairs. Measured: the runtime namespace of a barrel with
+   * `export * from './other.js'` contains `other`'s exports, so the runtime side
+   * of the independence guard has names this field deliberately does not. Star
+   * edges are compared by target; named edges by `names` → target.
+   * Also empty for `dynamic` and `require`.
+   */
   readonly names: readonly string[]
   /** Renamed named bindings. Empty except for `import`/`reexport`. */
   readonly aliases: readonly AliasedBinding[]
@@ -236,7 +245,16 @@ The forced-ordering argument from draft 1 is satisfied by construction, since 00
 
 ### The dynamic independence guard is cut
 
-Draft 1's load-bearing new idea was `await import()` versus the static walk. **The re-export half works and needs no compile step** — vitest resolves `.js` → `.ts` and transforms the fixture, so bug 0024's problem does not recur. Five of six sabotages caught, by four different assertions.
+Draft 1's load-bearing new idea was `await import()` versus the static walk. **The re-export half works, and it must run inside vitest.** Two draft-1 reviewers reached opposite conclusions here; both were right, because they measured different runtimes. Settled:
+
+```
+inside vitest:  await import('…/barrel.js')  ->  keys = ["MARKER","STAR"]
+bare node:      await import('…/barrel.js')  ->  ERR_MODULE_NOT_FOUND
+```
+
+So **no `tsc` step is needed** — vitest resolves `.js` → `.ts` and transforms the fixture, and bug 0024's problem does not recur. But say plainly what the guard then compares, because "runtime" overstates it: the other side of the comparison is **vite's resolver**, not the Node module system. Vite and ts-morph are two independent implementations of TS-aware resolution, so the guard is a real cross-check on the resolution _algorithm_ — it is not the module-system oracle draft 1 implied, and it cannot catch anything both tools get wrong the same way.
+
+**A consequence for `names`, measured in the same run.** The namespace above contains `STAR`, which arrives through `export * from './other.js'`. The static walk cannot know that name without resolving the target and reading its exports — so `names` for a star edge must be **empty**, and the runtime side has names with no static counterpart. The guard therefore cannot do a naive per-edge `names` comparison whenever a star edge is present. Either `names` is derived by resolving (which makes `moduleEdges` recursive, and needs an answer for circular pairs), or — preferred — **star edges are asserted by target only, and named edges by `names` → target**, with the split stated. Five of six sabotages were caught by four different assertions; the sixth is what `names` exists for.
 
 **The dynamic half exits 0 on the exact defect it was invented for.** Reverting `resolvedPath` to `undefined` for non-relative dynamic specifiers — `reverse-dependency.ts:49`'s defect — is **uncaught**, because Node has no tsconfig `paths` support: aliases raise `ERR_MODULE_NOT_FOUND` rather than disagreeing, and bare specifiers diverge by design under bug 0014. Residual scope is relative specifiers, where both sides reduce to a path join and cannot fail differently. **Cut it and state the gap.** (If the alias case is wanted later, Node subpath imports — `"imports": { "#internal/*": … }` — are honoured by both resolvers and a disagreement there is a real signal.)
 
@@ -257,7 +275,7 @@ The sixth sabotage the re-export half missed: swapping two edges' resolved targe
 1. §1's 19-form table as an edge list, with all five non-edge rows provably absent, **including the `NoSubstitutionTemplateLiteral` row**.
 2. §2's per-kind matrix — `import` via `isTypeOnlyImport` (incl. `import React, { type FC }` as runtime), both `reexport` trap rows, dynamic/type-expression/require constants.
 3. Uniform `lit.getSymbol()` resolution per kind, incl. `paths` aliases, bare packages, and the `type A = import('./barrel.js').Deep` → **barrel, not impl** case.
-4. Runtime independence, **re-export kind only**: `await import()` the fixture barrel under vitest; compare per-edge `names` → target. The dynamic half is cut with the gap stated in the file header.
+4. Runtime independence, **re-export kind only, and it must run under vitest** (bare Node cannot import a `.ts` fixture through `.js` specifiers — measured, `ERR_MODULE_NOT_FOUND`). Named edges compared `names` → target; **star edges by target only**, because the runtime namespace flattens them and the static walk deliberately does not. The dynamic half is cut, with both gaps stated in the file header: what it compares is vite's resolver against the TS compiler — two implementations, not the module system.
 5. Per kind × per family by `relpath:line` identity, with absences.
 6. `notHaveAliasedImports` pinned as an **explicit expected list** over a fixture holding both `import { x as y } from` and `export { x as y } from` — exactly one violation, named. Not "byte-identical to today", which has no _today_ inside the new build.
 7. `dependOn`: a type-only re-export does **not** satisfy it (the false green in §3), and a runtime edge does.
