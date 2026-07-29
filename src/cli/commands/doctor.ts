@@ -33,6 +33,10 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
     return 1
   }
 
+  // Per file, not one flat array. `diagnose()` treats rules independently, so
+  // the results are identical — but the loop is the only place that knows which
+  // file a rule came from, and flattening first discarded it (bug 0026).
+  const findings: DiagnosticFinding[] = []
   const rules: DiagnosableRule[] = []
   // Identities, never totals (docs/cli.md): a boolean told a JSON consumer that
   // something failed without saying which file or why, leaving them to scrape
@@ -40,7 +44,9 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   const loadFailures: { file: string; error: string }[] = []
   for (const file of args.ruleFiles) {
     try {
-      rules.push(...(await loadRuleFiles([file])))
+      const loaded = await loadRuleFiles([file])
+      rules.push(...loaded)
+      findings.push(...diagnose(loaded).map((f) => ({ ...f, ruleFile: file })))
     } catch (error: unknown) {
       // A rule file that self-executes a throwing `.check()` at import is a
       // documented shape, and `runCheck` already tolerates it. Without this,
@@ -110,8 +116,6 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
     return 1
   }
 
-  const findings = diagnose(rules)
-
   if (args.format === 'json') {
     emitJson(findings)
     return findings.length > 0 || loadFailures.length > 0 ? 1 : 0
@@ -136,7 +140,11 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
 function format(findings: readonly DiagnosticFinding[]): string {
   const lines: string[] = ['']
   for (const finding of findings) {
-    lines.push(`  ${finding.rule}`)
+    // The rule file first: with two identical vacuous rules in two files, the
+    // rule's own description is the same sentence twice and says nothing about
+    // which to open.
+    lines.push(finding.ruleFile === undefined ? `  ${finding.rule}` : `  ${finding.ruleFile}`)
+    if (finding.ruleFile !== undefined) lines.push(`    ${finding.rule}`)
     if (finding.kind === 'dead-glob') {
       lines.push(
         `    ${finding.origin ?? finding.glob ?? '(unknown)'}  [${finding.position ?? 'unknown'}]`,

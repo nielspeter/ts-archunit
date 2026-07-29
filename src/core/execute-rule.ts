@@ -115,9 +115,12 @@ export function applyFilters(
       // `v.bypassFilters` explicitly, not by accident. These findings are
       // immune today only because they carry `file: ''`, so `readFileSync('')`
       // throws into the catch above and `comment.file === ''` can never hold.
-      // The moment one carries a real path — and `doctor` reporting glob
-      // origins is exactly that temptation — an `// arch-ignore` would
-      // silently suppress the finding that says the rule enforces nothing.
+      // The moment one carries a real path this clause becomes the only
+      // protection — and bug 0026 is that moment: configuration findings now
+      // carry the rule file they came from, so this file IS read and its
+      // `// ts-archunit-exclude` comments ARE parsed. Without the first clause
+      // a comment in a rule file would silence the finding that says the rule
+      // enforces nothing. Pinned by tests/helpers/exclusion-comments.ts.
       result = result.filter(
         (v) => v.bypassFilters === true || !isExcludedByComment(v, allComments),
       )

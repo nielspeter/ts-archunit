@@ -196,6 +196,35 @@ describe('arch:baseline with a shape preset (no longer crashes)', () => {
     expect(baseline.count).toBe(1) // the real violation was still recorded
   })
 
+  it('WIRING: a refused finding names the rule file it came from', async () => {
+    // Same missing-wiring hole as `runCheck`'s: unwiring the attribution here
+    // was caught by nothing. And the print had to change with it — attributing
+    // the finding is pointless if the line that reports it drops `file`.
+    const printed: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      printed.push(String(chunk))
+      return true
+    })
+    const vacuous: RuleBuilderLike = {
+      violations: () => [
+        {
+          rule: 'x/vacuous',
+          element: 'x/vacuous',
+          file: '',
+          line: 0,
+          message: 'this rule asserts nothing',
+          bypassFilters: true,
+        },
+      ],
+    }
+    vi.mocked(loadRuleFiles).mockResolvedValue([vacuous])
+    const out = path.join(os.tmpdir(), `tsau-shape-baseline-attr-${String(process.pid)}.json`)
+    tmpFiles.push(out)
+    const code = await runBaseline({ ruleFiles: ['rules/mine.rules.ts'], output: out })
+    expect(code).toBe(1)
+    expect(printed.join('')).toContain('rules/mine.rules.ts')
+  })
+
   it('per-file: a throwing file does NOT drop the other files rules from the baseline', async () => {
     // runBaseline loops per file (parity with runCheck). File A throws at import;
     // File B returns builders. Both files' violations must land in the baseline.

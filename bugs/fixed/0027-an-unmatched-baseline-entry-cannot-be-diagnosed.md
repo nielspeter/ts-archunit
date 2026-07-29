@@ -1,6 +1,7 @@
 # Bug 0027: an unmatched baseline entry cannot be diagnosed unless _every_ entry is unmatched
 
 **Reported:** 2026-07-29
+**Fixed:** 2026-07-29 (v0.24.0)
 **Found in:** all versions through v0.23.0
 **Severity:** Medium — an already-accepted violation is reported as **new**, with no
 indication that the baseline is the reason. The reader sees what looks like fresh rot in
@@ -74,3 +75,46 @@ reads it, so it carries no information about whether hashing changed.
 - The three causes' texts are asserted to be distinct, and each one's remedy is verified to
   remediate (ADR-008 rule 2's behavioural corollary): apply the stated fix, assert the finding
   clears.
+
+## How it was fixed
+
+**v0.24.0 — and not by the mechanism this report suggested.**
+
+The suggestion above was to report "an entry whose `rule` string appears in this run under a
+different hash". That cannot work, and it was measured before anything was built: **the rule string
+is precisely what changed.** A description change alters `rule` and leaves `element` and `message`
+untouched, so comparing rule strings finds nothing.
+
+What survives is the violation's **subject**. `hashSubject(violation, root)` hashes
+`element::message` — identity without the rule description — and `BaselineEntry.subject` records it
+alongside the full hash. Then the three cases separate cleanly:
+
+| entry did not match because…   | subject present in the run? | response                        |
+| ------------------------------ | --------------------------- | ------------------------------- |
+| the violation was fixed        | no                          | silence — this is success       |
+| the rule's description changed | yes, under a different hash | name both spellings; regenerate |
+| the baseline is wholly wrong   | (`matched === 0`)           | the pre-existing finding        |
+
+`subject` is optional, so a baseline written before 0.24.0 still loads and simply cannot be
+diagnosed. That is honest degradation; guessing a cause is what the withdrawn `HASH_VERSION` bump
+did.
+
+**The specific diagnosis supersedes the generic one, and disproves it.** `unmatchedBaselineFinding`
+fires on `matched === 0` and, in the same-version case, tells the reader the likely cause is a
+differently-resolved repository root. But a detected description change means a stored _subject_
+matched — and subjects are scrubbed with the same root as hashes — so the root is demonstrably
+resolving consistently and that explanation is false. Reporting both would put two contradictory
+causes in one run.
+
+That interaction was found by three of the new tests failing: with a single-entry baseline
+`matched === 0`, so they selected the generic finding by index and saw the root-mismatch text.
+
+## Also corrected here
+
+- The false-red case is the first test in the file, and everything else is only safe because it
+  holds: an entry that stops matching is _normally success_, which is why the pre-existing finding
+  was gated on `matched === 0` in the first place.
+- One assertion of mine measured the wrong thing — `RULE_AFTER` contains `RULE_BEFORE` as a prefix,
+  so counting the description text counts the overlap rather than the grouping. It counts the
+  `was:` marker instead.
+- The remedy names its `<your-rule-files>` argument, so the command it prints runs.

@@ -1,6 +1,7 @@
 # Bug 0026: a location-less finding does not say which rule file it came from
 
 **Reported:** 2026-07-29
+**Fixed:** 2026-07-29 (v0.24.0)
 **Found in:** all versions through v0.23.0
 **Severity:** Medium — the finding is correct and actionable in kind, but not locatable. Two
 identical vacuous rules in two different files render as two identical paragraphs with
@@ -69,3 +70,44 @@ Decide two things explicitly rather than discovering them in review:
   (the defect fixed in v0.22.0).
 - `doctor`'s claim in `docs/cli.md` becomes true for `no-condition`, or the claim is
   narrowed to the finding kinds that can honour it.
+
+## How it was fixed
+
+**v0.24.0.** `attributeToRuleFile` (`src/cli/rule-file-findings.ts`) stamps `file` and `line: 1`
+onto findings that carry no location of their own, called from `runCheck` and `runBaseline` at the
+point in the per-file loop where the mapping exists. A violation that already has a location is
+left alone — overwriting the code it found with the rule file that declared the rule would be the
+feature backwards.
+
+`line: 1` follows `tsconfig()`'s precedent for a fault belonging to a file rather than to a
+position in it. The builders genuinely cannot supply a line: a rule with no glob has no position
+anywhere, and the assertion-gate findings are exactly the rules that may have none.
+
+**`doctor`'s half needed a restructure.** It flattened every file's rules into one array and called
+`diagnose()` once, discarding the mapping before it could be used. It now diagnoses per file and
+stamps `ruleFile` on each finding — `diagnose()` treats rules independently, so the results are
+identical. `DiagnosticFinding.ruleFile` is optional and `diagnose()` never sets it: it is handed
+rules, not files, and inventing a path it cannot verify is the thing this library exists to stop.
+
+`docs/cli.md`'s claim that `doctor` reports "which glob, in which rule, at which position" was
+true of a dead glob and false of every `no-condition` finding. Corrected rather than left to be
+rediscovered.
+
+## Found while fixing it
+
+- **The `ts-archunit-exclude` immunity had no test, and this change made it live.**
+  `applyFilters` keeps comment exclusions from silencing a configuration finding via
+  `v.bypassFilters === true || !isExcludedByComment(...)`, and its own comment named this exact
+  change as "the temptation" — because until now these findings carried `file: ''`, so
+  `readFileSync('')` threw and no comment could ever match. Now the rule file IS read and its
+  comments ARE parsed. Guarded in `tests/helpers/exclusion-comments.test.ts`, with the ordinary
+  violation asserted to be excluded in the same run — otherwise the guard would pass because the
+  comment matched nothing.
+- **Two source comments named a directive that does not exist** (`// arch-ignore`). The real
+  spelling is `// ts-archunit-exclude`. My first version of the new guard used the invented one and
+  its own control assertion caught it.
+- **`runBaseline` printed refused findings without the file**, so attributing them there would have
+  been invisible. The print now leads with the rule file.
+- **The wiring was caught by nothing.** `attributeToRuleFile` was unit-tested and both commands'
+  calls to it could be deleted with the suite still green — every assertion was made against the
+  function rather than against the command that has to call it. Both are now pinned end to end.

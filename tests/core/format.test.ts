@@ -208,16 +208,31 @@ describe('formatViolations for location-less config-level findings', () => {
    * silently deleted the remedy from every located violation and 2408 tests
    * still passed.
    */
-  it('deduplicates the remedy only where the message was already printed', () => {
-    const locationless = formatViolations([
+  it('renders a remedy that IS the message exactly once, in BOTH shapes', () => {
+    // COUNTED, not just present. The previous version of this test asserted
+    // `toContain('Fix: REMEDY')` for the located shape — which a duplicate
+    // satisfies — and that is how a regression in the same release went
+    // unnoticed: printing `message` for located violations made the location
+    // slot render it, and the `Fix:` line rendered it again. Two occurrences,
+    // caught by a probe rather than by this test.
+    //
+    // Asserting presence where the property is a count is the same
+    // membership-not-identity mistake as asserting a remedy is present without
+    // asserting no wrong remedy sits beside it.
+    const both = [
       mv({ file: '', line: 0, message: REMEDY, suggestion: REMEDY }),
-    ])
-    expect(locationless.split(REMEDY).length - 1).toBe(1)
-
-    const located = formatViolations([
       mv({ file: '/project/src/a.ts', line: 7, message: REMEDY, suggestion: REMEDY }),
-    ])
-    expect(located).toContain(`Fix: ${REMEDY}`)
+    ]
+    for (const v of both) {
+      const out = formatViolations([v], undefined, { codeFrames: false })
+      expect(out.split(REMEDY).length - 1, v.file || '(no file)').toBe(1)
+      // Present, not merely deduplicated away.
+      expect(out, v.file || '(no file)').toContain(REMEDY)
+    }
+    // The located one keeps its location alongside the single remedy.
+    const located = formatViolations([both[1]!], undefined, { codeFrames: false })
+    expect(located).toContain(':7')
+    expect(located).toContain('MyService.getTotal')
   })
 
   it('keeps a Fix line that differs from the message on both shapes', () => {

@@ -30,7 +30,7 @@ function writeRuleFile(name: string, body: string, tsconfig = FIXTURE_TSCONFIG):
   const file = path.join(workDir, name)
   fs.writeFileSync(
     file,
-    `import { project, modules } from ${JSON.stringify(repoRoot + '/src/index.js')}\n` +
+    `import { project, modules, functions } from ${JSON.stringify(repoRoot + '/src/index.js')}\n` +
       `const p = project(${JSON.stringify(tsconfig)})\n` +
       `export default [\n${body}\n]\n`,
   )
@@ -117,11 +117,73 @@ describe('runDoctor', () => {
     // Structural, so no phrasing can slip through. Two guesses at a wording
     // already have: `/\b2 (findings|problems|issues)\b/` missed "Total: 2
     // rules...", and the wider noun list missed "Summary: 2 items need
-    // attention." Every non-blank line belongs to a finding — three per
-    // finding, nothing else — so a total has nowhere to live. Derived from the
-    // rule file this test wrote, not pinned.
+    // attention." Every non-blank line belongs to a finding, so a total has
+    // nowhere to live. Derived from the rule file this test wrote, not pinned.
+    //
+    // FOUR lines per finding as of bug 0026, not three: the rule file it came
+    // from now leads each entry, because two identical vacuous rules in two
+    // files printed the same sentence twice with nothing saying which to open.
+    // The property this asserts is unchanged — no line is unaccounted for.
     const lines = text.split('\n').filter((line) => line.trim() !== '')
-    expect(lines).toHaveLength(2 * 3)
+    expect(lines).toHaveLength(2 * 4)
+    // And the rule file is one of them, once per finding.
+    expect(lines.filter((line) => line.trim() === file)).toHaveLength(2)
+  })
+
+  it('names the rule file, so two identical rules in two files are distinguishable', async () => {
+    // The reported symptom of bug 0026, end to end through the command rather
+    // than through the formatter: the SAME vacuous rule in two files. Its
+    // description is identical, so the rule file is the only thing that can
+    // tell them apart — and the loop over rule files was the only place that
+    // knew, and discarded it.
+    const a = writeRuleFile(
+      'dup-a.rules.ts',
+      `  functions(p).that().haveNameMatching(/^parse/).should(),`,
+    )
+    const b = writeRuleFile(
+      'dup-b.rules.ts',
+      `  functions(p).that().haveNameMatching(/^parse/).should(),`,
+    )
+    const out: string[] = []
+    const original = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      out.push(String(chunk))
+      return true
+    }
+    let code: number
+    try {
+      code = await runDoctor({ ruleFiles: [a, b], format: 'terminal' })
+    } finally {
+      process.stderr.write = original
+    }
+    const text = out.join('')
+    expect(code).toBe(1)
+    expect(text).toContain(a)
+    expect(text).toContain(b)
+    // Non-vacuity: both findings are really there, not one reported twice.
+    expect(text.split('asserts nothing').length - 1).toBe(2)
+  })
+
+  it('carries the rule file in the JSON payload too', async () => {
+    // The surface a tool consumes. `--format json` is the reason the finding
+    // has a field rather than the file being interpolated into prose.
+    const file = writeRuleFile(
+      'json-attr.rules.ts',
+      `  functions(p).that().haveNameMatching(/^parse/).should(),`,
+    )
+    const out: string[] = []
+    const original = process.stdout.write.bind(process.stdout)
+    process.stdout.write = (chunk: string | Uint8Array): boolean => {
+      out.push(String(chunk))
+      return true
+    }
+    try {
+      await runDoctor({ ruleFiles: [file], format: 'json' })
+    } finally {
+      process.stdout.write = original
+    }
+    const payload: unknown = JSON.parse(out.join(''))
+    expect(JSON.stringify(payload)).toContain(`"ruleFile":${JSON.stringify(file)}`)
   })
 
   it('states what the filesystem knows, and asserts no remedy for it', async () => {

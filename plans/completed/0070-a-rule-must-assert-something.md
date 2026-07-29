@@ -335,7 +335,7 @@ stands on the description change itself, which is measured.)
 > justified: this is ADR-008 rule 5 in the plan's own prose, and the thing that disagreed with
 > it was reading `hashViolation()`. `HASH_VERSION` stays at **2**. The real consequence —
 > descriptions change, so those entries must be re-accepted — is disclosed in the CHANGELOG
-> as a content change rather than a format change. See [bug 0027](../../bugs/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)
+> as a content change rather than a format change. See [bug 0027](../../bugs/fixed/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)
 > for the diagnosis gap this leaves open, which is the fix the bump was reaching for and did
 > not achieve.
 

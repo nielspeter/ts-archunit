@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseExclusionComments, isExcludedByComment } from '../../src/core/exclusion-comments.js'
+import { applyFilters } from '../../src/core/execute-rule.js'
 import type { ExclusionComment } from '../../src/core/exclusion-comments.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import { TestRuleBuilder, stubProject, alwaysFail } from '../support/test-rule-builder.js'
@@ -200,5 +201,71 @@ describe('inline exclusion end-to-end', () => {
     // Clean up
     fs.unlinkSync(filePath)
     fs.rmdirSync(tmpDir)
+  })
+})
+
+describe('a configuration finding cannot be silenced by a `ts-archunit-exclude` comment', () => {
+  // `applyFilters` filters comment exclusions with
+  // `v.bypassFilters === true || !isExcludedByComment(...)`, and that first
+  // clause is load-bearing: it is the only thing stopping a `ts-archunit-exclude`
+  // comment from suppressing a finding that says the rule enforces nothing.
+  //
+  // Its own docstring named the temptation — "the moment one carries a real
+  // path" — and bug 0026 is that moment: configuration findings are now stamped
+  // with the rule file they came from, so `readFileSync` succeeds and the
+  // comments in that file are parsed. Until then the clause was untestable in
+  // practice and nothing exercised it: these findings carried `file: ''`, so
+  // `readFileSync('')` threw into the catch and no comment could ever match.
+  const scratch = (): string => fs.mkdtempSync(path.join(os.tmpdir(), 'tsau-exclude-comment-'))
+
+  it('survives a comment that WOULD match it, while an ordinary violation does not', () => {
+    const dir = scratch()
+    try {
+      const file = path.join(dir, 'arch.rules.ts')
+      // Line 1 is the comment, so line 2 is what it excludes — and the stamped
+      // configuration finding sits at line 1. Both are covered by a block form.
+      fs.writeFileSync(
+        file,
+        [
+          '// ts-archunit-exclude-start test/rule: intentional',
+          'const x = 1',
+          '// ts-archunit-exclude-end',
+          '',
+        ].join('\n'),
+      )
+      const ctx = {
+        metadata: { id: 'test/rule' },
+        exclusions: [],
+        silentIndices: new Set<number>(),
+      }
+      const ordinary: ArchViolation = {
+        rule: 'r',
+        ruleId: 'test/rule',
+        element: 'x',
+        file,
+        line: 2,
+        message: 'an ordinary violation',
+      }
+      const configFinding: ArchViolation = {
+        rule: 'test/rule',
+        ruleId: 'test/rule',
+        element: 'test/rule',
+        file,
+        line: 1,
+        message: 'this rule asserts nothing and can never fail',
+        bypassFilters: true,
+      }
+
+      const kept = applyFilters([ordinary, configFinding], ctx)
+
+      // The comment works — otherwise this test proves nothing about the
+      // configuration finding surviving it (the guard would pass because the
+      // comment matched neither).
+      expect(kept.map((v) => v.message)).not.toContain('an ordinary violation')
+      // And the configuration finding is still there.
+      expect(kept.map((v) => v.message)).toContain('this rule asserts nothing and can never fail')
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

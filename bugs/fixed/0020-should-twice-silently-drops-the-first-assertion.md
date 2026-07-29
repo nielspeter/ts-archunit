@@ -85,3 +85,31 @@ Sabotaging `fork()`'s copy (`const fork = this`) is also **0 of 2340** today, an
 Ships with **[plan 0070](../../plans/completed/0070-a-rule-must-assert-something.md)'s 0.23.0**, not with R3b — 0070 took over proposal 019 and both bugs. R3b is what turns "zero conditions" from a silent pass into a failure ([bug 0019](./0019-a-rule-with-no-condition-passes-in-total-silence.md)); accumulating on its own upgrades a silent drop into an over-report, which is an improvement but leaves 0019 open.
 
 Also relevant to R3b's verdict rule, which reads "`andShould()` ANDs, so the verdict on empty is **every** condition is exempt." That verdict depends on how many conditions a rule ends up carrying — which is exactly what diverges here. Settling this after R3b ships means settling it as a bug report against R3b.
+
+## How it was fixed
+
+**v0.23.0.** One line: `RuleBuilder.fork()` no longer clears `_conditions`. Conditions accumulate,
+so a second `.should()` on one chain behaves exactly as `.andShould()` does — measured 4 + 4 = 8
+violations, identical to the `.andShould()` spelling. A `satisfy(condition)` written _before_
+`.should()` is retained too, which was a second silent drop nobody had reported.
+
+`fork()` itself survives as `copy()` plus the `_reason` resolution: it is `protected` on an
+exported class, so deleting it is a compile break for an external subclass. Its docstring now says
+the name is historical and warns the reader not to read behaviour from it.
+
+**The consequence for baselines, and the reversal that came with it.** Accumulate lengthens the
+rule description, and the description is hashed — so entries for a rule derived off a held rule
+stop matching and their accepted violations report as new. The release first bumped `HASH_VERSION`
+2 -> 3 to signal that, and **two independent reviews measured the bump as a defect**:
+`hashViolation()` never reads the constant, so it changed no hash and matched no entry
+differently, while routing every pre-0.23.0 baseline into the version-mismatch branch and telling
+those users the format was "the likely cause" — which cannot be true, and which buried the
+root-mismatch branch that usually is. Reverted to 2, with the real consequence disclosed in the
+CHANGELOG as a content change rather than a format change. See
+[bug 0027](./0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md) for the diagnosis gap that
+leaves open — which is what the bump was reaching for and did not achieve.
+
+**Why the naive guard was not enough.** The obvious test — assert a two-`.should()` rule reports 8
+— passes under a sabotaged `copy()` that shares the array, because every assertion happened to read
+the builder _after_ the derivation. The shipped guard discriminates by violation **message**, not
+by count, and is verified against both the clearing implementation and the sharing one.

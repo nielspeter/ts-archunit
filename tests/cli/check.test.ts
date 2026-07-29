@@ -117,6 +117,36 @@ describe('runCheck', () => {
     expect(code).toBe(2)
   })
 
+  it('WIRING: a location-less finding is attributed to its rule file', async () => {
+    // `attributeToRuleFile` is unit-tested in tests/cli/rule-file-findings.ts.
+    // This is the other half, and sabotage proved it was missing: unwiring the
+    // call in this command left the whole suite green, because every assertion
+    // about the attribution was made against the function rather than against
+    // the command that has to call it.
+    const reported: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      reported.push(String(chunk))
+      return true
+    })
+    mockLoadRuleFiles.mockResolvedValue([
+      {
+        violations: () => [
+          v({
+            rule: 'x/vacuous',
+            element: 'x/vacuous',
+            file: '',
+            line: 0,
+            message: 'this rule asserts nothing and can never fail',
+            bypassFilters: true,
+          }),
+        ],
+      },
+    ])
+    const code = await runCheck({ ...baseArgs, ruleFiles: ['rules/mine.rules.ts'] })
+    expect(code).toBe(1)
+    expect(reported.join('')).toContain('rules/mine.rules.ts')
+  })
+
   it('the rule-file failure is a configuration finding, so nothing can silence it', async () => {
     // A rule file that could not run enforced nothing, which is not a violation
     // to grade or to accept into a baseline. Asserted through the machinery

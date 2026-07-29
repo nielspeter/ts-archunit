@@ -40,12 +40,18 @@ function formatSingleViolation(
 
   const whyText = v.because ?? reason
   const whyLine = whyText ? `  ${dim('Why:')} ${whyText}` : ''
-  // Suppressed only when the `location` slot above already printed this exact
-  // text — which happens for a location-less finding whose remedy is its
-  // message. A located violation never renders `message` here, so its `Fix:`
-  // line is the only place the remedy appears and must always print.
-  const remedyAlreadyShown = !v.file && remedyRepeatsMessage(v)
-  const fixLine = v.suggestion && !remedyAlreadyShown ? `  ${dim('Fix:')} ${v.suggestion}` : ''
+  // Suppressed whenever the `location` slot above already printed this exact
+  // text, which is now BOTH shapes — see the note there. It used to be
+  // `!v.file && remedyRepeatsMessage(v)`, and that asymmetry was load-bearing
+  // and pinned, because a located violation did not render `message` at all: its
+  // `Fix:` line was the remedy's only appearance. Rendering `message` for both
+  // shapes removed the premise, and the `!v.file` half became a defect —
+  // measured, two occurrences of the remedy for a located finding whose
+  // suggestion is its message.
+  //
+  // So do not "restore" the asymmetry from the old comment: check whether this
+  // formatter still prints `message` for a located violation first.
+  const fixLine = v.suggestion && !remedyRepeatsMessage(v) ? `  ${dim('Fix:')} ${v.suggestion}` : ''
   const docsLine = v.docs ? `  ${dim('Docs:')} ${v.docs}` : ''
 
   const parts = [counter, '', ruleLine, '', location]

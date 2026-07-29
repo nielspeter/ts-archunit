@@ -81,3 +81,38 @@ Asserting on `console.warn` being called is not a guard. Under the current behav
 R3b's empty-**selector** half and this empty-**condition** half are the two directions of one property: _a rule must have something to check, and something to check it against._ Neither is currently enforced, and this one has no `doctor` coverage either — `diagnose()` reports `kind: 'no-condition'` as a diagnostic, which is the measuring instrument, not the gate.
 
 See also [bug 0020](./0020-should-twice-silently-drops-the-first-assertion.md), which is how a rule reaches this state without the author omitting anything.
+
+## How it was fixed
+
+Two releases, deliberately, so consumers could measure before anything broke.
+
+**v0.22.0 — the instrument.** `assertsSomething()` and `assertionAdvice()` on every builder
+(`TerminalBuilder` is the single root, so one hook reaches all fifteen), plus `describeRule()` on
+the six that reported `unnamed`. `doctor` and `diagnose()` name every assertion-less rule and the
+remedy for its own shape. Nothing at runtime changed. The four old `console.warn(...) + return []`
+sites were deleted — the `RuleBuilder` one could never fire for the commonest shape anyway, being
+gated on a phase `.should()` had already left, which is the specific defect this bug reported.
+
+**v0.23.0 — the flip.** One private gate, `TerminalBuilder.collectWithAssertionGuard()`, called
+from `violations()` / `check()` / `warn()`, raising an `ArchViolation` with `bypassFilters` —
+`error` severity whatever the rule asked for, refused by `.excluding()`, skipped by baseline and
+diff. Gate-first, ahead of `collectViolations()`, for three measured reasons recorded in the
+method's docstring.
+
+**Eight shapes, not seven.** A review of the release branch measured an eighth that the plan never
+enumerated and that is the worst of them: a predicate used after `.should()` **alongside a real
+condition** retroactively narrows the subject set the conditions are evaluated over. Measured
+`subjects 4 -> 0`, `violations 4 -> 0`, `diagnose() []`, `check()` passed — and its description
+reads as deliberate, so nobody had a reason to look. `assertsSomething()` consulted the
+misplaced-predicate list only when there were zero conditions.
+
+The finding also states that it cannot be suppressed and links the rule (ADR-008 rule 3): measured
+before that was added, a reader given only the remedy tries `.asSeverity('warn')`, `.excluding()`,
+the baseline and `--changed` first — four CI cycles.
+
+**An earlier revision emitted the remedy as a runtime stderr warning and it was withdrawn.** A
+bespoke output path bypassed the formatter, the JSON payload, the annotation surface and the exit
+code, and a five-persona review found a defect at each of those seams. The finding form reaches
+all four by construction. That withdrawal is what made the 0.23.0 gate cheap. It also uncovered
+[bug 0024](../0024-warn-terminal-is-invisible-inside-a-test-runner.md), which is the pre-existing
+half and remains open.
