@@ -133,9 +133,10 @@ assertsSomething(): boolean {
 
 // Protected: the advice channel. One string per state, produced by the builder that
 // knows its own states. diagnose() consumes it through DiagnosableRule, so the doctor
-// advice and the runtime message are the SAME string by construction — round 2 measured
-// draft 2 shipping two diverging texts for one state.
-protected assertionAdvice(): string {
+// advice and the failure message are the SAME string by construction — round 2 measured
+// draft 2 shipping two diverging texts for one state. PUBLIC as shipped, not protected:
+// a protected member cannot satisfy the structural interface diagnose() consumes.
+assertionAdvice(): string {
   return 'this rule asserts nothing, so it can never fail. Add an assertion, or delete the rule.'
 }
 
