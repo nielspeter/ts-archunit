@@ -55,6 +55,14 @@ export interface BaselineEntry {
   line: number
   /** Stable identity hash: sha256(rule + element + message) */
   hash: string
+  /**
+   * Subject hash: sha256(element + message), i.e. identity WITHOUT the rule
+   * description. Written since 0.24.0 and optional, so a baseline from an
+   * earlier version still loads — it simply cannot be diagnosed when an entry
+   * stops matching, which is honest degradation rather than a guessed cause.
+   * See \{@link hashSubject\} for what it is for.
+   */
+  subject?: string
 }
 
 /**
@@ -118,6 +126,33 @@ export function hashViolation(violation: ArchViolation, root?: string): string {
   const subject = violation.identity ?? `${violation.element}::${violation.message}`
   const content = `${scrub(violation.rule)}::${scrub(subject)}`
   return createHash('sha256').update(content).digest('hex').slice(0, 16)
+}
+
+/**
+ * The violation's **subject**: what was found, independent of which rule found it.
+ *
+ * `hashViolation` above is `rule::element::message`, so editing a rule's
+ * predicates or conditions — or accumulating them, which v0.23.0 made happen for
+ * a rule derived off a held rule — changes the identity of violations that did
+ * not change at all. Those entries stop matching and their already-accepted
+ * violations report as **new**, with nothing saying why (bug 0027).
+ *
+ * This is the differently-derived value that tells the two cases apart:
+ *
+ * | baseline entry did not match because… | subject present in the run? |
+ * | ------------------------------------- | --------------------------- |
+ * | the violation was fixed               | no — stay silent, this is success |
+ * | the rule's description changed        | yes — say so, and regenerate |
+ *
+ * Bug 0027's own suggested signal was "an entry whose `rule` string appears under
+ * a different hash", and it cannot work: the rule string is precisely what
+ * changed. Measured before this was built.
+ */
+export function hashSubject(violation: ArchViolation, root?: string): string {
+  const scrub = (text: string): string =>
+    root === undefined ? text : normalizeIdentityText(text, root)
+  const subject = violation.identity ?? `${violation.element}::${violation.message}`
+  return createHash('sha256').update(scrub(subject)).digest('hex').slice(0, 16)
 }
 
 /** Forward slashes so the recorded root reads the same on Windows and CI. */
@@ -190,20 +225,31 @@ export function withBaseline(baselinePath: string, options: BaselineOptions = {}
       ? path.resolve(baselineDir, parsed.root)
       : undefined
   const effectiveRoot = options.root !== undefined ? root : (recordedRoot ?? root)
-  const hashes = new Set(
-    parsed.violations
-      .map((entry: unknown) =>
-        entry !== null &&
-        typeof entry === 'object' &&
-        'hash' in entry &&
-        typeof entry.hash === 'string'
-          ? entry.hash
-          : undefined,
-      )
-      .filter((hash: string | undefined): hash is string => hash !== undefined),
-  )
+  const hashes = new Set<string>()
+  // subject hash -> the rule description recorded for it. Only what the
+  // description-change diagnosis needs, so a large baseline does not carry a
+  // second copy of every entry. Entries written before 0.24.0 have no subject
+  // and simply do not appear here.
+  const subjects = new Map<string, string>()
+  // Annotated as `readonly unknown[]`, not iterated directly: `parsed.violations`
+  // is `any[]` after the `Array.isArray` check, and ADR-005 bars both `any` and
+  // the `as` that would otherwise be needed to re-narrow it. Assigning to this
+  // type is allowed and hands each element back as `unknown`.
+  const rawEntries: readonly unknown[] = parsed.violations
+  for (const entry of rawEntries) {
+    if (entry === null || typeof entry !== 'object') continue
+    if ('hash' in entry && typeof entry.hash === 'string') hashes.add(entry.hash)
+    if (
+      'subject' in entry &&
+      typeof entry.subject === 'string' &&
+      'rule' in entry &&
+      typeof entry.rule === 'string'
+    ) {
+      subjects.set(entry.subject, entry.rule)
+    }
+  }
 
-  return new Baseline(hashes, effectiveRoot, hashVersion, resolved)
+  return new Baseline(hashes, effectiveRoot, hashVersion, resolved, subjects)
 }
 
 /**
@@ -238,6 +284,7 @@ export function generateBaseline(
       file: toPortablePath(v.file, root),
       line: v.line,
       hash: hashViolation(v, root),
+      subject: hashSubject(v, root),
     }))
 
   const baseline: BaselineFile = {
@@ -261,6 +308,12 @@ export class Baseline {
     private readonly root: string,
     private readonly hashVersion: number = HASH_VERSION,
     private readonly sourcePath?: string,
+    /**
+     * Subject hash -> the rule description recorded against it. Empty for a
+     * baseline written before 0.24.0, which disables the description-change
+     * diagnosis rather than guessing at it (bug 0027).
+     */
+    private readonly knownSubjects: ReadonlyMap<string, string> = new Map(),
   ) {}
 
   /**
@@ -297,8 +350,77 @@ export class Baseline {
       }
       kept.push(violation)
     }
-    const finding = this.unmatchedBaselineFinding(matched, matchable)
+    // The specific diagnosis SUPERSEDES the generic one, and not merely for
+    // tidiness: it disproves it. `unmatchedBaselineFinding` fires on
+    // `matched === 0` and, in the same-version case, tells the reader the likely
+    // cause is a differently-resolved repository root. A detected description
+    // change means a stored SUBJECT matched — and subjects are scrubbed with the
+    // same root as hashes — so the root is demonstrably resolving consistently
+    // and the root explanation is false. Reporting both would put two
+    // contradictory causes in one run, which is the ADR-008 rule 2 defect the
+    // withdrawn HASH_VERSION bump already committed once in this area.
+    const descriptionChange = this.descriptionChangeFinding(violations)
+    const finding = descriptionChange ?? this.unmatchedBaselineFinding(matched, matchable)
     return finding === undefined ? kept : [finding, ...kept]
+  }
+
+  /**
+   * A meta-finding for baseline entries that stopped matching because the
+   * **rule's description changed**, not because the violation was fixed.
+   *
+   * The distinction is the whole difficulty (bug 0027). An entry that stops
+   * matching is normally success — that is what a ratchet is for — so "some
+   * entries did not match" is not evidence of anything, which is why
+   * \{@link unmatchedBaselineFinding\} is gated on `matched === 0` and stays
+   * silent here. But that leaves the common case unexplained: an accepted
+   * violation reported as new, reading like fresh rot in application code.
+   *
+   * `hashSubject` is the differently-derived value that separates them. A
+   * violation in this run whose subject matches a baseline entry, under a
+   * different full hash, is the same finding about the same code under a rule
+   * whose description moved. A subject present in the baseline and absent from
+   * the run was fixed, and says nothing.
+   *
+   * Silent for a baseline written before 0.24.0: those entries have no subject,
+   * so the question cannot be asked and no cause is guessed.
+   */
+  private descriptionChangeFinding(violations: ArchViolation[]): ArchViolation | undefined {
+    if (this.knownSubjects.size === 0) return undefined
+    // Rule descriptions the baseline recorded for subjects this run re-reported
+    // under a different identity. A Map keyed by the OLD description, so the
+    // same edited rule is named once however many violations it has.
+    const changed = new Map<string, string>()
+    for (const violation of violations) {
+      if (violation.bypassFilters === true) continue
+      if (this.isKnown(violation)) continue
+      const recordedRule = this.knownSubjects.get(hashSubject(violation, this.root))
+      if (recordedRule === undefined) continue
+      changed.set(recordedRule, violation.rule)
+    }
+    if (changed.size === 0) return undefined
+
+    const where = this.sourcePath ?? 'the baseline file'
+    // Identities, never a total (ADR-008 rule 4): name the rules, both spellings,
+    // so the reader can see WHAT changed rather than being told how many did.
+    const pairs = [...changed.entries()]
+      .map(([was, now]) => `\n  was: ${was}\n  now: ${now}`)
+      .join('')
+    const plural = changed.size === 1 ? 'rule' : 'rules'
+    return {
+      rule: 'ts-archunit: baseline',
+      element: 'baseline',
+      file: '',
+      line: 0,
+      message:
+        `Baseline at ${where} no longer matches ${String(changed.size)} ${plural} whose ` +
+        `description changed, so already-accepted violations of ${changed.size === 1 ? 'it' : 'them'} ` +
+        `are being reported as new. This is not new rot in your code — the rule was edited, ` +
+        `or its conditions accumulated (v0.23.0):${pairs}`,
+      because:
+        "A violation's identity includes the rule description, so editing a rule re-reports every violation it had already accepted — indistinguishable from a regression unless it is named.",
+      suggestion: `Regenerate the baseline: \`npx ts-archunit baseline <your-rule-files> --output ${where}\`. Review the diff: the entries that vanish are the ones listed above, and their replacements should be the same violations under the new description.`,
+      bypassFilters: true,
+    }
   }
 
   /**

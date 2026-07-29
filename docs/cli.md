@@ -119,7 +119,7 @@ demo/no-condition
   if it comes from a preset (ruleId "preset/..."), report it to the preset's author
 ```
 
-It reports **identities, never totals** — which glob, in which rule, at which position. It **exits non-zero when it reports anything**, because an agent reads `exit 0` as "nothing to do".
+It reports **identities, never totals** — which rule file, which rule, and for a dead glob the glob and its position. (Before 0.24.0 this promised a position for every finding, which only a dead glob has: a rule that asserts nothing has no glob and no position, and its only identity was a prose sentence you had to grep for.) It **exits non-zero when it reports anything**, because an agent reads `exit 0` as "nothing to do".
 
 ::: warning Experimental — do not wire it into a pipeline
 `doctor` is a diagnostic you invoke, not a build gate, and it is deliberately absent from `--help`: retiring a documented command later would be its own breaking change, and its future is undecided. Use [`diagnose()`](/api-reference#diagnostics-experimental) for the same thing inside a test.

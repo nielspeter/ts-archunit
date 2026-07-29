@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
-import { ruleFileFailure } from '../../src/cli/rule-file-failure.js'
+import { attributeToRuleFile, ruleFileFailure } from '../../src/cli/rule-file-findings.js'
 import { formatViolationsGitHub } from '../../src/core/format-github.js'
 import { formatViolations } from '../../src/core/format.js'
 import { severityFor } from '../../src/core/violation.js'
@@ -108,5 +108,74 @@ describe('ruleFileFailure', () => {
     const relative = ruleFileFailure('nested/dir/x.rules.ts', new Error('e'), 1)
     expect(relative.file).toBe('nested/dir/x.rules.ts')
     expect(path.isAbsolute(relative.file)).toBe(false)
+  })
+})
+
+describe('attributeToRuleFile', () => {
+  const configFinding = {
+    rule: 'my/rule-id',
+    element: 'my/rule-id',
+    file: '',
+    line: 0,
+    message: 'this rule asserts nothing and can never fail',
+    suggestion: 'Add a condition after .should()',
+    bypassFilters: true,
+  }
+
+  it('stamps the rule file onto a finding that has no location of its own', () => {
+    const [stamped] = attributeToRuleFile([configFinding], 'rules/arch.rules.ts')
+    expect(stamped?.file).toBe('rules/arch.rules.ts')
+    expect(stamped?.line).toBe(1)
+    // Everything else is untouched — the identity, the remedy, the flag.
+    expect(stamped?.rule).toBe('my/rule-id')
+    expect(stamped?.suggestion).toBe(configFinding.suggestion)
+    expect(stamped?.bypassFilters).toBe(true)
+  })
+
+  it('leaves a violation that already has a location alone', () => {
+    // Ordinary violations point at the code they found, not at the rule file
+    // that declared the rule. Overwriting that would be the whole feature
+    // backwards.
+    const located = {
+      ...configFinding,
+      file: '/src/service.ts',
+      line: 42,
+      bypassFilters: undefined,
+    }
+    const [same] = attributeToRuleFile([located], 'rules/arch.rules.ts')
+    expect(same?.file).toBe('/src/service.ts')
+    expect(same?.line).toBe(42)
+  })
+
+  it('makes two identical vacuous rules distinguishable', () => {
+    // The reported symptom: two rule files each holding the same vacuous rule
+    // rendered as two identical paragraphs, with nothing saying which to open.
+    const a = attributeToRuleFile([configFinding], 'a.rules.ts')
+    const b = attributeToRuleFile([configFinding], 'b.rules.ts')
+    const rendered = formatViolations([...a, ...b], undefined, { codeFrames: false })
+    expect(rendered).toContain('a.rules.ts')
+    expect(rendered).toContain('b.rules.ts')
+  })
+
+  it('produces a file-level GitHub annotation with a usable line', () => {
+    // Before: `file: ''` took the run-level branch, so 40 vacuous rules across 6
+    // files all landed on the workflow summary with no way to tell them apart.
+    const stamped = attributeToRuleFile([configFinding], 'rules/arch.rules.ts')
+    const annotation = formatViolationsGitHub(stamped)
+    expect(annotation).toContain('file=rules/arch.rules.ts')
+    expect(annotation).not.toContain('line=0')
+    expect(annotation).toMatch(/line=[1-9]/)
+  })
+
+  it('does not resurrect the double-printed remedy', () => {
+    // A configuration finding whose `suggestion` IS its `message` used to rely on
+    // `file === ''` to be rendered once. Stamping a file changes which branch it
+    // takes, so the count is asserted here too — this is the third time in this
+    // release that the remedy could have started printing twice.
+    const selfRemedy = { ...configFinding, suggestion: configFinding.message }
+    const out = formatViolations(attributeToRuleFile([selfRemedy], 'a.rules.ts'), undefined, {
+      codeFrames: false,
+    })
+    expect(out.split(selfRemedy.message).length - 1).toBe(1)
   })
 })

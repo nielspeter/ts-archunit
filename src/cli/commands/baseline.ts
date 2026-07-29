@@ -2,7 +2,7 @@ import { collectViolations } from '../../helpers/baseline-generator.js'
 import { generateBaseline } from '../../helpers/baseline.js'
 import type { ArchViolation } from '../../core/violation.js'
 import { loadRuleFiles } from '../load-rules.js'
-import { failureOrViolations } from '../rule-file-failure.js'
+import { attributeToRuleFile, failureOrViolations } from '../rule-file-findings.js'
 
 export interface BaselineArgs {
   ruleFiles: string[]
@@ -34,7 +34,10 @@ export async function runBaseline(args: BaselineArgs): Promise<number> {
     }
     for (const builder of builders) {
       try {
-        violations.push(...collectViolations(builder))
+        // Same attribution as `runCheck` (bug 0026): the findings this command
+        // REFUSES to baseline are printed for the user to fix, and "which rule
+        // file" is the first thing they need.
+        violations.push(...attributeToRuleFile(collectViolations(builder), file))
       } catch (error: unknown) {
         violations.push(...failureOrViolations(file, error, total))
       }
@@ -59,7 +62,13 @@ export async function runBaseline(args: BaselineArgs): Promise<number> {
         `that currently enforces nothing, so accepting it would hide the gap. Fix these:\n`,
     )
     for (const violation of refused) {
-      process.stdout.write(`  - ${violation.rule}: ${violation.message}\n`)
+      // The rule file first when there is one. Attributing the finding
+      // (bug 0026) is pointless if the command that prints it drops the field:
+      // "which rule file" is the first thing the reader needs, and with two
+      // files holding the same vacuous rule the description alone is the same
+      // sentence twice.
+      const where = violation.file === '' ? '' : `${violation.file}: `
+      process.stdout.write(`  - ${where}${violation.rule}: ${violation.message}\n`)
     }
   }
 

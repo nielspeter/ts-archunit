@@ -132,3 +132,24 @@ partly meant to correct.
 It is also the same defect as one of 0070's own notes on accumulate: under accumulate, an
 inherited condition's violations are reported by the derived rule and stamped with the derived
 rule's `because` and `suggestion`. One cause, three symptoms, one place to fix it.
+
+## How it was fixed
+
+**v0.21.0.** `applyFilters` (`src/core/execute-rule.ts`) supplies `ruleId` and `because` from the
+rule's metadata to any finding that leaves them unset, and **deliberately refuses** to supply
+`suggestion` or `docs` to a `bypassFilters` finding. The author's `suggestion` describes how to fix
+a violation of the rule; a configuration finding reports that the rule cannot produce one, so
+pairing them is a false remedy by juxtaposition. Every configuration finding now states the fix for
+its own fault.
+
+`id` and `because` still reach these findings, because neither claims to be a remedy: the id says
+_which_ rule enforces nothing, which is the first thing the reader needs, and `because` states why
+the rule exists, which is context rather than a claim about this finding's cause.
+
+**Two later recurrences of the same family, both caught by review rather than by tests:** the
+`.excluding()` refusal hard-coded the empty-_selector_ remedy for every configuration finding
+(fixed in v0.22.0 — it now says "Fix the fault it names instead"), and v0.23.0's assertion-gate
+finding had to be built to carry its own `suggestion` _and_ its own `docs` for the same reason.
+Sabotage found that deleting its `suggestion` passed the whole suite, because a configuration
+finding is the one kind that cannot fall back to the author's text — so the remedy would have
+shipped with no `Fix:` line on any surface.

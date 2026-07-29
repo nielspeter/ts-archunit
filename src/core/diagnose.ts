@@ -62,6 +62,17 @@ export interface DiagnosticFinding {
   readonly onDisk?: OnDisk
   /** The sanctioned fix, or an honest list of causes where none is verifiable. */
   readonly advice: string
+  /**
+   * The rule file this rule was written in, when the caller knows it.
+   *
+   * `diagnose()` never sets this — it is handed rules, not files, and inventing
+   * a path it cannot verify is the thing this library exists to stop. `doctor`
+   * sets it, because its loop over rule files is the only place the mapping
+   * exists (bug 0026: `docs/cli.md` claimed identities "in which rule" and that
+   * was true of a dead glob's position and false of every `no-condition`
+   * finding, whose only identity was a prose sentence).
+   */
+  readonly ruleFile?: string
 }
 
 /**

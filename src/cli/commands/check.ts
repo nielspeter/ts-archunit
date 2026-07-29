@@ -5,7 +5,7 @@ import type { OutputFormat } from '../../core/check-options.js'
 import type { ArchViolation } from '../../core/violation.js'
 import { writeReport } from '../../core/execute-rule.js'
 import { loadRuleFiles } from '../load-rules.js'
-import { failureOrViolations } from '../rule-file-failure.js'
+import { attributeToRuleFile, failureOrViolations } from '../rule-file-findings.js'
 
 export interface CheckArgs {
   ruleFiles: string[]
@@ -51,7 +51,10 @@ export async function runCheck(args: CheckArgs): Promise<number> {
     }
     for (const builder of builders) {
       try {
-        collected.push(...builder.violations())
+        // Attributed here, where the rule file is known. A builder cannot do it
+        // — the same builder is legal in a test file, where vitest supplies the
+        // frame instead (bug 0026).
+        collected.push(...attributeToRuleFile(builder.violations(), file))
       } catch (error: unknown) {
         collected.push(...failureOrViolations(file, error, total))
       }

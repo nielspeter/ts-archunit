@@ -3,6 +3,39 @@ import { ArchRuleError } from '../core/errors.js'
 import { basename } from 'node:path'
 
 /**
+ * Attribute findings that have no source location of their own to the rule file
+ * they came from.
+ *
+ * [Bug 0026](../../bugs/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md):
+ * a configuration finding carries `file: ''` because it reports a fault in the
+ * rule rather than in the code, so two identical vacuous rules in two rule files
+ * rendered as two identical paragraphs with nothing saying which to open. In a
+ * test the frame comes free from vitest; in the CLI — the golden-path default —
+ * nothing supplied it, even though this loop knows the file and was discarding it.
+ *
+ * `line: 1`, following `tsconfig()`'s precedent for a fault that belongs to a
+ * file rather than to a position in it (`docs/config-rules.md` documents that
+ * choice). The builders cannot know the line: a rule with no glob has no
+ * position anywhere, and the assertion-gate findings are exactly the rules that
+ * may have none. Not `line: 0` — `::error file=x,line=0` is not a valid GitHub
+ * annotation and gets dropped or misplaced.
+ *
+ * **Safe against a `ts-archunit-exclude` comment only because these findings carry
+ * `bypassFilters`.** `execute-rule.ts` filters comment exclusions with
+ * `v.bypassFilters === true || !isExcludedByComment(...)`, and that first clause
+ * is what stops a real path here from making the finding suppressible by a
+ * comment in the rule file. It was written for this exact temptation, and until
+ * this change nothing tested it, because no such finding had a readable path.
+ * `tests/helpers/exclusion-comments.test.ts` now pins it.
+ */
+export function attributeToRuleFile(
+  violations: readonly ArchViolation[],
+  file: string,
+): ArchViolation[] {
+  return violations.map((v) => (v.file === '' ? { ...v, file, line: 1 } : v))
+}
+
+/**
  * A rule file, or one rule in it, that could not be evaluated at all.
  *
  * [Bug 0025](../../bugs/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md):

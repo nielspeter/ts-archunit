@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.24.0] - 2026-07-29
 
+**Three bugs in how a finding is located and diagnosed, bundled** — 0025, 0026 and 0027 are one subsystem, and releasing them separately would have cost consumers three version bumps for one area.
+
 **One malformed rule no longer silences the run.** [Bug 0025](./bugs/fixed/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md): `ts-archunit check` caught `ArchRuleError` and re-threw everything else, so any other error escaped the per-file loop and terminated the process — no report written, no exit code returned, and every finding already collected discarded. Measured on the real CLI: two rule files, the first holding a one-sided `correspondence()` with `.beComplete()`, the second holding four real violations. Before, a raw Node stack trace with `node_modules` paths and **zero** findings. After, five findings and exit 1.
 
 A minor rather than a patch: a run that used to crash now reports, and `^0.23.0` would have resolved a patch silently into every consumer's CI.
@@ -19,6 +21,25 @@ A minor rather than a patch: a run that used to crash now reports, and `^0.23.0`
 
   If you relied on `runCheck` rejecting so a wrapper script could catch it, it now resolves with a non-zero count instead. `ts-archunit baseline` gains the same treatment, where it matters twice over: a re-throw left **no baseline file at all**, so one malformed rule made the command unusable rather than producing a partial baseline you could finish.
 
+- **A finding with no source location of its own now names the rule file it came from** ([bug 0026](./bugs/fixed/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md)). A configuration finding carries no location, because it reports a fault in the rule rather than in the code — so two identical vacuous rules in two rule files rendered as two identical paragraphs with nothing saying which to open. In a test the frame comes free from vitest; in the CLI, the golden-path default, nothing supplied it although the per-file loop knew and was discarding it.
+
+  Stamped at that loop, with `line: 1` — the same choice `tsconfig()` makes for a fault belonging to a file rather than to a position in it. A violation that already has a location is untouched. `--format github` consequently emits a **file-level** annotation for these instead of one run-level line for the whole run.
+
+  `doctor` gains the same attribution and prints the rule file first. It now diagnoses per rule file rather than flattening every file's rules into one array, which is what discarded the mapping. `DiagnosticFinding` gains an optional `ruleFile`; `diagnose()` never sets it, because it is handed rules rather than files and must not invent a path it cannot verify.
+
+- **An unmatched baseline entry can be diagnosed** ([bug 0027](./bugs/fixed/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)). A violation's identity includes the rule description, so editing a rule — or accumulating its conditions, which v0.23.0 made happen for a rule derived off a held rule — changes the identity of violations that did not change at all. Those entries stopped matching and their accepted violations reported as **new**, reading like fresh rot in application code, and the finding whose whole purpose is to explain this could not fire: it is gated on `matched === 0`, and this produces a partial miss.
+
+  Baseline entries now record a `subject` hash — identity **without** the rule description — which is what separates the two cases that look identical from the outside:
+
+  | the entry stopped matching because… | subject still in the run? | what you get                     |
+  | ----------------------------------- | ------------------------- | -------------------------------- |
+  | the violation was fixed             | no                        | silence — this is success        |
+  | the rule's description changed      | yes                       | both spellings named; regenerate |
+
+  `subject` is optional, so a baseline written before 0.24.0 still loads and simply cannot be diagnosed — honest degradation rather than a guessed cause. **Regenerate to get the diagnosis**; nothing else requires it.
+
+  The specific diagnosis supersedes the generic `matched === 0` finding, and disproves it: that finding blames a differently-resolved repository root, and a matched subject proves the root is resolving consistently.
+
 - **`correspondence()` with the wrong number of sides is a finding whether or not an assertion was chosen.** `.beComplete()` on a one-sided correspondence cannot assert anything — there is no second side to compare against — so `assertsSomething()` now returns `false` for wrong arity regardless, and the fault reports through the assertion gate with the remedy it already had (another `.side(...)`, never `.beComplete()`). v0.23.0 fixed only the no-assertion branch and disclosed this one as still throwing; that asymmetry is gone. **If you catch `RangeError` around `correspondence()`, it now arrives as an `ArchRuleError` configuration finding.**
 
 ### Fixed
@@ -27,11 +48,23 @@ Three output defects, each found by running the real CLI while fixing the above 
 
 - **The default terminal format never printed a located violation's `message`** — for _every_ ordinary violation, not only new findings. The location slot rendered `file:line — element` and the message, the one sentence saying what is actually wrong, was rendered nowhere. `formatViolationsPlain` had always printed it, so the two formatters disagreed about what a violation is. Output gains one line per violation; nothing failed when this was fixed, because nothing pinned it either way.
 - **`--format github` doubled the period** between a message ending in punctuation and its `Fix:` clause (`…(reading 'config').. Fix: …`). This is the one format that concatenates the parts onto a single line, so it owns the punctuation between them.
+- **A configuration finding whose remedy IS its message printed it twice again.** Third occurrence in two releases, and this one was introduced _by_ the located-message fix above: the dedupe was conditioned on `!v.file`, which was correct only while located violations did not render their message. Removing that premise made the condition a defect. The guard now counts occurrences in **both** shapes — the previous version asserted the `Fix:` line was _present_ for the located shape, which a duplicate satisfies.
+
+- **`ts-archunit baseline` printed refused findings without their rule file**, so attributing them there would have been invisible.
+
 - **A rule-file failure named its own path four times** — in `rule`, in `element`, in the location line and in the remedy — and the location line runs it through `path.relative(cwd, …)`, so a rule file outside the cwd printed as `../../../../../../private/tmp/…`.
 
 ### Upgrading — 0.24.0
 
-Nothing to do. A run that previously crashed now reports and exits non-zero; a run that was already green stays green. Two behaviours to know about if you script around the CLI: `runCheck`/`runBaseline` no longer reject on an unexpected error from a rule file, and violation output is one line longer per violation.
+Nothing is required. A run that previously crashed now reports and exits non-zero; a run that was already green stays green.
+
+**Regenerate your baseline when convenient.** Entries written before 0.24.0 carry no `subject`, so if a rule's description changes later, the re-reported violations cannot be explained — you get the bare re-report, which is what bug 0027 was about. Existing baselines keep matching either way: the hash function is unchanged and the identity format version is still 2.
+
+Three behaviours to know about if you script around the CLI:
+
+- `runCheck` / `runBaseline` no longer reject on an unexpected error from a rule file — they resolve with a non-zero count.
+- Violation output is one line longer per violation (the message is now printed for located violations).
+- `--format github` emits a **file-level** annotation for configuration findings from a rule file, where it previously emitted one run-level line.
 
 ## [0.23.0] - 2026-07-29
 
