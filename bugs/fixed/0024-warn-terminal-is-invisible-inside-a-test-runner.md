@@ -1,6 +1,7 @@
 # Bug 0024: `.warn()` inside a test reports nothing — vitest drops it
 
 **Reported:** 2026-07-29
+**Fixed:** 2026-07-29 (v0.26.0)
 **Found in:** all versions through v0.21.0
 **Severity:** High — `.warn()` is the documented way to run an advisory rule in a test
 file, and in a passing test it produces **no output at all**. A team adopting the
@@ -86,3 +87,74 @@ Out of scope for 0070, which is about rules that assert **nothing**; this is abo
 that asserts something and reports it where nobody looks. They share a cause, and 0070's
 0.22.0 is the release that documented the mechanism — so this should not be left for
 someone to rediscover from that document.
+
+## How it was fixed
+
+**v0.26.0.** One channel — `writeStderr` in `src/core/stderr.ts` — and every
+library-originated message routed through it. Reproduced first, on a real child
+`vitest run` with the default reporter: a **passing** test whose rule has 4 real
+violations printed **nothing**, zero occurrences of the violation text.
+
+**The scope was wider than this report's five sites: ten calls across five files.**
+`executeWarn`'s report and the exclusion warnings were the reported half, but the
+same silence covered the exclusion-comment parse warnings, `matchers.ts`'s
+`expression()` escape-hatch warning, `presets/shared.ts`, `diff-aware.ts`'s
+git-fallback warning and `baseline.ts`'s invalid-file warning. A stale
+`.excluding()` in a passing test — the one signal that an exclusion has rotted
+after a rename — said nothing at all in the runner where rules are written.
+
+`writeReport` and `doctor`'s seven writes were moved onto the channel too. They
+were already on stderr, so they were visible; what they lacked was the EPIPE
+guard.
+
+**Both cautions in this report were re-measured and both held.**
+
+- **EPIPE.** Over 20 000 lines to a closed pipe: bare `process.stderr.write`
+  exits **1**, an attached `'error'` listener exits **0**, `console.warn` exits
+  **0**. A persistent listener rather than `once` — `once` removes itself after
+  the first error, leaving a second EPIPE uncaught, and re-adding per write leaks
+  listeners. Note this was a **live defect before the fix**: `writeReport`
+  already wrote to stderr unguarded, so a piped `check` could fail for EPIPE
+  rather than for findings, and the exit code cannot tell them apart.
+- **Test attribution.** Accepted and stated, as this report asked. vitest
+  annotates intercepted output with the test that produced it; a direct write
+  loses that. For a violation report the rule's identity is in the message, and
+  being attributed to a test that never printed would be worse.
+
+## The guard, and what it took
+
+`tests/core/warn-survives-the-test-runner.test.ts` spawns a real `vitest run`
+with the default reporter and `CI=true`, in both directions this report asked
+for: the **passing** test must show the output, and the **failing** test must
+still show it — the latter exists because vitest replays intercepted output for
+failing tests, so a guard written only that way passes with the defect fully
+restored.
+
+Two things had to be measured rather than assumed:
+
+- The probe is generated **inside** `tests/`, not in a temp directory:
+  `vitest.config.ts` sets `include: ['tests/**/*.test.ts']`, so a probe in
+  `os.tmpdir()` is filtered out and the child exits 1 with "No test files found"
+  — which reads exactly like the assertion failing.
+- The `writeReport`-specific wiring could not be tested behaviourally at all.
+  Bare node cannot import these modules (`.js` specifiers resolving to `.ts`),
+  and running the probe under vitest hands stdio to vitest, so the closed pipe
+  stops being real. That one is a **source-level tripwire**, labelled as such and
+  paired with the behavioural channel test: `process.stderr.write` may appear
+  only in `stderr.ts`. `console.error` in `src/cli/` is exempt and the exemption
+  is stated — `Console` is EPIPE-safe by construction and a terminal command is
+  not inside a test runner.
+
+**5 reverts, all caught** — the channel reverting to `console.warn`, the EPIPE
+guard removed, the newline dropped, the newline always added, and `writeReport`
+bypassing the channel. The last three were caught by nothing on the first round
+and have guards now.
+
+## Fallout, recorded
+
+**57 existing tests spied on `console.warn`**, which is this bug stated as a
+number: the whole warn path was covered by assertions that prove the call and
+cannot prove the delivery. All were moved to `process.stderr.write`. Six also
+asserted `expect(console.warn)` directly and had to be rebound to a named spy —
+`expect(process.stderr.write)` passes an unbound method reference, which this
+repo's lint config rejects.

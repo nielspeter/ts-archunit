@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.26.0] - 2026-07-29
+
+**An advisory rule in a passing test printed nothing at all** ([bug 0024](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md)). `.warn()` is the documented way to run a rule advisorily, and vitest's default reporter intercepts console output and replays it only for **failing** tests — so a rule with real violations in a passing test produced **zero** output. Measured on a real child `vitest run`: 4 violations, nothing printed. A team adopting the warn-then-ratchet path saw silence and concluded there was nothing to fix.
+
+A minor rather than a patch: output that did not exist now exists, and anything parsing this library's stderr sees more of it.
+
+### Fixed
+
+- **Every library-originated message now goes through one stderr channel that survives a test runner.** Ten call sites across five files — wider than the reported `.warn()` case. The exclusion-comment parse warnings, `expression()`'s escape-hatch warning, the diff-aware git-fallback warning and the invalid-baseline warning were all invisible in a passing test too. **A stale `.excluding()` said nothing** — the one signal that an exclusion has rotted after a rename, unreachable in the runner where rules are written.
+
+- **A piped run no longer dies of EPIPE.** This was a live defect before the fix, not a hazard introduced by it: `writeReport` already wrote to `process.stderr` unguarded, so `ts-archunit check 2>&1 | head` could fail from an uncaught EPIPE rather than from findings — and the exit code cannot tell those apart. Node's `Console` is built with `ignoreErrors: true`; a bare write is not, and the error arrives **asynchronously**, so neither `try`/`catch` nor the write callback can see it. Measured over 20 000 lines: bare write exits 1, guarded exits 0.
+
+### Changed
+
+- **`.warn()` output loses its vitest test attribution.** vitest annotates intercepted console output with the test that produced it (`stderr | file > test name`); a direct stderr write does not. For a violation report the rule's own identity is in the message, so the trade is small — and being attributed to a test that never printed would be worse than being unattributed. This is the accepted cost of the fix, stated rather than discovered.
+
+- **`doctor`'s output and the violation report share that channel**, so both are EPIPE-safe. `console.error` in the CLI is deliberately left alone: `Console` is EPIPE-safe by construction and a terminal command is not running inside a test runner.
+
+### Upgrading — 0.26.0
+
+**Expect output where there was none.** Any `.warn()` in a passing test, and any stale-exclusion or diff-aware warning, now prints to stderr. If a CI job asserted on empty stderr, it will see content — that content is findings you already had.
+
+If you assert on warnings in your own tests, they arrive on `process.stderr.write` rather than `console.warn`. Spying on `console.warn` will no longer see them, which is the point: a spy on the old channel proved the call and never the delivery, and 57 tests in this repository were doing exactly that.
+
 ## [0.25.0] - 2026-07-29
 
 **Two defects in `strictBoundaries()` — one that told you the wrong fix, one that told you nothing at all.** A minor rather than a patch: the second adds an error-severity finding that can turn a currently-green run red, and `^0.24.0` would have resolved a patch silently into every consumer's CI.

@@ -122,7 +122,7 @@ describe('RuleBuilder with CheckOptions', () => {
   })
 
   it('warn({ baseline }) logs only new violations', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const knownViolations: ArchViolation[] = [
       {

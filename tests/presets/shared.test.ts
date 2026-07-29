@@ -23,21 +23,21 @@ function loadTestProject(): ArchProject {
 
 describe('validateOverrides', () => {
   it('does nothing when overrides is undefined', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     validateOverrides(undefined, ['a', 'b'])
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
 
   it('does nothing when all override keys are known', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     validateOverrides({ 'rule/a': 'off' }, ['rule/a', 'rule/b'])
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
 
   it('warns for unrecognized override keys', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     validateOverrides({ 'rule/typo': 'off' }, ['rule/a', 'rule/b'])
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy).toHaveBeenCalledWith(
@@ -71,7 +71,7 @@ describe('collectRule', () => {
   })
 
   it('stamps severity:warn (NOT console.warn) when severity is warn', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const result = collectRule(violatingBuilder(), { id: 'test/rule' }, 'warn', undefined)
     const violations = result[0]!.violations()
     expect(violations.length).toBeGreaterThan(0)

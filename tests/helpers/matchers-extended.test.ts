@@ -91,7 +91,7 @@ describe('access() with real ts-morph nodes', () => {
 
 describe('expression() with real ts-morph nodes', () => {
   it('matches any node containing substring (string)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     // Get some nodes from the project
     const sf = project.getSourceFiles()[0]!
@@ -107,7 +107,7 @@ describe('expression() with real ts-morph nodes', () => {
   })
 
   it('matches with regex', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const sf = project.getSourceFiles()[0]!
     const allNodes = sf.getDescendants()
@@ -120,7 +120,7 @@ describe('expression() with real ts-morph nodes', () => {
   })
 
   it('regex returns false for non-matching node text', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const sf = project.getSourceFiles()[0]!
     const nodes = sf.getDescendants()
@@ -138,7 +138,7 @@ describe('expression() with real ts-morph nodes', () => {
   })
 
   it('warns only once per matcher instance (string)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const sf = project.getSourceFiles()[0]!
     const nodes = sf.getDescendants().slice(0, 5)
@@ -151,7 +151,7 @@ describe('expression() with real ts-morph nodes', () => {
   })
 
   it('warns only once per matcher instance (regex)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const sf = project.getSourceFiles()[0]!
     const nodes = sf.getDescendants().slice(0, 5)

@@ -94,23 +94,23 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
 
   describe('stale exclusion warnings still work', () => {
     it('warns when an exclusion matches nothing', () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const violations = [makeViolation()]
       applyFilters(violations, {
         exclusions: [/nonexistent/],
         metadata: { id: 'test-rule' },
       })
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Unused exclusion'))
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Unused exclusion'))
     })
 
     it('does not warn when exclusion matches via file', () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const violations = [makeViolation()]
       applyFilters(violations, {
         exclusions: [/images\.ts/],
         metadata: { id: 'test-rule' },
       })
-      expect(console.warn).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
     })
   })
 
@@ -157,7 +157,7 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
 
   describe('silent exclusions suppress unused-exclusion warnings', () => {
     it('silent exclusion matching nothing does not warn', () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const violations = [makeViolation()]
       const silentPattern = silent(/nonexistent/)
       applyFilters(violations, {
@@ -165,22 +165,22 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
         silentIndices: new Set([0]),
         metadata: { id: 'test-rule' },
       })
-      expect(console.warn).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
     })
 
     it('non-silent exclusion matching nothing still warns', () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const violations = [makeViolation()]
       applyFilters(violations, {
         exclusions: [/nonexistent/],
         silentIndices: new Set(),
         metadata: { id: 'test-rule' },
       })
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Unused exclusion'))
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Unused exclusion'))
     })
 
     it('mixed silent and non-silent: only non-silent warns', () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const violations = [makeViolation()]
       // Index 0 = silent (no match), Index 1 = non-silent (no match)
       applyFilters(violations, {
@@ -189,8 +189,8 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
         metadata: { id: 'test-rule' },
       })
       // Only the non-silent pattern should trigger a warning
-      expect(console.warn).toHaveBeenCalledTimes(1)
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('also-nonexistent'))
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('also-nonexistent'))
     })
 
     it('silent exclusion still filters violations when it matches', () => {
@@ -265,7 +265,7 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
 
     it('warns that the exclusion was REFUSED, not that it is stale', () => {
       // "may be stale after a rename" is false here and points at the wrong fix.
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const meta = makeViolation({ element: 'slices', file: '', bypassFilters: true })
       applyFilters([meta], { exclusions: ['slices'], metadata: { id: 'x/y' } })
       const text = warn.mock.calls.map((call) => String(call[0])).join('\n')

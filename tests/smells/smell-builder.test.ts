@@ -83,7 +83,7 @@ describe('SmellBuilder.inFolder()', () => {
 describe('SmellBuilder.warn() output formats', () => {
   it('warn with json format outputs JSON', () => {
     const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8).warn({ format: 'json' })
     expect(warnSpy).toHaveBeenCalled()
     // JSON output should start with [ or { or be valid JSON
@@ -102,14 +102,14 @@ describe('SmellBuilder.warn() output formats', () => {
 
   it('warn with terminal format outputs to console.warn', () => {
     const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8).warn({ format: 'terminal' })
     expect(warnSpy).toHaveBeenCalled()
   })
 
   it('warn does nothing when no violations', () => {
     const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     smells.duplicateBodies(p).minLines(1000).withMinSimilarity(0.5).warn()
     expect(warnSpy).not.toHaveBeenCalled()
   })

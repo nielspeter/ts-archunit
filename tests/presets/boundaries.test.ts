@@ -82,7 +82,7 @@ describe('strictBoundaries preset', () => {
 
   describe('noCopyPaste', () => {
     it('surfaces a WARN (not console.warn) on duplicate bodies across boundaries', () => {
-      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const rules = run({
         folders: '**/src/feature-*',
         shared: ['**/shared/**'],

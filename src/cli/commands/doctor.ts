@@ -2,6 +2,7 @@ import type { DiagnosableRule, DiagnosticFinding } from '../../core/diagnose.js'
 import { diagnose } from '../../core/diagnose.js'
 import { ArchRuleError } from '../../core/errors.js'
 import { loadRuleFiles } from '../load-rules.js'
+import { writeStderr } from '../../core/stderr.js'
 
 export interface DoctorArgs {
   ruleFiles: string[]
@@ -27,9 +28,7 @@ export interface DoctorArgs {
  */
 export async function runDoctor(args: DoctorArgs): Promise<number> {
   if (args.ruleFiles.length === 0) {
-    process.stderr.write(
-      'Error: no rule files. Pass them as arguments or set `rules` in your config.\n',
-    )
+    writeStderr('Error: no rule files. Pass them as arguments or set `rules` in your config.\n')
     return 1
   }
 
@@ -65,7 +64,7 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
       // raw TypeError from importing a vitest test file — used to crash the
       // whole command and abandon every remaining file.
       if (error instanceof ArchRuleError) {
-        process.stderr.write(
+        writeStderr(
           `Error: ${file} executes its rules at import and threw, so none of it could be ` +
             `diagnosed. Leave builders un-terminated in a rule file (see docs/running-in-tests).\n`,
         )
@@ -75,7 +74,7 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
         // test runner" unconditionally would be a false cause (ADR-008 rule 2,
         // caught in review). The error message is the evidence; the test-runner
         // sentence is offered as the common case, not stated as the cause.
-        process.stderr.write(
+        writeStderr(
           `Error: ${file} could not be loaded (${error instanceof Error ? error.message : String(error)}), ` +
             `so none of it could be diagnosed. If this file imports a test runner (vitest/jest), ` +
             `doctor cannot load it — run your test suite instead; the runtime writes the same ` +
@@ -111,7 +110,7 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   // checked `args.ruleFiles.length`, which is the wrong derivation: a file
   // exporting `[]` reached this point and reported a clean bill of health.
   if (rules.length === 0) {
-    process.stderr.write('Error: no rules found in the given files.\n')
+    writeStderr('Error: no rules found in the given files.\n')
     emitJson([])
     return 1
   }
@@ -123,17 +122,17 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
 
   if (findings.length === 0) {
     if (loadFailures.length > 0) {
-      process.stderr.write(
+      writeStderr(
         'No findings in the rules that loaded — but at least one file could not be ' +
           'loaded (see above), so this is not a clean bill of health.\n',
       )
       return 1
     }
-    process.stderr.write('No rules that cannot enforce anything.\n')
+    writeStderr('No rules that cannot enforce anything.\n')
     return 0
   }
 
-  process.stderr.write(format(findings))
+  writeStderr(format(findings))
   return 1
 }
 

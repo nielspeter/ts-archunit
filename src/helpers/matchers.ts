@@ -1,4 +1,5 @@
 import { Node, SyntaxKind, type CommentRange } from 'ts-morph'
+import { writeStderr } from '../core/stderr.js'
 
 /**
  * A matcher that tests whether a ts-morph AST node matches a specific pattern.
@@ -168,7 +169,7 @@ export function expression(textOrRegex: string | RegExp): ExpressionMatcher {
       // No syntaxKinds — walks all descendants
       matches(node: Node): boolean {
         if (!warned) {
-          console.warn(
+          writeStderr(
             `[ts-archunit] expression('${textOrRegex}') is a broad matcher. ` +
               `Prefer call(), access(), or newExpr() for precise matching.`,
           )
@@ -183,7 +184,7 @@ export function expression(textOrRegex: string | RegExp): ExpressionMatcher {
     // No syntaxKinds — walks all descendants
     matches(node: Node): boolean {
       if (!warned) {
-        console.warn(
+        writeStderr(
           `[ts-archunit] expression(${String(textOrRegex)}) is a broad matcher. ` +
             `Prefer call(), access(), or newExpr() for precise matching.`,
         )

@@ -115,7 +115,7 @@ describe('recommended preset', () => {
   })
 
   it('warns on an unrecognized override id (typo guard)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     recommended(p, { overrides: { 'preset/recommended/no-evalz': 'off' } })
     expect(warnSpy).toHaveBeenCalled()
     const msg = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')

@@ -76,7 +76,7 @@ describe('RuleBuilder', () => {
 
   describe('.warn()', () => {
     it('logs violations to stderr but does not throw', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const builder = new TestRuleBuilder(stubProject, elements)
       builder
         .that()
@@ -92,7 +92,7 @@ describe('RuleBuilder', () => {
     })
 
     it('does not log when there are no violations', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const builder = new TestRuleBuilder(stubProject, elements)
       builder
         .that()
@@ -208,7 +208,7 @@ describe('RuleBuilder', () => {
     })
 
     it('severity("warn") behaves like .warn()', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const builder = new TestRuleBuilder(stubProject, elements)
       builder.should().withCondition(alwaysFail('bad')).severity('warn')
       expect(warnSpy).toHaveBeenCalledOnce()
@@ -218,7 +218,7 @@ describe('RuleBuilder', () => {
 
   describe('.asSeverity()', () => {
     it('is non-terminal — sets severity, does not throw or warn', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const builder = new TestRuleBuilder(stubProject, elements)
       const configured = builder.should().withCondition(alwaysFail('bad'))
       const chained = configured.asSeverity('warn')
@@ -426,7 +426,7 @@ describe('RuleBuilder', () => {
     })
 
     it('returns empty when nothing matches — and does NOT warn about missing conditions', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const builder = new TestRuleBuilder(stubProject, elements)
       const subjects = builder
         .that()

@@ -8,6 +8,7 @@ import { formatViolations } from './format.js'
 import { formatViolationsJson } from './format-json.js'
 import { formatViolationsGitHub } from './format-github.js'
 import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
+import { writeStderr } from './stderr.js'
 
 /**
  * Context for executing a rule's terminal methods.
@@ -81,13 +82,13 @@ export function applyFilters(
     const silentIndices = ctx.silentIndices ?? new Set()
     exclusions.forEach((pattern, index) => {
       if (refusedPatterns.has(index)) {
-        console.warn(
+        writeStderr(
           `[ts-archunit] Exclusion '${String(pattern)}' in rule '${ruleId}' matched a ` +
             `configuration finding, which cannot be excluded — that finding reports the ` +
             `rule enforces nothing. Fix the fault it names instead.`,
         )
       } else if (!matchedPatterns.has(index) && !silentIndices.has(index)) {
-        console.warn(
+        writeStderr(
           `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
             `It matched zero violations — it may be stale after a rename.`,
         )
@@ -103,7 +104,7 @@ export function applyFilters(
         const sourceText = fs.readFileSync(filePath, 'utf-8')
         const parseResult = parseExclusionComments(sourceText, filePath)
         for (const warning of parseResult.warnings) {
-          console.warn(`[ts-archunit] ${warning.message}`)
+          writeStderr(`[ts-archunit] ${warning.message}`)
         }
         return parseResult.exclusions
       } catch {
@@ -207,7 +208,7 @@ export function writeReport(
     if (warnings.length > 0) parts.push(formatViolationsGitHub(warnings, 'warning'))
     process.stdout.write(parts.join('\n') + '\n')
   } else {
-    process.stderr.write(formatViolations(violations, reason) + '\n')
+    writeStderr(formatViolations(violations, reason))
   }
 }
 
@@ -271,11 +272,11 @@ export function executeWarn(
   if (filtered.length > 0) {
     const stamped = stampSeverity(filtered, 'warn')
     if (options?.format === 'json') {
-      console.warn(formatViolationsJson(stamped, ctx.reason))
+      writeStderr(formatViolationsJson(stamped, ctx.reason))
     } else if (options?.format === 'github') {
       process.stdout.write(formatViolationsGitHub(stamped, 'warning') + '\n')
     } else {
-      console.warn(formatViolations(stamped, ctx.reason))
+      writeStderr(formatViolations(stamped, ctx.reason))
     }
 
     // Logged first, then thrown: the ordinary violations still reach the
