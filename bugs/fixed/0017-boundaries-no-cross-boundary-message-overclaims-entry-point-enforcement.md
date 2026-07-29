@@ -1,7 +1,7 @@
 # Bug 0017: `strictBoundaries()`'s no-cross-boundary remedy cannot remediate, and its message overclaims entry-point enforcement
 
 **Reported:** 2026-07-28
-**Fixed:** 2026-07-29 (v0.24.1)
+**Fixed:** 2026-07-29 (v0.25.0)
 **Found in:** v0.19.0 through v0.21.0 (current). Introduced by `6ef8ade` — the commit that
 bulk-added remedies to every preset rule; before it, preset rules carried no
 `because`/`suggestion` at all. The defect was introduced _by_ the ADR-008 remedy fix:
@@ -111,7 +111,7 @@ the entry-point/internal distinction.
 - **Two enforcement defects found during this bug's review are filed separately**, because they
   are behaviour, not text: [bug 0022](../0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md)
   (`onlyImportFrom` is blind to `export … from` and `import()` — both cross this boundary
-  unflagged, measured) and [bug 0023](../0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)
+  unflagged, measured) and [bug 0023](./0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)
   (`shared` globs matched raw and guarded by nothing). The corrected message below is honest
   about static imports; 0022 is what makes it honest about imports generally.
 
@@ -172,7 +172,7 @@ identity guard is the real pin.
 
 ## How it was fixed
 
-**v0.24.1.** Three strings in `src/presets/boundaries.ts`, behaviour unchanged, and the
+**v0.25.0.** Three strings in `src/presets/boundaries.ts`, behaviour unchanged, and the
 `suggestion` is **computed** because no fixed string is right in both configurations:
 
 - `because` — "boundaries may only depend on themselves and the shared modules — an import from

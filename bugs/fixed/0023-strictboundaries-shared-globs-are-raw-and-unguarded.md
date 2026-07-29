@@ -1,6 +1,7 @@
 # Bug 0023: `strictBoundaries` `shared` globs are matched raw and guarded by nothing
 
 **Reported:** 2026-07-28
+**Fixed:** 2026-07-29 (v0.25.0)
 **Found in:** all versions through v0.21.0
 **Severity:** Medium — a false **red** on the natural spelling, and a silent no-op on a dead
 glob. The `folders` option got both treatments in earlier fixes (`atPath` normalization via
@@ -35,7 +36,7 @@ folders: '**/no-such-feat/*'   ->  1 discovery finding, error  (the guard shared
 The false red's `Fix:` line then compounds it: the violation carries `no-cross-boundary`'s
 remedy, telling the user to move into the shared module **they are already importing from**.
 (That remedy has its own defect —
-[bug 0017](./fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).)
+[bug 0017](./0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).)
 
 ## Why no test caught it
 
@@ -66,3 +67,56 @@ second one.
 - A dead `shared` glob produces a configuration finding, error severity, `bypassFilters`.
 - A legitimate shared import passes under both spellings — asserted on a fixture where a
   cross-boundary violation also exists, so the passing half is not vacuous.
+
+## How it was fixed
+
+**v0.25.0, and by ONE of the two halves this report proposed, deliberately.**
+
+All four reproduction rows were re-measured on bug 0017's fixture and every one held:
+
+```
+shared: ['**/src/shared/**']    shared import passes, 0 config findings   (correct)
+shared: ['src/shared/**']       shared import FLAGGED, 0 config findings  (false red, silent)
+shared: ['**/no-such-dir/**']   shared import FLAGGED, 0 config findings  (dead glob, silent)
+folders: 'src/features/*'       0 rules,               1 config finding   (the guard shared lacked)
+```
+
+Note the middle two rows: **indistinguishable from outside.** Same violation count, same silence.
+That is what the fix makes visible.
+
+**The guard only. Normalization is NOT the fix, and this report's first half is withdrawn.** The
+premise was that `folders` gets `atPath` normalization while `shared` does not, so the two options
+hold callers to different contracts. Measured, that premise is wrong twice:
+
+- `atPath` (bug 0018) is about **file-vs-folder** globs, not relative-vs-absolute. It is a
+  predicate combinator — `or(resideInFile, resideInFolder)` — and cannot normalize the glob
+  _strings_ that `onlyImportFrom` matches against resolved paths.
+- `folders` is **not normalized either**. Its discovery guard's own remedy states the contract:
+  "Boundary discovery matches absolute file paths… use a `'**/'`-prefixed glob". So the asymmetry
+  between the two options was never normalization — it was only the guard.
+
+Rewriting `shared` globs would therefore have made one option on this preset accept a spelling the
+other rejects: a worse asymmetry than the one being fixed, and a silent divergence rather than a
+loud one.
+
+So `shared` now gets the same treatment `folders` has: a glob matching no file is a configuration
+finding (`preset/boundaries/shared-discovery`, error, `bypassFilters`), naming the glob and the
+spelling that works.
+
+**Matched against file paths, not `atPath`'s file-or-folder** — a decision worth recording, because
+it makes the guard stricter than `shared-isolation`. `shared: ['**/src/shared']` (a folder glob with
+no trailing `/**`) selects files for `shared-isolation` via `atPath`, yet creates **no allowance**,
+because the allow list matches resolved file paths. It is a genuine fault for the purpose this
+guard covers, and guarding on file matches is what makes it visible. Pinned by its own test.
+
+## Guard
+
+Reuses bug 0017's fixture rather than growing a second one, as this report asked — and its
+cross-boundary violations are the non-vacuity anchor, so "the shared import passes" can never be
+satisfied by a rule that selected nothing.
+
+**7 reverts, all caught after two rounds.** The one that survived the first was subtle and worth
+recording: replacing the finding's `glob` field with a placeholder left the real glob visible
+anyway, because the remedy embeds it too — so an assertion that "the glob appears somewhere"
+passed. The test now pins the discovery clause (`for glob '<the glob>'`), since a finding that
+names a different glob than the one at fault is self-contradictory.

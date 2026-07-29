@@ -147,3 +147,75 @@ describe('the message is honest in both configurations', () => {
     }
   })
 })
+
+describe('a `shared` glob that matches nothing says so (bug 0023)', () => {
+  // `shared` globs go raw into `no-cross-boundary`'s allow list and are matched
+  // against absolute file paths, so a spelling that matches nothing creates no
+  // allowance — and said nothing about it. `folders` has had a loud guard since
+  // plan 0067; the two options sat on one preset holding the caller to two
+  // different contracts.
+  //
+  // Reusing this fixture rather than growing a second one, as bug 0023 asks: the
+  // cross-boundary violations above are the non-vacuity anchor, so "the shared
+  // import passes" is never satisfied by a rule that selected nothing.
+  const sharedFindings = (violations: ArchViolation[]): ArchViolation[] =>
+    violations.filter((v) => v.ruleId === 'preset/boundaries/shared-discovery')
+
+  it('the working spelling: shared import passes, no finding', () => {
+    const all = run({ folders: FOLDERS, shared: SHARED })
+    expect(sharedFindings(all)).toEqual([])
+    expect(edges(all)).not.toContain('uses-shared.ts -> util.ts')
+    // Non-vacuity: the rule ran and found the real cross-boundary edges.
+    expect(edges(all)).toHaveLength(2)
+  })
+
+  it('a relative spelling is reported, instead of silently flagging legal code', () => {
+    // Measured before the guard: this produced 3 cross-boundary violations — the
+    // two real ones plus a FALSE RED on `uses-shared.ts` — and zero explanation.
+    const all = run({ folders: FOLDERS, shared: ['src/shared/**'] })
+    const finding = sharedFindings(all)[0]
+    expect(finding).toBeDefined()
+    // Pinned on the DISCOVERY clause, not just "the glob appears somewhere":
+    // the remedy embeds the glob too, so replacing the finding's `glob` field
+    // with a placeholder left the message still mentioning it and was caught by
+    // nothing. A finding that names a different glob than the one at fault is
+    // self-contradictory, and this is the only assertion that would see it.
+    expect(finding?.message).toContain("for glob 'src/shared/**'")
+    expect(finding?.message).toContain('matched no file')
+    // The remedy names the spelling that works, and it is the one this fixture
+    // proves works in the test above.
+    expect(finding?.suggestion).toContain('**/src/shared/**')
+    expect(finding?.bypassFilters).toBe(true)
+    expect(finding?.severity).toBe('error')
+  })
+
+  it('a dead glob is reported too, and names itself', () => {
+    // Indistinguishable from the relative case before the guard: same violation
+    // count, same silence. The finding has to name the glob to tell them apart.
+    const finding = sharedFindings(run({ folders: FOLDERS, shared: ['**/no-such-dir/**'] }))[0]
+    expect(finding).toBeDefined()
+    expect(finding?.message).toContain('**/no-such-dir/**')
+  })
+
+  it('a folder glob with no trailing /** is a fault here, though shared-isolation accepts it', () => {
+    // The subtlety the guard is deliberately strict about: `atPath` selects files
+    // for `shared-isolation` by matching the folder, but the ALLOW LIST matches
+    // resolved file paths, so this spelling creates no allowance. Guarding on
+    // file matches — not on `atPath` — is what makes this case visible.
+    const all = run({ folders: FOLDERS, shared: ['**/src/shared'] })
+    expect(sharedFindings(all)[0]).toBeDefined()
+    // And it really would have been a false red: the shared import is flagged.
+    expect(edges(all)).toContain('uses-shared.ts -> util.ts')
+  })
+
+  it('reports each bad glob separately, so a mixed list is not hidden by a good one', () => {
+    // One working glob plus one dead: the working one must not mask the other,
+    // and the good one must not be reported.
+    const findings = sharedFindings(
+      run({ folders: FOLDERS, shared: ['**/src/shared/**', '**/no-such-dir/**'] }),
+    )
+    expect(findings).toHaveLength(1)
+    expect(findings[0]?.message).toContain('**/no-such-dir/**')
+    expect(findings[0]?.message).not.toContain('**/src/shared/**')
+  })
+})

@@ -20,6 +20,7 @@ export interface StrictBoundariesOptions extends PresetBaseOptions {
 }
 
 const RULE_IDS = [
+  'preset/boundaries/shared-discovery',
   'preset/boundaries/no-cycles',
   'preset/boundaries/no-cross-boundary',
   'preset/boundaries/shared-isolation',
@@ -146,6 +147,51 @@ export function strictBoundaries(
         `Use a '**/'-prefixed glob (e.g. '**/${boundaryGlob.replace(/^[./]+/, '')}') or the absolute project path.`,
     }),
   )
+
+  // --- Discovery guard for `shared`, mirroring the one above for `folders` ---
+  //
+  // `shared` globs go RAW into `no-cross-boundary`'s allow list and are matched
+  // by picomatch against absolute resolved file paths. A glob that matches no
+  // file creates no allowance — and produced no finding at all, so the user
+  // learned about it only through false reds on the exact code the preset's own
+  // docs tell them to write. Measured on `boundaries-folder-level`:
+  //
+  //   shared: ['**/src/shared/**']    shared import passes, 0 config findings
+  //   shared: ['src/shared/**']       shared import FLAGGED, 0 config findings
+  //   shared: ['**/no-such-dir/**']   shared import FLAGGED, 0 config findings
+  //   folders: 'src/features/*'       0 rules,              1 config finding
+  //
+  // The last row is the contract `shared` was missing: `folders` fails loudly on
+  // a spelling that matches nothing, and the two options sat on one preset
+  // holding the caller to two different contracts (bug 0023). Note that the
+  // middle two rows are indistinguishable from outside — same violation count,
+  // no explanation — which is what the guard fixes.
+  //
+  // A GUARD, deliberately not normalization. `folders` is not normalized either;
+  // its remedy states the absolute-path contract and tells the caller how to
+  // spell it. Rewriting `shared` globs instead would make one option on this
+  // preset accept a spelling the other rejects, which is a worse asymmetry than
+  // the one being fixed.
+  //
+  // Matched against FILE paths, not `atPath`'s file-or-folder: the allow list is
+  // what this guard is about, and `onlyImportFrom` matches resolved file paths.
+  // `shared: ['**/src/shared']` — a folder glob with no `/**` — selects files for
+  // `shared-isolation` via `atPath` yet creates no allowance, so it is a genuine
+  // fault here and the guard must fire for it.
+  for (const sharedGlob of sharedGlobs) {
+    const matchesFile = picomatch(sharedGlob)
+    const matchedFiles = p.getSourceFiles().filter((sf) => matchesFile(sf.getFilePath()))
+    builders.push(
+      ...assertDiscovered(matchedFiles, {
+        id: 'preset/boundaries/shared-discovery',
+        glob: sharedGlob,
+        remedy:
+          `A shared glob is matched against absolute file paths, so '${sharedGlob}' matched no file and ` +
+          `creates no allowance — every import of it is reported as a cross-boundary violation. ` +
+          `Use a '**/'-prefixed glob ending in '/**' (e.g. '**/${sharedGlob.replace(/^[./]+/, '').replace(/\/\*\*$/, '')}/**') or the absolute project path.`,
+      }),
+    )
+  }
 
   // --- No cycles between boundaries ---
   if (Object.keys(sliceDef).length > 0) {
