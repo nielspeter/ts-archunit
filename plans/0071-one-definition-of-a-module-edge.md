@@ -1,92 +1,99 @@
-# Plan 0071 — One definition of a module edge, and a rule that tested none
+# Plan 0071 — Forward dependency conditions see every module edge
 
-**Status:** READY — designed from a three-persona review of the two bugs (architect, testing, product), every claim below re-measured on `main` @ v0.26.0.
-**Priority:** High. [Bug 0022](../bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged, and the library's two halves disagree about what "imports" means. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is the vacuity half.
-**Effort:** ~2 days. One shared walk, six site dispositions, one policy decision, and a test surface built from scratch — because 98.5% of the existing one cannot see either defect.
-**Closes:** bugs 0022 and 0015.
-**Both bugs' suggested fixes are withdrawn.** See "Two withdrawn premises". They were measured wrong, not merely improvable.
+**Status:** DRAFT 2 — reviewed by five personas against a working prototype; **nine claims in draft 1 were measured wrong and are corrected below.**
+**Priority:** High. [Bug 0022](../bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
+**Effort:** ~2 days for 0022. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **descoped to a diagnostic** and moves to its own release.
+**Closes:** bug 0022. **Advances** bug 0015 (diagnostic only; the failing tier is withdrawn — see §5).
+**Release:** 0.27.0, minor. Ships 0022 alone.
+
+Draft 1 was titled "One definition of a module edge, and a rule that tested none". Both halves of that title were wrong: the slice graph and the `importFrom` predicate keep their own definition unless explicitly included (§3), and the "rule that tested none" tier fails correct code (§5). The title now claims only what the release does.
+
+## What draft 1 got wrong
+
+Recorded because draft 1 read as authoritative and was measured against a prototype. Each row was independently confirmed.
+
+| Draft 1 claimed                                                                                                                                          | Measured                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New walk 8.1ms vs 0.6ms — **13×**, "no warm-up benefit (the descendant walk repeats)"                                                                    | **~1.4× like-for-like, and warm the walk is ~2.5× _cheaper_ than `getImportDeclarations`.** `getImportStringLiterals()` reads the binder's cached `compilerNode.imports`; it is not a descendant walk. The 8.1ms amortised a one-time `_ensureBound()` already paid by every `getType()` call |
+| `typeOnly = decl.isTypeOnly() \|\| all-specifiers-type-only`, "mirroring `isTypeOnlyImport`"                                                             | **Wrong for `ImportDeclaration`** — it drops `isTypeOnlyImport`'s `getDefaultImport()`/`getNamespaceImport()` guards, so `import React, { type FC } from 'react'` would be classified type-only and **skipped under `ignoreTypeImports`: a lost existing finding**                            |
+| `type-expression` resolves via the `ImportTypeNode`'s type symbol                                                                                        | **Resolves the wrong file.** `type A = import('./barrel.js').Deep` → `/impl.ts`, not `/barrel.ts`, because the symbol walk follows the declaration. `notImportFrom('**/impl.ts')` would fire on a file that never names `impl`                                                                |
+| `line` must equal `decl.getStartLineNumber()` "because `hashViolation` hashes the message and the message carries the line"                              | **No dependency-condition message interpolates a line**, and `baseline.ts` says line numbers are "NOT used for matching". The invariant is still worth keeping — code frames, annotation position, reader trust — for a different reason                                                      |
+| Tier 1 (fail when a rule tested zero edges) is "the same shape and voice as `collectWithAssertionGuard`" and "needs no new mechanism"                    | **Fails correct code, and needs a new mechanism.** Measured three ways in §5. `collectWithAssertionGuard` is element-type-agnostic and cannot count edges; `Condition<T>` is a public exported type, so extending it is a public API change                                                   |
+| Tier 3 catches "0015's actual typo case, `onlyImportFrom('**/nowhere/**')`"                                                                              | That case produces **96 violations** — maximally loud. The silent case is a **denylist** glob that matches nothing                                                                                                                                                                            |
+| Unresolvable dynamic specifiers: ``import(`./locales/${lang}.js`)`` reds every i18n loader                                                               | **A template with a substitution yields no literal at all** — not an edge for any family. The real case is a _literal_ specifier that fails to resolve                                                                                                                                        |
+| The independence guard "would have caught `resolveDynamicImport` losing `@/`-aliased specifiers, because Node and TS resolve aliases by different rules" | **Backwards.** Node has no tsconfig `paths` support, so aliases _throw_ rather than disagree, and bare specifiers diverge by design (bug 0014). Reverting that exact defect exits **0 — uncaught**. The dynamic half is cut (§Guards)                                                         |
+| `bare-package-imports.test.ts:262` is precedent for an "old build vs new build" corpus test                                                              | It re-derives the old answer **inline, on one build**, in two lines. Two live builds would also be wrong: `project()`'s cache is module-scoped, so two copies mean two full program loads                                                                                                     |
+
+What survived: the bar (§Problem), the forcing order (§4), the central mechanism, monotonicity, and four refusals — the parity tautology, `includeReExports`, `notHaveAliasedImports`, and "regenerate your baseline" as headline advice.
 
 ## Problem
 
-`src/conditions/dependency.ts` collects edges from `sf.getImportDeclarations()` at five sites. That walk sees static `import` statements and nothing else. The reverse graph (`reverse-dependency.ts`) indexes static imports, re-exports **and** dynamic imports — so `onlyBeImportedVia('…')` sees a re-export as an import and `notImportFrom('…')` does not. A rule pair that reads as two views of one graph checks two different graphs.
+`src/conditions/dependency.ts` collects edges from `sf.getImportDeclarations()` at five sites. That walk sees static `import` statements and nothing else. The reverse graph indexes static imports, re-exports **and** dynamic imports — so `onlyBeImportedVia('…')` sees a re-export as an import and `notImportFrom('…')` does not.
 
-Separately, an allowlist constrains **edges**, not subjects: a subject with zero edges has nothing to violate and passes, however broken the allowlist.
+### The bar
 
-### The measurement that sets the bar
+Blinding `onlyImportFrom` and `notImportFrom` to collect no edges — ADR-008's "completely broken" floor. Reproduced in **three** isolated worktrees:
 
-Blinding `onlyImportFrom` and `notImportFrom` to collect **no edges at all** — the "completely broken" floor ADR-008 asks about:
+|                                                                |                                |
+| -------------------------------------------------------------- | ------------------------------ |
+| Baseline                                                       | 2478 passed / 176 files        |
+| Both conditions collecting nothing                             | **38 failed**, 12 files        |
+| `tests/archunit/arch-rules.test.ts` (18 of the affected sites) | **39/39 passed — zero caught** |
+| Widening to all four edge kinds                                | **2478 passed — zero changed** |
 
-|                                                       |                                       |
-| ----------------------------------------------------- | ------------------------------------- |
-| Baseline                                              | 2478 passed / 176 files               |
-| Both conditions collecting nothing                    | **38 failed** / 2440 passed, 12 files |
-| `tests/archunit/arch-rules.test.ts` (18 of the sites) | **39/39 passed — zero caught**        |
-| Widening the walk to all four edge kinds              | **2478 passed — zero changed**        |
+Widening was verified non-trivial before trusting "0 changed": **647 static declarations → 803 edges over `src/`** (+24%), and `src/index.ts` 0 → **114**.
 
-Reproduced three times independently (two reviewers, plus a clean `git worktree` run). Two numbers matter and they point the same way:
+So 1.5% of the suite distinguishes "collects static imports" from "collects nothing", and **0 of 2478** distinguishes it from "collects everything". The suite pins that the loop runs, never what it collects. The test surface is most of the work.
 
-- **1.5% of the suite** distinguishes "collects static imports" from "collects nothing".
-- **0 of 2478** distinguishes "collects static imports" from "collects everything".
+## Two withdrawn premises (from the bugs)
 
-So the existing 125 test sites pin **that the loop runs**, never **what it collects**. The dogfood rules in `arch-rules.test.ts` are the largest block and contribute nothing, because every one of them asserts _zero_ violations — and zero edges yields zero violations. This plan's test surface is therefore not a formality; it is most of the work.
+### 0022: "extract the reverse graph's three collectors"
 
-## Two withdrawn premises
+The reverse graph is the **weaker** half. `resolveDynamicImport` returns `undefined` for every non-relative specifier by construction; measured against 7 non-static edges in a `paths`-aliased project it loses **4 of 7**. The forward side deliberately matches the raw specifier for non-relative imports — bug 0014's fix. Porting the reverse definition forward would reintroduce bug 0014 inside the new edge kinds: `notImportFrom('picomatch')` would still miss `await import('picomatch')`.
 
-Recording these because both reports read as authoritative and both are wrong on a load-bearing point.
+**The extraction runs forward-out.** Generalize `importCandidates`; the reverse graph becomes a consumer.
 
-### 0022: "extract the reverse graph's three collectors and point the five forward sites at them"
+### 0015: "an edgeless subject should fail"
 
-**The reverse graph is the weaker half.** `resolveDynamicImport` (`reverse-dependency.ts:49`) returns `undefined` for every non-relative specifier by construction, and its relative branch is a hand-rolled candidate guess. Measured over 7 non-static edges in a project with `paths: { "@/*": ["src/*"] }`, it loses **4 of 7** — every `@/`-aliased and every bare specifier.
-
-The forward side deliberately matches the **raw specifier** for non-relative imports (`src/core/import-candidates.ts`). That is bug 0014's fix: `notImportFrom('fastify')` compared against `node_modules/@types/fastify/index.d.ts` never matched. Porting the reverse definition forward would reintroduce bug 0014 **inside the new edge kinds** — `notImportFrom('picomatch')` would still miss `await import('picomatch')`, which is the single most common real evasion of a package ban.
-
-**The extraction runs forward-out.** Generalize `importCandidates` into a kind-independent walk; the reverse graph becomes a consumer that filters to resolved project files.
-
-### 0015: "an edgeless subject should fail" (and the opt-in alternative)
-
-For the `only*` family, **zero edges is maximal compliance, not absent evidence.** `onlyImportFrom('**/domain/**')` over an import-free `domain/entity.ts` certifies that the file imports nothing outside `domain` — which it does, perfectly.
-
-Measured on this repo: 14 of 138 `src/` files have zero static imports, and 10 are pure leaf modules — `tarjan.ts`, `ansi.ts`, `code-frame.ts`, `stderr.ts`, `shallow-clone.ts` and friends. `tarjan.ts` is a dependency-free algorithm, the ideal innermost-layer citizen, and 0015-as-filed fails it under `layered/innermost-isolation` at error severity. Ask ADR-008 rule 2 for the remedy and the candidates are: add an import (actively harmful, and what an agent will do), exclude a working rule, narrow the selector, or delete the rule. **None remediate anything, because nothing is wrong with the code.**
-
-The opt-in alternative is also dead, and this repo has already paid for that lesson twice — `terminal-builder.ts` records it in one line: _"`.expectNonEmpty()`, which is the opt-in this whole plan exists because nobody uses."_
-
-**0015's real fault is rule-level**, and its own reproduction hides it: `subjects selected 1` makes subject-level and rule-level coincide. With 20 subjects, 19-with-edges and 1-without is a rule doing its job.
+For the `only*` family, zero edges is **maximal compliance**. 10 of this repo's 14 zero-import `src/` files are pure leaf modules; `tarjan.ts` is a dependency-free algorithm and would fail `layered/innermost-isolation` at error severity with no remedy that improves anything. See §5 for why the rule-level version fails too.
 
 ## Design
 
-### §1 One walk, `src/core/module-edges.ts`, built on one compiler call
+### §1 One walk, `src/core/module-edges.ts`
 
-`SourceFile.getImportStringLiterals()` returns one string literal per module specifier across every edge-carrying form, and none of the non-edges. **Measured** — 13 statements, 9 literals:
+`SourceFile.getImportStringLiterals()` returns one literal per module specifier across every edge-carrying form. **Measured, 19 forms:**
 
-| Source form                                  | literal? | parent kind         |
-| -------------------------------------------- | -------- | ------------------- |
-| `import { x } from 's'`                      | 1        | `ImportDeclaration` |
-| `import type { X } from 's'`                 | 1        | `ImportDeclaration` |
-| `import { type X as X2 } from 's'`           | 1        | `ImportDeclaration` |
-| `export { x as renamed } from 's'`           | 1        | `ExportDeclaration` |
-| `export * from 's'`                          | 1        | `ExportDeclaration` |
-| `export type { X as XT } from 's'`           | 1        | `ExportDeclaration` |
-| `export { type X as XI } from 's'`           | 1        | `ExportDeclaration` |
-| `import('s')`                                | 1        | `CallExpression`    |
-| `type A = import('s').X`                     | 1        | `LiteralType`       |
-| `declare module 's' {}`                      | **0**    | —                   |
-| `require('s')`                               | **0**    | —                   |
-| `import('./' + n + '.js')` (computed)        | **0**    | —                   |
-| `export { x as localRename }` (no specifier) | **0**    | —                   |
+| Form                                                                                                  | literal? | parent kind                   | notes                                                                 |
+| ----------------------------------------------------------------------------------------------------- | -------- | ----------------------------- | --------------------------------------------------------------------- |
+| `import { x } from 's'`, `import type { X }`, `import { type X as X2 }`                               | 1        | `ImportDeclaration`           |                                                                       |
+| `import 's'` (side-effect only)                                                                       | 1        | `ImportDeclaration`           | 0 named specifiers — runtime                                          |
+| `import {} from 's'`                                                                                  | 1        | `ImportDeclaration`           | runtime                                                               |
+| `import * as NS from 's'`, `import D from 's'`                                                        | 1        | `ImportDeclaration`           | runtime binding                                                       |
+| `export { x } from 's'`, `export { x as y } from 's'`, `export * from 's'`, `export * as NS from 's'` | 1        | `ExportDeclaration`           | runtime                                                               |
+| `export type { X } from 's'`, `export { type X } from 's'`, `export type * from 's'`                  | 1        | `ExportDeclaration`           | type-only — see §2                                                    |
+| `export {} from 's'`                                                                                  | 1        | `ExportDeclaration`           | runtime                                                               |
+| `import('s')`                                                                                         | 1        | `CallExpression`              |                                                                       |
+| ``import(`s`)`` (no substitution)                                                                     | 1        | `CallExpression`              | **`NoSubstitutionTemplateLiteral`** — see the hazard below            |
+| `type A = import('s').X`                                                                              | 1        | `LiteralType`                 |                                                                       |
+| `import x = require('s')`                                                                             | 1        | **`ExternalModuleReference`** | **runtime** — draft 1 had no row                                      |
+| `require('s')` in a `.js` file under `allowJs`                                                        | 1        | `CallExpression`              | **runtime, indistinguishable from `import()` by parent kind**         |
+| `require('s')` in a `.ts` file                                                                        | 0        | —                             |                                                                       |
+| `declare module 's' {}`                                                                               | 0        | —                             | correctly not an edge                                                 |
+| `import('./' + n)` (computed)                                                                         | 0        | —                             | not an edge for **any** family                                        |
+| `export { x as y }` (no specifier)                                                                    | 0        | —                             |                                                                       |
+| `declare module './rel.js' { … }`                                                                     | 0        | —                             | **a hole**, not a correct exclusion — routed to `moduleAugmentations` |
 
-One call, compiler-classified, correct exclusions — no `getDescendantsOfKind(CallExpression)` scan and no three hand-rolled collectors.
+Two traps that draft 1's 4-way branch would have hit, both misclassifying a **runtime** dependency as an erased one:
 
-**Cost, measured over 484 files:** `getImportDeclarations` 0.6ms → the new walk **8.1ms**, with no warm-up benefit (the descendant walk repeats). 13×. End-to-end on `strictBoundaries` over this repo it was noise (643ms → 660ms), but 37 rules × per-subject calls is the shape that bites at scale. **Cache per `(Project, SourceFile)` in a `WeakMap`**, exactly as `getReverseImportGraph` already does — and once the reverse graph consumes the same walk, the two caches become one.
+- **`import x = require('s')`** — parent `ExternalModuleReference`, grandparent `ImportEqualsDeclaration`. A branch ending in `else → 'type-expression'` gives it `typeOnly: true`, exempt under `ignoreTypeImports`. Common in hand-written `.d.ts`. ts-morph's own `SourceFileReferencingNodes` union names it.
+- **`require()` in `.js` under `allowJs`** — the binder collects it into `sourceFile.imports` with parent `CallExpression`. The discriminator is `callExpr.getExpression().getKind() === SyntaxKind.ImportKeyword`, which the reverse graph already has.
+
+**Type hazard, measured:** ``import(`./x.js`)`` yields a node whose kind is `NoSubstitutionTemplateLiteral`, for which `Node.isStringLiteral()` is **false** — while `getImportStringLiterals()` is declared `StringLiteral[]`. ADR-005 forbids `as`, so an implementer narrowing defensively drops this edge and typecheck says nothing. It must be a row in the guard, asserted by identity.
 
 ```ts
-// src/core/module-edges.ts — the return type is ts-morph-free by construction.
-export type ModuleEdgeKind = 'import' | 'reexport' | 'dynamic' | 'type-expression'
-
-/** A named binding carried across an edge under a different name. */
-export interface AliasedBinding {
-  readonly name: string
-  readonly alias: string
-}
+// src/core/module-edges.ts — the return type is ts-morph-free by construction, so a
+// cached value can never hand back a forgotten node.
+export type ModuleEdgeKind = 'import' | 'reexport' | 'dynamic' | 'type-expression' | 'require'
 
 export interface ModuleEdge {
   readonly kind: ModuleEdgeKind
@@ -94,198 +101,201 @@ export interface ModuleEdge {
   readonly specifier: string
   /** Resolved absolute path, when the compiler resolved it. */
   readonly resolvedPath: string | undefined
-  /** Every string a glob may match, primary first — bug 0014's contract, unchanged. */
-  readonly candidates: ImportCandidates
   /**
-   * 1-based line of the statement carrying the edge. MUST equal the old
-   * `decl.getStartLineNumber()` for `kind === 'import'` — `hashViolation` hashes
-   * the message and the message carries the line, so every baselined dependency
-   * violation depends on this.
+   * 1-based line of the statement carrying the edge. Equals
+   * `decl.getStartLineNumber()` for `kind === 'import'`: 88 of this repo's 1769
+   * import declarations (5%) have the specifier on a different line from the
+   * keyword, so keying off the literal would move 5% of every consumer's
+   * reported lines. Not a baseline-matching concern — `hashViolation` never sees
+   * the line — but it drives the code frame and the GitHub annotation position.
    */
   readonly line: number
   /** Erased at compile time, so no runtime dependency. Per-kind; see §2. */
   readonly typeOnly: boolean
-  /** Renamed named bindings. Empty for `dynamic` and `type-expression`. */
+  /** Named bindings crossing the edge; empty for `export *`, `dynamic`, `require`. */
+  readonly names: readonly string[]
+  /** Renamed named bindings. Empty except for `import`/`reexport`. */
   readonly aliases: readonly AliasedBinding[]
 }
 
-/** Every module edge leaving this file. Batch-first (ADR-007 rule 2), cached. */
-export function moduleEdges(sf: SourceFile): readonly ModuleEdge[]
+/** Every module edge leaving each file, in one call (ADR-007 rule 2). */
+export function moduleEdges(
+  files: readonly SourceFile[],
+): ReadonlyMap<string, readonly ModuleEdge[]>
 ```
 
-This is **not** a lowest-common-denominator: `candidates` serves the three glob conditions, `typeOnly` serves `onlyHaveTypeImportsFrom` and `ignoreTypeImports`, `aliases` serves `notHaveAliasedImports`, `line` serves message stability, and `kind` lets any site opt out of kinds it should not see. Every field has exactly one consumer family and nothing is left over.
+**Resolution is uniform: `lit.getSymbol()` on the string literal.** Measured across all five kinds, including `paths` aliases and bare packages, and it is what ts-morph uses internally for its own reference container. This replaces draft 1's three per-kind paths, fixes the `type-expression` wrong-file bug, and removes a `getType()` type-checker call (measured 3.2–3.9ms/pass per-kind vs 2.2–2.8ms uniform).
 
-**Resolution, per kind** (all four measured working, including `paths` aliases): `getModuleSpecifierSourceFile()` for `import`/`reexport`; the type-argument walk (`call.getType().getTypeArguments()[0]` → symbol → declaring `SourceFile`) for `dynamic`; the `ImportTypeNode`'s type symbol for `type-expression`. `candidatesFor(specifier, resolvedPath)` covers the unresolved case, which is what makes bare-package bans work on the new kinds.
+**No `candidates` field.** Draft 1 stored `candidatesFor(specifier, resolvedPath)`'s output alongside its two inputs — two representations of one fact that can disagree, and its consumers are four families, not one. Keep `specifier` + `resolvedPath`; expose `candidatesFor(edge)`.
 
-**Not `src/core/engine/`.** That directory does not exist and 60 files under `src/` import ts-morph; a one-module "engine" that 2 of 60 respect is the cosmetic boundary ADR-007's own Alternative 4 rejects. The honest move is `src/core/` with a ts-morph-free **return type** — `moduleEdges(filePath): readonly ModuleEdge[]` is already ADR-007 rule 2's shape, and the file header should say it is a deliberate down-payment on that boundary rather than an accident.
+**No cache, and the signature is why.** With the cost claim corrected there is nothing to cache: warm, the walk is cheaper than today's. A bulk signature also makes ADR-007 rule 2 true rather than asserted — one crossing returning a bulk result, instead of N per-file crossings needing a `WeakMap` to be affordable. Draft 1's ADR-007 argument also cited the wrong alternative: ADR-007's Alternative 4 is Rule 1 without Rule 2; this is Rule 2 without Rule 1, which ADR-007 calls the load-bearing half. The conclusion stands, the citation was wrong.
 
-### §2 The `typeOnly` contract, and the trap
+**Net win draft 1 did not claim:** deleting `resolveDynamicImport`/`indexDynamicImports` removes a `getDescendantsOfKind(CallExpression)` scan over ~30k nodes costing 60–100ms per graph rebuild.
 
-Today, in all five sites, **`import type` is a full edge**; the only exemption is the opt-in `{ ignoreTypeImports: true }`. That default is preserved.
+### §2 The `typeOnly` contract
 
-Type-only-ness exists for the new kinds and one form is a trap. **Measured:**
+Today, in all five sites, `import type` is a full edge; the only exemption is `{ ignoreTypeImports: true }`. **That default is preserved.**
 
-| Form                                         | `decl.isTypeOnly()` | all named specifiers type-only | correct answer     |
-| -------------------------------------------- | ------------------- | ------------------------------ | ------------------ |
-| `import type { X } from 's'`                 | true                | —                              | type-only          |
-| `import { type X as X2 } from 's'`           | **false**           | true                           | type-only          |
-| `export type { X as XT } from 's'`           | **true**            | **false**                      | type-only          |
-| `export { type X as XI } from 's'`           | **false**           | **true**                       | type-only          |
-| `export * from 's'`, `export { x } from 's'` | false               | false                          | runtime            |
-| `import('s')` (call)                         | —                   | —                              | **always runtime** |
-| `type A = import('s').X`                     | —                   | —                              | **always erased**  |
+Per kind, measured:
 
-**Neither predicate alone is correct for either declaration kind.** The rule is `decl.isTypeOnly() || (specifiers.length > 0 && specifiers.every(isTypeOnly))`, mirroring `isTypeOnlyImport` onto `ExportDeclaration`. Rows 3 and 4 are the ones a from-memory implementation gets wrong — the review's own prototype misclassified row 4 as a runtime edge, which would make `layered/type-imports-only` flag a type-only re-export.
+| Kind              | Rule                                                                                                                                                                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import`          | **Reuse `isTypeOnlyImport` unchanged.** Its `getDefaultImport()`/`getNamespaceImport()` guards are load-bearing: `import React, { type FC } from 'react'` is a runtime edge                                                                                                                                                     |
+| `reexport`        | New `isTypeOnlyReExport`: `decl.isTypeOnly() \|\| (namedExports.length > 0 && namedExports.every(isTypeOnly))`. **Both halves needed** — `export type { X as XT } from` has decl `true`/specifiers `false`; `export { type X as XI } from` has decl `false`/specifiers `true`. There is no default/namespace analogue, verified |
+| `dynamic`         | **Always runtime**                                                                                                                                                                                                                                                                                                              |
+| `type-expression` | **Always erased**                                                                                                                                                                                                                                                                                                               |
+| `require`         | **Always runtime**                                                                                                                                                                                                                                                                                                              |
+
+`onlyHaveTypeImportsFrom` has no `ImportOptions` overload, asymmetric with its three siblings. Pin the asymmetry or fix it; a test must state which.
 
 ### §3 Per-site disposition
 
-| Site                              | Disposition                                                                                | Direction                      |
-| --------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------ |
-| `onlyImportFrom` (:57)            | all 4 kinds; `typeOnly` exempt only under `ignoreTypeImports`                              | green→red, monotone            |
-| `notImportFrom` (:105)            | all 4 kinds; same exemption                                                                | green→red, monotone            |
-| `dependOn` (:155)                 | all 4 kinds; same exemption. **Delete its "static only" JSDoc**                            | **red→green**, monotone        |
-| `notHaveAliasedImports` (:196)    | consume the walk **filtered to `kind === 'import'`** — byte-identical to today             | **none**                       |
-| `onlyHaveTypeImportsFrom` (:235)  | all 4 kinds; `typeOnly` per §2                                                             | green→red, monotone            |
-| `reverse-dependency.ts` (:77-100) | replace all three collectors; delete `resolveDynamicImport`; dedup on `(importer, target)` | mixed; gains `type-expression` |
+| Site                                                       | Disposition                                                                                                | Direction           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------- |
+| `onlyImportFrom` (:57)                                     | all edge kinds; `typeOnly` exempt only under `ignoreTypeImports`                                           | green→red, monotone |
+| `notImportFrom` (:105)                                     | same                                                                                                       | green→red, monotone |
+| `dependOn` (:155)                                          | **runtime kinds only — never `typeOnly`.** See below                                                       | red→green, monotone |
+| `notHaveAliasedImports` (:196)                             | **not routed through `moduleEdges` at all.** Stays on a separate `importStatements(sf)` in the same module | none                |
+| `onlyHaveTypeImportsFrom` (:235)                           | `import` + `reexport` only. **Excludes `dynamic`** — see below                                             | green→red, monotone |
+| `importFrom` **predicate** (`src/predicates/module.ts:18`) | **in scope, not optional.** See below                                                                      | green→red           |
+| `reverse-dependency.ts` (:77-100)                          | replace all three collectors; delete `resolveDynamicImport`; dedup on `(importer, target)`                 | mixed               |
 
-**0022's hedge about direction is wrong and this is derivable, not empirical.** Four sites push one violation per matching/non-matching edge, so adding edges is monotonically green→red. Only `dependOn` uses `.some()`, so it is monotonically red→green. Measured on this repo's own source: `no-cross-boundary` 289 → **292**, `shared-isolation` 80 → **94**, `innermost-isolation` 20 → **21**, and **0** findings disappeared. The new ones are barrel re-export lines and `tests/fixtures/reverse-deps/src/public/index.ts:2,3` — a public barrel re-exporting `internal/`, which is 0022's motivating case sitting in our own corpus.
+Measured on this repo: `no-cross-boundary` 289 → **292**, `shared-isolation` 80 → **94**, `innermost-isolation` 20 → **21**, **0 findings lost**, 0 messages or lines changed for pre-existing findings. Monotonicity is derivable, not empirical: four sites push one violation per edge, so more edges is monotonically green→red; only `dependOn` uses `.some()`.
 
-**`notHaveAliasedImports` is excluded on purpose, and this is where 0022's five-site list is wrong.** Measured: `export { secret as s2 } from '../banned/secret.js'` → 1 violation under the shared walk, 0 today. Three reasons to refuse it: the rule's stated rationale is about **consumption** ("aliases hide API design problems — use the real export name") while a re-export rename is a deliberate **publication** decision, the canonical thing a barrel does; the line it draws is arbitrary (`export { x as y } from './impl.js'` flagged, `export { x as y }` not, decided by whether a specifier happens to be present); and its sanctioned remedy — "import the symbol by its original name" — is nonsense for a re-export line, which is ADR-008 rule 2. If renaming-on-re-export deserves a rule, it is a different rule with a different rationale.
-
-### §4 Bug 0015: rule-level, default-fail, three tiers, no new mechanism
-
-The unit is the **rule**. After conditions run, over the materialized subject set:
-
-1. **Total edges tested across all subjects == 0 → FAIL.** Default, `bypassFilters: true`, unsuppressible — the same shape and voice as `collectWithAssertionGuard`. The remedy is not optional and it is real: the author named a population and an edge constraint, and the population has no edges, so either the selector or the condition is wrong for these subjects. The finding states **both counts** (`N subjects, 0 edges`) and must not inherit the author's `suggestion` (bug 0021). Count edges **after** the `ignoreTypeImports` filter, or a subject set whose only edges are type-only reports "edges tested" while testing none.
-2. **An individual subject with 0 edges → nothing.** It is compliance. `reverse-dependency.ts:146`'s vacuous pass stays, and its comment gains the reason plus a pointer to tier 1 — 0015 is right that recording a mechanism without its consequence reads as a shrug.
-3. **Edges exist, but allowlist glob G matched none → `diagnose()` / `doctor`, not a build failure.** An over-provisioned allowlist is legitimate, so the remedy needs the reader's judgement, which is ADR-008 rule 1's discriminator for the warn/diagnostic tier. New `DiagnosticFinding.kind: 'unexercised-glob'`. **This is where 0015's actual typo case (`onlyImportFrom('**/nowhere/**')`) gets caught** — and it is a different fault from plan 0069's dead glob: the glob is satisfiable against the project and still exercised by nothing.
-
-`dependOn` is excluded from tier 1 — it already fails on an edgeless subject, correctly. `.expectNonEmpty()` is untouched: it asserts the selector matched subjects, a different claim, and keeping them separate is what stops a third mechanism appearing.
-
-This answers 0015's "wait until 0069's reporting surface exists": it exists (`diagnose`, `DiagnosticFinding`, `assertDiscovered`, `collectWithAssertionGuard`), it already has both a default-fail tier and a diagnostic tier, and this needs no new mechanism — only the right tier for each of two distinguishable faults.
-
-### §5 Sequencing — forced, and measured
-
-**One change; within it the widening lands before or with the edge count.** Files in this repo with zero static imports but ≥1 real edge: **6**.
+**`dependOn` must not count erased edges — draft 1 created a false green here.** Measured against `docs/modules.md`'s own teaching example ("server must depend on security middleware"), with the only reference being `export type { SecurityConfig } from './security-middleware.js'`:
 
 ```
-src/index.ts               static=0  edges=114  (reexport)
-src/core/index.ts          static=0  edges=13
-src/presets/index.ts       static=0  edges=12
-src/predicates/index.ts    static=0  edges=3
-tests/fixtures/dynamic-imports/src/template-consumer.ts   static=0  edges=2  (dynamic)
-tests/fixtures/reverse-deps/src/public/index.ts           static=0  edges=2  (reexport)
+0.26.0:      1 violation — "does not import from any path matching […]"
+draft 1:     0 violations
 ```
 
-Ship §4 on the narrow walk and the library's own public API surface reports _"this rule tested 0 edges"_ while carrying **114**. 0022 alone is safe (pure widening, no policy). **0015 alone is not.** Derive the count from the widened walk in the same commit so it is never computed from the narrow set.
+The server installs nothing; the line is erased; the rule certifies the runtime guarantee holds. Ask ADR-008's question and the answer is **pass**. On the baseline side it reads as "the violation was fixed", which 0.24.0's own table calls success. `dependOn` asserts a runtime dependency exists, so it must count runtime edges only. Its "static only" JSDoc is **rewritten, not deleted** — it is the only place a reader learns what a `dependOn` green means, and it must now say `import type` does not satisfy it.
+
+**`onlyHaveTypeImportsFrom` excludes `dynamic`, on ADR-008 rule 2.** Its shipped preset says _"Use `import type { X }` so the dependency is erased"_. Applied to `await import('../other/x.js')` that instruction cannot be followed. §3 in draft 1 ran exactly this test on `notHaveAliasedImports` and refused to widen it — and failed to run it on the row above.
+
+**`notHaveAliasedImports` leaves the shared walk entirely.** Draft 1 routed it through `moduleEdges` and filtered back to `kind === 'import'`, which invites "why does one of five sites disagree?" and made §3 and §5 contradict each other. The honest framing: **it is not an edge condition — it inspects `import` statement syntax.** A second, differently-named function beside `moduleEdges()` makes that structural rather than a filter. The decisive reason to refuse the widening is not consumption-vs-publication, it is the arbitrary boundary: `export { x as y } from './impl.js'` would be flagged and `export { x as y }` would not, decided by whether a specifier happens to be present — a coverage line invisible to the reader.
+
+**The `importFrom` predicate is in scope.** `src/builders/module-rule-builder.ts:122` makes `.notImportFrom()` **one method** that dispatches to the predicate before `.should()` and the condition after. Ship to one half and a single identifier carries two definitions of "an import", chosen by chain position — this plan's Problem statement reproduced inside one method name.
+
+### §4 The new findings must name their kind
+
+**Not cosmetic — it is a baseline-correctness requirement, and it is free only in this release.**
+
+`hashViolation` is `rule::element::message`, and the message carries only basename + resolved target. Measured: `notImportFrom('**/src/core/**')` over `src/conditions/**` gives 47 findings with **39 distinct hashes — 8 colliding pairs (17%)**. `dependency.ts:5` (an import) and `:9` (a re-export of the same module) hash **identically**. Replaying a frozen 0.26.0 baseline against the widened build: 49 findings, 1 unbaselined — and **the re-export was absorbed by a pre-existing entry**, so it was never reported as new.
+
+That breaks the migration's core promise. It also gives every new finding a remedy that does not fit its line: measured on this repo, `src/core/index.ts:1` is `export type { Predicate } from './predicate.js'` and is reported as _"index.ts **imports** …/predicate.ts"_ with _"Invert the dependency … pass it in as a parameter"_ — nonsense for a re-exported type alias.
+
+So each kind gets its own verb: `re-exports`, `dynamically imports`, `references the type from`, `requires`. **`kind === 'import'` messages stay byte-identical**, so every existing baseline survives; the new kinds get distinct identities _and_ fitting remedies. Doing this in 0.28 instead invalidates every baseline written at 0.27.
+
+### §5 Bug 0015 is descoped to a diagnostic
+
+**The failing tier is withdrawn.** Three independent measurements:
+
+- **This repo's own presets.** Six boundaries, one dependency-free `shared/constants.ts`: `strictBoundaries` generates 13 rules, **12** of which have subjects and zero edges. `applySharedIsolation` emits one rule per (sharedGlob × boundaryFolder), so one legitimate file produces one finding per boundary.
+- **A real layered demo.** A pure-entity innermost layer: 2 subjects, 0 edges → unsuppressible error under `layered/innermost-isolation`. An i18n loader: 3 subjects, 0 edges.
+- **The `ignoreTypeImports` inversion.** Draft 1 required counting edges _after_ the filter. So a layer whose only dependency is `import type` — the outcome the docs recommend `ignoreTypeImports` for — counts zero and fires on the **best possible** result.
+
+The remedy for all of these is "delete the rule" or "delete the preset". Draft 1 refuted subject-level failure for exactly this reason and then reinstated it one level up; summing zero over twenty subjects does not turn maximal compliance into absent evidence. And the ROADMAP already records the precedent: the slice discovery guards were **built and withdrawn from 0.18.1 because they fire on legitimate projects with no opt-out**, returning only once an opt-out exists.
+
+It also could not have shipped as specified: `collectWithAssertionGuard` is element-type-agnostic and cannot count edges, and `Condition<T>` is a public exported type backing `defineCondition()`.
+
+**What ships instead, in a later release:** a diagnostic for a glob that was never exercised, aimed at the case that is actually silent. Draft 1 aimed it at `onlyImportFrom('**/nowhere/**')`, which produces **96 violations** — maximally loud. The silent case is a **denylist** glob matching nothing: `notImportFrom('**/legcay/**')` reports zero forever. `diagnose()`'s existing skip is the precedent and must not be "fixed" — _"a positive condition glob is indistinguishable from an armed tripwire that has not fired"_.
+
+Two prerequisites, both stated so the follow-up is not surprised: `diagnose()` currently promises to report "without running any of them", and a glob-exercise tally requires running; and `doctor` cannot load a rule file that imports vitest, so the authoring shape 0015 is about is the one the channel cannot reach.
+
+## Sequencing and release shape
+
+**0.27.0 ships 0022 alone.** 0015's diagnostic follows. Draft 1 bundled them; the reviews were unanimous against it:
+
+- **Attributability.** One undifferentiated delta cannot distinguish a widening red (a real barrel crossing a boundary, remedy: remove the coupling) from a vacuity red (remedy: fix the rule). Opposite remedies.
+- **Opposite suppressibility.** 0022's findings are ordinary violations — baselineable, ratchetable. A `bypassFilters` finding is not, and `baseline` exits non-zero on one, so bundling removes the adopter's only staging tool for the half that has one.
+- 0015's blast radius is **unmeasurable** until 0022 ships: four of this repo's six zero-static-import files are barrels that stop being edgeless under the widening.
+
+The forced-ordering argument from draft 1 is satisfied by construction, since 0022 goes first.
 
 ## Guards
 
-### The parity test 0022 asks for becomes a tautology — do not ship it as the guard
+### The dynamic independence guard is cut
 
-0022 asks for "the forward walk and the reverse graph derive the same edge set from one fixture". The moment both call `moduleEdges`, `expect(forward).toEqual(reverse)` compares a value to itself: green with the walk arbitrarily broken, and `0 === 0` green when it collects nothing. Both reviewers caught this independently. Keep it as a cheap re-divergence pin; **label it as not the rule-5 guard.**
+Draft 1's load-bearing new idea was `await import()` versus the static walk. **The re-export half works and needs no compile step** — vitest resolves `.js` → `.ts` and transforms the fixture, so bug 0024's problem does not recur. Five of six sabotages caught, by four different assertions.
 
-### What replaces it
+**The dynamic half exits 0 on the exact defect it was invented for.** Reverting `resolvedPath` to `undefined` for non-relative dynamic specifiers — `reverse-dependency.ts:49`'s defect — is **uncaught**, because Node has no tsconfig `paths` support: aliases raise `ERR_MODULE_NOT_FOUND` rather than disagreeing, and bare specifiers diverge by design under bug 0014. Residual scope is relative specifiers, where both sides reduce to a path join and cannot fail differently. **Cut it and state the gap.** (If the alias case is wanted later, Node subpath imports — `"imports": { "#internal/*": … }` — are honoured by both resolvers and a disagreement there is a real signal.)
 
-- **An explicit expected edge list in the test file**, with both halves asserted against _it_ rather than against each other. ADR-008 rule 4's note applies verbatim: replace snapshots with explicit lists, not with counts. **The deliberate absences are part of the list** — `export { type X } from` and the computed dynamic must be _provably_ absent, since an omitted row is indistinguishable from a missed edge.
-- **Genuine independence from the module system, for the two kinds where the static answer is a guess.** Re-exports: build a fixture package, `await import()` its barrel, and assert the runtime namespace's keys equal the names the static walk says cross the edge. Dynamic: `await import(specifier)` from the fixture's own directory and compare the loaded marker export against `edge.resolvedPath`. Node's resolver and ts-morph cannot fail the same way — and this is the guard that would have caught `resolveDynamicImport` losing `@/`-aliased specifiers, because Node and TS resolve aliases by different rules and the disagreement _is_ the signal. ADR-008 rule 5 blesses this shape explicitly.
-- **Per edge kind × per condition family, by element identity** — `file:line` sets, never counts, so "found the re-export" cannot be confused with "found the static import three times".
-- **The §2 type-only matrix in both directions**, ~14 rows, including the two trap rows.
-- **Corpus-wide message/line equivalence** for every pre-existing static-import finding, old build vs new. The pattern already exists — `bare-package-imports.test.ts:262` does exactly this for bug 0014's change, with `expect(checked).toBeGreaterThan(500)` guarding the guard.
-- **A vacuity assertion on every one of the above** (`edges.length > 0` per fixture).
+The sixth sabotage the re-export half missed: swapping two edges' resolved targets. That is why `ModuleEdge` carries `names` — the guard must compare edge→target pairs, not sets of names.
 
-### The gap this plan must close in `arch-rules.test.ts`
+### The parity test stays a non-guard
 
-18 of the 80 affected test cases live there and **0** catch blindness; every one asserts zero violations, which zero edges satisfies. That file already carries two exemplary rule-5 pairs for _selector_ non-vacuity (ts-morph vs a filesystem walk at :72; "no glob written in this file can ever match" at :97). It has none for _condition_ non-vacuity. One positive control, by identity:
+`expect(forward).toEqual(reverse)` is a tautology once both call `moduleEdges`, and `0 === 0` is green. Keep it as a re-divergence pin, **labelled**, scoped to edges resolving to a project source file — the bare-target policies are deliberately opposed.
 
-```ts
-it("NON-VACUITY: the dependency conditions see this repo's real edges", () => {
-  // Every ban in this file asserts ZERO violations, so nothing here proves an
-  // edge was ever collected — measured: all 18 pass with the walk returning [].
-  const found = modules(p)
-    .that()
-    .resideInFolder('**/src/conditions/**')
-    .should()
-    .notImportFromCondition('**/src/core/**')
-    .violations()
-  expect(found.map((v) => path.basename(v.file)).sort()).toEqual([
-    /* explicit list */
-  ])
-})
-```
+### Everything else
 
-An explicit list, not `.length > 0`: a count survives the walk losing re-exports and gaining a duplicate.
-
-### Fixtures
-
-- **`tests/fixtures/module-edges/`** (new) — the per-kind × per-family matrix and the parity pin. Needs forms no boundary fixture would carry: `import type`, `export type`, `export { type X } from`, `export *`, bare dynamic, computed dynamic, `type A = import('x').Y`.
-- **`tests/fixtures/edgeless/`** (new, 3 files) — `edgeless.ts` (no edges), `has-edges.ts` (edges, all allowlisted), `allowed/target.ts`. Tier 1 needs a **satisfiable** allowlist plus a compliant sibling; no existing root offers that without also offering violations.
-- **`boundaries-folder-level/`** — add exactly one file, `via-reexport.ts`, as proof the fix reaches the shipped preset. Budget it honestly: it changes the expected edge set in ~4 places in that test file, and those are precisely the reds an agent "fixes" by bumping a number. Update them **by identity**.
-- **Reuse what exists:** `tests/fixtures/reverse-deps/src/internal/reexport-only.ts` and `tests/fixtures/dynamic-imports/src/` already contain both missing kinds and are referenced only by reverse/dynamic tests. Pointing the forward conditions at them is cheaper than 0022 implies.
-- **Do not touch `tests/fixtures/presets/boundaries/`.** `boundaries.test.ts:32` asserts `errors(...).toEqual([])` for the happy path, so any new cross-boundary edge there reds an unrelated test. (The constraint recorded in 0017's guard — `duplicateBodies` running pairwise — is narrower than written: it needs `noCopyPaste: true` and function bodies ≥5 lines, so re-export one-liners cannot trip it. Correct that note in passing.)
+- **Explicit expected edge lists**, with the deliberate absences part of the list. An omitted row is indistinguishable from a missed edge.
+- **By identity, `relpath:line`, never basenames** — draft 1's item 14 used basenames and `dependency.ts` appears 5× in that list, so a multiset survives losing a re-export and gaining a duplicate inside one file.
+- **A vacuity assertion on every fixture** (`edges.length > 0`), and `checked > N` on every corpus loop.
 
 ## Test inventory
 
-1. `module-edges.test.ts` — the 13-form × 9-literal table of §1, asserted as an edge list with the four exclusions provably absent.
-2. `module-edges.test.ts` — the §2 type-only matrix, ~14 rows, both directions, both trap rows.
-3. `module-edges.test.ts` — resolution per kind incl. `paths` aliases and bare specifiers; `candidates` primary-first.
-4. `module-edges-independence.test.ts` — runtime `await import()` vs the static walk, for re-export and dynamic kinds.
-5. `dependency-edge-kinds.test.ts` — per kind × per family (5 families), by `file:line` identity, with the absences.
-6. `dependency-edge-kinds.test.ts` — `notHaveAliasedImports` byte-identical to today (the `kind === 'import'` filter).
-7. `dependency-edge-kinds.test.ts` — `dependOn`'s red→green direction, explicitly.
-8. `edge-parity.test.ts` — forward vs reverse, **labelled a re-divergence pin, not the guard**, scoped to edges resolving to a project source file (the bare-target policies are deliberately opposed).
-9. `rule-tested-no-edges.test.ts` — tier 1: fires when all subjects are edgeless; silent with one edge-bearing sibling; asserted by identity so a fire-on-everything stub reds.
-10. `rule-tested-no-edges.test.ts` — tier 1 is `bypassFilters` + `error`, and does **not** carry `expectNonEmpty`'s empty-selector remedy (bug 0021's shape).
-11. `rule-tested-no-edges.test.ts` — the remedy remediates: apply the stated fix, assert the finding clears.
-12. `rule-tested-no-edges.test.ts` — cause discrimination: an empty selector and an edgeless rule produce distinguishable findings.
-13. `unexercised-glob.test.ts` — tier 3 reaches `diagnose()`/`doctor` and does **not** fail a build.
-14. `arch-rules.test.ts` — the positive control above.
-15. `layered.test.ts` — `type-imports-only` gains an **edge-identity** assertion. It is currently pinned by `.some(v => v.ruleId === …)` at four sites and nothing anywhere pins _which_ import is exempt.
-16. Corpus-wide `{file, line, message}` equivalence for pre-existing static-import findings.
-17. `baseline-compat` — an old-text baseline replays against the new build with **0** new findings for unchanged static-import violations.
+1. §1's 19-form table as an edge list, with all five non-edge rows provably absent, **including the `NoSubstitutionTemplateLiteral` row**.
+2. §2's per-kind matrix — `import` via `isTypeOnlyImport` (incl. `import React, { type FC }` as runtime), both `reexport` trap rows, dynamic/type-expression/require constants.
+3. Uniform `lit.getSymbol()` resolution per kind, incl. `paths` aliases, bare packages, and the `type A = import('./barrel.js').Deep` → **barrel, not impl** case.
+4. Runtime independence, **re-export kind only**: `await import()` the fixture barrel under vitest; compare per-edge `names` → target. The dynamic half is cut with the gap stated in the file header.
+5. Per kind × per family by `relpath:line` identity, with absences.
+6. `notHaveAliasedImports` pinned as an **explicit expected list** over a fixture holding both `import { x as y } from` and `export { x as y } from` — exactly one violation, named. Not "byte-identical to today", which has no _today_ inside the new build.
+7. `dependOn`: a type-only re-export does **not** satisfy it (the false green in §3), and a runtime edge does.
+8. Parity, labelled a non-guard, scoped to resolved project files.
+9. §4's per-kind messages: `import` byte-identical to 0.26.0; each new kind distinct. **Plus the collision pin** — a file that both imports and re-exports the same module yields two distinct `hashViolation` values.
+10. A frozen 0.26.0 baseline (committed fixture) replays against the new build: every pre-existing static finding matches, and the new-kind findings are reported as new.
+11. Corpus-wide per-edge equivalence on **one build**: `moduleEdges` filtered to `kind === 'import'` is sequence-equal to `getImportDeclarations().map(…)` over `{line, candidates, typeOnly}`, with `checked > 500`. Message equality follows, because the template is a pure function of those fields. **`importCandidates` and `isTypeOnlyImport` stay exported and used by this test** — draft 1's note that ESLint flagging them unused is a good signal is incompatible with having this guard.
+12. `arch-rules.test.ts` positive control: the conditions see this repo's real edges, by `relpath:line`, derived **after** the widening, using `inProjectSrc()` rather than a raw folder glob.
+13. `layered/type-imports-only` gains an edge-identity assertion — it is pinned by `.some(v => v.ruleId === …)` at four sites and nothing pins _which_ import is exempt.
+14. The `importFrom` predicate and `notImportFrom` condition agree on one fixture — the two-definitions-in-one-identifier case.
+15. A bare dynamic import (`import('picomatch')`, `resolvedPath: undefined`, `candidates: ['picomatch']`) under `onlyImportFrom` in **both** option states — the real unresolvable case, not the template one.
+16. `require` kinds: `import x = require('s')` in `.ts`, `require('s')` in `.js` under `allowJs`, both classified **runtime**, not `type-expression`.
+17. Reverse graph: dedup on `(importer, target)` — measured today, one importer with two static imports of one target yields **two byte-identical violations at the same `file:line`**, hence two identical baseline hashes.
+
+**On `type-expression`:** measured **0 instances** across every file the tsconfig reaches, including `node_modules`. So items 3 and 5 need a dedicated fixture or the changelog's "the reverse half gains `type-expression`" claim is asserted by nothing. Add the fixture or drop the claim.
 
 ## Migration
 
-The new findings are **ordinary** violations (`bypassFilters: false`), so a consumer on a baseline gets unbaselined errors on files their PR never touched, and a consumer on `--changed` sees **nothing** — the barrel did not change. Both are wrong to leave implicit.
-
-**The recipe, and it must be run before it is published.** Note what does _not_ work: `npx ts-archunit@0.26.0 check` does **not** reproduce the old behaviour, because `loadRuleFiles` imports the rule file from the user's project and its `import … from '@nielspeter/ts-archunit'` resolves against the project's `node_modules` — old CLI, new conditions.
+**The recipe, verified by running it.** Note first what does **not** work, and it is worse than draft 1 said: a separately-installed `ts-archunit@0.26.0` binary **prints `0.26.0` and reports the new findings**, because `loadRuleFiles` imports the rule file from the user's project and its `import … from '@nielspeter/ts-archunit'` resolves against the project's `node_modules`. A team bisecting "which version did this?" pins @0.26.0, sees identical output, and concludes the upgrade was not the cause. This needs to be a boxed warning, and the CLI should print one line when the two versions differ.
 
 ```bash
-# BEFORE upgrading — the only moment the old behaviour exists
-npx ts-archunit baseline arch.rules.ts --output pre-0.27.json
-# upgrade, then: everything reported here is new in 0.27.0
-npx ts-archunit check arch.rules.ts --baseline pre-0.27.json
+# BEFORE upgrading — refresh the baseline you already have, in place, and commit it.
+npm run arch:baseline        # or: ts-archunit baseline <rules> --output arch-baseline.json
+# upgrade, then CI's normal invocation reports only what 0.27.0 added.
 ```
 
-Two release constraints follow, not suggestions:
+Refreshing **in place** is better than draft 1's `pre-0.27.json`: measured, a config-file `baseline: 'arch-baseline.json'` means plain `check` keeps using the old file while the recipe's artifact sits unused. And `baseline` has no clobber guard, so an adopter reaching for `npm run arch:baseline` at the wrong moment overwrites their snapshot — `baseline` should refuse to overwrite without `--force`, like `init` does.
 
-- **No condition `description` string and no existing violation message may change.** `hashViolation` is `rule::element::message` and `rule` is built from condition descriptions; appending "(including re-exports)" to `onlyImportFrom`'s description reports 100% of findings as new and silently breaks every committed baseline. Inventory item 17 is the pin.
-- The `--format json` variant needs `|| true`, because `check` exits non-zero and would abort a `set -e` script.
+**The honest middle, which draft 1 missed.** Regenerating auto-accepts the release's best finding; triaging 300 findings across 40 barrels is not a sprint. The third option is in the product already:
 
-**"Regenerate your baseline" is the wrong headline advice**: it auto-accepts, unreviewed, the highest-value finding in the release — 0022 itself argues the re-export is the _worse_ case because it re-publishes another boundary's internals. Ratchet the **delta**: baseline on 0.26.0, upgrade, triage what the delta reports, and only then regenerate with the diff reviewed. Size it honestly rather than promising it is small — 122 `export … from` and 7 `import(` in `src/` here, nearly all within-package barrels, so the cross-boundary delta is near zero for most codebases and large for one shape: a codebase whose primary cross-module access pattern is barrel re-export. Step 1 is how a reader finds out which they are.
+```ts
+...strictBoundaries(p, { … }).map((b) => b.asSeverity('warn')),
+```
 
-**Tell adopters not to reach for `--changed`.** It is the first thing anyone under CI pressure tries, and the new findings are by definition in untouched files, so it hides 100% of them and yields a permanently green build that enforces nothing on legacy re-exports.
+Measured: 9 findings → 4 errors, 5 warnings, CI green, and **0.26.0 was the release that made warn output actually appear**. A warn prints on every run and cannot be silently forgotten; a regenerated baseline makes the finding invisible forever. Ratchet down, then drop the `.asSeverity('warn')`.
 
-**And the release must name three reversals, not one:**
+Name the move a team will otherwise find on their own: `.excluding('index.ts')` silences **every barrel in the project at once**, including their legitimate static imports, because `element` is the basename. It belongs on the do-not-reach-for list beside `--changed`.
 
-- `docs/modules.md:161` states the current behaviour as a **contract** — "All three check static `import` declarations only". So is `dependOn`'s JSDoc. This is a documented-contract reversal, the same category as 0.23.0's two "pinned by a test" rows, and both texts change in the same commit.
-- **Barrels become dependency-bearing files.** `src/index.ts` goes from 0 dependencies to 114. That single sentence is what lets a reader predict their own diff.
-- The reverse half changes too: it gains `type-expression`, so `beImported()` reports **fewer** orphans and `onlyBeImportedVia` **more** importers — a second red→green surface.
+**`--changed` must be made to speak — five lines, and it is not a migration note.** Measured: 9 error-severity findings, `--changed` reports **zero**, exit 0, and `--format json` emits `"reason": null`. `DiffFilter.size` exists and is **never read anywhere**. Every finding this release adds is by construction in a file nobody touched, so `--changed` hides 100% of them and yields a permanently green build. One stderr line on the channel 0.26.0 built — `[ts-archunit] --changed: 9 violations in unchanged files were not reported (4 files).` — plus `summary.reason` in the JSON. Generic, permanent, and it cannot be un-read like a release note.
+
+**Four reversals, with the emphasis corrected.** Draft 1 led with `docs/modules.md:161`, which is a documented _limitation_ plus a workaround pointer — reversing a limitation only makes rules stricter. The genuine guarantee reversal is the one draft 1 said to delete: **`dependOn`'s JSDoc**, which reverses red→green. Lead with that. Then: barrels become dependency-bearing (`src/index.ts` 0 → 114 dependencies — the sentence that lets a reader predict their own diff); the reverse half gains kinds, so `noDeadModules()` reports fewer orphans (**`noDeadModules` is the name in the docs and the rule teams run** — draft 1 named only `beImported`); and `modules.md:161`'s workaround pointer becomes wrong advice.
+
+**Doc surfaces draft 1 missed:** `docs/standard-rules.md:268` (enumerates which forms resolve), `docs/slices.md:22-45` (teaches import-glob semantics on the page documenting the still-static slice graph), `docs/api-reference.md:98` vs `:223` (predicate and condition tables twenty lines apart, reading identically), `docs/what-to-check.md:666` (the barrel recipe — after 0.27 the barrel is the likeliest violator), `docs/.vitepress/dist/` (committed build output carrying the old contract), and **consumer-side copies**: `explain --format agent` output is pasted into `CLAUDE.md` by a documented workflow, so the preset `imperative` strings now mean something wider with no refresh mechanism. Tell people to re-run it.
 
 ## Out of scope
 
-- **The slice graph.** `src/helpers/slice-graph.ts:48,105` powers `beFreeOfCycles()`, `notDependOn()` and `respectLayerOrder()` — i.e. `layered/layer-order`, `layered/no-cycles`, `boundaries/no-cycles` — and is blind to re-exports too. Barrel re-export is _the_ classic cycle shape, so this is genuinely valuable, but a cycle finding is the hardest kind to remedy, it roughly doubles the blast radius, and it is a different upgrade story. **File it as a follow-up and disclose the limitation in the changelog** — what is not acceptable is shipping without saying which side of the line it is on.
-- **The `importFrom` predicate** (`src/predicates/module.ts:18`) — same upgrade story and same remedy, so it _should_ ride along if it fits the day; if not, it is the first follow-up, because `.that().importFrom('**/legacy/**')` and `.should().notImportFrom('**/legacy/**')` are taught side by side in `docs/what-to-check.md` and would otherwise disagree.
-- **`require()`** stays blind everywhere. Already documented as such in the reverse half; state it rather than paper over it.
-- **Widening `notHaveAliasedImports`** — §3.
-- **An `includeReExports` option.** It would reinstate two user-selectable definitions of "an import" — the exact defect this plan removes, with a config surface — and plan 0069 already settled the principle: "an opt-out is the first thing an agent adds on the first red." "An import is an import" is the honest default; `.excluding()` and the baseline are the visible escape hatches. A _dynamic_-import knob has real semantic content (deliberate deferral) and can arrive later on a demand signal, named for what it means — not preemptively in the breaking release, where it reads as the sanctioned way to get green.
+- **The slice graph** (`slice-graph.ts:48,105`) — `beFreeOfCycles()`, `notDependOn()`, `respectLayerOrder()` stay static-only. Barrel re-export is _the_ classic cycle shape, so this is valuable, but a cycle finding is the hardest class to remedy and it is a different upgrade story. **The disclosure must be louder than a changelog line**: one sentence in `beFreeOfCycles()`'s JSDoc and in `layered/no-cycles` / `boundaries/no-cycles` metadata, because `strictBoundaries` will red on a barrel from one rule and stay silent on it from its sibling, in the same run. Rule metadata is read on every failure; a changelog is read once. The retrofit is cheap (both sites are resolved-file-only); the reds are not.
+- **`declare module './rel.js'`** — a real compile-time reference the binder routes to `moduleAugmentations`, so `getImportStringLiterals()` structurally cannot see it. State it as a hole, not a correct exclusion.
+- **An `includeReExports` option** — it reinstates two user-selectable definitions of "an import", and 0069 settled the principle: "an opt-out is the first thing an agent adds on the first red."
+- **Exporting `ModuleEdge`** — deferred, but note the cost honestly: `defineCondition()` is a public, documented, taught extension point, so every custom dependency condition in the wild will keep calling `getImportDeclarations()` and reproduce bug 0022 outside the package, where no future fix reaches it. §2's four-row trap table is the evidence they will get it wrong. Revisit in 0.28 rather than never.
 
 ## Notes for whoever implements
 
-- **`onlyBeImportedVia` double-reports today**, and unifying the walk forces the decision. `addToGraph` (`reverse-dependency.ts:26`) takes a `deduplicate` flag: `false` for static imports, `true` for the others. Measured: one target, one importer, two static imports of it → **two byte-identical violations at the same `file:line`**, hence two identical baseline hashes. Dedup on `(importerPath, targetPath)` — the reverse graph's value is a set of files and per-edge multiplicity is meaningless at that granularity.
-- **The reverse graph hardcodes `line: 1`** while the forward walk reports real lines, so parity can only be keyed on `(importer, imported)` pairs.
-- `isTypeOnlyImport` and `importCandidates` become unused in `dependency.ts` after the change. ESLint flagging them is the signal that the per-declaration logic genuinely moved rather than being duplicated.
-- **Unresolvable dynamic specifiers need opposite answers per family.** `import(\`./locales/${lang}.js\`)`cannot resolve: under`notImportFrom`nothing matches → no violation (silent under-enforcement, disclose it); under`onlyImportFrom` nothing matches the allowlist → **violation**, which reds every i18n loader, lazy route table and plugin loader at error severity. Recommendation: an edge whose specifier is not a static string is **not an edge** for the allowlist family, and tier 3 reports the count so the gap is visible rather than silent.
-- **Re-run the blindness sabotage after the fix and put the number in the changelog.** If the caught count is still ~38/2478, the change added _visibility_ without adding _coverage_, and the 60-odd survivors are now survivors over a larger surface.
-- **Enumerate the sabotage matrix from the diff**, not from this plan. A list written from memory honestly reports "nothing passes". Read the **exit code** of `npx vitest run`, never the reporter text — ANSI codes have already defeated a grep-based verdict in this project once. Expect ~8 reverts to be caught by nothing on the first round; every one will be a case neither bug report enumerated.
-- **`plans/0069-appendix-vacuous-tests.md` has a hole this plan should fill**: it enumerated tests failing under an empty _selector_, and an edgeless _subject_ is a non-empty selector — so `tests/conditions/dependency.test.ts:43` ("passes for a module with no imports (vacuously true)") is not in it. Under §4 that test stays green and gains a sibling for tier 1; the appendix needs a sibling number derived the same mechanical way.
+- **`onlyBeImportedVia` double-reports today**, and unifying the walk forces the decision: `addToGraph`'s `deduplicate` flag is `false` for static imports. Dedup on `(importerPath, targetPath)`.
+- **The reverse graph hardcodes `line: 1`**, so parity can only key on `(importer, imported)`.
+- **The reverse graph's whole-graph cache is keyed on `Project` alone and computed from the file list of the first call**, which is never part of the key — stale-forever if the file set changes. Nothing in `src/` mutates a `Project` after handing it out, so this is a consumer hazard; say so in the header rather than leaving it discovered.
+- **`ImportTypeNode.getStartLineNumber()`** is the type node's line, not the statement's; they differ for a multi-line type alias.
+- **Re-run the blindness sabotage after the fix and put the number in the changelog.** If it is still ~38/2478, the change added visibility without coverage.
+- **Enumerate the sabotage matrix from the diff**, read exit codes, and expect reverts caught by nothing on the first round.
+- **`plans/0069-appendix-vacuous-tests.md` has a hole**: it enumerated tests failing under an empty _selector_, so `tests/conditions/dependency.test.ts:43` ("passes for a module with no imports (vacuously true)") is not in it. Under §5 that test stays green — the failing tier is withdrawn — but the appendix should say why.
