@@ -49,8 +49,12 @@ const violating = () =>
 
 function silenceWarnings(): string[] {
   const written: string[] = []
-  const spy = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    written.push(args.map(String).join(' '))
+  // `process.stderr.write`, not `console.warn`: bug 0024 moved every
+  // library-originated message onto the one channel that survives a passing test
+  // under vitest's default reporter.
+  const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    written.push(String(chunk))
+    return true
   })
   onTestFinished(() => {
     spy.mockRestore()

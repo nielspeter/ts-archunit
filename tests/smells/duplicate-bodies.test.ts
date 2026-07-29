@@ -58,7 +58,7 @@ describe('smells.duplicateBodies()', () => {
   })
 
   it('.warn() logs but does not throw', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8).warn()
     expect(warnSpy).toHaveBeenCalled()
   })

@@ -77,7 +77,7 @@ describe('layeredArchitecture preset', () => {
 
   describe('typeImportsAllowed', () => {
     it('surfaces a WARN (not console.warn) when a layer has value imports from others', () => {
-      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const rules = run({ layers: ordered, typeImportsAllowed: ['**/routes/**'] })
       const w = warns(rules)
       expect(w.some((v) => v.ruleId === 'preset/layered/type-imports-only')).toBe(true)

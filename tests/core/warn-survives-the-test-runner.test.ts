@@ -1,0 +1,260 @@
+/**
+ * `.warn()` output has to reach the developer (bug 0024).
+ *
+ * **A spy cannot test this, which is why the bug shipped.** Every existing test
+ * of the warn path asserted that the channel was *called* — `vi.spyOn(console,
+ * 'warn')` — and a spy proves the call, never the delivery. vitest's default
+ * reporter intercepts console output and replays it only for **failing** tests,
+ * and `.warn()` never fails a test, so 4 real violations produced zero output
+ * for every version through v0.24.x.
+ *
+ * So this spawns a real `vitest run` over a real fixture, in a child process,
+ * with the default reporter and `CI=true`, and reads what a developer would
+ * actually see. It is slow by the standards of this suite and it is the only
+ * shape that can fail for the right reason.
+ *
+ * The bug asks for sabotage in both directions, and both are here: the passing
+ * test must show the output (that is the fix), and the failing-test case must
+ * still show it (otherwise this is measuring the failure path, where vitest
+ * replays intercepted output anyway, and would pass even with the defect
+ * restored).
+ */
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const repoRoot = path.resolve(import.meta.dirname, '../..')
+
+/**
+ * Generated INSIDE the tests tree, not in a temp directory.
+ *
+ * `vitest.config.ts` sets `include: ['tests/**\/*.test.ts']`, so a probe written
+ * to `os.tmpdir()` is filtered out and the child exits 1 with "No test files
+ * found" — which reads exactly like the assertion failing. Measured. Living here
+ * also means the probe imports the library through the same relative paths every
+ * other test uses, instead of hand-built absolute paths into `node_modules`.
+ *
+ * The parent run globbed its file list before `beforeAll` created anything here,
+ * so these are never collected by the run that writes them.
+ */
+const generatedDir = path.join(repoRoot, 'tests/__generated__')
+
+/** A test file that uses the library exactly as a consumer's test would. */
+function writeProbe(name: string, body: string): string {
+  const file = path.join(generatedDir, name)
+  fs.writeFileSync(
+    file,
+    [
+      `import { describe, it, expect } from 'vitest'`,
+      `import { Project } from 'ts-morph'`,
+      `import path from 'node:path'`,
+      `import { functions } from '../../src/builders/function-rule-builder.js'`,
+      ``,
+      `const tsconfig = path.resolve(import.meta.dirname, '../fixtures/poc/tsconfig.json')`,
+      `const p = new Project({ tsConfigFilePath: tsconfig })`,
+      `const proj = { tsConfigPath: tsconfig, _project: p, getSourceFiles: () => p.getSourceFiles() }`,
+      `const parsers = () => functions(proj).that().haveNameMatching(/^parse/).should().notExist()`,
+      ``,
+      body,
+    ].join('\n'),
+  )
+  return file
+}
+
+/**
+ * Run vitest as a child, with the DEFAULT reporter — the one a consumer runs and
+ * the one that drops intercepted console output from passing tests.
+ */
+function runVitest(file: string): { output: string; status: number } {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, 'node_modules/vitest/vitest.mjs'), 'run', file, '--root', repoRoot],
+    {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+      env: { ...process.env, CI: 'true', NO_COLOR: '1' },
+      timeout: 120_000,
+    },
+  )
+  return { output: `${result.stdout ?? ''}${result.stderr ?? ''}`, status: result.status ?? -1 }
+}
+
+beforeAll(() => {
+  // Cleaned on the way IN as well as out: a crashed earlier run would otherwise
+  // leave probe files that the next parent run collects as its own tests.
+  fs.rmSync(generatedDir, { recursive: true, force: true })
+  fs.mkdirSync(generatedDir, { recursive: true })
+})
+afterAll(() => {
+  fs.rmSync(generatedDir, { recursive: true, force: true })
+})
+
+describe('.warn() inside a test that PASSES', () => {
+  it('prints its violations where the developer can see them', () => {
+    const file = writeProbe(
+      'passing.test.ts',
+      [
+        `describe('advisory', () => {`,
+        `  it('warns and passes', () => {`,
+        `    const rule = parsers()`,
+        `    expect(rule.violations()).toHaveLength(4)`,
+        `    rule.warn()`,
+        `  })`,
+        `})`,
+      ].join('\n'),
+    )
+    const { output, status } = runVitest(file)
+
+    // The test really passed — otherwise this is the failing-test path, where
+    // vitest replays intercepted output and the defect is invisible.
+    expect(status, output).toBe(0)
+    expect(output).toContain('1 passed')
+
+    // And the violations reached the reader. `parseFooOrder` is a real function
+    // in the poc fixture; the count is asserted inside the child, so this
+    // cannot pass on an empty rule.
+    expect(output).toContain('parseFooOrder')
+    expect(output).toContain('should not exist')
+  })
+})
+
+describe('the same output when the test FAILS', () => {
+  it('still reaches the reader', () => {
+    // The other direction the bug asks for. With the defect restored this test
+    // would pass — vitest replays intercepted console output for failing tests —
+    // so it exists to stop someone "simplifying" the passing case above into
+    // this one and concluding the channel works.
+    const file = writeProbe(
+      'failing.test.ts',
+      [
+        `describe('advisory', () => {`,
+        `  it('warns, then fails for an unrelated reason', () => {`,
+        `    parsers().warn()`,
+        `    expect(1).toBe(2)`,
+        `  })`,
+        `})`,
+      ].join('\n'),
+    )
+    const { output, status } = runVitest(file)
+    expect(status).not.toBe(0)
+    expect(output).toContain('parseFooOrder')
+  })
+})
+
+describe('the other library warnings, on the same channel', () => {
+  it('a stale exclusion is reported from a passing test', () => {
+    // `.warn()` was the reported half; the same silence covered every
+    // library-originated message. A stale `.excluding()` in a passing test said
+    // nothing at all, so the one signal that an exclusion has rotted after a
+    // rename was unreachable in the runner where rules are written.
+    const file = writeProbe(
+      'stale-exclusion.test.ts',
+      [
+        `describe('stale exclusion', () => {`,
+        `  it('reports it and passes', () => {`,
+        `    const v = parsers().rule({ id: 'probe/stale' }).excluding('NoSuchElement').violations()`,
+        `    expect(v).toHaveLength(4)`,
+        `  })`,
+        `})`,
+      ].join('\n'),
+    )
+    const { output, status } = runVitest(file)
+    expect(status, output).toBe(0)
+    expect(output).toContain('1 passed')
+    expect(output).toContain('Unused exclusion')
+    expect(output).toContain('NoSuchElement')
+  })
+})
+
+describe('the channel itself', () => {
+  // Two properties of `writeStderr` that the child-process tests above cannot
+  // see, both measured in their own child because they are about process
+  // behaviour rather than about text.
+  const runNode = (script: string, pipe: boolean): { status: number; out: string } => {
+    const file = path.join(generatedDir, 'channel.mjs')
+    fs.writeFileSync(file, script)
+    // `sh -c` so the pipe is real: a closed downstream reader is the whole point,
+    // and spawnSync's own stdio cannot reproduce it.
+    const cmd = pipe
+      ? `${JSON.stringify(process.execPath)} ${JSON.stringify(file)} 2>&1 | head -2 >/dev/null; exit \${PIPESTATUS[0]}`
+      : `${JSON.stringify(process.execPath)} ${JSON.stringify(file)} 2>&1`
+    const r = spawnSync('bash', ['-c', cmd], { encoding: 'utf-8', timeout: 60_000 })
+    return { status: r.status ?? -1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` }
+  }
+
+  it('survives a closed downstream pipe instead of dying of EPIPE', () => {
+    // Node's Console is built with `ignoreErrors: true`; a bare
+    // `process.stderr.write` is not, and the EPIPE arrives ASYNCHRONOUSLY, so
+    // neither try/catch nor the write callback can see it. Measured over 20 000
+    // lines: bare write exits 1, an attached 'error' listener exits 0.
+    //
+    // This is not hypothetical for this library: `writeReport` already wrote to
+    // stderr unguarded, so `ts-archunit check 2>&1 | head` could fail for EPIPE
+    // rather than for findings — indistinguishable from the exit code.
+    const { status } = runNode(
+      [
+        `import { writeStderr } from ${JSON.stringify(path.join(repoRoot, 'src/core/stderr.ts'))}`,
+        `const line = 'x'.repeat(200)`,
+        `for (let i = 0; i < 20000; i++) writeStderr(line)`,
+      ].join('\n'),
+      true,
+    )
+    expect(status).toBe(0)
+  })
+
+  it('TRIPWIRE: nothing writes to stderr except the channel', () => {
+    // Paired with the behavioural test above, and honest about being a tripwire.
+    //
+    // The behavioural half proves the CHANNEL is EPIPE-safe. It cannot prove
+    // nobody bypasses it: reverting `writeReport` to its own bare
+    // `process.stderr.write` was caught by nothing, and the obvious behavioural
+    // guard is unavailable — bare node cannot import these modules (they use
+    // `.js` specifiers that resolve to `.ts`, which only the bundler does), and
+    // running the probe under vitest hands stdio to vitest, so the closed pipe
+    // stops being real. Both measured before settling for a source scan.
+    //
+    // `console.error` in `src/cli/` is deliberately exempt: `Console` is built
+    // with `ignoreErrors: true`, so it is EPIPE-safe by construction, and a
+    // terminal command is not running inside a test runner.
+    const offenders: string[] = []
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+        } else if (entry.name.endsWith('.ts')) {
+          const rel = path.relative(repoRoot, full)
+          if (rel === path.join('src', 'core', 'stderr.ts')) continue
+          const text = fs.readFileSync(full, 'utf-8')
+          // Comments discussing the API are fine; a call is not.
+          for (const [i, line] of text.split('\n').entries()) {
+            const code = line.replace(/\/\/.*$/, '')
+            if (code.includes('process.stderr.write(')) offenders.push(`${rel}:${i + 1}`)
+          }
+        }
+      }
+    }
+    walk(path.join(repoRoot, 'src'))
+    expect(offenders).toEqual([])
+  })
+
+  it('separates consecutive messages, as console.warn did', () => {
+    // The call sites this replaced used `console.warn`, which appends a newline.
+    // Ten sites remembering to add one is a mistake waiting to happen, and two
+    // findings run onto one line is the defect this channel exists to avoid.
+    const { out } = runNode(
+      [
+        `import { writeStderr } from ${JSON.stringify(path.join(repoRoot, 'src/core/stderr.ts'))}`,
+        `writeStderr('FIRST-MESSAGE')`,
+        `writeStderr('SECOND-MESSAGE')`,
+        `writeStderr('THIRD-ALREADY-ENDS\\n')`,
+      ].join('\n'),
+      false,
+    )
+    expect(out).toContain('FIRST-MESSAGE\nSECOND-MESSAGE\n')
+    // An already-terminated message must not gain a second newline.
+    expect(out).toContain('THIRD-ALREADY-ENDS\n')
+    expect(out).not.toContain('THIRD-ALREADY-ENDS\n\n')
+  })
+})

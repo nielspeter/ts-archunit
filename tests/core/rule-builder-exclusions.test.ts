@@ -20,7 +20,7 @@ const elements = [
 describe('.excluding()', () => {
   it('suppresses violations matching exact element name', () => {
     const builder = new TestRuleBuilder(stubProject, elements)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     try {
       builder.should().withCondition(alwaysFail()).excluding('UserService').check()
       expect.unreachable('should have thrown')
@@ -36,7 +36,7 @@ describe('.excluding()', () => {
 
   it('suppresses violations matching regex pattern', () => {
     const builder = new TestRuleBuilder(stubProject, elements)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     try {
       builder
         .should()
@@ -58,7 +58,7 @@ describe('.excluding()', () => {
 
   it('does not suppress non-matching violations', () => {
     const builder = new TestRuleBuilder(stubProject, elements)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     try {
       builder.should().withCondition(alwaysFail()).excluding('UserService').check()
       expect.unreachable('should have thrown')
@@ -76,7 +76,7 @@ describe('.excluding()', () => {
 
   it('supports multiple exclusion patterns', () => {
     const builder = new TestRuleBuilder(stubProject, elements)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     try {
       builder
         .should()
@@ -95,7 +95,7 @@ describe('.excluding()', () => {
   })
 
   it('warns about unused exclusions', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const builder = new TestRuleBuilder(stubProject, elements)
     try {
       builder.should().withCondition(alwaysFail()).excluding('NonExistent').check()
@@ -107,7 +107,7 @@ describe('.excluding()', () => {
   })
 
   it('works with .check() — excluded violations do not throw', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const builder = new TestRuleBuilder(stubProject, elements)
     expect(() => {
       builder
@@ -120,7 +120,7 @@ describe('.excluding()', () => {
   })
 
   it('works with .warn() — excluded violations not logged', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const builder = new TestRuleBuilder(stubProject, elements)
     builder
       .should()
@@ -138,7 +138,7 @@ describe('.excluding()', () => {
   })
 
   it('works with baseline — exclusions applied before baseline filter', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     // Create a baseline that knows about OrderService
     const knownViolation: ArchViolation = {
@@ -171,7 +171,7 @@ describe('.excluding()', () => {
   })
 
   it('preserved across named selections (fork)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const selection = new TestRuleBuilder(stubProject, elements)
       .that()
       .withPredicate(nameMatches(/Service$/))
@@ -205,7 +205,7 @@ describe('.excluding()', () => {
     //
     // Plan 0069 moved that copy into `TerminalBuilder.adoptFilterState`, and
     // reverting it to a plain assignment turns this red and nothing else.
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const selection = new TestRuleBuilder(stubProject, elements)
       .that()
       .withPredicate(nameMatches(/Service$/))
@@ -234,7 +234,7 @@ describe('.excluding()', () => {
   })
 
   it('silent() exclusion suppresses unused-exclusion warning through builder chain', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const builder = new TestRuleBuilder(stubProject, elements)
     try {
       builder
@@ -256,7 +256,7 @@ describe('.excluding()', () => {
   })
 
   it('silent() exclusion still filters violations when matched', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const builder = new TestRuleBuilder(stubProject, elements)
     try {
       builder
@@ -278,7 +278,7 @@ describe('.excluding()', () => {
   })
 
   it('silent() exclusion preserved across fork', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const selection = new TestRuleBuilder(stubProject, elements)
       .that()
       .withPredicate(nameMatches(/Service$/))
@@ -296,7 +296,7 @@ describe('.excluding()', () => {
   })
 
   it('unused exclusion warning includes the rule ID', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const builder = new TestRuleBuilder(stubProject, elements)
     try {
       builder

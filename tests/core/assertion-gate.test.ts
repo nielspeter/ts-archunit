@@ -503,8 +503,9 @@ describe('every remedy remediates (ADR-008 rule 2, behavioural corollary)', () =
     // empty-SELECTOR remedy for every configuration finding, and the assertion
     // gate's finding has nothing to do with the selector.
     const warnings: string[] = []
-    const spy = vi.spyOn(console, 'warn').mockImplementation((...a: unknown[]) => {
-      warnings.push(String(a[0]))
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      warnings.push(String(chunk))
+      return true
     })
     functions(p)
       .that()

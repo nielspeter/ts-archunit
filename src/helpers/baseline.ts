@@ -7,6 +7,7 @@ import {
   normalizeIdentityText,
   toPortablePath,
 } from '../core/identity-root.js'
+import { writeStderr } from '../core/stderr.js'
 
 /**
  * Identity-hash format version.
@@ -217,7 +218,7 @@ export function withBaseline(baselinePath: string, options: BaselineOptions = {}
     !('violations' in parsed) ||
     !Array.isArray(parsed.violations)
   ) {
-    console.warn(`[ts-archunit] Invalid baseline file format at ${resolved} — treating as empty`)
+    writeStderr(`[ts-archunit] Invalid baseline file format at ${resolved} — treating as empty`)
     return new Baseline(new Set(), root, HASH_VERSION)
   }
   const hashVersion =

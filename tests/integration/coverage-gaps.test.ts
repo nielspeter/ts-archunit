@@ -565,7 +565,7 @@ describe('function body analysis — access, newExpr, expression, useInsteadOf',
 
   describe('expression() matcher on functions', () => {
     it('expression(string) searches broadly with warning', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       try {
         // parseFooOrder returns an object with field property - contains 'field'
         expect(() => {
@@ -583,7 +583,7 @@ describe('function body analysis — access, newExpr, expression, useInsteadOf',
     })
 
     it('expression(regex) matches against node text', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       try {
         expect(() => {
           functions(p)
@@ -599,7 +599,7 @@ describe('function body analysis — access, newExpr, expression, useInsteadOf',
     })
 
     it('expression() that does not match produces violation', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       try {
         expect(() => {
           functions(p)

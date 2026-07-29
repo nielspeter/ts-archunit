@@ -339,7 +339,7 @@ describe('excluding — suppress specific violations', () => {
 
   it('excluding a specific element by name suppresses its violation', () => {
     // Suppress console.warn for stale exclusion warnings
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     try {
       // BaseService is abstract; without excluding it, notExist() throws
@@ -352,7 +352,7 @@ describe('excluding — suppress specific violations', () => {
   })
 
   it('excluding with regex suppresses matching violations', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     try {
       expect(() => {
@@ -364,7 +364,7 @@ describe('excluding — suppress specific violations', () => {
   })
 
   it('excluding warns on unused exclusions', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     try {
       // "NonExistent" will not match any violation — should trigger a stale warning
@@ -472,7 +472,7 @@ describe('severity — .severity("error") and .severity("warn")', () => {
   })
 
   it('severity("warn") does not throw on violations', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     try {
       expect(() => {
@@ -500,7 +500,7 @@ describe('warn terminal method', () => {
   const p = loadPocProject()
 
   it('.warn() does not throw even with violations', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     try {
       expect(() => {
@@ -512,7 +512,7 @@ describe('warn terminal method', () => {
   })
 
   it('.warn() with format: json writes to stderr', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     try {
       classes(p).that().areAbstract().should().notExist().warn({ format: 'json' })

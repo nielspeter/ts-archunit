@@ -5,6 +5,7 @@ import { resideInFile, resideInFolder } from '../predicates/identity.js'
 import { or } from '../core/combinators.js'
 import type { RuleMetadata } from '../core/rule-metadata.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
+import { writeStderr } from '../core/stderr.js'
 
 export type RuleSeverity = 'error' | 'warn' | 'off'
 
@@ -88,7 +89,7 @@ export function validateOverrides(
   const knownSet = new Set(knownIds)
   for (const key of Object.keys(overrides)) {
     if (!knownSet.has(key)) {
-      console.warn(
+      writeStderr(
         `[ts-archunit] Override key '${key}' does not match any rule in this preset. ` +
           `Available rules: ${knownIds.join(', ')}`,
       )

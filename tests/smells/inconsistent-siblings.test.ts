@@ -78,7 +78,7 @@ describe('smells.inconsistentSiblings()', () => {
   })
 
   it('.warn() logs but does not throw', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     smells.inconsistentSiblings(p).forPattern(call('this.extractCount')).minLines(2).warn()
     expect(warnSpy).toHaveBeenCalled()
   })

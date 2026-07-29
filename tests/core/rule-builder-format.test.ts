@@ -25,7 +25,7 @@ describe('RuleBuilder with format option', () => {
   })
 
   it('warn({ format: "json" }) prints JSON to stderr', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const builder = new TestRuleBuilder(stubProject, elements)
     builder.should().withCondition(alwaysFail()).warn({ format: 'json' })

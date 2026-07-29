@@ -69,7 +69,7 @@ describe('diffAware() function', () => {
     mockedExecFileSync.mockImplementation(() => {
       throw new Error('fatal: not a git repository')
     })
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     const filter = diffAware('main')
 
@@ -84,7 +84,7 @@ describe('diffAware() function', () => {
     mockedExecFileSync.mockImplementation(() => {
       throw new Error('fatal: ambiguous argument')
     })
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
     diffAware('develop')
 

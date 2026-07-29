@@ -118,7 +118,7 @@ Two kinds of tool are converging on that job. ts-archunit is the one that stays 
 
 ts-archunit is the **deterministic, computational gate for your team's own architecture** — the cell neither of the above fills. A rule is defensible in a review, and unlike a prompt or a `CLAUDE.md` convention (half-life: weeks), it doesn't rot when the model changes.
 
-→ Full argument and sources: **[Why ts-archunit](./docs/why-ts-archunit.md)**
+→ Full argument and sources: **[Why ts-archunit](https://github.com/nielspeter/ts-archunit/blob/main/docs/why-ts-archunit.md)**
 
 ## Quick Start with Presets
 
