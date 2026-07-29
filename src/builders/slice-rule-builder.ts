@@ -222,18 +222,15 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * made three of the assertion hooks unlocatable in a doctor report.
    */
   override describeRule(): RuleDescription {
-    // Named from the DISCOVERY, not from buildRuleDescription(): the latter
-    // embeds every slice's file list, and a warning line carrying ten
-    // filenames is unfindable in a CI log (review measured exactly that).
-    const source =
-      this._discovery === undefined
-        ? 'slices()'
-        : this._discovery.mode === 'matching'
-          ? `slices().matching("${this._discovery.glob}")`
-          : 'slices().assignedFrom({...})'
+    // The rule's own description, not a call-site locator. An earlier revision
+    // derived a bounded name from `_discovery` so the withdrawn runtime
+    // warning would not carry ten filenames — but `explain --format agent`
+    // reads this field, and consumers commit that output into their agent's
+    // prompt, so bounding it stripped the condition (the only architectural
+    // imperative in the line) from every id-less slice rule.
     return {
       ...super.describeRule(),
-      rule: this._metadata?.id ?? source,
+      rule: this._metadata?.id ?? this.buildRuleDescription(),
     }
   }
 

@@ -1,6 +1,6 @@
 # Proposal 019 — A Rule That Enforces Nothing Must Fail
 
-**Status:** Draft 1
+**Status:** **Absorbed by [plan 0070](../plans/0070-a-rule-must-assert-something.md).** Its 0.22.0 work replaced the four `console.warn + return []` sites with one per-state `assertionAdvice()` read by `doctor`/`diagnose()`; its 0.23.0 makes the state fail. The one ask 0070 did **not** take is the `overrides`-key warning in `src/presets/shared.ts` — see 0070's Out of scope.
 **Priority:** High — this is a false green in the core execution path, and the mechanism to fix it already shipped.
 **Affects:** four `collectViolations()` paths (`src/core/rule-builder.ts`, `src/builders/slice-rule-builder.ts`, `src/graphql/resolver-rule-builder.ts`, `src/graphql/schema-rule-builder.ts`). No new API; reuses the `bypassFilters` meta-finding built in 0.18.0/0.18.1.
 **Related:** [018](./018-adoptable-discovery-surface.md) covers a different defect — findings that exist but are emitted where an agent cannot receive them. This one covers findings that are never produced at all. Split deliberately: 018 needs a ratchet first, this needs none. The dogfooded regression rule once bolted on here was removed: every formulation reviewed either could not fail or reported a hand-typed measurement that did not match the printed code. Fix the four sites first; guard them once there is a rule that has been watched to fail.

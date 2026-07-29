@@ -26,7 +26,10 @@ export function formatViolationsGitHub(
 
   return violations
     .map((v) => {
-      const relativePath = path.relative(cwd, v.file)
+      // Escaped as a PROPERTY: the runner splits the property list on commas,
+      // and a path containing one truncates the annotation onto a file that
+      // does not exist (measured). Same treatment as `title` two lines down.
+      const relativePath = escapeGitHubProperty(path.relative(cwd, v.file))
       const title = v.ruleId
         ? `Architecture Violation: ${v.ruleId}`
         : `Architecture Violation: ${v.rule}`

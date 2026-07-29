@@ -101,11 +101,15 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     return this._pattern !== undefined
   }
 
-  /** Named by id or by the API that builds it — the inherited version says 'unnamed'. */
+  /**
+   * Named by id or by what the detector checks — the inherited version says
+   * 'unnamed'. Uses `describe()` rather than a call-site locator for the same
+   * reason as `SliceRuleBuilder`: `explain --format agent` reads this field.
+   */
   override describeRule(): RuleDescription {
     return {
       ...super.describeRule(),
-      rule: this._metadata?.id ?? 'smells.inconsistentSiblings()',
+      rule: this._metadata?.id ?? this.describe(),
     }
   }
 

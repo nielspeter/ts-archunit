@@ -86,6 +86,14 @@ describe('locationless configuration findings (plan 0070)', () => {
     expect(lines[1]).toMatch(/^::error file=/)
   })
 
+  it('escapes commas and colons in file=, which is a property value too', () => {
+    // The runner splits the property list on commas, so an unescaped path
+    // truncates the annotation onto a file that does not exist — measured.
+    const output = formatViolationsGitHub([mv({ file: 'src/a,b.ts', line: 3 })])
+    expect(output).toContain('file=src/a%2Cb.ts')
+    expect(output).not.toContain('file=src/a,b.ts')
+  })
+
   it('escapes commas and colons in the title, which is the only identity carrier', () => {
     const output = formatViolationsGitHub([
       mv({ file: '', line: 0, ruleId: 'preset/layered: {a,b}' }),

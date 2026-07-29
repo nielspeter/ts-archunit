@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   publish:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -63,7 +64,7 @@ jobs:
           # dry-running a version with no section. npm publish is immutable;
           # this test must fail closed.
           echo "$NOTES" > /tmp/release-notes.txt
-          if [ -z "$NOTES" ]; then
+          if [ -z "${NOTES//[[:space:]]/}" ]; then
             echo "Error: CHANGELOG.md has no '## [${VERSION}]' section." >&2
             echo "Rename the [Unreleased] heading to [${VERSION}] before tagging." >&2
             exit 1

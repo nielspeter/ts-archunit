@@ -194,6 +194,16 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   }
 
   override assertionAdvice(): string {
+    // Two distinct faults reach here, and naming the wrong one is the ADR-008
+    // rule 2 defect this plan is partly about: with fewer than two sides the
+    // fix is another `.side(...)`, not an assertion — adding `.beComplete()`
+    // would leave the rule exactly as broken (measured in review).
+    if (this._sides.length !== 2) {
+      return (
+        `this correspondence has ${String(this._sides.length)} side(s) and needs exactly two, ` +
+        'so it compares nothing. Add the missing .side(name, ...) call.'
+      )
+    }
     return 'this correspondence asserts nothing: call .beComplete(), .haveNoOrphans(), or .beBijective().'
   }
 

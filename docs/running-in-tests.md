@@ -92,21 +92,30 @@ it('only new violations fail', () => {
 
 ## The pre-flight for this form
 
-`doctor` cannot load a file that imports a test runner, so for rules written inside
-`it()` bodies the pre-flight is the runtime itself: **a rule that asserts nothing warns
-on stderr** the first time it reaches a terminal (`.check()`, `.violations()`,
-`.warn()`) — once per rule, not once per call. Run your normal test suite and read the
-output: every `[ts-archunit] Rule '…'` line is a rule that a future release will fail
-instead of warn about. The warning is written directly to `process.stderr`, so it
-appears even under reporters that swallow `console` output from passing tests —
-vitest's default reporter does exactly that, and these rules pass by design. This
-reaches every authoring shape by construction: `it()` bodies, `checkAll([...])`
-arrays, rules built in loops, and presets.
+A rule that asserts nothing — a selector with no condition after `.should()`, or a
+predicate like `areAsync()` used _after_ `.should()`, where it filters instead of
+asserting — can never fail. A future release makes that a hard failure, so it is worth
+finding now.
 
-Note the per-file behaviour of a _self-executing_ rule file (one that calls `.check()`
-at module top level): the CLI's `check` command surfaces every finding in one run, but a
-throwing self-executing file stops at its first throw — which is one reason this page
-recommends leaving builders un-terminated in rule files.
+`doctor` cannot help here: it loads a rule file as a module, and a file that imports a
+test runner cannot be loaded that way. Use `diagnose()` in-process instead — same
+findings, same remedies, and it takes the builders you already have:
+
+```typescript
+import { diagnose } from '@nielspeter/ts-archunit'
+
+it('every architecture rule asserts something', () => {
+  const rules = [
+    classes(p).that().extend('BaseRepository').should().beExported(),
+    modules(p).that().resideInFolder('src/domain/**').should().notImportFrom('src/http/**'),
+  ]
+  expect(diagnose(rules)).toEqual([])
+})
+```
+
+That is itself an architecture rule about your architecture rules, and it fails with the
+specific remedy for whichever shape is wrong. The `checkAll([...])` form above already
+holds its rules in an array, so it can pass the same array to `diagnose()`.
 
 ## Converting between the two forms
 

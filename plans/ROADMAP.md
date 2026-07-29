@@ -1,6 +1,6 @@
 # ts-archunit Roadmap
 
-**Version:** 0.21.0 · **Tests:** 2363 across 169 files · **Updated:** 2026-07-28
+**Version:** 0.21.0 (npm) · **Next:** 0.22.0 built, unmerged, untagged · **Tests:** 2392 across 171 files · **Updated:** 2026-07-29
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
 **Plans:** 59 completed (`completed/`) · 5 open (below) · proposals in `../proposals/` ·
 open defects in `../bugs/`
@@ -13,13 +13,13 @@ open defects in `../bugs/`
 
 ## Open work
 
-| Plan                                                                          | State                                                       | Effort   | Blocked on                                                                                                        |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| [0070](./0070-a-rule-must-assert-something.md) — A rule must assert something | **0.22.0 SHIPPED** (the instrument); 0.23.0 (the flip) next | ~2 days  | nothing — 0.23.0 implements the flip per the twice-reviewed draft 3                                               |
-| 0069 — No rule may certify nothing                                            | **R-any/R1/R2a/R3a SHIPPED** (v0.20.0)                      | ~2 days  | R2b unblocked; R3b = the glob guard + `emptyIsPass` only (019 moved to 0070), still gated on an adopting codebase |
-| 0067 — Empty-selector safety (**part C only**)                                | **PARTIAL**                                                 | ~1 day   | a version decision (breaking re-cut)                                                                              |
-| 0047 — TypeScript escape-hatch matchers                                       | **PROPOSED**                                                | ~1 day   | go/no-go — trimmed scope already agreed                                                                           |
-| 0048 — `usingTagged()` symbol-tagged matcher                                  | **PROPOSED**                                                | ~1.5 day | go/no-go — deferred until demand                                                                                  |
+| Plan                                                                          | State                                                                        | Effort   | Blocked on                                                                                                        |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| [0070](./0070-a-rule-must-assert-something.md) — A rule must assert something | **0.22.0 BUILT** (the instrument), unmerged/untagged; 0.23.0 (the flip) next | ~2 days  | nothing — 0.23.0 implements the flip per the twice-reviewed draft 3                                               |
+| 0069 — No rule may certify nothing                                            | **R-any/R1/R2a/R3a SHIPPED** (v0.20.0)                                       | ~2 days  | R2b unblocked; R3b = the glob guard + `emptyIsPass` only (019 moved to 0070), still gated on an adopting codebase |
+| 0067 — Empty-selector safety (**part C only**)                                | **PARTIAL**                                                                  | ~1 day   | a version decision (breaking re-cut)                                                                              |
+| 0047 — TypeScript escape-hatch matchers                                       | **PROPOSED**                                                                 | ~1 day   | go/no-go — trimmed scope already agreed                                                                           |
+| 0048 — `usingTagged()` symbol-tagged matcher                                  | **PROPOSED**                                                                 | ~1.5 day | go/no-go — deferred until demand                                                                                  |
 
 All three need a decision, not implementation. 0063 shipped 2026-07-25.
 
@@ -48,11 +48,12 @@ relies on.
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [0012](../bugs/0012-metric-findings-have-no-usable-ratchet.md) — improving a metric goes red                                                    | **Open**, and wider than first filed: eight sites, not one. Needs a per-element threshold ratchet, which is a design decision rather than a fix.                                                                                                                                                                                                                                                                     |
 | [0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) — `only*` conditions pass on ∅                                 | **Open.** An allowlist condition is ∀ over the subject's edges, so a subject with no edges satisfies it. Same vacuity class as plan 0069, one layer down: the selector matches, the condition has nothing to check.                                                                                                                                                                                                  |
-| [0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md) — a rule with no condition passes silently                             | **Open, closing via [plan 0070](./0070-a-rule-must-assert-something.md).** As of 0.22.0 the assertion gate WARNS on every such rule (stderr, once per rule, per-state remedy); 0.23.0 turns the warn into an unsuppressable configuration finding, which closes this.                                                                                                                                                |
+| [0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md) — a rule with no condition passes silently                             | **Open, closing via [plan 0070](./0070-a-rule-must-assert-something.md).** 0.22.0 completes the instrument — `doctor`/`diagnose()` now report every such rule with the remedy for its own shape; 0.23.0 turns that into an unsuppressable configuration finding, which closes this.                                                                                                                                  |
 | [0020](../bugs/0020-should-twice-silently-drops-the-first-assertion.md) — `should()` twice drops the first assertion                            | **Open, closing via [plan 0070](./0070-a-rule-must-assert-something.md)** at 0.23.0 (accumulate instead of clear, `HASH_VERSION` bump). The flip ships with 0019's.                                                                                                                                                                                                                                                  |
 | [0017](../bugs/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md) — `no-cross-boundary`'s remedy cannot remediate | **Open.** The sanctioned `Fix:` ("import from the other boundary's entry point") reproduces the identical violation — measured, the remedy loops. The message describes entry-point-mediated access; the condition enforces total folder isolation. Worst surface: the wrong `imperative` sits in consumers' committed `explain --format agent` prompt blocks. Text-only fix, baseline-free (measured), patch-sized. |
 | [0022](../bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) — forward import conditions miss two edge kinds    | **Open.** `onlyImportFrom`/`notImportFrom` collect `getImportDeclarations()` only, so `export … from` and `import()` cross any banned edge unflagged — a false green in five preset rules. The reverse graph indexes all three edge kinds, so the two halves disagree about what "imports" means. Measured on the boundary preset.                                                                                   |
 | [0023](../bugs/0023-strictboundaries-shared-globs-are-raw-and-unguarded.md) — `shared` globs raw and unguarded                                  | **Open.** `strictBoundaries({ shared })` matches the user's globs against absolute paths with no normalization, so the relative spelling is a false red on legitimate shared imports — and a dead `shared` glob produces no finding at all, while a dead `folders` glob fails loudly. Two contracts on one preset.                                                                                                   |
+| [0024](../bugs/0024-warn-terminal-is-invisible-inside-a-test-runner.md) — `.warn()` in a test reports nothing                                   | **Open.** `executeWarn` writes through `console.warn`, and vitest's default reporter replays intercepted console output only for FAILING tests — so an advisory rule in a passing test produces no output at all. The CLI path is fine (`process.stderr.write`). Found while reviewing plan 0070's 0.22.0, whose own diagnostic was withdrawn for the same reason.                                                   |
 
 ### Fixed
 
@@ -79,8 +80,8 @@ table-versus-prose contradiction the Open/Fixed split was written to remove.
 **Proposal [019](../proposals/019-rules-that-enforce-nothing-must-fail.md) got
 cheaper.** It replaces `console.warn(...) + return []` at four sites — a rule
 that has subjects but no conditions asserts nothing and passes. **The four sites
-were deleted at 0.22.0 by [plan 0070](./0070-a-rule-must-assert-something.md)** —
-the assertion gate's single per-state warning replaced them, closing
+are deleted by [plan 0070](./0070-a-rule-must-assert-something.md)'s 0.22.0 work** —
+`assertionAdvice()` replaced them with one per-state remedy read by `doctor`, closing
 [bug 0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md)'s
 observation that the main one could not fire (it was gated on
 `_phase === 'predicate'`, which `should()` had already left). But 0014 merged the two builder hierarchies into one root, so the
@@ -120,19 +121,18 @@ state without failing on it.
 
 ## Releases
 
-| Version    | Theme                                                                                                          |
-| ---------- | -------------------------------------------------------------------------------------------------------------- |
-| **0.22.0** | The assertion gate, warn form — a rule that asserts nothing warns with its own remedy (plan 0070's instrument) |
-| **0.21.0** | A held builder is immutable — 40 chain methods across 12 classes are copy-on-write ⚠️ behaviour                |
-| **0.20.0** | `doctor` / `diagnose()` and the glob declaration model; config findings cannot be downgraded                   |
-| **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps       |
-| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable                    |
-| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking               |
-| 0.17.0     | `init` scaffolds the shape presets                                                                             |
-| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                                     |
-| 0.15.0     | `tsconfig()` config-assertion rule                                                                             |
-| 0.14.0     | `ts-archunit init` scaffolder                                                                                  |
-| 0.13.0     | AI-agent delivery program                                                                                      |
+| Version    | Theme                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| **0.21.0** | A held builder is immutable — 40 chain methods across 12 classes are copy-on-write ⚠️ behaviour          |
+| **0.20.0** | `doctor` / `diagnose()` and the glob declaration model; config findings cannot be downgraded             |
+| **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps |
+| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable              |
+| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking         |
+| 0.17.0     | `init` scaffolds the shape presets                                                                       |
+| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                               |
+| 0.15.0     | `tsconfig()` config-assertion rule                                                                       |
+| 0.14.0     | `ts-archunit init` scaffolder                                                                            |
+| 0.13.0     | AI-agent delivery program                                                                                |
 
 ### 0.18.0 — the AI-era program (PR #2, 2026-07-24)
 

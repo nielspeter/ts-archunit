@@ -34,7 +34,10 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   }
 
   const rules: DiagnosableRule[] = []
-  let failedToLoad = false
+  // Identities, never totals (docs/cli.md): a boolean told a JSON consumer that
+  // something failed without saying which file or why, leaving them to scrape
+  // stderr prose they do not read.
+  const loadFailures: { file: string; error: string }[] = []
   for (const file of args.ruleFiles) {
     try {
       rules.push(...(await loadRuleFiles([file])))
@@ -73,7 +76,7 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
             `diagnostics to stderr.\n`,
         )
       }
-      failedToLoad = true
+      loadFailures.push({ file, error: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -82,26 +85,40 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   // one broken file, one clean file, zero findings — printing the error and
   // then exiting 0 with a clean bill of health: exactly the "exit 0 plus
   // silence" this command exists to prevent, reintroduced by the catch that
-  // fixed the crash. Every exit path below folds `failedToLoad` in.
-  if (failedToLoad && rules.length === 0) return 1
+  // fixed the crash. Every exit path below folds the load failures in.
+  //
+  // And every exit path emits the JSON document when asked for it: a consumer
+  // parsing stdout used to get zero bytes on the commonest single-file failure,
+  // and `JSON.parse('')` throws — the exact consumer the exit-code fix was for.
+  const emitJson = (findings: DiagnosticFinding[]): void => {
+    if (args.format === 'json') {
+      process.stdout.write(JSON.stringify({ findings, loadFailures }, null, 2) + '\n')
+    }
+  }
+
+  if (loadFailures.length > 0 && rules.length === 0) {
+    emitJson([])
+    return 1
+  }
 
   // Nothing to diagnose is not the same as nothing wrong. The earlier guard
   // checked `args.ruleFiles.length`, which is the wrong derivation: a file
   // exporting `[]` reached this point and reported a clean bill of health.
   if (rules.length === 0) {
     process.stderr.write('Error: no rules found in the given files.\n')
+    emitJson([])
     return 1
   }
 
   const findings = diagnose(rules)
 
   if (args.format === 'json') {
-    process.stdout.write(JSON.stringify({ findings, failedToLoad }, null, 2) + '\n')
-    return findings.length > 0 || failedToLoad ? 1 : 0
+    emitJson(findings)
+    return findings.length > 0 || loadFailures.length > 0 ? 1 : 0
   }
 
   if (findings.length === 0) {
-    if (failedToLoad) {
+    if (loadFailures.length > 0) {
       process.stderr.write(
         'No findings in the rules that loaded — but at least one file could not be ' +
           'loaded (see above), so this is not a clean bill of health.\n',
