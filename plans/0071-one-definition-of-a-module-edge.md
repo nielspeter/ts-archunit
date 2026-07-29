@@ -93,6 +93,11 @@ Two traps that draft 1's 4-way branch would have hit, both misclassifying a **ru
 ```ts
 // src/core/module-edges.ts — the return type is ts-morph-free by construction, so a
 // cached value can never hand back a forgotten node.
+// `require` exists so the classifier CANNOT silently mislabel a CJS runtime
+// dependency as an erased one — that misclassification is the bug §1 found. No
+// condition consumes it in 0.27: every site filters to the kinds it handles, so
+// behaviour toward `require` is unchanged. Enforcing it is a separate decision
+// (see Out of scope) because its visibility is asymmetric by file type.
 export type ModuleEdgeKind = 'import' | 'reexport' | 'dynamic' | 'type-expression' | 'require'
 
 export interface ModuleEdge {
@@ -150,15 +155,16 @@ Per kind, measured:
 
 ### §3 Per-site disposition
 
-| Site                                                       | Disposition                                                                                                | Direction           |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------- |
-| `onlyImportFrom` (:57)                                     | all edge kinds; `typeOnly` exempt only under `ignoreTypeImports`                                           | green→red, monotone |
-| `notImportFrom` (:105)                                     | same                                                                                                       | green→red, monotone |
-| `dependOn` (:155)                                          | **runtime kinds only — never `typeOnly`.** See below                                                       | red→green, monotone |
-| `notHaveAliasedImports` (:196)                             | **not routed through `moduleEdges` at all.** Stays on a separate `importStatements(sf)` in the same module | none                |
-| `onlyHaveTypeImportsFrom` (:235)                           | `import` + `reexport` only. **Excludes `dynamic`** — see below                                             | green→red, monotone |
-| `importFrom` **predicate** (`src/predicates/module.ts:18`) | **in scope, not optional.** See below                                                                      | green→red           |
-| `reverse-dependency.ts` (:77-100)                          | replace all three collectors; delete `resolveDynamicImport`; dedup on `(importer, target)`                 | mixed               |
+| Site                                                       | Disposition                                                                                                 | Direction           |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------- |
+| `onlyImportFrom` (:57)                                     | all edge kinds; `typeOnly` exempt only under `ignoreTypeImports`                                            | green→red, monotone |
+| `notImportFrom` (:105)                                     | same                                                                                                        | green→red, monotone |
+| `dependOn` (:155)                                          | **runtime kinds only — never `typeOnly`.** See below                                                        | red→green, monotone |
+| `notHaveAliasedImports` (:196)                             | **not routed through `moduleEdges` at all.** Stays on a separate `importStatements(sf)` in the same module  | none                |
+| `onlyHaveTypeImportsFrom` (:235)                           | `import` + `reexport` only. **Excludes `dynamic`** — see below                                              | green→red, monotone |
+| `importFrom` **predicate** (`src/predicates/module.ts:18`) | **in scope, not optional.** See below                                                                       | green→red           |
+| `reverse-dependency.ts` (:77-100)                          | replace all three collectors; delete `resolveDynamicImport`; dedup on `(importer, target)`                  | mixed               |
+| **`require` kind — every site**                            | **excluded in 0.27.** Each site filters to the kinds it handles, so behaviour toward `require` is unchanged | none                |
 
 Measured on this repo: `no-cross-boundary` 289 → **292**, `shared-isolation` 80 → **94**, `innermost-isolation` 20 → **21**, **0 findings lost**, 0 messages or lines changed for pre-existing findings. Monotonicity is derivable, not empirical: four sites push one violation per edge, so more edges is monotonically green→red; only `dependOn` uses `.some()`.
 
@@ -185,7 +191,7 @@ The server installs nothing; the line is erased; the rule certifies the runtime 
 
 That breaks the migration's core promise. It also gives every new finding a remedy that does not fit its line: measured on this repo, `src/core/index.ts:1` is `export type { Predicate } from './predicate.js'` and is reported as _"index.ts **imports** …/predicate.ts"_ with _"Invert the dependency … pass it in as a parameter"_ — nonsense for a re-exported type alias.
 
-So each kind gets its own verb: `re-exports`, `dynamically imports`, `references the type from`, `requires`. **`kind === 'import'` messages stay byte-identical**, so every existing baseline survives; the new kinds get distinct identities _and_ fitting remedies. Doing this in 0.28 instead invalidates every baseline written at 0.27.
+So each kind a condition can report gets its own verb: `re-exports`, `dynamically imports`, `references the type from`. (`require` needs none in 0.27 — no site consumes it.) **`kind === 'import'` messages stay byte-identical**, so every existing baseline survives; the new kinds get distinct identities _and_ fitting remedies. Doing this in 0.28 instead invalidates every baseline written at 0.27.
 
 ### §5 Bug 0015 is descoped to a diagnostic
 
@@ -287,6 +293,7 @@ Name the move a team will otherwise find on their own: `.excluding('index.ts')` 
 
 - **The slice graph** (`slice-graph.ts:48,105`) — `beFreeOfCycles()`, `notDependOn()`, `respectLayerOrder()` stay static-only. Barrel re-export is _the_ classic cycle shape, so this is valuable, but a cycle finding is the hardest class to remedy and it is a different upgrade story. **The disclosure must be louder than a changelog line**: one sentence in `beFreeOfCycles()`'s JSDoc and in `layered/no-cycles` / `boundaries/no-cycles` metadata, because `strictBoundaries` will red on a barrel from one rule and stay silent on it from its sibling, in the same run. Rule metadata is read on every failure; a changelog is read once. The retrofit is cheap (both sites are resolved-file-only); the reds are not.
 - **`declare module './rel.js'`** — a real compile-time reference the binder routes to `moduleAugmentations`, so `getImportStringLiterals()` structurally cannot see it. State it as a hole, not a correct exclusion.
+- **Enforcing the `require` kind.** The kind is classified so it cannot be mistaken for an erased edge, and consumed by nothing. Enforcing it is a separate decision for two reasons: its visibility is **asymmetric by file type** — `import x = require('s')` is seen in `.ts`, bare `require('s')` only in `.js` under `allowJs` — and a coverage boundary decided by file extension is exactly what §3 refuses for `notHaveAliasedImports`. A project without `allowJs` would get partial CJS enforcement with no way to tell.
 - **An `includeReExports` option** — it reinstates two user-selectable definitions of "an import", and 0069 settled the principle: "an opt-out is the first thing an agent adds on the first red."
 - **Exporting `ModuleEdge`** — deferred, but note the cost honestly: `defineCondition()` is a public, documented, taught extension point, so every custom dependency condition in the wild will keep calling `getImportDeclarations()` and reproduce bug 0022 outside the package, where no future fix reaches it. §2's four-row trap table is the evidence they will get it wrong. Revisit in 0.28 rather than never.
 
