@@ -1,6 +1,6 @@
 # ts-archunit Roadmap
 
-**Version:** 0.21.0 (npm) · **Next:** 0.22.0 built, unmerged, untagged · **Tests:** 2392 across 171 files · **Updated:** 2026-07-29
+**Version:** 0.22.0 · **Tests:** 2394 across 171 files · **Updated:** 2026-07-29
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
 **Plans:** 59 completed (`completed/`) · 5 open (below) · proposals in `../proposals/` ·
 open defects in `../bugs/`
@@ -13,13 +13,13 @@ open defects in `../bugs/`
 
 ## Open work
 
-| Plan                                                                          | State                                                                        | Effort   | Blocked on                                                                                                        |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| [0070](./0070-a-rule-must-assert-something.md) — A rule must assert something | **0.22.0 BUILT** (the instrument), unmerged/untagged; 0.23.0 (the flip) next | ~2 days  | nothing — 0.23.0 implements the flip per the twice-reviewed draft 3                                               |
-| 0069 — No rule may certify nothing                                            | **R-any/R1/R2a/R3a SHIPPED** (v0.20.0)                                       | ~2 days  | R2b unblocked; R3b = the glob guard + `emptyIsPass` only (019 moved to 0070), still gated on an adopting codebase |
-| 0067 — Empty-selector safety (**part C only**)                                | **PARTIAL**                                                                  | ~1 day   | a version decision (breaking re-cut)                                                                              |
-| 0047 — TypeScript escape-hatch matchers                                       | **PROPOSED**                                                                 | ~1 day   | go/no-go — trimmed scope already agreed                                                                           |
-| 0048 — `usingTagged()` symbol-tagged matcher                                  | **PROPOSED**                                                                 | ~1.5 day | go/no-go — deferred until demand                                                                                  |
+| Plan                                                                          | State                                                       | Effort   | Blocked on                                                                                                          |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| [0070](./0070-a-rule-must-assert-something.md) — A rule must assert something | **0.22.0 SHIPPED** (the instrument); 0.23.0 (the flip) next | ~2 days  | nothing — 0.23.0 implements the flip per the twice-reviewed draft 3, whose Implementation notes carry the deferrals |
+| 0069 — No rule may certify nothing                                            | **R-any/R1/R2a/R3a SHIPPED** (v0.20.0)                      | ~2 days  | R2b unblocked; R3b = the glob guard + `emptyIsPass` only (019 moved to 0070), still gated on an adopting codebase   |
+| 0067 — Empty-selector safety (**part C only**)                                | **PARTIAL**                                                 | ~1 day   | a version decision (breaking re-cut)                                                                                |
+| 0047 — TypeScript escape-hatch matchers                                       | **PROPOSED**                                                | ~1 day   | go/no-go — trimmed scope already agreed                                                                             |
+| 0048 — `usingTagged()` symbol-tagged matcher                                  | **PROPOSED**                                                | ~1.5 day | go/no-go — deferred until demand                                                                                    |
 
 All three need a decision, not implementation. 0063 shipped 2026-07-25.
 
@@ -121,18 +121,19 @@ state without failing on it.
 
 ## Releases
 
-| Version    | Theme                                                                                                    |
-| ---------- | -------------------------------------------------------------------------------------------------------- |
-| **0.21.0** | A held builder is immutable — 40 chain methods across 12 classes are copy-on-write ⚠️ behaviour          |
-| **0.20.0** | `doctor` / `diagnose()` and the glob declaration model; config findings cannot be downgraded             |
-| **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps |
-| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable              |
-| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking         |
-| 0.17.0     | `init` scaffolds the shape presets                                                                       |
-| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                               |
-| 0.15.0     | `tsconfig()` config-assertion rule                                                                       |
-| 0.14.0     | `ts-archunit init` scaffolder                                                                            |
-| 0.13.0     | AI-agent delivery program                                                                                |
+| Version    | Theme                                                                                                          |
+| ---------- | -------------------------------------------------------------------------------------------------------------- |
+| **0.22.0** | The assertion instrument — `doctor`/`diagnose()` see every rule that asserts nothing, each with its own remedy |
+| **0.21.0** | A held builder is immutable — 40 chain methods across 12 classes are copy-on-write ⚠️ behaviour                |
+| **0.20.0** | `doctor` / `diagnose()` and the glob declaration model; config findings cannot be downgraded                   |
+| **0.19.0** | Portable violation identity — `withBaseline()` works across checkouts; three collectors see handler maps       |
+| **0.18.1** | Slice glob parsing (every spelling agrees); meta-finding remedies visible and unsilenceable                    |
+| **0.18.0** | AI-era program — `correspondence()`, object-literal functions, empty-selector safety ⚠️ breaking               |
+| 0.17.0     | `init` scaffolds the shape presets                                                                             |
+| 0.16.0     | Docs restructure (golden path); shape presets → returning form ⚠️ breaking                                     |
+| 0.15.0     | `tsconfig()` config-assertion rule                                                                             |
+| 0.14.0     | `ts-archunit init` scaffolder                                                                                  |
+| 0.13.0     | AI-agent delivery program                                                                                      |
 
 ### 0.18.0 — the AI-era program (PR #2, 2026-07-24)
 
