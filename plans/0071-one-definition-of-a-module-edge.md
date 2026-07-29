@@ -128,8 +128,6 @@ export interface ModuleEdge {
    * Also empty for `dynamic` and `require`.
    */
   readonly names: readonly string[]
-  /** Renamed named bindings. Empty except for `import`/`reexport`. */
-  readonly aliases: readonly AliasedBinding[]
 }
 
 /** Every module edge leaving each file, in one call (ADR-007 rule 2). */
@@ -177,16 +175,16 @@ Per kind, measured:
 
 ### §3 Per-site disposition
 
-| Site                                                       | Disposition                                                                                                 | Direction           |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------- |
-| `onlyImportFrom` (:57)                                     | all edge kinds; `typeOnly` exempt only under `ignoreTypeImports`                                            | green→red, monotone |
-| `notImportFrom` (:105)                                     | same                                                                                                        | green→red, monotone |
-| `dependOn` (:155)                                          | **runtime kinds only — never `typeOnly`.** See below                                                        | red→green, monotone |
-| `notHaveAliasedImports` (:196)                             | **not routed through `moduleEdges` at all.** Stays on a separate `importStatements(sf)` in the same module  | none                |
-| `onlyHaveTypeImportsFrom` (:235)                           | `import` + `reexport` only. **Excludes `dynamic`** — see below                                              | green→red, monotone |
-| `importFrom` **predicate** (`src/predicates/module.ts:18`) | **in scope, not optional.** See below                                                                       | green→red           |
-| `reverse-dependency.ts` (:77-100)                          | replace all three collectors; delete `resolveDynamicImport`; dedup on `(importer, target)`                  | mixed               |
-| **`require` kind — every site**                            | **excluded in 0.27.** Each site filters to the kinds it handles, so behaviour toward `require` is unchanged | none                |
+| Site                                                       | Disposition                                                                                                               | Direction           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `onlyImportFrom` (:57)                                     | all edge kinds; `typeOnly` exempt only under `ignoreTypeImports`                                                          | green→red, monotone |
+| `notImportFrom` (:105)                                     | same                                                                                                                      | green→red, monotone |
+| `dependOn` (:155)                                          | **runtime kinds only — never `typeOnly`.** See below                                                                      | red→green, monotone |
+| `notHaveAliasedImports` (:196)                             | **not routed through `moduleEdges` at all.** Keeps calling `sf.getImportDeclarations()`, with the reason in its docstring | none                |
+| `onlyHaveTypeImportsFrom` (:235)                           | `import` + `reexport` only. **Excludes `dynamic`** — see below                                                            | green→red, monotone |
+| `importFrom` **predicate** (`src/predicates/module.ts:18`) | **in scope, not optional.** See below                                                                                     | green→red           |
+| `reverse-dependency.ts` (:77-100)                          | replace all three collectors; delete `resolveDynamicImport`; dedup on `(importer, target)`                                | mixed               |
+| **`require` kind — every site**                            | **excluded in 0.27.** Each site filters to the kinds it handles, so behaviour toward `require` is unchanged               | none                |
 
 Measured on this repo: `no-cross-boundary` 289 → **292**, `shared-isolation` 80 → **94**, `innermost-isolation` 20 → **21**, **0 findings lost**, 0 messages or lines changed for pre-existing findings. Monotonicity is derivable, not empirical: four sites push one violation per edge, so more edges is monotonically green→red; only `dependOn` uses `.some()`.
 
@@ -201,7 +199,11 @@ The server installs nothing; the line is erased; the rule certifies the runtime 
 
 **`onlyHaveTypeImportsFrom` excludes `dynamic`, on ADR-008 rule 2.** Its shipped preset says _"Use `import type { X }` so the dependency is erased"_. Applied to `await import('../other/x.js')` that instruction cannot be followed. §3 in draft 1 ran exactly this test on `notHaveAliasedImports` and refused to widen it — and failed to run it on the row above.
 
-**`notHaveAliasedImports` leaves the shared walk entirely.** Draft 1 routed it through `moduleEdges` and filtered back to `kind === 'import'`, which invites "why does one of five sites disagree?" and made §3 and §5 contradict each other. The honest framing: **it is not an edge condition — it inspects `import` statement syntax.** A second, differently-named function beside `moduleEdges()` makes that structural rather than a filter. The decisive reason to refuse the widening is not consumption-vs-publication, it is the arbitrary boundary: `export { x as y } from './impl.js'` would be flagged and `export { x as y }` would not, decided by whether a specifier happens to be present — a coverage line invisible to the reader.
+**`notHaveAliasedImports` leaves the shared walk entirely — and needs no replacement function.** Draft 2 first specified a separate `importStatements(sf)` "so the distinction is structural rather than a filter". Measured what the condition actually reads: `sf.getImportDeclarations()`, each `getNamedImports()` specifier's `getName()`/`getAliasNode()`, and the declaration node itself for `importViolation`'s code frame. So `importStatements` would be `sf.getImportDeclarations()` under a new name — an indirection with one caller that buys only the label, which the docstring can carry for free.
+
+**Consequence: `aliases` and `AliasedBinding` come out of `ModuleEdge` entirely.** That field existed solely to serve this condition, so with the condition off the walk it has **no consumer** — one fewer field, one fewer exported type, and one fewer thing to specify, guard and sabotage. This also retires draft 1's "every field has exactly one consumer family" claim, which was wrong about `candidates`; the interface is now small enough not to need the argument.
+
+The honest framing: **it is not an edge condition — it inspects `import` statement syntax**, and the docstring says so. And the decisive reason to refuse the widening is not consumption-vs-publication, it is the arbitrary boundary: `export { x as y } from './impl.js'` would be flagged and `export { x as y }` would not, decided by whether a specifier happens to be present — a coverage line invisible to the reader.
 
 **The `importFrom` predicate is in scope.** `src/builders/module-rule-builder.ts:122` makes `.notImportFrom()` **one method** that dispatches to the predicate before `.should()` and the condition after. Ship to one half and a single identifier carries two definitions of "an import", chosen by chain position — this plan's Problem statement reproduced inside one method name.
 
@@ -290,7 +292,7 @@ The sixth sabotage the re-export half missed: swapping two edges' resolved targe
 3. Uniform `lit.getSymbol()` resolution per kind, incl. `paths` aliases, bare packages, and the `type A = import('./barrel.js').Deep` → **barrel, not impl** case.
 4. Runtime independence, **re-export kind only, and it must run under vitest** (bare Node cannot import a `.ts` fixture through `.js` specifiers — measured, `ERR_MODULE_NOT_FOUND`). Named edges compared `names` → target; **star edges by target only**, because the runtime namespace flattens them and the static walk deliberately does not. The dynamic half is cut, with both gaps stated in the file header: what it compares is vite's resolver against the TS compiler — two implementations, not the module system.
 5. Per kind × per family by `relpath:line` identity, with absences.
-6. `notHaveAliasedImports` pinned as an **explicit expected list** over a fixture holding both `import { x as y } from` and `export { x as y } from` — exactly one violation, named. Not "byte-identical to today", which has no _today_ inside the new build.
+6. `notHaveAliasedImports` pinned as an **explicit expected list** over a fixture holding both `import { x as y } from` and `export { x as y } from` — exactly one violation, named. It stays on `getImportDeclarations()`, so this is a no-change pin: it must red if anyone routes it through the widened walk. Not "byte-identical to today", which has no _today_ inside the new build.
 7. `dependOn`: a type-only re-export does **not** satisfy it (the false green in §3), and a runtime edge does.
 8. Parity, labelled a non-guard, scoped to resolved project files.
 9. §4's per-kind messages: `import` byte-identical to 0.26.0; each new kind distinct. **Plus the collision pin** — a file that both imports and re-exports the same module yields two distinct `hashViolation` values.
