@@ -23,6 +23,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { project } from '../../src/core/project.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 
@@ -37,6 +38,22 @@ const repoRoot = path.resolve(import.meta.dirname, '../..')
  *
  * The parent run globbed its file list before `beforeAll` created anything here,
  * so these are never collected by the run that writes them.
+ *
+ * **`tests/__generated__` is excluded from `tsconfig.json` and gitignored, and both
+ * are load-bearing.** `include: ["src", "tests"]` made these files members of the
+ * ROOT ts-morph program, so a concurrent `new Project({ tsConfigFilePath })` that
+ * was mid-load when `afterAll` deleted the directory threw
+ * `Error: File not found: …/tests/__generated__/failing.test.ts` — six test files
+ * build a project from the root tsconfig and were all exposed. Measured at roughly
+ * three runs in four whenever two suites overlapped, which is what a developer with
+ * `vitest --watch` open alongside `npm test` does. CI runs one suite, so CI never
+ * saw it.
+ *
+ * A crashed run also left untracked `.test.ts` files that the next `npm run
+ * typecheck` compiled — and `prepublishOnly` runs `validate`, so that state blocks
+ * a publish with an error pointing at a file nobody wrote.
+ *
+ * Pinned below by `the generated directory is invisible to the root project`.
  */
 const generatedDir = path.join(repoRoot, 'tests/__generated__')
 
@@ -88,6 +105,25 @@ beforeAll(() => {
 })
 afterAll(() => {
   fs.rmSync(generatedDir, { recursive: true, force: true })
+})
+
+describe('the generated directory is invisible to the root project', () => {
+  it('a file written here is not a member of the root ts-morph program', () => {
+    // The guard for the flakiness this file caused. Behavioural, not a re-read of
+    // the tsconfig I edited: write a real file, load the root project the way six
+    // other test files do, and assert ts-morph never sees it. If `exclude` loses
+    // this entry, a concurrent suite starts throwing `File not found` when
+    // `afterAll` runs — and the failure surfaces in unrelated files, which is what
+    // made it hard to attribute.
+    const planted = path.join(generatedDir, 'planted.ts')
+    fs.writeFileSync(planted, 'export const planted = 1\n')
+    const root = project(path.join(repoRoot, 'tsconfig.json'))
+    const seen = root.getSourceFiles().map((sf) => sf.getFilePath())
+    // Vacuity anchor: the project really loaded this repo.
+    expect(seen.length).toBeGreaterThan(400)
+    expect(seen.filter((f) => f.includes('__generated__'))).toEqual([])
+    fs.rmSync(planted, { force: true })
+  })
 })
 
 describe('.warn() inside a test that PASSES', () => {

@@ -16,5 +16,5 @@
     "isolatedModules": true
   },
   "include": ["src", "tests"],
-  "exclude": ["node_modules", "dist", "poc"]
+  "exclude": ["node_modules", "dist", "**/dist", "poc", "tests/__generated__"]
 }

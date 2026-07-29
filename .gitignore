@@ -9,3 +9,8 @@ docs/.vitepress/cache/
 /.claude/
 /.serena/
 .playwright-mcp/
+
+# Probe test files generated at runtime by tests/core/warn-survives-the-test-runner.test.ts.
+# Deleted in afterAll; ignored so a crashed run cannot leave them to be committed —
+# or, worse, collected as tests by the next run. See that file's header.
+tests/__generated__/
