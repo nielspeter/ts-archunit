@@ -142,7 +142,20 @@ export function moduleEdges(
 
 **No `candidates` field.** Draft 1 stored `candidatesFor(specifier, resolvedPath)`'s output alongside its two inputs — two representations of one fact that can disagree, and its consumers are four families, not one. Keep `specifier` + `resolvedPath`; expose `candidatesFor(edge)`.
 
-**No cache, and the signature is why.** With the cost claim corrected there is nothing to cache: warm, the walk is cheaper than today's. A bulk signature also makes ADR-007 rule 2 true rather than asserted — one crossing returning a bulk result, instead of N per-file crossings needing a `WeakMap` to be affordable. Draft 1's ADR-007 argument also cited the wrong alternative: ADR-007's Alternative 4 is Rule 1 without Rule 2; this is Rule 2 without Rule 1, which ADR-007 calls the load-bearing half. The conclusion stands, the citation was wrong.
+**No cache — measured across a real preset run, not inferred from a single pass.** Draft 1 justified a cache with a wrong per-pass number (13×). Correcting that number is not by itself an argument against a cache, because the cost is per-rule × passes, not per pass. So it was measured properly:
+
+|                                                               |                                            |
+| ------------------------------------------------------------- | ------------------------------------------ |
+| One full walk + resolve pass (472 files, 1708 resolved edges) | **6.7ms**                                  |
+| Rules `strictBoundaries` generates over this repo             | **79**                                     |
+| Worst case, if every rule spanned every file                  | 527ms — against a 137ms baseline, **4.8×** |
+| **Realistic: summed subject sets across those 79 rules**      | **1665 file-visits → ~23ms, ~17%**         |
+
+Subject sets are narrow: they sum to about **3.5×** the file count, not 79×. So no cache, and the number to quote in the changelog is ~17% on a preset run, not "free".
+
+**The condition that would reverse this**, named so nobody has to rediscover it: rules whose selector spans the whole project. `modules(p).should().notImportFrom(…)` with no `.that()` is legal, and a preset over a flat project approaches the worst-case row. If a consumer reports a preset run slowing by multiples, that is the shape to look for, and a per-`(Project, filePath)` cache of **resolution** — not of the walk, which is already cheap — is the fix.
+
+Warm, the walk itself is cheaper than today's. A bulk signature also makes ADR-007 rule 2 true rather than asserted — one crossing returning a bulk result, instead of N per-file crossings needing a `WeakMap` to be affordable. Draft 1's ADR-007 argument also cited the wrong alternative: ADR-007's Alternative 4 is Rule 1 without Rule 2; this is Rule 2 without Rule 1, which ADR-007 calls the load-bearing half. The conclusion stands, the citation was wrong.
 
 **Net win draft 1 did not claim:** deleting `resolveDynamicImport`/`indexDynamicImports` removes a `getDescendantsOfKind(CallExpression)` scan over ~30k nodes costing 60–100ms per graph rebuild.
 
