@@ -500,11 +500,11 @@ Report which rules **cannot enforce anything**, without running them.
 
 **Experimental.** The shape may change, and `ts-archunit doctor` is deliberately absent from `--help` because retiring a documented command is its own breaking change.
 
-| Export              | Signature                                                           | Description                                                                                                                                |
-| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `diagnose`          | `diagnose(rules: RuleBuilderLike[], project?): DiagnosticFinding[]` | Report dead globs and condition-less rules. Reports identities, never totals. The project defaults to the one each rule was built against. |
-| `DiagnosticFinding` | type                                                                | `{ kind, rule, origin?, glob?, position?, fault?, onDisk?, advice }`                                                                       |
-| `DiagnosableRule`   | type                                                                | What `diagnose` can inspect. Any `RuleBuilderLike` qualifies.                                                                              |
+| Export              | Signature                                                           | Description                                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `diagnose`          | `diagnose(rules: RuleBuilderLike[], project?): DiagnosticFinding[]` | Report dead globs and condition-less rules. Reports identities, never totals. The project defaults to the one each rule was built against.                                                                                            |
+| `DiagnosticFinding` | type                                                                | `{ kind, rule, ruleFile?, origin?, glob?, position?, fault?, onDisk?, advice }`. `ruleFile` is set by `doctor`, which knows which file each rule came from; `diagnose()` never sets it, because it is handed rules rather than files. |
+| `DiagnosableRule`   | type                                                                | What `diagnose` can inspect. Any `RuleBuilderLike` qualifies.                                                                                                                                                                         |
 
 ```typescript
 import { project, modules, diagnose } from '@nielspeter/ts-archunit'
