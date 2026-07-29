@@ -79,6 +79,16 @@ functions(p)
   .areAsync()
   .check()
 
+// ❌ fails: `areAsync` narrowed the selection AFTER the condition was stated,
+//    so `notExist` was checked against an empty set and held vacuously
+functions(p)
+  .that()
+  .haveNameMatching(/^parse/)
+  .should()
+  .notExist()
+  .areAsync()
+  .check()
+
 // ❌ fails: never reached .should()
 functions(p)
   .that()
@@ -95,6 +105,8 @@ functions(p)
 ```
 
 A rule with no condition selects some code and then asserts nothing about it, so it can never fail — and a suite full of them reports coverage it does not have. The finding names which of those shapes you wrote and what to add.
+
+The third example is the one worth studying, because it does not look broken. Predicates filter and conditions assert; a predicate written **after** `.should()` still filters, so it narrows the set the conditions are evaluated over — and if that leaves nothing, every condition holds vacuously. The rule's own description reads as if it were deliberate (`that have name matching /^parse/ and are async should not exist`), which is why nobody goes looking. Its remedy is to move the predicate, not to add a condition: it already has one.
 
 **There is no opt-out.** Not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. If a rule is a placeholder, delete it or leave it commented out; if it is generated from configuration, skip generating it when there is nothing to assert. A rule that is present and green is a claim that something is checked.
 

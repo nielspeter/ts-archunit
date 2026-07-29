@@ -140,9 +140,8 @@ describe('arch:baseline with a shape preset (no longer crashes)', () => {
     tmpFiles.push(out)
     const spy = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
-    await expect(
-      runBaseline({ ruleFiles: ['arch.rules.ts'], output: out }),
-    ).resolves.toBeUndefined()
+    // Exit code 0: every violation here is baselineable, so nothing is refused.
+    await expect(runBaseline({ ruleFiles: ['arch.rules.ts'], output: out })).resolves.toBe(0)
     spy.mockRestore()
 
     expect(fs.existsSync(out)).toBe(true)
@@ -159,10 +158,42 @@ describe('arch:baseline with a shape preset (no longer crashes)', () => {
     tmpFiles.push(out)
     vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
-    await expect(
-      runBaseline({ ruleFiles: ['arch.rules.ts'], output: out }),
-    ).resolves.toBeUndefined()
+    await expect(runBaseline({ ruleFiles: ['arch.rules.ts'], output: out })).resolves.toBe(0)
     expect(fs.existsSync(out)).toBe(true)
+  })
+
+  it('exits non-zero when a finding could not be baselined', async () => {
+    // `doctor` exits non-zero on purpose, because an agent reads `exit 0` as
+    // "nothing to do". This command sits on the documented 0.23.0 upgrade path
+    // and did the opposite: it printed the blocker, exited 0, got committed, and
+    // the next `arch` job failed on findings the baseline was meant to cover.
+    //
+    // Both halves asserted: the code is non-zero AND the file is still written
+    // with the findings that COULD be baselined, so re-running after the fix is
+    // cheap rather than starting over.
+    const assertionLess: RuleBuilderLike = {
+      violations: () => [
+        {
+          rule: 'r/vacuous',
+          element: 'r/vacuous',
+          file: '',
+          line: 0,
+          message: 'this rule asserts nothing',
+          bypassFilters: true,
+        },
+        { rule: 'r/real', element: 'E', file: '/e.ts', line: 3, message: 'a real violation' },
+      ],
+    }
+    vi.mocked(loadRuleFiles).mockResolvedValue([assertionLess])
+    const out = path.join(os.tmpdir(), `tsau-shape-baseline-refused-${String(process.pid)}.json`)
+    tmpFiles.push(out)
+    const spy = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+    await expect(runBaseline({ ruleFiles: ['arch.rules.ts'], output: out })).resolves.toBe(1)
+    spy.mockRestore()
+
+    const baseline = JSON.parse(fs.readFileSync(out, 'utf-8')) as { count: number }
+    expect(baseline.count).toBe(1) // the real violation was still recorded
   })
 
   it('per-file: a throwing file does NOT drop the other files rules from the baseline', async () => {

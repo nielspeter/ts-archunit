@@ -20,14 +20,23 @@ import {
  * NOT grounds to fail — see `unmatchedBaselineFinding`, which fires on the
  * measurement instead.
  */
-// 3 as of 0.23.0. Accumulate (bug 0020) changes `buildRuleDescription()` for
-// any rule derived off a held rule, and the description is hashed — so those
-// entries no longer match. Without the bump, `matched === 0` fires the
-// unmatched-baseline finding whose text asserts "generated against a different
-// repository root": a false cause, in the release about findings that assert
-// causes they cannot verify. With it, the version-mismatch branch is true and
-// its remedy (regenerate) is the right one.
-const HASH_VERSION = 3
+// Stays 2 through 0.23.0, deliberately. Accumulate (bug 0020) lengthens
+// `buildRuleDescription()` for a rule derived off a held rule and for a
+// pre-`.should()` `satisfy()`, and the description is hashed — so those entries
+// stop matching. That is a change in the hash's *input*, not in how it is
+// computed: `hashViolation` below never reads this constant.
+//
+// 0.23.0 drafted a bump to 3 to signal it and two independent reviews measured
+// that as a defect. It matches no entry differently, and the only thing it
+// changes is which `cause` sentence `unmatchedBaselineFinding` picks — so every
+// user holding a pre-0.23.0 baseline that matched nothing for an unrelated
+// reason would be told the format was "the likely cause", which cannot be true,
+// while the branch naming the cause that usually is (a differently-resolved
+// root) became unreachable. Bump this only when `hashViolation` changes.
+//
+// The unmatched *entry* still cannot be diagnosed — see bug 0027; that is the
+// gap the bump was reaching for and did not close.
+const HASH_VERSION = 2
 
 /**
  * A single entry in the baseline file.
@@ -336,7 +345,14 @@ export class Baseline {
       suggestion:
         this.hashVersion > HASH_VERSION
           ? 'Upgrade ts-archunit to a version that reads this format.'
-          : `Regenerate it: \`npx ts-archunit baseline --output ${where}\`. Review the diff first — entries that vanish were never matching here.`,
+          : // `<your-rule-files>` stands in for the caller's own paths on
+            // purpose: the command needs rule files unless a config supplies
+            // them, and printed without them it fails with "No rule files
+            // specified" — a remedy that
+            // cannot remediate (ADR-008 rule 2). Measured. The path is left as
+            // recorded rather than absolutized, so the line is copyable on a
+            // machine other than the one that wrote the baseline.
+            `Regenerate it: \`npx ts-archunit baseline <your-rule-files> --output ${where}\` (rule files are implied if a ts-archunit config lists them). Review the diff first — entries that vanish were never matching here.`,
       bypassFilters: true,
     }
   }

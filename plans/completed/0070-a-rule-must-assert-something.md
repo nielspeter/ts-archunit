@@ -9,12 +9,12 @@ diagnosis and the state table survived every round unchanged.
 **Effort:** One root gate, one new advice hook, seven `assertsSomething()` hooks, two new
 `RuleBuilder` fields, five deletions, `describeRule()` on six builders, and the guards.
 Two releases. **See Implementation notes for what 0.22.0 actually shipped.**
-**Closes:** [bug 0019](../bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md).
-**Splits from:** [plan 0069](./0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
-**Absorbs:** [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
+**Closes:** [bug 0019](../../bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../../bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md).
+**Splits from:** [plan 0069](../0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
+**Absorbs:** [proposal 019](../../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
 including its central ask, the **deletion** of the four `console.warn + return []` sites, which
 draft 2 forgot — except the override-key ask (see Out of scope).
-**Unblocked:** [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)
+**Unblocked:** [bug 0021](../../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)
 shipped in v0.21.0. This plan's finding inherits that pattern; round 2 found three places where
 draft 2 would have reintroduced the 0021 defect, all closed below.
 
@@ -211,7 +211,7 @@ Two adjacent texts change with this, or they contradict it:
   selector instead"_, the empty-**selector** remedy, for every config finding. Round 2 named it
   the third 0021-family site. It becomes cause-neutral: _"fix the fault it names instead."_
 
-Per [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md),
+Per [bug 0021](../../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md),
 the finding sets its own `suggestion` (from `assertionAdvice()`), keeps `ruleId` and `because`,
 and inherits nothing — and the test that enforces that for the three existing producers gains
 this one as its **fourth** (round 2's sabotage matrix showed the finding could lose all three
@@ -321,6 +321,24 @@ version-mismatch branch is true and its remedy (regenerate) is the right one. (D
 a specific before/after hash pair as evidence; the "after" hash reproduces nowhere — the claim
 stands on the description change itself, which is measured.)
 
+> **WITHDRAWN at implementation, and the reasoning above is wrong in its load-bearing clause.**
+> Two independent reviews of the 0.23.0 branch measured it: `hashViolation()` never reads
+> `HASH_VERSION` (`baseline.ts` — the hash is `sha256(rule::element::message)`), so the bump
+> changes no hash and no entry matches differently. Every clause that followed from "without
+> the bump, `matched === 0` fires" is therefore false: the description change makes a **partial**
+> miss, and `unmatchedBaselineFinding` is gated on `matched === 0`, so it stays silent either
+> way. Worse, the bump makes the version-mismatch branch fire for every pre-0.23.0 baseline
+> that matches nothing for an unrelated reason, naming the format as "the likely cause" when
+> the format cannot be a cause — and burying the root-mismatch branch that usually is.
+>
+> The paragraph was written from the same understanding as the code, which is why it read as
+> justified: this is ADR-008 rule 5 in the plan's own prose, and the thing that disagreed with
+> it was reading `hashViolation()`. `HASH_VERSION` stays at **2**. The real consequence —
+> descriptions change, so those entries must be re-accepted — is disclosed in the CHANGELOG
+> as a content change rather than a format change. See [bug 0027](../../bugs/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)
+> for the diagnosis gap this leaves open, which is the fix the bump was reaching for and did
+> not achieve.
+
 **Blast radius, re-measured against shipped 0.22.0 (2394 tests, 2026-07-29).** The earlier
 table said the gate breaks 1; it breaks **6**, and only two of the six were in it. Each
 disposition below is a decision, and the five reversals belong in the CHANGELOG as reversals
@@ -395,7 +413,7 @@ it against draft 2's inventory: 5 of 28 reverts survived everything. Those five 
 3. **Each state's message contains its own remedy and no other state's** — asserted on message
    text, including state 2 naming the misplaced predicate (`"are async" is a predicate`), and
    state 2 arising from a 4-subject selector so a resurrected count claim would be caught.
-   3b. **Each remedy actually remediates** — [ADR-008](../adr/008-agent-first-failure-surfaces.md)
+   3b. **Each remedy actually remediates** — [ADR-008](../../adr/008-agent-first-failure-surfaces.md)
    rule 2's behavioural corollary, which is new since draft 3 and is the guard this plan most
    needs. For every one of the seven states: apply the fix the message states, and assert the
    finding **clears**. A contains-assertion and the message are written from the same

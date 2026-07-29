@@ -145,7 +145,8 @@ async function handleCheck(
 /** Handle the `baseline` subcommand. */
 async function handleBaseline(ruleFiles: string[], output: string): Promise<void> {
   if (!requireRuleFiles(ruleFiles)) return
-  await runBaseline({ ruleFiles, output })
+  const code = await runBaseline({ ruleFiles, output })
+  if (code !== 0) process.exitCode = code
 }
 
 /** Reject a `--format` value that isn't valid for the given subcommand. */

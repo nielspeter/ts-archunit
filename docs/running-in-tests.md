@@ -94,8 +94,14 @@ it('only new violations fail', () => {
 
 A rule that asserts nothing — a selector with no condition after `.should()`, or a
 predicate like `areAsync()` used _after_ `.should()`, where it filters instead of
-asserting — can never fail. A future release makes that a hard failure, so it is worth
-finding now.
+asserting — can never fail. **Since 0.23.0 it is a hard failure** that nothing can
+suppress, so find them before you upgrade.
+
+**The cheapest pre-flight for this form is the upgrade itself.** Install 0.23.0 on a
+scratch branch and run your suite: every offender fails in its own test, with its own
+file, line and code frame — better attribution than any diagnostic can give you, because
+vitest reports the frame that built the rule. Then fix, and merge the fixes before you
+merge the upgrade.
 
 `doctor` cannot help here: it loads a rule file as a module, and a file that imports a
 test runner cannot be loaded that way. Use `diagnose()` in-process instead — same
@@ -116,6 +122,12 @@ it('every architecture rule asserts something', () => {
 That is itself an architecture rule about your architecture rules, and it fails with the
 specific remedy for whichever shape is wrong. The `checkAll([...])` form above already
 holds its rules in an array, so it can pass the same array to `diagnose()`.
+
+**It only sees the rules in the array.** Written as above — a second, hand-copied list
+beside the rules the tests actually run — it is green for every rule you forgot to copy,
+which is the same hand-maintained-list problem the rules themselves exist to catch. Hoist
+each builder so the test and the array share one object, or prefer the scratch-branch
+upgrade above, which cannot miss a rule because it runs all of them.
 
 ## Converting between the two forms
 

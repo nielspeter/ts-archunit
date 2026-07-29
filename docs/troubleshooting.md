@@ -20,9 +20,14 @@ Two different causes share this symptom:
 
 **The rule asserts nothing.** A selector with no condition after `.should()` — or a
 predicate like `areAsync()` used _after_ `.should()`, where it filters instead of
-asserting — can never fail. Run `npx ts-archunit doctor <your rule files>`, or
-`diagnose(rules)` for rules written inside a test: as of 0.22.0 both name the exact
-shape and the fix for it.
+asserting — can never fail. **As of 0.23.0 it does not "do nothing" — it fails**, as a
+[configuration finding](/violation-reporting#a-rule-must-assert-something) that no
+terminal, severity, exclusion, baseline or diff filter can suppress. If you are reading
+this because a rule started failing with "asserts nothing and can never fail", that is
+the release, and the finding names the shape you wrote and what to add.
+
+To find them without running the rules: `npx ts-archunit doctor <your rule files>`, or
+`diagnose(rules)` for rules written inside a test.
 
 **The rule never executes.** If a rule in `arch.rules.ts` seems to do nothing, check that it does **not** end in `.check()` (or `.warn()` / `.severity()`). In a CLI rule file, those terminals execute the rule immediately and return `undefined`, so the CLI silently skips it:
 
@@ -92,9 +97,10 @@ Expected. [`tsconfig()`](/config-rules) checks the resolved options object, whic
 
 That's by design for **severity** warnings. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
 
-Separately, a rule that **asserts nothing** never reports at all — no violation, no
-warning — because there is nothing for it to check. `doctor` and `diagnose()` are what
-surface those (see above); the next minor turns them into failures.
+A rule that **asserts nothing** is the one thing `warn` cannot cover: through 0.22.0 it
+reported nothing at all, and since 0.23.0 it fails at `error` severity whatever you asked
+for, because a rule that cannot fire has no violations to be advisory about. `doctor` and
+`diagnose()` find them without running the rules (see above).
 
 ## Still stuck?
 

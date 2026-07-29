@@ -111,12 +111,15 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
     expect(withBaseline(file).filterNew([])).toEqual([])
   })
 
-  it('a v2 baseline (pre-0.23.0) is told to REGENERATE, not blamed on the root', () => {
-    // 0.23.0 bumped HASH_VERSION 2 -> 3 because accumulate (bug 0020) changes
-    // the hashed rule description for any rule derived off a held rule. Without
-    // the bump, `matched === 0` reaches the same-version branch, whose text
-    // asserts "generated against a different repository root" — a cause it
-    // cannot verify, in the release about exactly that. This pins the branch.
+  it('a same-version baseline that matches nothing keeps the root explanation', () => {
+    // 0.23.0 drafted HASH_VERSION 2 -> 3 to signal that accumulate (bug 0020)
+    // changes the hashed rule description. Withdrawn, and this test is the
+    // inversion: `hashViolation` never reads the constant, so the bump matched
+    // no entry differently — its ONLY effect was to route every pre-0.23.0
+    // baseline into the version-mismatch branch and tell the reader the format
+    // was "the likely cause", which cannot be true. The current version is what
+    // any live baseline declares, so the branch a real user reaches is this one,
+    // and it must keep naming the cause that can actually be theirs.
     const root = scratch('.git')
     const file = path.join(root, 'baseline.json')
     fs.writeFileSync(
@@ -131,8 +134,27 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
     const meta = withBaseline(file)
       .filterNew([pathFree])
       .filter((v) => v.bypassFilters === true)
+    expect(meta[0]?.message).toContain('different repository root')
+    expect(meta[0]?.message).not.toContain('identity format v2 and this version reads')
+    // And the remedy it prints must be runnable. It named `baseline --output X`
+    // with no rule files, which exits 1 with "No rule files specified" — a
+    // remedy that cannot remediate (ADR-008 rule 2), measured.
     expect(meta[0]?.suggestion).toContain('Regenerate')
-    expect(meta[0]?.message).not.toContain('different repository root')
+    expect(meta[0]?.suggestion).toContain('<your-rule-files>')
+  })
+
+  it('the declared version is what the current constant writes, so v2 files still match', () => {
+    // The two derivations that must agree: what `generateBaseline` stamps, and
+    // what `withBaseline` treats as current. A bump to either 3 or 4 is caught
+    // here — the previous suite pinned only "older than current", so bumping to
+    // 4 instead of 3 was caught by nothing.
+    const root = scratch('.git')
+    const file = path.join(root, 'baseline.json')
+    generateBaseline([pathFree], file, { root })
+    const written: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'))
+    expect(JSON.stringify(written)).toContain('"hashVersion":2')
+    // Same file, read back: matches, and produces no meta-finding.
+    expect(withBaseline(file, { root }).filterNew([pathFree])).toEqual([])
   })
 
   it('tells the reader to upgrade, not regenerate, when the file is newer', () => {

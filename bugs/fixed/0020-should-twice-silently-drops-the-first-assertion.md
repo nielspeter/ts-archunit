@@ -82,6 +82,6 @@ Sabotaging `fork()`'s copy (`const fork = this`) is also **0 of 2340** today, an
 
 ## Relationship to plan 0069
 
-Ships with **[plan 0070](../../plans/0070-a-rule-must-assert-something.md)'s 0.23.0**, not with R3b — 0070 took over proposal 019 and both bugs. R3b is what turns "zero conditions" from a silent pass into a failure ([bug 0019](./0019-a-rule-with-no-condition-passes-in-total-silence.md)); accumulating on its own upgrades a silent drop into an over-report, which is an improvement but leaves 0019 open.
+Ships with **[plan 0070](../../plans/completed/0070-a-rule-must-assert-something.md)'s 0.23.0**, not with R3b — 0070 took over proposal 019 and both bugs. R3b is what turns "zero conditions" from a silent pass into a failure ([bug 0019](./0019-a-rule-with-no-condition-passes-in-total-silence.md)); accumulating on its own upgrades a silent drop into an over-report, which is an improvement but leaves 0019 open.
 
 Also relevant to R3b's verdict rule, which reads "`andShould()` ANDs, so the verdict on empty is **every** condition is exempt." That verdict depends on how many conditions a rule ends up carrying — which is exactly what diverges here. Settling this after R3b ships means settling it as a bug report against R3b.

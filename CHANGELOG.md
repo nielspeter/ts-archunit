@@ -15,27 +15,58 @@ A rule with no condition selects some code and then asserts nothing about it, so
 
 - **All seven assertion-less shapes are now configuration findings and fail on every terminal** ([bug 0019](./bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md)). The finding carries the remedy for the shape you actually wrote — the table in 0.22.0's entry lists all seven — and there is **no way to downgrade it**: not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. Five of these were green before:
 
-  | Shape                                                                | Before                                 | Now                                               |
-  | -------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------- |
-  | `.should()` reached, no condition                                    | passed silently                        | fails — add a condition                           |
-  | a predicate after `.should()` (`areAsync()` filters, it asserts not) | passed silently                        | fails — the misplaced predicate is named          |
-  | never reached `.should()`                                            | passed silently                        | fails — add `.should()` and a condition           |
-  | `tsconfig(p)` with no `.requires()`                                  | passed silently (**pinned by a test**) | fails — add `.requires({...})`                    |
-  | `smells.inconsistentSiblings()` with no `.forPattern()`              | passed silently (**pinned by a test**) | fails — add `.forPattern(...)`                    |
-  | `correspondence()` with two sides and no assertion                   | threw `RangeError`                     | fails as an `ArchRuleError` configuration finding |
-  | `correspondence()` with the wrong number of sides, no assertion      | threw `RangeError`                     | configuration finding naming `.side(...)`         |
+  | Shape                                                                | Before                                                    | Now                                               |
+  | -------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------- |
+  | `.should()` reached, no condition                                    | passed silently                                           | fails — add a condition                           |
+  | a predicate after `.should()` (`areAsync()` filters, it asserts not) | passed silently                                           | fails — the misplaced predicate is named          |
+  | a predicate after `.should()` **alongside a real condition**         | passed silently, having narrowed the selection to nothing | fails — move the predicate                        |
+  | never reached `.should()`                                            | passed silently                                           | fails — add `.should()` and a condition           |
+  | `tsconfig(p)` with no `.requires()`                                  | passed silently (**pinned by a test**)                    | fails — add `.requires({...})`                    |
+  | `smells.inconsistentSiblings()` with no `.forPattern()`              | passed silently (**pinned by a test**)                    | fails — add `.forPattern(...)`                    |
+  | `correspondence()` with two sides and no assertion                   | threw `RangeError`                                        | fails as an `ArchRuleError` configuration finding |
+  | `correspondence()` with the wrong number of sides, no assertion      | threw `RangeError`                                        | configuration finding naming `.side(...)`         |
 
   The two rows marked **pinned by a test** were reversals of a documented, tested contract, not bug fixes: a test in this repo asserted that each of those produced no violations. Both are retired, and this row is the notice.
 
   Wrong arity **with** an assertion chosen still throws `RangeError` — measured. Adding `.beComplete()` does not fix a one-sided correspondence, so that fault keeps its own error and its own remedy. If you catch `RangeError` around `correspondence()`, the no-assertion cases now arrive as `ArchRuleError` instead.
 
+  **The row in bold is the one that was not in the plan, and it is the worst of the eight.** Every other assertion-less shape looks unfinished; this one reads as deliberate:
+
+  ```typescript
+  functions(p)
+    .that()
+    .haveNameMatching(/^parse/)
+    .should()
+    .notExist()
+    .areAsync()
+  //   before: subjects 4 -> 0, violations 4 -> 0, diagnose() [], check() passed
+  ```
+
+  `areAsync()` after `.should()` is a predicate, so it retroactively narrows the set the rule's **conditions** are evaluated over — here to nothing, so `notExist` held vacuously and the rule went green. Its description even reads as intentional (`that have name matching /^parse/ and are async should not exist`), so nobody had a reason to look. `assertsSomething()` consulted the misplaced-predicate list only when there were **zero** conditions, so the release caught this shape in its harmless variant and missed it in the dangerous one. Found by a review of the release branch, measured, fixed there. Its remedy is "move it before `.should()`" and explicitly **not** "add a condition" — it has one.
+
   The finding is raised **before** the rule runs. A rule with both a dead glob and no condition now reports the missing assertion only — the right root cause, since no selector makes an assertion-less rule capable of failing. The selector fault resurfaces on the next run, once there is something to assert.
 
-- **Conditions accumulate instead of clearing** ([bug 0020](./bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md)). A rule derived from a held rule kept the parent's predicates but silently dropped its conditions, so `parent.should().beExported()` followed by a derived `.should().notContain(...)` asserted only the second. Both are asserted now, and a second `.should()` on one chain behaves like `.andShould()`. If you built rules this way expecting the reset, those rules now report violations they previously discarded.
+- **Conditions accumulate instead of clearing** ([bug 0020](./bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md)). A rule derived from a held rule kept the parent's predicates but silently dropped its conditions, so `parent.should().beExported()` followed by a derived `.should().notContain(...)` asserted only the second. Both are asserted now, and a second `.should()` on one chain behaves like `.andShould()`. A `satisfy(condition)` written **before** `.should()` is also retained rather than dropped. If you built rules this way expecting the reset, those rules now report violations they previously discarded.
 
-- **Baseline hash version is now 3, so existing baseline files no longer match.** Accumulate changes the rule description for any rule derived off a held rule, and the description is hashed. Regenerate with `npx ts-archunit baseline <rules> --output arch-baseline.json` (the `arch:baseline` script `init` scaffolds), or `generateBaseline(...)` if you build it in-process, and commit the result. Without the bump every entry would silently miss and the unmatched-baseline finding would blame "a different repository root" — a false cause, in the release about findings that assert causes they cannot verify. With the bump you get the version-mismatch finding, whose remedy is the correct one.
+- **Some baseline entries stop matching — the ones for rules whose description changed.** A violation's identity is a hash of `rule::element::message`, and `rule` is the rule's description. Accumulate lengthens that description for the two shapes it changes: a rule derived off a held rule that already carried a condition, and a `satisfy(condition)` written **before** `.should()` (previously dropped, now retained and fired). Those entries hash differently, so an already-accepted violation is reported as new.
+
+  Regenerate with `npx ts-archunit baseline <rules> --output arch-baseline.json` (the `arch:baseline` script `init` scaffolds), or `generateBaseline(...)` in-process, and **review the diff** — the entries that vanish are exactly the rules whose descriptions changed. Every other entry still matches; the hash function is unchanged.
+
+  The identity format version stays at **2** on purpose. An earlier cut of this release bumped it to 3 to signal the change, and two independent reviews measured that as a mistake worth naming here: `hashViolation()` never reads the version, so the bump changed no hash and matched no entry differently — while making the unmatched-baseline finding tell every user with a pre-0.23.0 file that the format was "the likely cause", which cannot be true, and burying the branch that names the cause that usually is (a differently-resolved repository root). A remedy that cannot remediate is precisely what this release exists to stop shipping (ADR-008 rule 2), including when we are the ones shipping it.
+
+### Added
+
+- **`remedyRepeatsMessage` and `severityFor` are exported.** Violation semantics an external renderer or aggregator cannot re-derive from the `ArchViolation` type alone: without the first it reprints a remedy already in the message (the defect fixed below, in our own three renderers), and without the second it grades a configuration finding by the severity the rule asked for, which `severityFor` exists to refuse.
 
 ### Fixed
+
+- **The finding says there is no escape hatch, and links the rule.** It now ends with "This finding cannot be suppressed: not by `.warn()`, `.asSeverity('warn')`, `.excluding()`, a baseline, or diff-aware mode", and carries a `Docs:` link to the section stating the grammar. Measured before it was added: a reader given only the remedy tries `.asSeverity('warn')`, then `.excluding()`, then the baseline, then `--changed` — four CI cycles — because nothing told them those were refused. ADR-008 rule 3 requires saying so, and the release was shipping that rule while not obeying it.
+
+- **`ts-archunit baseline` exits non-zero when a finding could not be baselined.** Configuration findings are deliberately not baselineable, and the command already said so clearly — then exited 0. `doctor` exits non-zero for exactly this reason ("an agent reads `exit 0` as nothing to do"), and this command sits on the documented upgrade path above: the blocker was printed, the baseline was committed, and the next `arch` job failed on findings the baseline was supposed to cover. The file is still written with everything that _could_ be baselined, so re-running after the fix is cheap.
+
+- **The unmatched-baseline finding's own remedy now runs.** It printed `npx ts-archunit baseline --output <file>`, which exits 1 with "No rule files specified" unless a config supplies them — a remedy that cannot remediate, measured. It now names the rule-files argument.
+
+- **`doctor` and the failure no longer print an empty rule name for a bare entry point.** `describeRule()` returns `''` for an entry point with no predicates and no conditions, and `''` is not nullish, so the `?? 'unnamed rule'` fallback was dead code — for precisely the shape the diagnostic exists to report.
 
 - **A remedy identical to its message is no longer printed twice.** A configuration finding's fault and its remedy are one sentence, carried in both `message` and `suggestion` on purpose — a tool reads `suggestion`, a human reads the body. Every renderer printed the paragraph, then printed it again as `Fix:`. All three formatters (terminal, plain, GitHub annotations) now show it once; the fields are unchanged, so nothing a tool reads has moved. A located violation's `Fix:` line always prints, because that format never renders `message` for those.
 
@@ -47,9 +78,23 @@ A rule with no condition selects some code and then asserts nothing about it, so
 npx ts-archunit doctor <your rule files>   # exits non-zero if it reports anything
 ```
 
-For rules written inside a test body, `doctor` cannot load the file — call `diagnose([...])` on the builders directly, or collect them into an array and use `checkAll`. Every remedy `doctor` prints is backward-compatible with 0.22.0, so the whole migration can land **before** you upgrade.
+Every remedy `doctor` prints is backward-compatible with 0.22.0, so the whole migration can land **before** you upgrade.
 
-If a reported rule is a deliberate placeholder, delete it or comment it out. If it is generated from configuration, skip generating it when there is nothing to assert. If it comes from a preset (`ruleId "preset/..."`), report it to the preset's author — a preset rule that asserts nothing is a bug in the preset.
+**If your rules live inside test bodies, do not use the pre-flight — upgrade on a scratch branch and run your suite.** `doctor` cannot load a file that imports vitest/jest, and on 0.22.0 the message it prints for that case says to "run your test suite instead; the runtime writes the same diagnostics to stderr" — which is **not true on 0.22.0**, whose whole contract is that no rule behaves differently. That text is already published and cannot be recalled; it becomes true on 0.23.0, where the gate does fail at runtime. So for this population: install 0.23.0 on a throwaway branch, run the suite, and every offender fails in its own test with its own file, line and code frame — better attribution than any diagnostic gives you.
+
+The `diagnose([...])` array documented in [running in tests](https://nielspeter.github.io/ts-archunit/running-in-tests) still works, but note what it is: a second, hand-copied list beside the rules your tests actually run. It is green for every rule you forget to copy. Prefer the scratch-branch run, which cannot miss one.
+
+If a reported rule is a deliberate placeholder, delete it or comment it out. If it is generated from configuration, skip generating it when there is nothing to assert.
+
+If it comes from a **third-party preset** (`ruleId "preset/..."`), that is a bug in the preset and it needs reporting upstream — but you should not have to hold CI open until someone else cuts a release. Drop the broken rule by construction, using the same predicate the gate uses:
+
+```typescript
+// One rule in this preset asserts nothing — reported upstream at <issue link>.
+// This drops that rule and keeps the other twelve.
+export default acmePreset(p).filter((r) => r.assertsSomething())
+```
+
+That is exclusion by construction, not a suppression flag: it is visible in the rule file, it names nothing it cannot verify, and it keeps every other rule in the preset enforcing. **Scope it to third-party presets, with the upstream issue linked.** Applied to your own rule array it silently reinstates the exact false coverage this release removes — which is why there is no flag for it.
 
 Then regenerate baselines (above), and expect new violations from any rule that was silently dropping its parent's conditions.
 

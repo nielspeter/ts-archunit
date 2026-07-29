@@ -14,7 +14,7 @@ export interface BaselineArgs {
  *
  * Wraps existing APIs: collectViolations + generateBaseline.
  */
-export async function runBaseline(args: BaselineArgs): Promise<void> {
+export async function runBaseline(args: BaselineArgs): Promise<number> {
   // Per-file parity with runCheck: a user rule file that self-executes a
   // throwing `.check()` at import surfaces its own violations without discarding
   // the other files' rules. (Presets no longer throw at import — returning form.)
@@ -53,4 +53,13 @@ export async function runBaseline(args: BaselineArgs): Promise<void> {
       process.stdout.write(`  - ${violation.rule}: ${violation.message}\n`)
     }
   }
+
+  // Non-zero when something could not be baselined, for the same reason
+  // `doctor` exits non-zero: an agent reads `exit 0` as "nothing to do", and
+  // this command sits on the documented 0.23.0 upgrade path. Exiting 0 here
+  // meant `npm run arch:baseline` reported the blocker, succeeded, got
+  // committed, and the next `arch` job failed on findings the baseline was
+  // supposed to have covered. The file is still written — the findings that
+  // COULD be baselined are recorded, so re-running after the fix is cheap.
+  return refused.length > 0 ? 1 : 0
 }

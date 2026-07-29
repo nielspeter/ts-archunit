@@ -33,10 +33,11 @@ export interface DiagnosableRule extends RuleBuilderLike {
   assertsSomething?: () => boolean
   /**
    * The remedy for this rule's assertion-less state. When present, `diagnose`
-   * reports it VERBATIM as the finding's advice, so the doctor and the runtime
-   * warning are the same string by construction (plan 0070) — they were
-   * measured diverging, and two texts for one state is a trust problem for an
-   * agent diffing them.
+   * reports it VERBATIM as the finding's advice, so the doctor and the
+   * configuration finding the gate raises at runtime carry the same string by
+   * construction (plan 0070) — they were measured diverging, and two texts for
+   * one state is a trust problem for an agent diffing them. Absent, the base
+   * `TerminalBuilder` text is used, from the one place that owns it.
    */
   assertionAdvice?: () => string
   /** The project this rule was built against. */
@@ -187,7 +188,14 @@ function describe(
 
 function ruleName(rule: DiagnosableRule): string {
   const described = rule.describeRule?.()
-  return (described?.id || described?.rule) ?? 'unnamed rule'
+  // `||` throughout, never `??`: `describeRule()` returns `rule: ''` for a bare
+  // entry point (no predicates, no conditions), and `'' ` is not nullish — so
+  // `?? 'unnamed rule'` made the fallback dead code and `doctor` printed an
+  // empty rule name for precisely the shape this diagnostic is about. Caught by
+  // sabotage, not by reading. The gate derives the same name in
+  // `TerminalBuilder.collectWithAssertionGuard`; both must be non-empty, and
+  // both are asserted so.
+  return described?.id || described?.rule || 'unnamed rule'
 }
 
 /** Whether the rule reached a terminal with no condition attached. */

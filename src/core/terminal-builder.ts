@@ -24,6 +24,14 @@ import { shallowClone } from './shallow-clone.js'
  * builders on the other — which is what bug 0013 cost. Anything that must
  * hold for all thirteen builders now has exactly one place to live.
  */
+/**
+ * Where the assertion-gate finding sends the reader. Same shape as `GLOB_DOCS`,
+ * and it points at the section that states the grammar and the no-opt-out rule —
+ * not at the builder's own page, which is about writing rules that work.
+ */
+export const ASSERTION_DOCS =
+  'https://nielspeter.github.io/ts-archunit/violation-reporting#a-rule-must-assert-something'
+
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
@@ -150,8 +158,15 @@ export abstract class TerminalBuilder {
     if (this.assertsSomething()) return this.collectViolations()
 
     const described = this.describeRule()
-    const name = described.id ?? (described.rule || this.constructor.name)
-    const advice = this.assertionAdvice()
+    const name = described.id || described.rule || this.constructor.name
+    // ADR-008 rule 3: where there is deliberately no escape hatch, say so, and
+    // say what to do instead. Stated on the finding rather than inside
+    // `assertionAdvice()` so the seven per-shape remedies stay one sentence each
+    // and this stays one sentence in one place. Measured before it was added: a
+    // reader given only the remedy tries `.asSeverity('warn')`, `.excluding()`,
+    // the baseline and `--changed` — four CI cycles — because nothing told them
+    // those were refused.
+    const advice = `${this.assertionAdvice()} This finding cannot be suppressed: not by .warn(), .asSeverity('warn'), .excluding(), a baseline, or diff-aware mode.`
     return [
       {
         rule: name,
@@ -162,10 +177,18 @@ export abstract class TerminalBuilder {
         message: advice,
         // Its own remedy, never the author's (bug 0021): their `suggestion`
         // describes how to fix a violation of the rule, and this finding says
-        // the rule cannot produce one.
+        // the rule cannot produce one. Same for `docs` — the author's link is
+        // about their rule; this one is about the grammar the rule broke.
         suggestion: advice,
-        because: this._reason,
+        docs: ASSERTION_DOCS,
         bypassFilters: true,
+        // `ruleId` and `because` are deliberately NOT set here. `applyFilters`
+        // fills both from the rule's metadata for every finding that leaves
+        // them unset, and all three callers of this method go through it — so
+        // setting them here was two lines that read as load-bearing and were
+        // not: sabotage removed each with nothing failing. The remedy fields
+        // above are the opposite case, and must stay, because `applyFilters`
+        // deliberately refuses to supply those for a `bypassFilters` finding.
       },
     ]
   }
@@ -254,13 +277,16 @@ export abstract class TerminalBuilder {
   /**
    * Whether this rule asserts anything about what it selects (plan 0070).
    *
-   * `false` means the rule can never fail: `diagnose()` / `doctor` report it,
-   * and the next minor makes it a configuration finding. Nothing at runtime
-   * reads this in this release — the gate that did was withdrawn, because a
-   * bespoke stderr channel bypassed the formatter, the JSON payload, the
-   * annotation path and the exit code, and every one of those was where a
-   * review found a defect in it. At 0.23.0 the same hook produces an
-   * `ArchViolation`, which reaches all four surfaces by construction.
+   * `false` means the rule can never fail, and as of 0.23.0
+   * `collectWithAssertionGuard()` turns that into an unsuppressable
+   * configuration finding on every terminal; `diagnose()` / `doctor` report it
+   * without running the rule. 0.22.0 shipped this hook with nothing at runtime
+   * reading it, because the gate drafted for that release wrote through a
+   * bespoke stderr channel that bypassed the formatter, the JSON payload, the
+   * annotation path and the exit code — a review found a defect at each of those
+   * seams, so the channel was withdrawn and the hook shipped on its own. The
+   * finding form reaches all four surfaces by construction, which is what the
+   * withdrawal bought.
    *
    * Concrete with a `true` default rather than abstract: both roots are public
    * exports, so an abstract member is a compile break for an external subclass

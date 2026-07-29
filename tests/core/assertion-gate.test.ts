@@ -25,7 +25,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { Project } from 'ts-morph'
 import * as rootExports from '../../src/index.js'
 import * as graphqlExports from '../../src/graphql/index.js'
-import { TerminalBuilder } from '../../src/core/terminal-builder.js'
+import { TerminalBuilder, ASSERTION_DOCS } from '../../src/core/terminal-builder.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
@@ -38,6 +38,9 @@ import { ArchRuleError } from '../../src/core/errors.js'
 import { formatViolations, formatViolationsPlain } from '../../src/core/format.js'
 import { formatViolationsJson } from '../../src/core/format-json.js'
 import { formatViolationsGitHub } from '../../src/core/format-github.js'
+import { generateBaseline, withBaseline } from '../../src/helpers/baseline.js'
+import fs from 'node:fs'
+import os from 'node:os'
 import { project } from '../../src/core/project.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
@@ -169,6 +172,171 @@ describe('assertionAdvice: one remedy per state, and only its own', () => {
     expect(advice(resolvers(load('graphql'), 'src/**/*.resolver.ts'))).toContain('contain(')
   })
 
+  it('NO remedy may name a mechanism that does not remediate', () => {
+    // Found by sabotage, and it is the sharpest hole the reviews found: adding
+    // `.expectNonEmpty()` to state 1's advice — which verifiably does NOT clear
+    // the finding, since the gate wins over it (`rule-builder.test.ts`) — left
+    // all 2411 tests green. Every other block asserts the correct remedy is
+    // PRESENT; none asserted no wrong remedy was added beside it. That is
+    // bug 0017's shape (a remedy that reads perfectly and does not work) inside
+    // the block written to close bug 0017's corollary.
+    //
+    // An explicit list, not a count (ADR-008 rule 4): every mechanism a reader
+    // might reach for to make the finding go away without fixing the rule.
+    const suppressors =
+      /expectNonEmpty|allowEmpty|emptyIsPass|\.excluding\(|asSeverity|\.warn\(|--changed|baseline|silent\(/
+    const sl = load('slices')
+    const repo = project(path.resolve(import.meta.dirname, '../../tsconfig.json'))
+    const p2 = project(fixtures('smells/inconsistent-siblings'))
+    const parsers = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+    const everyState: TerminalBuilder[] = [
+      parsers.should(),
+      parsers.should().areAsync(),
+      parsers.should().areAsync().areExported(),
+      parsers.should().notExist().areAsync(),
+      parsers,
+      functions(p),
+      parsers.should().that(),
+      tsconfig(repo),
+      smells.inconsistentSiblings(p2).minLines(2),
+      correspondence(p)
+        .side('a', parsers, (f) => f.getName() ?? '?')
+        .side('b', ['x']),
+      correspondence(p).side('a', parsers, (f) => f.getName() ?? '?'),
+      slices(sl).matching('src/').should(),
+      schemaFromSDL('type Query { a: String }').that().queries().should(),
+      resolvers(load('graphql'), 'src/**/*.resolver.ts'),
+    ]
+    expect(everyState).toHaveLength(14)
+    for (const rule of everyState) {
+      expect(rule.assertsSomething()).toBe(false)
+      expect(rule.assertionAdvice()).not.toMatch(suppressors)
+    }
+  })
+
+  it('a misplaced predicate disqualifies the rule even WITH a real condition', () => {
+    // The false green both other shapes hide behind, measured on the shipped
+    // branch before the fix: `areAsync()` after `.should()` lands in
+    // addPredicate and retroactively narrows the set the conditions are
+    // evaluated over — to nothing here, so `notExist` held vacuously.
+    //
+    //   subjects 4 -> 0   violations 4 -> 0   diagnose() []   check() passed
+    //
+    // This is the one assertion-less shape whose description reads as
+    // deliberate, so nobody goes looking. `assertsSomething()` consulted
+    // `_misplaced` only when `_conditions.length === 0`.
+    const sel = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+    const good = sel.should().notExist()
+    const bad = sel.should().notExist().areAsync()
+
+    // Non-vacuity anchor: the correct rule really does report 4.
+    expect(good.assertsSomething()).toBe(true)
+    expect(good.violations()).toHaveLength(4)
+
+    // The broken one selects nothing and must not be allowed to pass.
+    expect(bad.subjects()).toHaveLength(0)
+    expect(bad.assertsSomething()).toBe(false)
+    const v = bad.violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]?.bypassFilters).toBe(true)
+    expect(() => bad.check()).toThrow(ArchRuleError)
+    expect(diagnose([bad])).toHaveLength(1)
+
+    // Its remedy is "move it", NOT "add a condition" — it has one. Naming the
+    // wrong fix here would leave the rule exactly as broken (ADR-008 rule 2).
+    const a = bad.assertionAdvice()
+    expect(a).toContain('"are async"')
+    expect(a).toContain('Move it before .should()')
+    expect(a).toContain('vacuously')
+    expect(a).not.toContain('then add a condition')
+
+    // And the remedy remediates: moving it before .should() restores all four.
+    const moved = sel.and().areAsync().should().notExist()
+    expect(moved.assertsSomething()).toBe(true)
+    expect(moved.violations().every((x) => x.bypassFilters !== true)).toBe(true)
+  })
+
+  it("the gate finding carries its own identity, remedy and docs — not the author's", () => {
+    // Seven reverts of this finding's fields were each caught by nothing: the
+    // plan specified this test and it was never written. `file`/`line` matter
+    // beyond metadata — `!v.file` is the branch both the GitHub-annotation fix
+    // and the render-once dedupe hang on, so a location stamped here silently
+    // breaks two shipped fixes without failing anything.
+    const AUTHOR = {
+      id: 'arch/example',
+      because: 'the reason the rule exists',
+      suggestion: "the author's fix for a VIOLATION of the rule",
+      docs: 'https://example.com/author-docs',
+    }
+    const rule = functions(p)
+      .that()
+      .haveNameMatching(/^parse/)
+      .should()
+      .rule(AUTHOR)
+    const v = rule.violations()[0]
+    expect(v).toBeDefined()
+
+    // Identity: named by the author's id, never empty, never a placeholder word.
+    expect(v?.ruleId).toBe(AUTHOR.id)
+    expect(v?.rule).toBe(AUTHOR.id)
+    expect(v?.element).toBe(AUTHOR.id)
+
+    // Inherited: `because` states why the rule exists, which is context rather
+    // than a claim about this finding's cause. Supplied by `applyFilters`, not
+    // by the gate — asserted here on the post-filter result because that is
+    // what a consumer receives, and the gate deliberately leaves it unset so
+    // there is one place that fills it.
+    expect(v?.because).toBe(AUTHOR.because)
+    expect(v?.ruleId).toBe(AUTHOR.id)
+
+    // Refused: both channels that claim to be a remedy (bug 0021).
+    expect(v?.suggestion).not.toBe(AUTHOR.suggestion)
+    expect(v?.suggestion).toContain(rule.assertionAdvice())
+    expect(v?.docs).not.toBe(AUTHOR.docs)
+    expect(v?.docs).toBe(ASSERTION_DOCS)
+
+    // ...and the link resolves. Comparing the field to the constant is a
+    // same-derivation check — changing the constant changes both sides, which
+    // sabotage confirmed — so the section is looked up in the docs source. A
+    // `Fix:`/`Docs:` line that 404s is a remedy that cannot remediate, and
+    // nothing else in the suite would notice the anchor rotting.
+    const anchor = ASSERTION_DOCS.split('#')[1]
+    expect(anchor).toBeTruthy()
+    const page = fs.readFileSync(
+      path.resolve(import.meta.dirname, '../../docs/violation-reporting.md'),
+      'utf-8',
+    )
+    const slugs = [...page.matchAll(/^#{2,4} (.+)$/gm)].map((m) =>
+      (m[1] ?? '')
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-'),
+    )
+    expect(slugs).toContain(anchor)
+
+    // Location-less, and asserted because two renderers branch on it.
+    expect(v?.file).toBe('')
+    expect(v?.line).toBe(0)
+  })
+
+  it('both name derivations are non-empty for a bare entry point', () => {
+    // `describeRule()` returns `rule: ''` for an entry point with no predicates
+    // and no conditions, and `'' ` is not nullish — so `?? 'unnamed rule'` was
+    // dead code and `doctor` printed an empty name for exactly the shape it
+    // exists to report. The gate and `diagnose()` derive the name separately;
+    // both are asserted, which is what makes this a two-derivation guard.
+    const bare = functions(p)
+    expect(bare.describeRule().rule).toBe('')
+    expect(bare.violations()[0]?.rule).toBe('FunctionRuleBuilder')
+    expect(diagnose([bare])[0]?.rule).not.toBe('')
+    expect(diagnose([bare])[0]?.rule).toBeTruthy()
+  })
+
   it('CONTROL: a rule with a real condition asserts something and offers no remedy', () => {
     // Non-vacuity anchor: the selector matches 4 subjects, so this is
     // "asserts something", not "matched nothing".
@@ -190,7 +358,12 @@ describe('assertionAdvice: one remedy per state, and only its own', () => {
     const v = rule.violations()
     expect(v).toHaveLength(1)
     expect(v[0]?.bypassFilters).toBe(true)
-    expect(v[0]?.message).toBe(rule.assertionAdvice())
+    // The per-shape remedy verbatim, plus the one sentence the finding adds:
+    // ADR-008 rule 3 requires it to say there is no escape hatch, and a reader
+    // given only the remedy tries four suppression channels first (measured).
+    expect(v[0]?.message).toContain(rule.assertionAdvice())
+    expect(v[0]?.message).toContain('cannot be suppressed')
+    expect(v[0]?.docs).toBe(ASSERTION_DOCS)
     expect(() => rule.check()).toThrow(ArchRuleError)
   })
 
@@ -206,9 +379,23 @@ describe('assertionAdvice: one remedy per state, and only its own', () => {
     expect(rule.asSeverity('warn').violations()[0]?.severity).toBe('error')
     // .warn() throws on it.
     expect(() => rule.asSeverity('warn').warn()).toThrow(ArchRuleError)
-    // A baseline built from its own hash does not suppress it.
+    // A baseline built from its own hash does not suppress it. Constructed for
+    // real: the previous version of this block asserted `toBeDefined()` on a
+    // finding it never passed through a baseline, so it could not fail for the
+    // reason its comment named — the property held only by inheritance from
+    // `bypassFilters`, which is a different claim.
     const finding = rule.violations()[0]
     expect(finding).toBeDefined()
+    const file = path.join(
+      os.tmpdir(),
+      `tsau-gate-baseline-${String(process.pid)}-${String(finding?.line ?? 0)}.json`,
+    )
+    try {
+      generateBaseline(finding === undefined ? [] : [finding], file)
+      expect(withBaseline(file).filterNew(finding === undefined ? [] : [finding])).toHaveLength(1)
+    } finally {
+      if (fs.existsSync(file)) fs.unlinkSync(file)
+    }
   })
 
   it('the remedy remediates: adding a condition clears the finding', () => {
@@ -236,7 +423,8 @@ describe('assertionAdvice: one remedy per state, and only its own', () => {
       const v = rule.violations()
       expect(v).toHaveLength(1)
       expect(v[0]?.bypassFilters).toBe(true)
-      expect(v[0]?.message).toBe(rule.assertionAdvice())
+      expect(v[0]?.message).toContain(rule.assertionAdvice())
+      expect(v[0]?.message).toContain('cannot be suppressed')
       expect(() => rule.check()).toThrow(ArchRuleError)
     }
   })
@@ -345,8 +533,12 @@ describe('every remedy remediates (ADR-008 rule 2, behavioural corollary)', () =
       .that()
       .haveNameMatching(/^parse/)
       .should()
-    const advice = rule.assertionAdvice()
+    // The finding's own text, not the bare advice: the gate appends the ADR-008
+    // rule 3 sentence, and what must reach each surface exactly once is what the
+    // reader is actually shown.
     const found = rule.violations()
+    const advice = found[0]?.message ?? ''
+    expect(advice).toContain(rule.assertionAdvice())
     const occurrences = (haystack: string): number => haystack.split(advice).length - 1
 
     // Each renderer must show the remedy — and show it once. Twice was the
@@ -363,7 +555,7 @@ describe('every remedy remediates (ADR-008 rule 2, behavioural corollary)', () =
     // Compared in encoded form: the advice quotes `"preset/..."`, and those
     // quotes are backslash-escaped in the payload.
     const json = formatViolationsJson(found)
-    expect(json).toContain(`"suggestion": ${JSON.stringify(advice)}`)
+    expect(json).toContain(JSON.stringify(advice).slice(1, -1))
     expect(json).not.toContain('"suggestion": null')
 
     // And the thrown error: a one-line summary by design, so the assertion is
@@ -422,10 +614,12 @@ describe('diagnose() parity — one string, one place', () => {
         label: 'InconsistentSiblingsBuilder',
       },
       // The eighth case: a builder that implements only `assertsSomething` and
-      // inherits the advice. It pins `diagnose()`'s fallback to
-      // TerminalBuilder's own method — an earlier revision hard-coded a second
-      // copy of that string, and either copy could be rewritten with nothing
-      // failing.
+      // INHERITS the advice through the prototype chain. Note what it does and
+      // does not pin — it takes the left branch of `diagnose()`'s `??`, because
+      // extending TerminalBuilder means `assertionAdvice` is present. The `??`
+      // right-hand side is for a duck-typed plain object, and it has its own
+      // case below; a comment claiming this one covered the fallback was wrong
+      // in the same way the historical `this._x.push` guard was.
       {
         rule: new AdviceLessBuilder().rule({ id: 'test/advice-less' }),
         label: 'inherits the base advice',
@@ -439,9 +633,42 @@ describe('diagnose() parity — one string, one place', () => {
       // second copy of the generic fallback in diagnose() that either side
       // could change unnoticed.
       expect(findings[0]?.advice, label).toBe(rule.assertionAdvice())
-      // And the finding is locatable — not 'unnamed'.
+      // And the finding is locatable — not 'unnamed', and not empty. `''` is
+      // what `describeRule()` returns for a bare entry point, and it is not
+      // nullish, so the `?? 'unnamed rule'` fallback never fired for it.
       expect(findings[0]?.rule, label).not.toBe('unnamed')
+      expect(findings[0]?.rule, label).toBeTruthy()
     }
+  })
+
+  it("a duck-typed DiagnosableRule with no advice hook gets TerminalBuilder's text", () => {
+    // The `??` right-hand side in diagnose(), which nothing exercised: every
+    // existing case extends TerminalBuilder and so takes the left branch.
+    // Replacing the fallback with `''` left all 2411 tests green.
+    //
+    // `diagnose()` consumes a structural interface, so a plain object is a legal
+    // input — that is the whole reason the interface is structural, and it is
+    // what an external tool holding its own rule objects passes.
+    // `violations` is required by `RuleBuilderLike`, which `DiagnosableRule`
+    // extends — the minimum a real external caller would hold.
+    const ducked = { assertsSomething: () => false, violations: (): ArchViolation[] => [] }
+    const findings = diagnose([ducked]).filter((f) => f.kind === 'no-condition')
+    expect(findings).toHaveLength(1)
+    expect(findings[0]?.advice).toBe(TerminalBuilder.prototype.assertionAdvice.call(ducked))
+    expect(findings[0]?.advice).toContain('Add an assertion')
+    expect(findings[0]?.rule).toBe('unnamed rule')
+  })
+
+  it('tsconfig() with no requirements fails at .check(), not only in violations()', () => {
+    // The one shape covered at the advice-string level and through violations()
+    // but never end-to-end: unwiring `check()`'s gate call failed five tests and
+    // none of them was tsconfig's. Same code path as the others, so this is
+    // cheap — and "same code path" is exactly the assumption that stops being
+    // true one refactor later.
+    const repo = project(path.resolve(import.meta.dirname, '../../tsconfig.json'))
+    expect(() => tsconfig(repo).check()).toThrow(ArchRuleError)
+    // The remedy remediates: a real requirement makes it a normal rule.
+    expect(() => tsconfig(repo).requires({ strict: true }).check()).not.toThrow()
   })
 
   it('the inherited base advice names the fault and both remedies', () => {

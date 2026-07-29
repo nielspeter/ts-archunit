@@ -209,9 +209,24 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * `.that()...` with no `.should()` selects a set and then says nothing about
    * it, so it can never fail — proposal 019. Exposed as a method because
    * `_conditions` is protected and `doctor` must not duck-type a private name.
+   *
+   * **A misplaced predicate disqualifies the rule even when conditions exist**,
+   * which `_conditions.length > 0` alone did not. Measured on the shipped 0.23.0
+   * branch, and it is the worst shape of the seven rather than a corner:
+   *
+   *     functions(p).that().haveNameMatching(/^parse/).should().notExist().areAsync()
+   *       subjects 4 -> 0   violations 4 -> 0   diagnose() []   check() passes
+   *
+   * `areAsync()` after `.should()` lands in `addPredicate` and retroactively
+   * narrows the set every condition is evaluated over — here to nothing, so
+   * `notExist` holds vacuously. The rule reads as deliberate, its description
+   * reads as deliberate, and it certifies nothing. Every other assertion-less
+   * shape at least looks unfinished; this one does not, so the author has no
+   * reason to look. Under ADR-008 the finding is not optional: the remedy is
+   * one method call and nothing about it is a judgement call.
    */
   override assertsSomething(): boolean {
-    return this._conditions.length > 0
+    return this._conditions.length > 0 && this._misplaced.length === 0
   }
 
   /**
@@ -229,13 +244,27 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
     }
     if (this._misplaced.length > 0) {
       const names = this._misplaced.map((d) => `"${d}"`).join(', ')
-      const verb =
-        this._misplaced.length === 1
-          ? 'is a predicate, which filters'
-          : 'are predicates, which filter'
+      const one = this._misplaced.length === 1
+      const verb = one ? 'is a predicate, which filters' : 'are predicates, which filter'
+      const it = one ? 'it' : 'them'
+      // Two faults, two remedies. With conditions present the rule is not
+      // "asserting nothing" in the reader's sense — it asserts something over a
+      // set the misplaced predicate silently shrank, possibly to empty, which is
+      // a different sentence and a different fix (move it; do NOT add another
+      // condition). Telling this author to "add a condition" would name a fix
+      // that leaves the rule exactly as broken — ADR-008 rule 2.
+      if (this._conditions.length > 0) {
+        return (
+          `this rule's ${names} ${verb} subjects rather than asserting anything about them, ` +
+          `and ${one ? 'it comes' : 'they come'} after .should() — so ${it} narrowed the ` +
+          "selection this rule's conditions are evaluated over, and if that narrowed it to " +
+          `nothing the conditions hold vacuously. Move ${it} before .should(), where the ` +
+          'filtering is explicit.'
+        )
+      }
       return (
         `this rule asserts nothing: ${names} ${verb} subjects rather than asserting ` +
-        `anything about them. Move ${this._misplaced.length === 1 ? 'it' : 'them'} before .should(), then add a condition.`
+        `anything about them. Move ${it} before .should(), then add a condition.`
       )
     }
     return (
@@ -293,11 +322,11 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   /**
    * An independent copy, carrying **both** lists. See `TerminalBuilder.copy`.
    *
-   * `fork()` below clears the conditions because it exists for `should()`;
-   * this one must not, or `.should().beExported().that().areAsync()` would
-   * silently drop `beExported` — a rule that asserted something turned into
-   * one that asserts nothing, by the fix for a bug about rules that assert
-   * nothing.
+   * Nothing on this class clears the conditions any more (bug 0020): a rule
+   * that asserted something must never be turned into one that asserts nothing
+   * by a chain method, which is what `.should()` used to do via `fork()`.
+   * `.should().beExported().that().areAsync()` keeps `beExported`, and a second
+   * `.should()` accumulates exactly as `.andShould()` does.
    */
   protected override copy(): this {
     const clone = super.copy()
@@ -308,17 +337,23 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   }
 
   /**
-   * A copy with the conditions cleared. Used by `.should()`.
+   * A copy carrying everything, including the conditions, with `_reason`
+   * resolved from metadata. The only caller is `.should()`.
    *
-   * The clearing is all that distinguishes this from `copy()` — its original
-   * job, "support named selections without mutation", is what `copy()` does as
-   * of bug 0016. And the clearing is a defect in its own right
-   * ([bug 0020](../../bugs/0020-should-twice-silently-drops-the-first-assertion.md)):
-   * a second `.should()` on a builder that already carries a condition
-   * discards it, so `.should().notExist().should().beExported()` enforces only
-   * the second and loses four findings with no output. Measured. It ships with
-   * R3b, because the rule it produces — zero conditions — must fail before the
-   * silent drop can be turned into an over-report.
+   * **The name is historical.** It used to clear the conditions, which is what
+   * distinguished it from `copy()`, and that clearing was
+   * [bug 0020](../../bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md):
+   * a second `.should()` on a builder that already carried a condition discarded
+   * it, so `.should().notExist().should().beExported()` enforced only the second
+   * and lost four findings with no output. Measured. Removed in 0.23.0 —
+   * conditions accumulate, and a second `.should()` behaves as `.andShould()`.
+   *
+   * What is left is `copy()` plus the `_reason` resolution, so the method is now
+   * thin enough to inline. It stays because it is `protected` on an exported
+   * class: deleting it is a compile break for an external subclass that
+   * overrides or calls it, which is the same compatibility argument that keeps
+   * `globs()` concrete and `assertsSomething()` exempt-by-default. Do not read
+   * the name as a description of the behaviour.
    */
   protected fork(): this {
     const fork = this.copy()
