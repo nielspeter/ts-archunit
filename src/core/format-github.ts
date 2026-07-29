@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { ArchViolation } from './violation.js'
+import { remedyRepeatsMessage } from './violation.js'
 
 /**
  * Format violations as GitHub Actions annotation commands.
@@ -34,7 +35,9 @@ export function formatViolationsGitHub(
         ? `Architecture Violation: ${v.ruleId}`
         : `Architecture Violation: ${v.rule}`
       let message = v.because ? `${v.message} (${v.because})` : v.message
-      if (v.suggestion) message += `. Fix: ${v.suggestion}`
+      // The annotation body opens with `message`, so a remedy identical to it is
+      // already there — see `remedyRepeatsMessage`.
+      if (v.suggestion && !remedyRepeatsMessage(v)) message += `. Fix: ${v.suggestion}`
       if (v.docs) message += `. Docs: ${v.docs}`
 
       // GitHub annotation format: ::level file=path,line=N,title=T::message

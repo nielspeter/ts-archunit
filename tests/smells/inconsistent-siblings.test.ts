@@ -57,9 +57,24 @@ describe('smells.inconsistentSiblings()', () => {
     expect(() => builder.check()).not.toThrow()
   })
 
-  it('returns no violations when no pattern is set', () => {
+  it('a detector with no pattern IS a violation — it detects nothing (bug 0019)', () => {
+    // REVERSED at 0.23.0: this asserted `.not.toThrow()`, pinning a detector
+    // that can never report as correct behaviour.
     const builder = smells.inconsistentSiblings(p).minLines(2)
-    expect(() => builder.check()).not.toThrow()
+    const v = builder.violations()
+    expect(v).toHaveLength(1)
+    expect(v[0]?.bypassFilters).toBe(true)
+    expect(v[0]?.message).toContain('.forPattern(')
+    expect(() => builder.check()).toThrow(ArchRuleError)
+  })
+
+  it('the remedy remediates: adding .forPattern() clears the finding', () => {
+    const v = smells
+      .inconsistentSiblings(p)
+      .minLines(2)
+      .forPattern(call('this.extractCount'))
+      .violations()
+    expect(v.every((x) => x.bypassFilters !== true)).toBe(true)
   })
 
   it('.warn() logs but does not throw', () => {

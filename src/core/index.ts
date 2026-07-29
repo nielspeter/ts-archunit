@@ -1,7 +1,14 @@
 export type { Predicate } from './predicate.js'
 export type { Condition, ConditionContext } from './condition.js'
 export type { ArchViolation } from './violation.js'
-export { createViolation, getElementName, getElementFile, getElementLine } from './violation.js'
+export {
+  createViolation,
+  getElementName,
+  getElementFile,
+  getElementLine,
+  remedyRepeatsMessage,
+  severityFor,
+} from './violation.js'
 export { ArchRuleError } from './errors.js'
 export { RuleBuilder } from './rule-builder.js'
 export { project } from './project.js'

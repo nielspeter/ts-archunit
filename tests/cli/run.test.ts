@@ -1,10 +1,12 @@
-import { readFileSync } from 'node:fs'
+import fs, { readFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { run } from '../../src/cli/index.js'
 
-const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../package.json')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const pkgPath = path.join(repoRoot, 'package.json')
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
 
 afterEach(() => {
@@ -92,6 +94,39 @@ describe('run', () => {
     await run(['explain', 'rules.ts', '--format', 'github'])
     expect(process.exitCode).toBe(1)
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("not valid for 'explain'"))
+  })
+})
+
+describe('baseline propagates its exit code', () => {
+  it("run(['baseline', ...]) sets exitCode from runBaseline", async () => {
+    // The dispatcher half of the non-zero-on-refused change. `runBaseline`'s own
+    // return value is asserted in the integration suite; unwiring it HERE — so
+    // the command reports the blocker and the process still exits 0 — was caught
+    // by nothing, which is the whole failure mode: an agent reads exit 0 as
+    // "nothing to do", commits the baseline, and the next job reds.
+    //
+    // Driven through a real rule file rather than a mock, because the wiring is
+    // what is under test and a mocked loader would bypass the dispatcher.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tsau-run-baseline-'))
+    const rules = path.join(dir, 'arch.rules.ts')
+    const out = path.join(dir, 'baseline.json')
+    fs.writeFileSync(
+      rules,
+      [
+        "import { project, functions } from '" + repoRoot + "/src/index.js'",
+        "const p = project('" + repoRoot + "/tests/fixtures/poc/tsconfig.json')",
+        // No condition: an assertion-less rule, so its finding cannot be baselined.
+        'export default [functions(p).that().haveNameMatching(/^parse/).should()]',
+      ].join('\n'),
+    )
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+    try {
+      await run(['baseline', rules, '--output', out])
+    } finally {
+      writeSpy.mockRestore()
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+    expect(process.exitCode).toBe(1)
   })
 })
 

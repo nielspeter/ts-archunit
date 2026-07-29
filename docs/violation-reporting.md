@@ -51,13 +51,66 @@ classes(p).that().haveDecorator('Deprecated').should().notExist().warn()
 
 #### The one thing `.warn()` cannot silence
 
-A **configuration finding** — one that reports the rule enforces _nothing_, such as an empty selector or an empty slice discovery — always throws, whatever terminal you use, and is always reported at `error` severity.
+A **configuration finding** — one that reports the rule enforces _nothing_, such as an empty selector, an empty slice discovery, or [a rule that asserts nothing](#a-rule-must-assert-something) — always throws, whatever terminal you use, and is always reported at `error` severity.
 
 `.warn()` says "this rule's violations are advisory". A rule that cannot fire has no violations to be advisory about: the finding is not that your code is wrong, it is that the rule is not checking anything. Three of the four ways to quiet a finding already refused these — `.excluding()` says so out loud, and both baseline and diff skip them — and `.warn()` was the gap.
 
 The thrown error carries **only** the configuration findings; ordinary violations are still logged exactly as before. `.violations()` remains the non-throwing programmatic surface if you need to inspect rather than fail.
 
 This applies to `.severity('warn')` and to `.asSeverity('warn')` too — both reach the same place.
+
+### A rule must assert something
+
+Since 0.23.0, a rule that never states a condition is a configuration finding too — it fails, on every terminal, with the remedy for its particular shape:
+
+```typescript
+// ❌ fails: reached .should(), no condition follows
+functions(p)
+  .that()
+  .haveNameMatching(/^parse/)
+  .should()
+  .check()
+
+// ❌ fails: `areAsync` is a predicate, so nothing after .should() is asserted
+functions(p)
+  .that()
+  .haveNameMatching(/^parse/)
+  .should()
+  .areAsync()
+  .check()
+
+// ❌ fails: `areAsync` narrowed the selection AFTER the condition was stated,
+//    so `notExist` was checked against an empty set and held vacuously
+functions(p)
+  .that()
+  .haveNameMatching(/^parse/)
+  .should()
+  .notExist()
+  .areAsync()
+  .check()
+
+// ❌ fails: never reached .should()
+functions(p)
+  .that()
+  .haveNameMatching(/^parse/)
+  .check()
+
+// ✅ asserts something
+functions(p)
+  .that()
+  .haveNameMatching(/^parse/)
+  .should()
+  .notExist()
+  .check()
+```
+
+A rule with no condition selects some code and then asserts nothing about it, so it can never fail — and a suite full of them reports coverage it does not have. The finding names which of those shapes you wrote and what to add.
+
+The third example is the one worth studying, because it does not look broken. Predicates filter and conditions assert; a predicate written **after** `.should()` still filters, so it narrows the set the conditions are evaluated over — and if that leaves nothing, every condition holds vacuously. The rule's own description reads as if it were deliberate (`that have name matching /^parse/ and are async should not exist`), which is why nobody goes looking. Its remedy is to move the predicate, not to add a condition: it already has one.
+
+**There is no opt-out.** Not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. If a rule is a placeholder, delete it or leave it commented out; if it is generated from configuration, skip generating it when there is nothing to assert. A rule that is present and green is a claim that something is checked.
+
+Run [`ts-archunit doctor`](/cli#doctor) to find these across a whole rule set without running the rules.
 
 ### When to Use Which
 

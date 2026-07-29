@@ -15,6 +15,14 @@ export {
   getElementName,
   getElementFile,
   getElementLine,
+  // Violation semantics an external renderer or aggregator cannot re-derive
+  // from the `ArchViolation` type alone. `formatViolationsPlain`'s docstring
+  // invites callers that aggregate violations themselves, and without these two
+  // such a caller reprints a remedy that is already in the message (the defect
+  // 0.23.0 fixed in our own three renderers) and grades a configuration finding
+  // by the rule's requested severity (which `severityFor` exists to refuse).
+  remedyRepeatsMessage,
+  severityFor,
 } from './core/violation.js'
 
 // Core — rule builder, error & metadata

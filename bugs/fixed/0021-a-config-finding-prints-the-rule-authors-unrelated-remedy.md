@@ -123,7 +123,7 @@ per-producer remedies fail 2, 3 and 2.
 
 ## Relationship to plan 0070
 
-**Blocks it.** [Plan 0070](../../plans/0070-a-rule-must-assert-something.md) adds a sixth kind of
+**Blocks it.** [Plan 0070](../../plans/completed/0070-a-rule-must-assert-something.md) adds a sixth kind of
 configuration finding — "this rule asserts nothing" — whose whole value is that it carries the
 right remedy for one of four distinguishable states. Shipping it before this fix means its
 `Fix:` line is whatever the author wrote about something else, which is the defect it is

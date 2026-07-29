@@ -1,19 +1,20 @@
 # Plan 0070 — a rule must assert something, and every assertion you write is kept
 
-**State:** DRAFT 3, **0.22.0 implemented** (built, unmerged, untagged) — reviewed twice as a plan, then twice more as code. Round 1 (architect + product) replaced the mechanism's
+**State:** DONE — **0.22.0** shipped the instrument, **0.23.0** shipped the flip. Reviewed twice
+as a plan, then twice more as code. Round 1 (architect + product) replaced the mechanism's
 location; round 2 (five personas, mechanism implemented in throwaway worktrees, 28-revert
 sabotage matrix) replaced the mechanism's **message contract** and its ordering. The
-diagnosis and the state table have survived both rounds unchanged.
+diagnosis and the state table survived every round unchanged.
 **Priority:** Highest open item, ahead of R3b. Both defects are live in v0.21.0 and both are silent.
 **Effort:** One root gate, one new advice hook, seven `assertsSomething()` hooks, two new
 `RuleBuilder` fields, five deletions, `describeRule()` on six builders, and the guards.
 Two releases. **See Implementation notes for what 0.22.0 actually shipped.**
-**Closes:** [bug 0019](../bugs/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../bugs/0020-should-twice-silently-drops-the-first-assertion.md).
-**Splits from:** [plan 0069](./0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
-**Absorbs:** [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
+**Closes:** [bug 0019](../../bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../../bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md).
+**Splits from:** [plan 0069](../0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
+**Absorbs:** [proposal 019](../../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
 including its central ask, the **deletion** of the four `console.warn + return []` sites, which
 draft 2 forgot — except the override-key ask (see Out of scope).
-**Unblocked:** [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)
+**Unblocked:** [bug 0021](../../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md)
 shipped in v0.21.0. This plan's finding inherits that pattern; round 2 found three places where
 draft 2 would have reintroduced the 0021 defect, all closed below.
 
@@ -210,7 +211,7 @@ Two adjacent texts change with this, or they contradict it:
   selector instead"_, the empty-**selector** remedy, for every config finding. Round 2 named it
   the third 0021-family site. It becomes cause-neutral: _"fix the fault it names instead."_
 
-Per [bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md),
+Per [bug 0021](../../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md),
 the finding sets its own `suggestion` (from `assertionAdvice()`), keeps `ruleId` and `because`,
 and inherits nothing — and the test that enforces that for the three existing producers gains
 this one as its **fourth** (round 2's sabotage matrix showed the finding could lose all three
@@ -298,7 +299,15 @@ tags in quick succession with no group means `latest` lands on whichever publish
   0.23.0 turns into failures. Baseline identity is untouched in 0.22.0 — `rule` comes from the
   condition context, not `describeRule()` (measured; recorded so nobody re-derives it).
 
-### 0.23.0 — the flip. The gate returns the finding; `fork()` stops clearing; `HASH_VERSION` bumps.
+### 0.23.0 — the flip. The gate is re-added as a finding; `fork()` stops clearing; `HASH_VERSION` bumps.
+
+**Re-added, not flipped.** 0.22.0 shipped the hooks and withdrew the runtime gate entirely
+(see Implementation notes), so 0.23.0 adds `collectWithAssertionGuard` back in its finding
+form — gate-first, ahead of `collectViolations()`, for the three reasons §1 gives — and this
+time it needs none of the withdrawn machinery: no latch, no channel, no name special-case. The
+finding is an `ArchViolation` with `bypassFilters`, so it reaches the formatter, the JSON
+payload, the annotation surface, the exit code, diff and baseline through code that already
+exists and is already tested. That is the whole reason the withdrawal was worth its cost.
 
 0019 and 0020 ship together: 0019 alone leaves 0020 able to manufacture a one-condition rule
 where the author wrote two (which does not trip 0019); 0020 alone leaves `.should()` with no
@@ -312,25 +321,59 @@ version-mismatch branch is true and its remedy (regenerate) is the right one. (D
 a specific before/after hash pair as evidence; the "after" hash reproduces nowhere — the claim
 stands on the description change itself, which is measured.)
 
-**Blast radius, measured with this mechanism, this suite (2368 tests):**
+> **WITHDRAWN at implementation, and the reasoning above is wrong in its load-bearing clause.**
+> Two independent reviews of the 0.23.0 branch measured it: `hashViolation()` never reads
+> `HASH_VERSION` (`baseline.ts` — the hash is `sha256(rule::element::message)`), so the bump
+> changes no hash and no entry matches differently. Every clause that followed from "without
+> the bump, `matched === 0` fires" is therefore false: the description change makes a **partial**
+> miss, and `unmatchedBaselineFinding` is gated on `matched === 0`, so it stays silent either
+> way. Worse, the bump makes the version-mismatch branch fire for every pre-0.23.0 baseline
+> that matches nothing for an unrelated reason, naming the format as "the likely cause" when
+> the format cannot be a cause — and burying the root-mismatch branch that usually is.
+>
+> The paragraph was written from the same understanding as the code, which is why it read as
+> justified: this is ADR-008 rule 5 in the plan's own prose, and the thing that disagreed with
+> it was reading `hashViolation()`. `HASH_VERSION` stays at **2**. The real consequence —
+> descriptions change, so those entries must be re-accepted — is disclosed in the CHANGELOG
+> as a content change rather than a format change. See [bug 0027](../../bugs/0027-an-unmatched-baseline-entry-cannot-be-diagnosed.md)
+> for the diagnosis gap this leaves open, which is the fix the bump was reaching for and did
+> not achieve.
 
-| Change            | Broken | Disposition                                                                                                                                                                                                                             |
-| ----------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.22.0 instrument | 2      | `diagnose.test.ts:218,:309` — updated preserving identity assertions                                                                                                                                                                    |
-| 0.23.0 gate       | +1     | `tests/config/tsconfig.test.ts:339` — a shipped test asserting the tsconfig state **passes**. Retired as a deliberate policy reversal: it pinned bug 0019's fifth state as correct behaviour. Stated in the CHANGELOG, not just deleted |
-| Accumulate        | +1     | `held-builder-is-immutable.test.ts:286` — replaced (with `:268`) per items 9/10; the naive flip is satisfied by a sabotaged `copy()`                                                                                                    |
+**Blast radius, re-measured against shipped 0.22.0 (2394 tests, 2026-07-29).** The earlier
+table said the gate breaks 1; it breaks **6**, and only two of the six were in it. Each
+disposition below is a decision, and the five reversals belong in the CHANGELOG as reversals
+rather than as quiet edits — the discipline the tsconfig row already established:
+
+| Test                                                                                    | Kind                  | Disposition                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config/tsconfig.test.ts` — "an empty spec produces no violations"                      | **policy reversal**   | Someone pinned the assertion-less state as correct. Retire it, and say so                                                                                                           |
+| `smells/inconsistent-siblings.test.ts` — "returns no violations when no pattern is set" | **policy reversal**   | Same shape, second builder. The row the 0.22.0 review predicted                                                                                                                     |
+| `builders/correspondence-builder.test.ts` — "throws when no assertion is chosen"        | planned               | The `RangeError` becomes the finding. Assert the finding, not the throw                                                                                                             |
+| `core/assertion-gate.test.ts` ×2 — the two 0.22.0 CONTROLs                              | by design             | They pin "nothing throws" and "zero-condition rules report no violations" — i.e. 0.22.0's contract. Both must invert, and their comments should say the release that made them true |
+| `core/rule-builder.test.ts` — `.expectNonEmpty()` bypass-flagged finding                | **the ordering call** | See below. This is item 5's collision arriving in a shipped test                                                                                                                    |
+| `core/held-builder-is-immutable.test.ts:286`                                            | accumulate            | Replaced (with `:268`) per items 9/10; the naive flip is satisfied by a sabotaged `copy()`                                                                                          |
+
+**The `.expectNonEmpty()` collision, decided.** That test builds a rule with
+`.expectNonEmpty()` and **no condition**, then asserts the _selector_ finding. Under gate-first
+the assertion-less finding wins and the message stops matching. Item 5 predicted exactly this
+and the decision stands: an assertion-less rule cannot fail whatever its selector does, so the
+missing assertion is the root cause, and the selector fault resurfaces on the next run once a
+condition exists. The cost, stated: `.expectNonEmpty()` on a rule with no condition stops being
+the thing that reports. Rewrite that test to carry a condition — which is what any real
+`.expectNonEmpty()` rule has — and add its no-condition twin as an ordering pin.
 
 ### Upgrading — 0.23.0
 
-Three audiences: (1) `RuleBuilder`'s six entry points, **silence → failure** — but by 0.23.0
-every affected rule has been warning on stderr since 0.22.0; (2) slices/schemas/resolvers — the
-old warn fired only when the glob matched something, so part of this audience is also
-silence → failure, not "warning → failure" as draft 2 overstated; (3) `tsconfig()` and
-`inconsistentSiblings()` — no signal ever existed.
+**One audience, not three, and it is silence → failure for all of them.** The earlier draft
+split by "did you see a warning before?" — that split is gone, because 0.22.0 ships no warning.
+Nobody has ever had a runtime signal for any of the seven states. What every consumer does have
+is a diagnostic they can run on 0.22.0 before upgrading, and the note must say so in the first
+line rather than the fourth.
 
-The instrument sequence, named: upgrade to 0.22.0 → run your normal `check` (or tests, or
-`baseline` — `runBaseline` already enumerates every refused finding, green) → fix every warn →
-upgrade to 0.23.0 → **regenerate the baseline** (the same-line-reported-twice note from the
+The instrument sequence, named: upgrade to 0.22.0 → run `npx ts-archunit doctor <rule files>`,
+or `diagnose(rules)` for rules written inside a test body → fix everything it names (every
+remedy is backward-compatible on 0.22.0, so this whole step lands green) → upgrade to 0.23.0 →
+**regenerate the baseline** (the same-line-reported-twice note from the
 `should()`-twice shape included). Every remedy is backward-compatible under 0.22.0, so the
 sequence has no red step.
 
@@ -370,6 +413,17 @@ it against draft 2's inventory: 5 of 28 reverts survived everything. Those five 
 3. **Each state's message contains its own remedy and no other state's** — asserted on message
    text, including state 2 naming the misplaced predicate (`"are async" is a predicate`), and
    state 2 arising from a 4-subject selector so a resurrected count claim would be caught.
+   3b. **Each remedy actually remediates** — [ADR-008](../../adr/008-agent-first-failure-surfaces.md)
+   rule 2's behavioural corollary, which is new since draft 3 and is the guard this plan most
+   needs. For every one of the seven states: apply the fix the message states, and assert the
+   finding **clears**. A contains-assertion and the message are written from the same
+   understanding and agree even when it is wrong — bug 0017 is a remedy that reads perfectly and
+   reproduces the violation it claims to fix, and bug 0021 is a remedy that could not apply at
+   all. Both were rated High. These seven are mechanical (`add a condition`, `move the predicate
+before .should()`, `add .requires({...})`, `add .forPattern(...)`, `add .beComplete()`, `add
+the missing .side(...)`, `add .should()` + a condition), so there is no excuse for any of them
+   being unverified. This is also the pin that would have caught the correspondence arity remedy
+   naming an assertion, which shipped in 0.22.0 and was found by review rather than by a test.
 4. **Through the machinery, not the flag:** the finding survives a `withBaseline` replay built
    from its own hash; `.warn()` throws (round 2: unwiring `warn()` was caught by nothing);
    `.asSeverity('warn')` still reports `error`; diff mode keeps it; `.excluding()` refuses

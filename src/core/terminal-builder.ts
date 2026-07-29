@@ -24,6 +24,14 @@ import { shallowClone } from './shallow-clone.js'
  * builders on the other — which is what bug 0013 cost. Anything that must
  * hold for all thirteen builders now has exactly one place to live.
  */
+/**
+ * Where the assertion-gate finding sends the reader. Same shape as `GLOB_DOCS`,
+ * and it points at the section that states the grammar and the no-opt-out rule —
+ * not at the builder's own page, which is about writing rules that work.
+ */
+export const ASSERTION_DOCS =
+  'https://nielspeter.github.io/ts-archunit/violation-reporting#a-rule-must-assert-something'
+
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
@@ -124,11 +132,73 @@ export abstract class TerminalBuilder {
   }
 
   /**
+   * A rule that asserts nothing about what it selects cannot fail, so it is
+   * reported as a configuration finding (bug 0019, plan 0070).
+   *
+   * **Gate-first**, ahead of `collectViolations()`, for three measured reasons:
+   * an assertion-less rule cannot produce a legitimate finding, so running it
+   * buys nothing but a full AST walk; `CorrespondenceBuilder.collectViolations`
+   * throws before returning, so a gate placed after it would never run for that
+   * builder and its `RangeError` would escape the CLI's `ArchRuleError`-only
+   * catch, dropping every remaining rule file; and the alternative ordering —
+   * let an existing `bypassFilters` finding win — only functions for rules that
+   * opted into `.expectNonEmpty()`, which is the opt-in this whole plan exists
+   * because nobody uses.
+   *
+   * The consequence, accepted: a rule with a dead glob AND no condition reports
+   * the missing assertion only. That is the right root cause — no selector
+   * makes an assertion-less rule capable of failing — and the selector fault
+   * resurfaces on the next run, once there is something to assert.
+   *
+   * `bypassFilters` makes it a configuration finding: `error` severity
+   * regardless of `.asSeverity('warn')`, refused by `.excluding()`, and skipped
+   * by diff and baseline. See `severityFor` and ADR-008 rule 1.
+   */
+  private collectWithAssertionGuard(): ArchViolation[] {
+    if (this.assertsSomething()) return this.collectViolations()
+
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    // ADR-008 rule 3: where there is deliberately no escape hatch, say so, and
+    // say what to do instead. Stated on the finding rather than inside
+    // `assertionAdvice()` so the seven per-shape remedies stay one sentence each
+    // and this stays one sentence in one place. Measured before it was added: a
+    // reader given only the remedy tries `.asSeverity('warn')`, `.excluding()`,
+    // the baseline and `--changed` — four CI cycles — because nothing told them
+    // those were refused.
+    const advice = `${this.assertionAdvice()} This finding cannot be suppressed: not by .warn(), .asSeverity('warn'), .excluding(), a baseline, or diff-aware mode.`
+    return [
+      {
+        rule: name,
+        ruleId: described.id,
+        element: name,
+        file: '',
+        line: 0,
+        message: advice,
+        // Its own remedy, never the author's (bug 0021): their `suggestion`
+        // describes how to fix a violation of the rule, and this finding says
+        // the rule cannot produce one. Same for `docs` — the author's link is
+        // about their rule; this one is about the grammar the rule broke.
+        suggestion: advice,
+        docs: ASSERTION_DOCS,
+        bypassFilters: true,
+        // `ruleId` and `because` are deliberately NOT set here. `applyFilters`
+        // fills both from the rule's metadata for every finding that leaves
+        // them unset, and all three callers of this method go through it — so
+        // setting them here was two lines that read as load-bearing and were
+        // not: sabotage removed each with nothing failing. The remedy fields
+        // above are the opposite case, and must stay, because `applyFilters`
+        // deliberately refuses to supply those for a `bypassFilters` finding.
+      },
+    ]
+  }
+
+  /**
    * Execute the rule and return violations after exclusion filtering.
    * Does not throw — use for programmatic access (presets, aggregation).
    */
   violations(): ArchViolation[] {
-    const raw = this.collectViolations()
+    const raw = this.collectWithAssertionGuard()
     const filtered = applyFilters(raw, {
       reason: this._reason,
       metadata: this._metadata,
@@ -146,7 +216,7 @@ export abstract class TerminalBuilder {
    * @param options - Optional baseline, diff filtering, and output format
    */
   check(options?: CheckOptions): void {
-    const violations = this.collectViolations()
+    const violations = this.collectWithAssertionGuard()
     executeCheck(
       violations,
       {
@@ -166,7 +236,7 @@ export abstract class TerminalBuilder {
    * @param options - Optional baseline, diff filtering, and output format
    */
   warn(options?: CheckOptions): void {
-    const violations = this.collectViolations()
+    const violations = this.collectWithAssertionGuard()
     executeWarn(
       violations,
       {
@@ -207,13 +277,16 @@ export abstract class TerminalBuilder {
   /**
    * Whether this rule asserts anything about what it selects (plan 0070).
    *
-   * `false` means the rule can never fail: `diagnose()` / `doctor` report it,
-   * and the next minor makes it a configuration finding. Nothing at runtime
-   * reads this in this release — the gate that did was withdrawn, because a
-   * bespoke stderr channel bypassed the formatter, the JSON payload, the
-   * annotation path and the exit code, and every one of those was where a
-   * review found a defect in it. At 0.23.0 the same hook produces an
-   * `ArchViolation`, which reaches all four surfaces by construction.
+   * `false` means the rule can never fail, and as of 0.23.0
+   * `collectWithAssertionGuard()` turns that into an unsuppressable
+   * configuration finding on every terminal; `diagnose()` / `doctor` report it
+   * without running the rule. 0.22.0 shipped this hook with nothing at runtime
+   * reading it, because the gate drafted for that release wrote through a
+   * bespoke stderr channel that bypassed the formatter, the JSON payload, the
+   * annotation path and the exit code — a review found a defect at each of those
+   * seams, so the channel was withdrawn and the hook shipped on its own. The
+   * finding form reaches all four surfaces by construction, which is what the
+   * withdrawal bought.
    *
    * Concrete with a `true` default rather than abstract: both roots are public
    * exports, so an abstract member is a compile break for an external subclass
@@ -235,10 +308,11 @@ export abstract class TerminalBuilder {
   /**
    * The remedy for this builder's assertion-less state, as one string.
    *
-   * This is the "one string, one place" channel: the runtime warning (0.22.0),
-   * the eventual failure message (0.23.0) and `diagnose()`'s advice all read
-   * it, so they cannot drift — plan 0070 round 2 measured the doctor and the
-   * runtime shipping two diverging texts for the same state.
+   * The "one string, one place" channel: `diagnose()`'s advice and the
+   * finding's message and `suggestion` all read this method, so the diagnostic
+   * a consumer runs before upgrading and the failure they get after cannot
+   * disagree — plan 0070 round 2 measured an earlier design shipping two
+   * diverging texts for one state.
    *
    * Public for the same `DiagnosableRule` duck-typing reason as
    * `assertsSomething` — plan 0070 drafted this `protected`, and a protected

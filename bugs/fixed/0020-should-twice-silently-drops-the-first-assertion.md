@@ -1,6 +1,7 @@
 # Bug 0020: `should()` twice silently drops the first assertion
 
 **Reported:** 2026-07-28
+**Fixed:** 2026-07-29 (v0.23.0)
 **Found in:** all versions through v0.20.0
 **Severity:** High — an assertion the author explicitly wrote is discarded, with no output. The rule reads as if it checks two things, checks one, and goes green.
 
@@ -43,7 +44,7 @@ held    = slices(p).matching('src/').should().respectLayerOrder('controllers','s
   held.should().beFreeOfCycles().violations() ['leaky-controller.ts', '[feature-a, feature-b]']
 ```
 
-One source shape, two behaviours, decided by which entry point you used. Before [bug 0016](./fixed/0016-narrowing-a-named-selection-mutates-it.md) this was invisible — everything mutated _and_ accumulated, so the divergence was buried in the leak. Fixing 0016 is what made it stable and observable.
+One source shape, two behaviours, decided by which entry point you used. Before [bug 0016](./0016-narrowing-a-named-selection-mutates-it.md) this was invisible — everything mutated _and_ accumulated, so the divergence was buried in the leak. Fixing 0016 is what made it stable and observable.
 
 ## Which direction is safe
 
@@ -81,6 +82,6 @@ Sabotaging `fork()`'s copy (`const fork = this`) is also **0 of 2340** today, an
 
 ## Relationship to plan 0069
 
-Ships with **[plan 0070](../plans/0070-a-rule-must-assert-something.md)'s 0.23.0**, not with R3b — 0070 took over proposal 019 and both bugs. R3b is what turns "zero conditions" from a silent pass into a failure ([bug 0019](./0019-a-rule-with-no-condition-passes-in-total-silence.md)); accumulating on its own upgrades a silent drop into an over-report, which is an improvement but leaves 0019 open.
+Ships with **[plan 0070](../../plans/completed/0070-a-rule-must-assert-something.md)'s 0.23.0**, not with R3b — 0070 took over proposal 019 and both bugs. R3b is what turns "zero conditions" from a silent pass into a failure ([bug 0019](./0019-a-rule-with-no-condition-passes-in-total-silence.md)); accumulating on its own upgrades a silent drop into an over-report, which is an improvement but leaves 0019 open.
 
 Also relevant to R3b's verdict rule, which reads "`andShould()` ANDs, so the verdict on empty is **every** condition is exempt." That verdict depends on how many conditions a rule ends up carrying — which is exactly what diverges here. Settling this after R3b ships means settling it as a bug report against R3b.

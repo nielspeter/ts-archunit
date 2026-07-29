@@ -161,6 +161,26 @@ export function severityFor(
   return violation.bypassFilters === true ? 'error' : fallback
 }
 
+/**
+ * True when a violation's remedy **is** its message, so a renderer that has
+ * already shown the message must not append a `Fix:` line repeating it.
+ *
+ * The assertion gate's finding reports that a rule cannot fire; there, the fault
+ * and its remedy are one sentence, and both fields carry that sentence on
+ * purpose — the JSON payload reads `suggestion`, a human reads the body, and a
+ * configuration finding is the one kind that cannot fall back to the author's
+ * `suggestion` (`execute-rule.ts` refuses it, bug 0021). Measured before the
+ * fix: every surface printed the same paragraph twice.
+ *
+ * One definition, because the three renderers must not disagree about it.
+ * Whether a given renderer *did* render the message stays renderer-local: the
+ * rich terminal format shows it only for a location-less finding, while the
+ * plain and GitHub formats always do.
+ */
+export function remedyRepeatsMessage(violation: ArchViolation): boolean {
+  return violation.suggestion !== undefined && violation.suggestion === violation.message
+}
+
 export function getElementName(node: Node): string {
   const directName = getNodeName(node)
   if (directName !== undefined) return directName

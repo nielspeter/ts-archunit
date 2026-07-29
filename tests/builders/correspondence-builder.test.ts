@@ -187,10 +187,36 @@ describe('correspondence()', () => {
       }).toThrow(/exactly two/)
     })
 
-    it('throws when no assertion is chosen', () => {
-      expect(() => {
-        correspondence(stubProject).side('a', ['x']).side('b', ['x']).check()
-      }).toThrow(/requires an assertion/)
+    it('reports a finding when no assertion is chosen (bug 0019, was a throw)', () => {
+      // CHANGED at 0.23.0: this was a bare RangeError, which escaped the CLI's
+      // ArchRuleError-only catch and dropped every remaining rule file. It is
+      // now a configuration finding, so it formats, baselines, annotates and
+      // exits like every other finding.
+      const rule = correspondence(stubProject).side('a', ['x']).side('b', ['x'])
+      const v = rule.violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]?.bypassFilters).toBe(true)
+      expect(v[0]?.message).toContain('.beComplete()')
+      expect(() => rule.check()).toThrow(ArchRuleError)
+      expect(() => rule.check()).not.toThrow(RangeError)
+    })
+
+    it('the remedy remediates: adding .beComplete() clears the finding', () => {
+      const v = correspondence(stubProject)
+        .side('a', ['x'])
+        .side('b', ['x'])
+        .beComplete()
+        .violations()
+      expect(v.every((x) => x.bypassFilters !== true)).toBe(true)
+    })
+
+    it('wrong arity still names arity, not an assertion', () => {
+      // Two faults reach the same hook, and naming the wrong one is ADR-008
+      // rule 2: adding .beComplete() here would leave the rule as broken.
+      const v = correspondence(stubProject).side('a', ['x']).violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]?.message).toContain('.side(')
+      expect(v[0]?.message).not.toContain('.beComplete()')
     })
 
     it('a selection side requires a keyFn', () => {
