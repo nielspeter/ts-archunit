@@ -92,8 +92,10 @@ project exists.
 
 ## Out of scope
 
-- **Condition globs.** They are not declared at all — [plan 0073](./0073-conditions-declare-their-globs.md) —
-  and the two `condition` rows above say "no fault" regardless.
+- **Condition globs.** Declared as of
+  [plan 0073](./completed/0073-conditions-declare-their-globs.md) (12 conditions, stamped
+  `position: 'condition'`), so R3b now sees them — and the two `condition` rows above still say
+  "no fault", which is why 0073 changed no verdict and R3b must not start changing them either.
 - **Path normalization** — making `'src/*'` _work_ rather than merely diagnosing it. 0069
   keeps this separable, and it is the second breaking change on the 1.0 path.
 - **Bug 0015**, the `only*` edgeless-subject exposure.

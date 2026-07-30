@@ -1,7 +1,31 @@
 # Plan 0073 — Conditions declare their globs
 
-**Status:** READY. Smaller than it looks: the interface, the gathering and the stamping all
-exist already and no condition uses them.
+**Status:** DONE, 2026-07-30, commit `e125c5c`. Smaller than it looks: the interface, the
+gathering and the stamping all existed already and no condition used them.
+
+**Two things the plan got wrong, both corrected by parsing instead of reading:**
+
+1. **The population is 12, not 7.** `structural.ts`'s `resideInFile` / `resideInFolder` —
+   the generic element twins, exported publicly as `conditionResideInFile` /
+   `conditionResideInFolder` (`src/index.ts:81-82`) and used by the class, module and type
+   builders — were missing from the table below. They were the _more_ reachable half of the
+   hole, since `function.ts`'s pair is internal to `FunctionRuleBuilder`. Three further
+   aliases in `src/rules/dependencies.ts` (`onlyDependOn`, `mustNotDependOn`, `typeOnlyFrom`)
+   are pure delegations and inherit the declaration; that is now asserted, because a refactor
+   that reimplemented one inline would silently stop declaring.
+2. **Guard 4 was vacuous and was dropped.** It asked for an `explain` assertion on the
+   ground that "a reader of `explain` cannot see which paths a rule forbids". Measured, that
+   ground is false: `explain` renders `describeRule()`, which interpolates the glob into the
+   condition's `description` string, so it prints `Do NOT import from "**/legacy/**"` with
+   the entire change reverted. `explain` never reads `globs()`. The real consumers are
+   `doctor` and `diagnose()`. The discriminator is now an assertion rather than a comment,
+   so the vacuous version cannot be re-added.
+
+A derivation detail worth keeping: `onlyImportFrom`, `notImportFrom` and `dependOn` are
+**overloaded**, and their implementation signature is
+`(...args: [string[], ImportOptions] | string[])`. A walk that reads implementation
+signatures only misses three of the four dependency conditions — measured, on the first
+version of the guard's own walk.
 **Priority:** Medium. Not a false green on its own — nothing reports a condition glob today,
 so nothing reports one wrongly. It is the missing half of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)'s
 glob model, and the prerequisite for anything that wants to reason about condition globs at
@@ -41,7 +65,7 @@ A reader of `explain` cannot see which paths a rule forbids. An agent pasting
 `explain --format agent` into a `CLAUDE.md` gets the rule's selector and not its subject.
 And 0069's table reasons about `position: 'condition'` rows that no site ever occupies.
 
-## The seven conditions, measured
+## The twelve conditions, measured
 
 Every condition in `src/conditions/` that takes globs, with the kind each glob is matched
 against:
@@ -55,6 +79,11 @@ against:
 | `onlyBeImportedVia`       | `reverse-dependency.ts` | the **importer's** file path                            | `file-path`     |
 | `resideInFile`            | `function.ts`           | `getSourceFile().getFilePath()`                         | `file-path`     |
 | `resideInFolder`          | `function.ts`           | the immediate parent directory                          | `parent-dir`    |
+| `resideInFile`            | `structural.ts`         | `getElementFile(element)` — the generic element twin    | `file-path`     |
+| `resideInFolder`          | `structural.ts`         | the immediate parent directory                          | `parent-dir`    |
+| `onlyDependOn`            | `rules/dependencies.ts` | delegates to `onlyImportFrom`                           | `import-target` |
+| `mustNotDependOn`         | `rules/dependencies.ts` | delegates to `notImportFrom`                            | `import-target` |
+| `typeOnlyFrom`            | `rules/dependencies.ts` | delegates to `onlyHaveTypeImportsFrom`                  | `import-target` |
 
 `onlyBeImportedVia` is the row to get right and the easy one to get wrong: its glob names
 the **files allowed to import the subject**, so it is a genuine `file-path` glob and _is_
@@ -118,6 +147,26 @@ all 2580.
    `onlyBeImportedVia` to `import-target` (item 2 must red); swap `globAnyOf` for
    `combineGlobs`/`all` on a variadic family (a set with one live glob would read as dead —
    the 0.18.1 withdrawal in the other direction, per `glob-site.ts:185`).
+
+## Result
+
+`tests/core/condition-glob-declaration.test.ts`, 11 tests. Two sabotage matrices enumerated
+from the diff, run in the foreground against an asserted-green baseline, reading exit codes:
+**21 of 21 caught**, tree verified clean by git after each.
+
+The first 14 attack the source — every declaration dropped in turn, both `onlyBeImportedVia`
+and `resideInFolder` kinds swapped, `any` swapped for `all`, and each of the two helpers
+(`functionCondition`, `elementCondition`) stopped from threading `globs` through. The other 7
+attack the guard's own machinery, which is where the plan's real risk was: a new glob-taking
+condition appearing unclassified (S15), an alias reimplemented inline (S16), a **name**
+condition wrongly declaring globs so identifiers reach the path universe (S17), the parse walk
+matching nothing (S18), a row dropped from the table (S19), overload signatures no longer read
+(S20), and the non-path discriminator list emptied (S21).
+
+Behaviour-neutrality confirmed rather than asserted: **2588 tests passed unchanged** with the
+nine declarations in place, before the guard was written. That is the measurement that makes
+this plan distinguishable from R3b — and the reason the guard has to assert the declaration
+itself, since nothing else in the suite can see it.
 
 ## Out of scope
 

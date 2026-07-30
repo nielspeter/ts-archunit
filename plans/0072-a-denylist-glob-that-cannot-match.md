@@ -5,9 +5,10 @@ measurement, and the question was already settled correctly in
 [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)'s decision table before this plan
 re-opened it. What survives is a successor with a different shape — an **author-declared
 expectation**, not a diagnosis — specified in "What is actually left" below.
-**Prerequisite for anything here:** [plan 0073](./0073-conditions-declare-their-globs.md).
-Condition globs are invisible to the diagnosis machinery today, which is a defect worth
-fixing on its own terms and is _not_ a route to this fault.
+**Prerequisite for anything here:** [plan 0073](./completed/0073-conditions-declare-their-globs.md),
+**done 2026-07-30**. Condition globs now reach the diagnosis machinery stamped
+`position: 'condition'` — a defect fixed on its own terms, and still _not_ a route to this
+fault, since the machinery deliberately skips that position.
 
 ## The fault, which is real
 
@@ -89,9 +90,10 @@ Recorded because draft 1 asserted the opposite of each, and whoever reads 0073 n
 1. **`GlobSite.polarity` does not carry the denylist/allowlist distinction.**
    `negateGlobs` (`src/core/glob-site.ts:236`) is its only writer, so it tracks `not()`
    combinator negation. `notImportFrom`'s sites are polarity **positive**.
-2. **There is no condition-position glob site to un-skip.** A `notImportFrom` rule exposes
-   **0** glob trees through the `diagnose()` interface; add a `.that()` and it exposes
-   **1** — the selector. `Condition<T>` (`src/core/condition.ts:47`) declares `description`
+2. **There was no condition-position glob site to un-skip** — fixed by 0073, and the
+   measurement is preserved because it is what made the rest of this section true. Before
+   0073 a `notImportFrom` rule exposed **0** glob trees through the `diagnose()` interface;
+   with a `.that()` it exposed **1** — the selector. It is **2** now. `Condition<T>` (`src/core/condition.ts:47`) declares `description`
    and `evaluate` and nothing about globs; only _predicates_ declare them. So
    `diagnose.ts:169`'s `position === 'condition'` skip is skipping **predicate-derived**
    sites, and the conditions' own globs never reach `globSitesOf` at all.
@@ -155,7 +157,7 @@ free. **Decide that before building it.**
 
 ## Out of scope
 
-- **Condition-declared globs** — [plan 0073](./0073-conditions-declare-their-globs.md).
+- **Condition-declared globs** — [plan 0073](./completed/0073-conditions-declare-their-globs.md).
   The prerequisite for any of this, and worth doing on its own merits.
 - **[Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)** —
   the `only*` family passing on an edgeless subject. 0069 records it as a known exposure at
