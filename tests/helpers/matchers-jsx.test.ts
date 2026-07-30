@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { Project, SyntaxKind } from 'ts-morph'
+import { Project, SyntaxKind, ts } from 'ts-morph'
 import { jsxElement, jsxText } from '../../src/helpers/matchers.js'
 
 function createTsxProject(code: string) {
   const project = new Project({
     useInMemoryFileSystem: true,
-    compilerOptions: { jsx: 2, strict: true },
+    compilerOptions: { jsx: ts.JsxEmit.React, strict: true },
   })
   return project.createSourceFile('test.tsx', code)
 }

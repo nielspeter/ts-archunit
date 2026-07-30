@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Project } from 'ts-morph'
+import { Project, ts } from 'ts-morph'
 import { collectJsxElements } from '../../src/models/arch-jsx-element.js'
 import {
   areHtmlElements,
@@ -19,7 +19,7 @@ import type { ArchJsxElement } from '../../src/models/arch-jsx-element.js'
 function createElements(code: string, fileName = 'test.tsx'): ArchJsxElement[] {
   const project = new Project({
     useInMemoryFileSystem: true,
-    compilerOptions: { jsx: 2, strict: true },
+    compilerOptions: { jsx: ts.JsxEmit.React, strict: true },
   })
   const sf = project.createSourceFile(fileName, code)
   return collectJsxElements(sf)
