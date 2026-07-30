@@ -3,6 +3,7 @@ import type { SourceFile, ImportDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { candidatesFor, matchedCandidate } from '../core/import-candidates.js'
+import { globAnyOf } from '../core/glob-site.js'
 import {
   edgeTypeOnlyRemedy,
   edgeValuePhrase,
@@ -162,6 +163,16 @@ export function onlyImportFrom(
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description: `only import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
@@ -211,6 +222,16 @@ export function notImportFrom(
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description: `not import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
@@ -288,6 +309,16 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description:
       globs.length === 1 ? `depend on ${quotedGlobs}` : `depend on at least one of ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
@@ -397,6 +428,16 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description: `only have type imports from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []

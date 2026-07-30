@@ -1,5 +1,7 @@
 import picomatch from 'picomatch'
 import type { Condition, ConditionContext } from '../core/condition.js'
+import { globNode } from '../core/glob-site.js'
+import type { DeclaredGlobs } from '../core/glob-site.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
@@ -11,8 +13,13 @@ function functionCondition(
   description: string,
   predicate: (fn: ArchFunction) => boolean,
   messageFn: (fn: ArchFunction) => string,
+  globs?: DeclaredGlobs,
 ): Condition<ArchFunction> {
   return {
+    // Threaded through the helper rather than spread onto its result, so a path
+    // condition added later gets the parameter in its face (plan 0073). Undefined
+    // for the name/type conditions, whose `RegExp` is not a path glob at all.
+    globs,
     description,
     evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
@@ -188,6 +195,7 @@ export function resideInFile(glob: string): Condition<ArchFunction> {
     (fn) => isMatch(fn.getSourceFile().getFilePath()),
     (fn) =>
       `${fn.getName() ?? '<anonymous>'} resides in '${fn.getSourceFile().getFilePath()}' which does not match '${glob}'`,
+    globNode({ glob, kind: 'file-path' }),
   )
 }
 
@@ -210,5 +218,9 @@ export function resideInFolder(glob: string): Condition<ArchFunction> {
       const folder = filePath.substring(0, filePath.lastIndexOf('/'))
       return `${fn.getName() ?? '<anonymous>'} resides in folder '${folder}' which does not match '${glob}'`
     },
+    // `parent-dir`, not `file-path` — the glob is matched against the immediate
+    // parent directory, so it is the twin of `identity.ts:98` and needs the same
+    // kind. A `file-path` kind here would be checked against the wrong universe.
+    globNode({ glob, kind: 'parent-dir' }),
   )
 }
