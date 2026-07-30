@@ -1,15 +1,15 @@
 # Plan 0071 — Forward dependency conditions see every module edge
 
-**Status:** DRAFT 4 — implementation-ready. Drafts 1–3 each had claims measured wrong; that history is in this branch's commit messages and in the two bug files, not here. **Draft 4 exists because two independent reviewers, working from opposite ends, found the same thing: item 7 — the release's headline guard — was green with bug 0022 fully reinstated.**
+**Status:** **0.27.0 SHIPPED** (2026-07-30) — the three instruments are released; §Test inventory items 1-3 are done, with 29 tests and a 15-revert sabotage matrix. **0.28.0 — the widening — is the remaining work**, and DRAFT 4 is its spec. Drafts 1–3 each had claims measured wrong; that history is in this branch's commit messages and in the two bug files, not here. **Draft 4 exists because two independent reviewers, working from opposite ends, found the same thing: item 7 — the release's headline guard — was green with bug 0022 fully reinstated.**
 **Priority:** High. [Bug 0022](../bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
 **Closes:** bug 0022. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **out of scope** — its option 1 is refuted and the evidence lives in that file.
 
 **Two releases, deliberately:**
 
-|                           |                                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **0.27.0 — instruments**  | `--changed` discloses what it filtered; `baseline` prints the delta it accepted; `docs/upgrading.md`           |
-| **0.28.0 — the widening** | `moduleEdges`, the four forward conditions, the two predicates, the reverse-graph consumers, per-kind messages |
+|                             |                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **0.27.0 — instruments** ✅ | `--changed` discloses what it filtered; `baseline` prints the delta it accepted; `docs/upgrading.md` — **shipped 2026-07-30** |
+| **0.28.0 — the widening**   | `moduleEdges`, the four forward conditions, the two predicates, the reverse-graph consumers, per-kind messages                |
 
 Instruments first, because an adopter's **pre-upgrade** measurement must be trustworthy before the thing it measures changes. Same shape as 0.22.0 → 0.23.0. Cost: one extra bump, and the fix slips a release — cheap against shipping a migration path that cannot be relied on.
 
@@ -338,6 +338,14 @@ Built and verified: pristine passes; the **star/star swap fails**; `resolvedPath
 22. **The path-join derivation** (Guards): every relative specifier of every kind, `checked > 0`.
 
 **On `type-expression`:** measured **0 instances** anywhere the tsconfig reaches, including `node_modules`. Classifying every literal across 471 files: `ImportDeclaration` 1756, `ExportDeclaration` 155, `CallExpression`/`StringLiteral` 6, `CallExpression`/`NoSubstitutionTemplateLiteral` 2, and **zero** `LiteralType`, `ExternalModuleReference` or `require()`-in-`.js`. So items 6, 8, **and 16/16b** all need dedicated fixtures — draft 3 named only 6 and 8. One fixture covers the forms (a reviewer built it: 18 edges from 22 candidate lines, with `declare module './t.js'`, `declare module 'virtual-thing'` and `import('./' + n)` correctly absent).
+
+## What 0.27.0's implementation found that draft 4 did not predict
+
+Recorded here because the same two shapes will recur in 0.28.0.
+
+1. **`writeReport`'s `reason` parameter is per-violation, not run-level.** `format.ts` renders it as each violation's `Why:` line (`v.because ?? reason`), so routing a run-level notice through it duplicates the line **and** attributes it to an unrelated finding. `summary.reason` in JSON is genuinely run-level; the terminal path has no run-level slot at all. 0.28.0's per-kind messages touch the same renderer — do not assume `reason` is a report header.
+2. **A guarded helper with an unguarded call site is an unguarded feature.** The `activeNotice` tests called the function directly, so replacing its `writeStderr` call in `execute-rule.ts` with a no-op stayed green across the whole suite. Every wiring point needs its own assertion through the real terminal, which is what item 7's three assertions are for on the 0.28.0 side.
+3. **`docs/upgrading.md` had to be read out of `CHANGELOG.md`, not reconstructed.** Writing it from memory got 0.6.0 wrong: it looks additive (`expression()` dedup) and the entry says findings drop from 189 to 13 and to update baselines. Three other releases (0.7.2, 0.8.0, 0.10.0) change enforcement in ways the version number does not hint at.
 
 ## Migration
 

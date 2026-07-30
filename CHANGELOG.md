@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.27.0] - 2026-07-30
+
+The first of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/0071-one-definition-of-a-module-edge.md)'s two releases: the instruments an adopter needs **before** 0.28.0 widens what counts as a module edge. Nothing here changes which findings a rule reports.
+
+### Added
+
+- **`docs/upgrading.md`** — one row per released version: does it change enforcement, and what must you do. Written because the per-release notes in this file, followed in release order, produce the wrong outcome: 0.19.0 says regenerate the baseline, 0.23.0 says regenerate, 0.24.0 says regenerate when convenient, and 0.28.0 will say regenerate **before** upgrading. Someone on 0.18.1 reading them in order regenerates last — after every widening — and silently accepts everything the newer releases added.
+- **`BaselineDelta` and `formatBaselineDelta`** — what a `generateBaseline` call changed. `generateBaseline` now returns it instead of `void`, which is additive for existing callers.
+- **`suppressionNotice` / `activeNotice`** in `core/diff-disclosure.ts`, and `size` / `baseBranch` on the `DiffFilterLike` interface (both optional, so a caller-supplied filter still satisfies it).
+
+### Changed
+
+- **`--changed` now says how many findings it suppressed.** It filters _reporting_, not evaluation, so a run with every finding suppressed was byte-identical to a clean run — exit 0, no output, `total: 0` — and the reader chose the flag once, in CI config. The count reaches stderr and `summary.reason` in `--format json`, because stdout and stderr are different streams and an agent piping one would otherwise read `total: 0` and stop. The count is derived by the caller as `before - after` rather than self-reported by the filter, so it holds for a caller-supplied `DiffFilterLike` too.
+- **`.check({ diff })` and `.warn({ diff })` state the configuration once per process** rather than counting. `filterToChanged` runs once per rule there, so no call site knows the run total, and a diff-aware suite with 79 rules would print 79 lines on the channel 0.26.0 made unconditionally visible. A configuration statement cannot be wrong; a per-rule count presented as a run total would be.
+- **`ts-archunit baseline` prints the delta it applied** — `41 → 78 entries (+37, −0)` — with distinct sentences for a first run, for a prior file that could not be read as a baseline, and for a refresh where no prior identity survived. That last case keys on the **measured overlap**, not on the hash version: v2 identities are byte-identical to v1 for any violation whose fields hold no path, so a version-keyed message would assert "none of its identities could be compared" beside `(+0, −0)`.
+
+### Fixed
+
+- **A run-level notice no longer becomes a violation's `Why:` line.** `writeReport`'s `reason` parameter is rendered per violation (`v.because ?? reason`), so routing the suppression notice through it both duplicated the line and attributed it to a finding it had nothing to do with. Found by the sabotage matrix, in this release's own code, before it shipped.
+
+### Upgrading — 0.27.0
+
+No action required. Two output changes:
+
+- A `--changed` run that hides findings prints one extra stderr line, and `--format json` sets `summary.reason` where it was previously always `null`. Anything asserting `reason === null` on a diff-aware run needs updating.
+- `ts-archunit baseline`'s first stdout line changed from `Baseline generated: N violations recorded` to one of the delta sentences above. Anything grepping that exact string needs updating.
+
 ## [0.26.0] - 2026-07-29
 
 **An advisory rule in a passing test printed nothing at all** ([bug 0024](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md)). `.warn()` is the documented way to run a rule advisorily, and vitest's default reporter intercepts console output and replays it only for **failing** tests — so a rule with real violations in a passing test produced **zero** output. Measured on a real child `vitest run`: 4 violations, nothing printed. A team adopting the warn-then-ratchet path saw silence and concluded there was nothing to fix.

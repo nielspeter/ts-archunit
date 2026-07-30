@@ -59,6 +59,7 @@ npx ts-archunit check layers.rules.ts naming.rules.ts body.rules.ts
 npx ts-archunit check arch.rules.ts --baseline arch-baseline.json
 
 # Diff-aware (only report violations in changed files)
+#   Prints how many findings it suppressed — a green --changed run is not a green run
 npx ts-archunit check arch.rules.ts --changed --base main
 
 # Watch mode — re-run on file changes
@@ -76,6 +77,22 @@ npx ts-archunit baseline arch.rules.ts --output arch-baseline.json
 ```
 
 Records all existing violations so that `check --baseline` only fails on new ones. See [Gradual Adoption](/core-concepts#baseline-mode) for details.
+
+**It prints the delta it applied**, because refreshing a baseline is how findings get
+accepted permanently and the number that matters is how many were newly accepted:
+
+```
+Baseline updated: 41 → 78 entries (+37, −0). The +37 are findings this file now
+accepts that it did not before.
+Written to: arch-baseline.json
+```
+
+A first run says `Baseline created: 78 entries accepted (no previous baseline)` — not a
+delta, because there was nothing to compare against. If no prior identity survived, it
+says so and names the identity format as the likely cause, since `(+78, −78)` otherwise
+reads as "you accepted 78 new findings" when the truth is "nothing could be compared".
+
+Refresh **before** upgrading, never after — see [Upgrading](/upgrading).
 
 ### `explain` — Dump Rule Metadata
 
@@ -127,17 +144,17 @@ It reports **identities, never totals** — which rule file, which rule, and for
 
 ## Options
 
-| Flag                | Short | Description                                                           |
-| ------------------- | ----- | --------------------------------------------------------------------- |
-| `--baseline <path>` |       | Baseline file for filtering known violations                          |
-| `--output <path>`   |       | Output path for baseline file (default: `arch-baseline.json`)         |
-| `--changed`         |       | Only report violations in files changed since base branch             |
-| `--base <branch>`   |       | Base branch for `--changed` (default: `main`)                         |
-| `--format <format>` |       | Output format: `terminal`, `json`, `github`, `auto` (default: `auto`) |
-| `--watch`           | `-w`  | Watch for file changes and re-run (check command only)                |
-| `--config <path>`   |       | Path to config file                                                   |
-| `--version`         | `-v`  | Show version number                                                   |
-| `--help`            | `-h`  | Show help message                                                     |
+| Flag                | Short | Description                                                                                                                                               |
+| ------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--baseline <path>` |       | Baseline file for filtering known violations                                                                                                              |
+| `--output <path>`   |       | Output path for baseline file (default: `arch-baseline.json`)                                                                                             |
+| `--changed`         |       | Only report violations in files changed since base branch. Reports how many findings it suppressed, on stderr and in `summary.reason` for `--format json` |
+| `--base <branch>`   |       | Base branch for `--changed` (default: `main`)                                                                                                             |
+| `--format <format>` |       | Output format: `terminal`, `json`, `github`, `auto` (default: `auto`)                                                                                     |
+| `--watch`           | `-w`  | Watch for file changes and re-run (check command only)                                                                                                    |
+| `--config <path>`   |       | Path to config file                                                                                                                                       |
+| `--version`         | `-v`  | Show version number                                                                                                                                       |
+| `--help`            | `-h`  | Show help message                                                                                                                                         |
 
 ## Config File
 
