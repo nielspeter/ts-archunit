@@ -378,6 +378,8 @@ R3a ships first and may ship alone, so it cannot borrow R3b's notes. Three sente
 
 Plus one hazard that is genuinely new and easy to miss: **in a self-executing rule file, a throwing `.warn()` truncates the rest of the module.** Today `rule1.warn(); rule2.check()` evaluates both, because `.warn()` cannot throw. After R3a a meta-finding in `rule1` aborts module evaluation, the CLI's catch (`src/cli/commands/check.ts:41-50`) folds `rule1`'s finding into the run and the output looks entirely normal — while `rule2` was never registered. Silent coverage loss, shipped by the release whose thesis is that silent coverage loss is the defect. `.check()` already has this hazard; R3a extends it to the surface documented as "logs, does not throw". The `export default [rule1, rule2]` shape is unaffected. R3a states the semantics, and the CLI **reports the truncation rather than absorbing it**.
 
+> **Shipped without the second half — filed as [bug 0029](../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md), 2026-07-30.** R3a's semantics shipped in v0.23.0; the CLI reporting never got built, and the hazard above is now reachable with shipped features. Measured at v0.26.0 against a real self-executing rule file: rule 1 warns on a dead `.expectNonEmpty()` selector, rule 2 has four real violations, and **all four are absent** from the terminal and from `--format json`. A `.violations()` control reports all four, isolating the cause to the throw. The reporting is bug 0029's remedy, not R3b's — it belongs to the release that acknowledges it rather than to the next feature.
+
 ### R3b's Upgrading section, ordered — and the order is the point
 
 1. _"Before upgrading, run `ts-archunit doctor` on 0.2x and classify what it reports."_
