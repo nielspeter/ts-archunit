@@ -126,7 +126,7 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
       file,
       JSON.stringify({
         generatedAt: '2026-07-28T00:00:00.000Z',
-        hashVersion: 2,
+        hashVersion: 3,
         count: 1,
         violations: [{ rule: 'r', file: 'a.ts', line: 1, hash: 'deadbeefdeadbeef' }],
       }),
@@ -152,7 +152,7 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
     const file = path.join(root, 'baseline.json')
     generateBaseline([pathFree], file, { root })
     const written: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'))
-    expect(JSON.stringify(written)).toContain('"hashVersion":2')
+    expect(JSON.stringify(written)).toContain('"hashVersion":3')
     // Same file, read back: matches, and produces no meta-finding.
     expect(withBaseline(file, { root }).filterNew([pathFree])).toEqual([])
   })

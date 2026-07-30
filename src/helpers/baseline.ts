@@ -37,7 +37,26 @@ import { writeStderr } from '../core/stderr.js'
 //
 // The unmatched *entry* still cannot be diagnosed — see bug 0027; that is the
 // gap the bump was reaching for and did not close.
-const HASH_VERSION = 2
+//
+// 3 — dependency findings carry a producer-set `identity`, so `hashViolation`
+//     computes a different string for all of them (bug 0028). This bump satisfies
+//     the rule above, where 0.23.0's attempt did not: the *formula* changed, not
+//     just one of its inputs.
+//
+//     Why it had to: a dependency message carries the basename and the resolved
+//     target and nothing else, so two edges from one file to one module hashed
+//     identically. Measured on this repo's barrel after v0.28.0 made barrels
+//     dependency-bearing — 114 findings, 87 identities, 46.5% of findings sharing
+//     one with a sibling. `identity` adds the imported names, which discriminate
+//     and survive code moving where a line number would not.
+//
+//     **It invalidates existing baselines for every dependency finding**, not only
+//     the colliding ones, because identity replaces `element::message` wholesale.
+//     No printed text changes, which is why bug 0028 first recorded this as needing
+//     no migration treatment — that conflated text-stability with baseline-stability
+//     and was wrong. The bump is what lets `unmatchedBaselineFinding` name the real
+//     cause instead of guessing at a re-resolved root.
+const HASH_VERSION = 3
 
 /**
  * A single entry in the baseline file.

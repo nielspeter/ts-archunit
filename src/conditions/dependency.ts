@@ -81,6 +81,42 @@ function edgeViolation(
     line: edge.line,
     message,
     because: context.because,
+    // `identity` — the canonical form that supersedes `element::message` in the
+    // baseline hash. [Bug 0028](../../bugs/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).
+    //
+    // The message carries the basename and the resolved target and nothing else, so
+    // two edges from one file to one module are byte-identical and share a hash.
+    // Measured on this repo's own barrel after v0.28.0 made barrels
+    // dependency-bearing: `src/index.ts` produced **114 findings and 87 identities —
+    // 26 colliding groups, 46.5% of findings sharing**. You could not accept one and
+    // keep failing on its sibling, and a re-export added later was silently
+    // pre-accepted by an entry written before it existed.
+    //
+    // **`names` is the discriminator, and the line is not.** Measured, adding `names`
+    // takes those 114 edges to 114 distinct identities; adding the line does too, and
+    // is rejected for the reason `baseline.ts` already excludes it — an accepted
+    // violation has to survive its code moving. A sample colliding pair shows why
+    // names work: same file, same target, same kind, `[project, workspace,
+    // resetProjectCache]` against `[ArchProject]`.
+    //
+    // This is `ModuleEdge.names`' first production consumer. Until now its only
+    // reader was the runtime independence test, which is a fair criticism of a field
+    // that costs a per-kind rule to compute.
+    //
+    // **A residual, stated.** For `kind === 'import'` `names` is the INWARD name, so
+    // `import { X } from 'm'` and `import { X as Y } from 'm'` in one file both carry
+    // `['X']` and still share an identity. Separating them needs the local binding,
+    // which `ModuleEdge` deliberately does not carry — the same reason
+    // `notHaveAliasedImports` was never routed through the edge walk. That shape is
+    // legal and unusual; the shape this fixes is the barrel, where re-exports use the
+    // OUTWARD name and aliases therefore differ. Measured: 26 colliding groups on this
+    // repo's barrel go to 0, and the aliased-import pair is what remains.
+    identity: [
+      sourceFile.getBaseName(),
+      edge.kind,
+      edgeCandidates(edge)[0],
+      [...edge.names].sort((a, b) => a.localeCompare(b)).join(','),
+    ].join('::'),
   }
 }
 
