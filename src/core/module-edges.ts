@@ -5,7 +5,7 @@ import { isTypeOnlyImport, isTypeOnlyReExport } from './import-options.js'
 /**
  * One definition of "a module edge", for every condition that needs one.
  *
- * [Bug 0022](../../bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md):
+ * [Bug 0022](../../bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md):
  * `src/conditions/dependency.ts` collected edges from `sf.getImportDeclarations()`
  * at five sites — static `import` statements and nothing else — while the reverse
  * graph indexed static imports, re-exports **and** dynamic imports. So

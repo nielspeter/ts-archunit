@@ -101,7 +101,14 @@ jobs:
     needs: publish
     # The script's bounds are ~60s for the POST plus the poll budget; 10 minutes has
     # headroom now that the POST is no longer allowed 900s on its own.
-    timeout-minutes: 10
+    # 15, not 10: the POST is bounded at 60s and the poll budget below is 450s, so
+    # this leaves headroom. The budget itself is still an ESTIMATE — the success path
+    # has never executed, and the live index is ~306k tokens, so a full re-crawl may
+    # take longer than the default 180s. Raised pre-emptively because this job runs
+    # `needs: publish`: a too-short budget reds the run AFTER an immutable npm
+    # publish, and "the poll was short" would be indistinguishable from "the refresh
+    # did nothing" if the script did not now report `state` separately.
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -122,6 +129,9 @@ jobs:
           # Turns on the release-specific remedy: the publish already succeeded and
           # is immutable, so "re-run the publish job" is the wrong advice here.
           CONTEXT7_RELEASE_CONTEXT: '1'
+          # 15 x 30s = 450s, inside the 15-minute job budget. Tighten this once a
+          # real run reports the actual indexing latency.
+          CONTEXT7_POLL_ATTEMPTS: '15'
         # `rennf93/upsert-context7@1.1` is gone from here on purpose. Measured
         # 2026-07-30: its `add` endpoint answers 405, and its `refresh` endpoint is
         # a page route that answers 200 with HTML — which the action reports as

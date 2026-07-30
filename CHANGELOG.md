@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.28.0] - 2026-07-30
 
-The second of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/0071-one-definition-of-a-module-edge.md)'s two releases: **one definition of a module edge**, closing [bug 0022](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md). This release **changes enforcement**. Read [Upgrading](https://nielspeter.github.io/ts-archunit/upgrading) first.
+The second of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0071-one-definition-of-a-module-edge.md)'s two releases: **one definition of a module edge**, closing [bug 0022](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md). This release **changes enforcement**. Read [Upgrading](https://nielspeter.github.io/ts-archunit/upgrading) first.
 
 **Before upgrading, on 0.27.x:** refresh the baseline, commit it separately, and record your finding count.
 
@@ -61,7 +61,7 @@ Preset `imperative` strings now mean something wider. If you paste that output i
 
 ## [0.27.0] - 2026-07-30
 
-The first of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/0071-one-definition-of-a-module-edge.md)'s two releases: the instruments an adopter needs **before** 0.28.0 widens what counts as a module edge. Nothing here changes which findings a rule reports.
+The first of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0071-one-definition-of-a-module-edge.md)'s two releases: the instruments an adopter needs **before** 0.28.0 widens what counts as a module edge. Nothing here changes which findings a rule reports.
 
 ### Added
 
