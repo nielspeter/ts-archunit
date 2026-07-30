@@ -424,4 +424,35 @@ describe('the declaration reaches the surfaces that consume it', () => {
     expect(findings.filter((f) => f.position === 'condition')).toEqual([])
     expect(findings.filter((f) => f.glob === G)).toEqual([])
   })
+
+  it('reports nothing new for a condition glob that IS checkable', () => {
+    /**
+     * The assertion above is **vacuous with respect to the skip**, and that was
+     * measured rather than reasoned: removing
+     * `site.position === 'condition'` from `diagnose.ts:169` leaves it green.
+     *
+     * `notImportFrom` declares `import-target`, which `path-universe.ts:72`
+     * deliberately gives no views, so `isDeadSite` is false for it whether the
+     * skip is there or not — it is exempt by **kind** before the position is ever
+     * consulted. So the test proved the exemption it did not intend to test.
+     *
+     * `onlyBeImportedVia` declares `file-path`, which has real views, so a glob
+     * matching nothing IS dead and the **position** is the only thing keeping it
+     * out of the report. Found while fixing bug 0030, whose own guard used
+     * `file-path` for exactly this reason.
+     */
+    const p = loadProject()
+    const dead = '**/nonexistent-folder/**'
+    const rule = modules(p).that().resideInFolder('**/src/**').should().onlyBeImportedVia(dead)
+
+    const sites = rule
+      .globs()
+      .flatMap((tree) => globSitesOf(tree))
+      .filter((s) => s.position === 'condition')
+    // Non-vacuity: the site exists, is `file-path`, and carries the dead glob —
+    // so "no finding" below is the position doing the work, not an absent site.
+    expect(sites.map((s) => `${s.kind}:${s.glob}`)).toEqual([`file-path:${dead}`])
+
+    expect(diagnose([rule]).filter((f) => f.glob === dead)).toEqual([])
+  })
 })

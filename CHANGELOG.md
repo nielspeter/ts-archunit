@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.30.0] - 2026-07-30
+
+A custom predicate can finally tell `doctor` what glob it matches against. Additive and
+opt-in — **no baseline impact, no enforcement change** unless you declare something.
+
+### Added
+
+- **`definePredicate` and `defineCondition` accept an optional `globs` argument**
+  ([bug 0030](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0030-user-defined-predicates-and-conditions-cannot-declare-globs.md)).
+  Both factories returned only the fields they were handed, so a custom path-matching
+  predicate's glob never reached `globs()`, `doctor` or `diagnose()` — a typo narrowed the
+  selection to nothing, the rule passed, and `doctor` exited **0** on it. Declare the glob and
+  the same mistake is reported and exits **1**:
+
+  ```ts
+  const inGenerated = definePredicate<SourceFile>(
+    "reside in '**/generated/**'",
+    (file) => picomatch('**/generated/**')(file.getFilePath()),
+    globNode({ glob: '**/generated/**', kind: 'file-path' }), // <- the new argument
+  )
+  ```
+
+  The `kind` is **believed**, so it has to be right: `file-path` and `parent-dir` are checked
+  against the project's paths, while `import-target` deliberately is not, because a bare
+  specifier legitimately matches no path. A bare specifier declared `file-path` earns a false
+  dead-glob report; a real path declared `import-target` is silently exempt. Declaring nothing
+  is the honest choice when unsure — it is exactly the prior behaviour. Kinds and costs are
+  tabulated in [Custom rules](https://nielspeter.github.io/ts-archunit/custom-rules#declaring-a-glob).
+  - `defineCondition` takes the same argument, with one difference: a **condition** glob that
+    matches nothing is deliberately not reported, because a denylist glob matching nothing is
+    indistinguishable from a ban being respected. Declaring it makes it visible, not a finding.
+
+### Fixed
+
+- **A guard shipped in 0.29.0 could not fail.** The test asserting that a condition glob
+  matching nothing produces no finding used an `import-target` glob — which has no path
+  universe, so it was exempt by **kind** before position was ever consulted. Measured: removing
+  the condition-position skip from `diagnose.ts` left that test green, so it proved an exemption
+  it was not testing. Now also covered with `onlyBeImportedVia`, which declares `file-path` and
+  is genuinely checkable, so the position is what does the work. No shipped behaviour was wrong;
+  the guard for it was.
+- **The `doctor` output in the docs is now the output `doctor` actually prints.** The first
+  version was written from the formatter's source rather than captured from a run, and was wrong.
+
 ## [0.29.0] - 2026-07-30
 
 Two fixes and one piece of plumbing. **This release invalidates dependency baselines** and no
@@ -74,7 +118,7 @@ git commit -am 'chore: refresh arch baseline before upgrade'
 
 - `elementCondition` and `functionCondition` take an optional `globs` argument. Internal, but
   named here because the **public** `definePredicate` / `defineCondition` did **not** get one —
-  see [bug 0030](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0030-user-defined-predicates-and-conditions-cannot-declare-globs.md).
+  see [bug 0030](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0030-user-defined-predicates-and-conditions-cannot-declare-globs.md).
   A custom path-matching predicate's glob is still invisible to `doctor`, which is a
   present-tense detection gap rather than a latent one.
 

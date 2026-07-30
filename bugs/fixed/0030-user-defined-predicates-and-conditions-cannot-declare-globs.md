@@ -3,6 +3,8 @@
 **Reported:** 2026-07-30
 **Found in:** all versions since v0.20.0 (R2a) for `definePredicate`; the asymmetry with
 built-ins dates from v0.29.0 and [plan 0073](../plans/completed/0073-conditions-declare-their-globs.md)
+**Fixed:** 2026-07-30, released in **v0.30.0**. Additive and non-breaking; both parameters are
+optional, so every existing two-argument call is unaffected.
 **Severity:** Medium for `definePredicate`, Low for `defineCondition`, and the split is the
 point — see below. Neither is a false green: a glob nobody declares is a glob `doctor` does not
 report, so this is **under-detection**, not a wrong verdict.
@@ -94,3 +96,55 @@ Whether a user-declared glob should be _believed_ about its `kind`. A user passi
 exemption backwards and see a false dead-glob report. That is an argument for documenting the
 kinds, not for withholding the parameter — but it should be decided in the same change rather
 than discovered after.
+
+## The fix, and what it measured
+
+Two optional parameters, exactly as suggested. `tests/core/user-defined-globs.test.ts`, 8 tests,
+**6 of 6 sabotages caught** plus one more that mattered more than any of them (below).
+
+Verified end to end through the real CLI rather than through `diagnose` alone. A custom
+predicate declaring `globNode({ glob: '**/generated/**', kind: 'file-path' })` in a rule file:
+
+```
+  rules/arch.rules.ts
+    that reside in '**/generated/**' should not import from "**/banned/**"
+    reside in '**/generated/**'  [selector]
+    no-match: these are anchored but matched no file. Common causes: …
+```
+
+`doctor` exits **1**. Without the parameter there is no such report and it exits 0 — which is
+the whole bug, now observable from the outside.
+
+### The plumbing never needed changing, and that was measured before writing any code
+
+A hand-built `Predicate` object literal carrying `globs`, passed to `.satisfy()`, **already**
+reached `globs()` stamped `position: 'selector'` and **was already reported dead by
+`diagnose()`, identically to a built-in `resideInFolder` control.** `satisfy()` stores the
+object as-is (`rule-builder.ts:104-109`). So the fix is a signature, not a mechanism — which is
+why it is two lines rather than a plan.
+
+### It found a vacuous assertion in plan 0073's own guard
+
+`condition-glob-declaration.test.ts`'s "reports nothing new" test asserted that a condition
+glob matching nothing produces no finding — using `notImportFrom`, which declares
+`import-target`. Measured: **removing the `position === 'condition'` skip from
+`diagnose.ts:169` leaves that test green.** `import-target` has no path universe
+(`path-universe.ts:72`), so `isDeadSite` is false for it whether the skip exists or not — the
+test proved an exemption by **kind** while claiming to prove one by **position**.
+
+Fixed in the same change by adding a case that uses `onlyBeImportedVia`, which declares
+`file-path` and therefore _is_ checkable: the site exists, carries the dead glob, and is still
+not reported, so the position is doing the work. That case reds when the skip is removed. This
+guard file's own `defineCondition` test used `file-path` deliberately for the same reason, which
+is what exposed the gap.
+
+### The `kind` question, decided
+
+The bug listed "should a user-declared `kind` be believed?" as needing a decision in the same
+change. **Decided: believed, and documented.** `definePredicate`'s JSDoc and
+`docs/custom-rules.md` both carry the table of kinds and state the cost in each direction — a
+bare specifier declared `file-path` earns a false dead-glob report; a real path declared
+`import-target` is silently exempt — with the explicit advice that declaring nothing is the
+honest choice when unsure, since that is exactly the prior behaviour. Validating the kind is not
+possible without knowing what the user's `test` function does with the glob, which is the thing
+only they can see.

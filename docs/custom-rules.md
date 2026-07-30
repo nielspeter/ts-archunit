@@ -64,6 +64,66 @@ classes(p).that().satisfy(hasManyMethods(15)).should().notExist().check()
 classes(p).that().satisfy(hasManyMethods(20)).should().notExist().warn()
 ```
 
+### Declaring a glob
+
+If a custom predicate matches paths against a glob, **declare it**. Otherwise `doctor`
+cannot see it, and a typo narrows the selection to nothing while the run stays green and
+`doctor` exits 0 — the rule checks nothing and nothing says so.
+
+```typescript
+import picomatch from 'picomatch'
+import { definePredicate, globNode } from '@nielspeter/ts-archunit'
+
+const GENERATED = '**/generated/**'
+
+const inGenerated = definePredicate<SourceFile>(
+  `reside in '${GENERATED}'`,
+  (file) => picomatch(GENERATED)(file.getFilePath()),
+  globNode({ glob: GENERATED, kind: 'file-path' }), // <- the third argument
+)
+```
+
+With the glob declared, `doctor` reports it when it can never match — and exits non-zero,
+because an agent reads `exit 0` as "nothing to do":
+
+```
+  rules/arch.rules.ts
+    that reside in '**/generated/**' should not import from "**/banned/**"
+    reside in '**/generated/**'  [selector]
+    no-match: these are anchored but matched no file. Common causes: the glob names a
+    directory rather than the files inside it (append "/**"), a path segment is
+    misspelled, or the directory holds no source files
+```
+
+Without the third argument that report does not exist: the rule selects nothing, passes, and
+`doctor` exits 0.
+
+`defineCondition` takes the same third argument. The difference is what happens next: a
+**condition** glob that matches nothing is deliberately _not_ reported, because a denylist
+glob matching nothing is indistinguishable from a ban being respected. Declaring it makes it
+visible to `explain`; it does not make it a finding.
+
+#### Choosing the `kind`
+
+The `kind` says what the glob is really matched against, and it selects which paths are
+checked for satisfiability. **A declared kind is believed**, so a wrong one costs you
+something in each direction.
+
+| `kind`          | matched against                                | note                                                                   |
+| --------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `file-path`     | an **absolute** file path                      | Anchor the glob — `'**/src/**'`, not `'src/**'`, which matches nothing |
+| `parent-dir`    | a file's immediate parent directory            |                                                                        |
+| `import-target` | a resolved module path **or a bare specifier** | Has no path universe by design, so `'fastify'` is never reported dead  |
+| `specifier`     | a string in the source, not a path             |                                                                        |
+| `literal`       | a literal value in the source                  |                                                                        |
+
+Declaring a bare specifier as `file-path` earns a **false** dead-glob report. Declaring a real
+path as `import-target` silently exempts it from checking. When unsure, declare nothing — that
+is exactly the behaviour you had before the argument existed.
+
+For more than one glob, use `globAnyOf(globs, kind)`: a set is dead only when **every** glob in
+it is dead, which is what `any` means.
+
 ### Predicates on ArchFunction
 
 Custom predicates work on any element type, including `ArchFunction`:
