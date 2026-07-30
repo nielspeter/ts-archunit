@@ -6,6 +6,7 @@ import type { RuleMetadata } from './rule-metadata.js'
 import { ArchRuleError } from './errors.js'
 import { formatViolations } from './format.js'
 import { formatViolationsJson } from './format-json.js'
+import { activeNotice } from './diff-disclosure.js'
 import { formatViolationsGitHub } from './format-github.js'
 import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
 import { writeStderr } from './stderr.js'
@@ -226,7 +227,17 @@ export function executeCheck(
     filtered = options.baseline.filterNew(filtered)
   }
   if (options?.diff) {
+    // Per rule, so no run total exists here — state the configuration once per
+    // process instead of printing one line per rule (plan 0071,
+    // `core/diff-disclosure.ts`).
+    const before = filtered.length
     filtered = options.diff.filterToChanged(filtered)
+    const notice = activeNotice(
+      before - filtered.length,
+      options.diff.size,
+      options.diff.baseBranch,
+    )
+    if (notice !== undefined) writeStderr(notice)
   }
 
   if (filtered.length > 0) {
@@ -266,7 +277,17 @@ export function executeWarn(
     filtered = options.baseline.filterNew(filtered)
   }
   if (options?.diff) {
+    // Per rule, so no run total exists here — state the configuration once per
+    // process instead of printing one line per rule (plan 0071,
+    // `core/diff-disclosure.ts`).
+    const before = filtered.length
     filtered = options.diff.filterToChanged(filtered)
+    const notice = activeNotice(
+      before - filtered.length,
+      options.diff.size,
+      options.diff.baseBranch,
+    )
+    if (notice !== undefined) writeStderr(notice)
   }
 
   if (filtered.length > 0) {

@@ -1,5 +1,5 @@
 import { collectViolations } from '../../helpers/baseline-generator.js'
-import { generateBaseline } from '../../helpers/baseline.js'
+import { formatBaselineDelta, generateBaseline } from '../../helpers/baseline.js'
 import type { ArchViolation } from '../../core/violation.js'
 import { loadRuleFiles } from '../load-rules.js'
 import { attributeToRuleFile, failureOrViolations } from '../rule-file-findings.js'
@@ -44,16 +44,22 @@ export async function runBaseline(args: BaselineArgs): Promise<number> {
     }
   }
 
-  generateBaseline(violations, args.output)
+  const delta = generateBaseline(violations, args.output)
 
   // Report what was actually WRITTEN, not what was collected. Config-level findings
   // are deliberately not baselineable (they report that a rule enforces nothing), so
   // printing the pre-filter count told users they had accepted findings that CI would
   // still fail on, with no hint why.
   const refused = violations.filter((v) => v.bypassFilters === true)
-  const recorded = violations.length - refused.length
 
-  process.stdout.write(`Baseline generated: ${String(recorded)} violations recorded\n`)
+  // The delta first: it is the number the 0.28.0 upgrade recipe depends on, and a
+  // reader who stops after one line should have read the one that matters (plan
+  // 0071). The count comes from `delta`, not recomputed here: this used to be
+  // `violations.length - refused.length`, which is the same number derived a
+  // second way, and two derivations of one fact in two files drift. The
+  // cross-check lives in the test instead, against the entry count of the file
+  // that was actually written.
+  process.stdout.write(`${formatBaselineDelta(delta)}\n`)
   process.stdout.write(`Written to: ${args.output}\n`)
 
   if (refused.length > 0) {

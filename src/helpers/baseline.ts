@@ -274,7 +274,7 @@ export function generateBaseline(
   violations: ArchViolation[],
   outputPath: string,
   options: BaselineOptions = {},
-): void {
+): BaselineDelta {
   const resolved = path.resolve(outputPath)
   const baselineDir = path.dirname(resolved)
   const root =
@@ -296,6 +296,9 @@ export function generateBaseline(
       subject: hashSubject(v, root),
     }))
 
+  // Read before writing — this is the only moment both sets exist (plan 0071).
+  const prior = readPriorHashes(resolved)
+
   const baseline: BaselineFile = {
     generatedAt: new Date().toISOString(),
     hashVersion: HASH_VERSION,
@@ -306,6 +309,149 @@ export function generateBaseline(
 
   fs.mkdirSync(path.dirname(resolved), { recursive: true })
   fs.writeFileSync(resolved, JSON.stringify(baseline, null, 2) + '\n')
+
+  const written = new Set(entries.map((e) => e.hash))
+  return {
+    before: prior?.count,
+    after: entries.length,
+    added:
+      prior === undefined
+        ? entries.length
+        : [...written].filter((h) => !prior.hashes.has(h)).length,
+    removed: prior === undefined ? 0 : [...prior.hashes].filter((h) => !written.has(h)).length,
+    priorHashVersion: prior?.hashVersion,
+    priorUnreadable: prior?.unreadable ?? false,
+  }
+}
+
+/**
+ * The hashes of the baseline file about to be overwritten.
+ *
+ * `undefined` when there is no prior file — the first-run case, which must read
+ * as "41 new entries", never as "+41, −0 against an empty baseline".
+ *
+ * Deliberately tolerant in the same shape as {@link withBaseline}, and for the
+ * same reason: a prior file that cannot be parsed must not throw here, because
+ * the write is the user's whole purpose. But it is reported rather than treated
+ * as absent — silently calling a corrupt baseline "no prior baseline" would
+ * print `(+78, −0)` and hide that 41 accepted findings just stopped being
+ * accepted.
+ */
+function readPriorHashes(
+  resolved: string,
+):
+  | { hashes: Set<string>; count: number; hashVersion: number | undefined; unreadable: boolean }
+  | undefined {
+  if (!fs.existsSync(resolved)) return undefined
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(fs.readFileSync(resolved, 'utf-8'))
+  } catch {
+    return { hashes: new Set(), count: 0, hashVersion: undefined, unreadable: true }
+  }
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !('violations' in parsed) ||
+    !Array.isArray(parsed.violations)
+  ) {
+    return { hashes: new Set(), count: 0, hashVersion: undefined, unreadable: true }
+  }
+
+  const hashVersion =
+    'hashVersion' in parsed && typeof parsed.hashVersion === 'number' ? parsed.hashVersion : 1
+  // Same `readonly unknown[]` narrowing as `withBaseline`, for the ADR-005
+  // reason documented there.
+  const rawEntries: readonly unknown[] = parsed.violations
+  const hashes = new Set<string>()
+  for (const entry of rawEntries) {
+    if (entry === null || typeof entry !== 'object') continue
+    if ('hash' in entry && typeof entry.hash === 'string') hashes.add(entry.hash)
+  }
+  // `count` is the entry count, not `hashes.size`: two entries can share a hash
+  // (bug 0028, measured at 17% in this repo), and reporting the deduplicated
+  // number as "41 entries" would disagree with the file the reader can open.
+  return { hashes, count: rawEntries.length, hashVersion, unreadable: false }
+}
+
+/**
+ * The delta a `generateBaseline` call applied, for the caller to report.
+ *
+ * Plan 0071's second instrument. The 0.28.0 upgrade recipe is "refresh the
+ * baseline, commit, then upgrade", and its whole safety rests on the adopter
+ * seeing what that refresh accepted. Before this, `baseline` printed only the
+ * new total — so a refresh that accepted 37 findings and one that accepted none
+ * printed the same shape of line, and the number that mattered was the one
+ * nobody could see.
+ */
+export interface BaselineDelta {
+  /** Entries in the file that was overwritten; `undefined` if there was none. */
+  readonly before: number | undefined
+  /** Entries written now. */
+  readonly after: number
+  /** Entries written now whose identity was not in the prior file. */
+  readonly added: number
+  /** Prior entries whose identity is not in what was just written. */
+  readonly removed: number
+  /** The prior file's hash version, when it had a readable one. */
+  readonly priorHashVersion?: number
+  /** A prior file existed but could not be read as a baseline. */
+  readonly priorUnreadable: boolean
+}
+
+/**
+ * The one-line delta, e.g. `41 → 78 entries (+37, −0)`.
+ *
+ * Kept beside {@link BaselineDelta} rather than in the CLI so the `baseline`
+ * command and any programmatic caller print the same sentence.
+ */
+export function formatBaselineDelta(delta: BaselineDelta): string {
+  const plural = (n: number): string => (n === 1 ? 'entry' : 'entries')
+
+  if (delta.priorUnreadable) {
+    return (
+      `Baseline replaced: ${String(delta.after)} ${plural(delta.after)} written. ` +
+      `The previous file could not be read as a baseline, so this is not a delta — ` +
+      `whatever it accepted is no longer accepted. Check it in git history if that matters.`
+    )
+  }
+  if (delta.before === undefined) {
+    return `Baseline created: ${String(delta.after)} ${plural(delta.after)} accepted (no previous baseline).`
+  }
+
+  const line =
+    `Baseline updated: ${String(delta.before)} → ${String(delta.after)} ${plural(delta.after)} ` +
+    `(+${String(delta.added)}, −${String(delta.removed)}).`
+
+  // A full replacement — nothing carried over — means something different from a
+  // delta of the same magnitude, and the reader's next action is not the same:
+  // "you accepted 78 new findings" versus "the identities all changed, so this
+  // says nothing about what you accepted".
+  //
+  // **Keyed on the measurement, not on the version.** A version mismatch looks
+  // like the obvious trigger and is not one: v2 is byte-identical to v1 for any
+  // violation whose fields contain no path (see HASH_VERSION), so a v1 baseline
+  // usually keeps matching entirely — and a message asserting "none of its
+  // identities could be compared" beside `(+0, −0)` would be plainly false. The
+  // overlap is the differently-derived value (ADR-008 rule 5); the version is
+  // offered as a likely cause only once the measurement has established there
+  // is something to explain.
+  if (delta.before > 0 && delta.added === delta.after && delta.removed === delta.before) {
+    const cause =
+      delta.priorHashVersion !== undefined && delta.priorHashVersion !== HASH_VERSION
+        ? ` The identity format changed (v${String(delta.priorHashVersion)} → v${String(HASH_VERSION)}), which is the usual cause.`
+        : ''
+    return (
+      `${line} No entry survived: every prior identity is gone and every entry written is new, ` +
+      `so this delta does not tell you what changed in your code.${cause}`
+    )
+  }
+
+  if (delta.added > 0) {
+    return `${line} The +${String(delta.added)} are findings this file now accepts that it did not before.`
+  }
+  return line
 }
 
 /**
