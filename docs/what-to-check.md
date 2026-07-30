@@ -706,6 +706,13 @@ modules(p).that().resideInFolder('**/src/**').should().satisfy(noUnusedExports()
 functions(p).that().resideInFolder('**/src/**').should().satisfy(noStubComments()).check()
 ```
 
+> **Careful with `.excluding('index.ts')` in a _dependency_ rule.** `element` is matched
+> as a **basename**, so that silences every `index.ts` in the project at once — including
+> their legitimate imports. It is safe here, in a reverse-graph rule about entry points.
+> Since v0.28.0 barrels carry dependencies (this repo's own `src/index.ts` went from 0 to
+> 114), so it is the line teams reach for on their first red, in the wrong place. Use a
+> path glob — `'**/src/index.ts'` — see [Setup Best Practices](/setup-best-practices).
+
 For broad exclusion patterns that legitimately match nothing in some workspaces, wrap them in `silent()` to suppress the stale-exclusion warning: `.excluding(silent(/\.d\.ts$/), 'index.ts')`. See [Setup & Best Practices](/setup-best-practices#suppressing-individual-violations) for baseline-vs-`.excluding()` guidance.
 
 ### Export hygiene

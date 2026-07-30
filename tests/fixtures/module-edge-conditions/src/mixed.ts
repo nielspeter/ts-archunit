@@ -4,3 +4,9 @@
 import { SECRET } from './banned/secret.js'
 export { SECRET as Reexported } from './banned/secret.js'
 export const both = SECRET
+// An ALIASED import, so item 9 has something positive to find. Without this the
+// fixture contained no `import { x as y }` at all, and a test titled "flags the
+// aliased import" made two toEqual([]) assertions — it would have passed if the
+// condition returned [] unconditionally.
+import { SECRET as Hidden } from './banned/secret.js'
+export const hidden = Hidden

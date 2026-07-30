@@ -1,5 +1,18 @@
 # Custom Rules
 
+::: warning A hand-written dependency condition sees static imports only
+The built-in dependency conditions were widened in v0.28.0 to see `export … from`,
+`import()` and `type X = import(…).Y` as well as static imports. A condition you write
+with `defineCondition()` does **not** get that for free: if it calls
+`sourceFile.getImportDeclarations()`, it reproduces the gap
+([bug 0022](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md))
+inside your repository, where no fix of ours reaches.
+
+`ModuleEdge` is not exported yet — deliberately, for one release — so the interim
+answer is to be aware of it rather than to work around it. If this affects you, say so
+on the issue tracker; that is the signal that decides whether it ships in 0.29.
+:::
+
 ts-archunit provides `definePredicate()` and `defineCondition()` for encoding team-specific conventions that aren't covered by built-in rules.
 
 ## Why Custom Rules

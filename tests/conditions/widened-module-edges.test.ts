@@ -14,9 +14,16 @@ import { modules, project } from '../../src/index.js'
 import { dependOn } from '../../src/conditions/dependency.js'
 import { hashViolation } from '../../src/helpers/baseline.js'
 import type { ArchViolation } from '../../src/core/violation.js'
+import { Project } from 'ts-morph'
+import { edgesOf, type ModuleEdge } from '../../src/core/module-edges.js'
 
 const fixtureRoot = path.join(import.meta.dirname, '../fixtures/module-edge-conditions')
 const p = project(path.join(fixtureRoot, 'tsconfig.json'))
+
+/** The raw edges of one fixture file, for asserting a test's own premise. */
+const tsProject = new Project({ tsConfigFilePath: path.join(fixtureRoot, 'tsconfig.json') })
+const edgesOfFixture = (name: string): readonly ModuleEdge[] =>
+  edgesOf(tsProject.getSourceFileOrThrow(name))
 
 const BANNED = '**/banned/**'
 
@@ -47,6 +54,9 @@ describe('notImportFrom sees every kind (the widening itself)', () => {
       // dedup shape (item 20), and both are forward findings.
       'src/imports-twice.ts:5',
       'src/imports-twice.ts:6',
+      // The aliased import added for item 9. Line 11 sorts before line 4 because
+      // `identify` compares the strings, not the numbers.
+      'src/mixed.ts:11',
       'src/mixed.ts:4',
       'src/mixed.ts:5',
       'src/twice.ts:4',
@@ -86,13 +96,18 @@ describe('item 16b — `require` is classified and enforced by nothing', () => {
 
     expect(found).not.toContain('src/cjs-consumer.js:3')
     expect(found).not.toContain('src/equals-consumer.d.ts:3')
-    // The premise: those two files really do carry a banned edge, so the absences
-    // above are an exclusion rather than an empty fixture.
+    // The premise, asserted on the EDGE. This used to assert
+    // `resideInFile(...).notExist()` → 1, which proves only that the file is in the
+    // program: edit the `require` line out of the fixture and it stayed green while
+    // asserting nothing.
     expect(found.length).toBeGreaterThan(0)
-    expect(
-      modules(p).that().resideInFile(inFixture('cjs-consumer.js')).should().notExist().violations()
-        .length,
-    ).toBe(1)
+    for (const name of ['cjs-consumer.js', 'equals-consumer.d.ts']) {
+      expect(
+        edgesOfFixture(name).some(
+          (e) => e.kind === 'require' && e.resolvedPath?.includes('/banned/') === true,
+        ),
+      ).toBe(true)
+    }
   })
 
   it('never emits the string `undefined` in a message', () => {
@@ -132,18 +147,89 @@ describe('item 19b — onlyHaveTypeImportsFrom excludes dynamic', () => {
   })
 
   it('gives a re-export a remedy that names its consequence', () => {
-    // The remedy for an import is local and complete. For a re-export it erases
-    // the edge AND removes a runtime export consumers may import as a value, so
-    // the reader has to be told before following it (ADR-008 rule 2).
+    // For a re-export, `export type { X } from` erases the edge AND removes a
+    // runtime export consumers may import as a value, so the reader has to be told
+    // before following it (ADR-008 rule 2).
+    const found = modules(p).should().onlyHaveTypeImportsFrom(BANNED).violations()
+    const reexport = found.find((v) => v.file.endsWith('consumer-reexport.ts'))
+
+    expect(reexport?.suggestion).toContain('export type')
+    expect(reexport?.suggestion).toContain('removes a runtime export')
+  })
+
+  /**
+   * The condition must NOT set a remedy for `kind === 'import'`.
+   *
+   * `execute-rule.ts` resolves `v.suggestion ?? meta?.suggestion`, so a
+   * producer-set remedy **wins** over the rule author's. Setting one for `import`
+   * replaced the shipped `layered/type-imports-only` remedy — which offers "or move
+   * the value you need into a layer this one is allowed to depend on", the only
+   * followable action when the value is needed at runtime — with a one-option
+   * remedy, and silently discarded any consumer's own `.rule({ suggestion })`.
+   *
+   * Invisible to every message-identity guard, because `suggestion` is not hashed.
+   */
+  it('does not override the rule author`s remedy for a plain import', () => {
+    const authored = 'MY OWN REMEDY — move the value into a permitted module.'
+    const found = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-import.ts'))
+      .should()
+      .onlyHaveTypeImportsFrom(BANNED)
+      .rule({ id: 'authored', suggestion: authored })
+      .violations()
+
+    expect(found).toHaveLength(1)
+    // The author's text survives resolution — this is the whole property. Before
+    // the fix it was replaced by `edgeTypeOnlyRemedy('import')`.
+    expect(found[0]?.suggestion).toBe(authored)
+
+    // With no authored remedy the slot stays empty, so the condition is injecting
+    // nothing rather than injecting something that happens to match.
+    const bare = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-import.ts'))
+      .should()
+      .onlyHaveTypeImportsFrom(BANNED)
+      .violations()
+    expect(bare[0]?.suggestion).toBeUndefined()
+
+    // …while a re-export in the same run DOES get one, so the split is real.
+    const reexport = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-reexport.ts'))
+      .should()
+      .onlyHaveTypeImportsFrom(BANNED)
+      .rule({ id: 'authored-2', suggestion: authored })
+      .violations()
+    expect(reexport[0]?.suggestion).toContain('export type')
+  })
+
+  it('gives a STAR re-export a remedy it can actually follow', () => {
+    // `export type { … } from` is unfollowable for `export * from`: filling in the
+    // braces means enumerating the target's entire export list, which an agent
+    // will invent rather than look up. `export type * from` is the one-token fix.
+    const star = modules(p)
+      .should()
+      .onlyHaveTypeImportsFrom(BANNED)
+      .violations()
+      .find((v) => v.file.endsWith('consumer-star.ts'))
+
+    expect(star?.suggestion).toContain('export type * from')
+    expect(star?.suggestion).not.toContain('export type { … } from')
+  })
+
+  it('makes the sentence agree with itself, per kind', () => {
+    // `edgeValuePhrase` was per-kind and the tail was not, so a re-export read
+    // "has a runtime re-export of … which should be a type-only IMPORT".
     const found = modules(p).should().onlyHaveTypeImportsFrom(BANNED).violations()
     const reexport = found.find((v) => v.file.endsWith('consumer-reexport.ts'))
     const staticImport = found.find((v) => v.file.endsWith('consumer-import.ts'))
 
-    expect(staticImport?.suggestion).toContain('import type')
-    expect(reexport?.suggestion).toContain('export type')
-    expect(reexport?.suggestion).toContain('removes a runtime export')
-    // The two remedies must differ, or the per-kind switch is decoration.
-    expect(reexport?.suggestion).not.toBe(staticImport?.suggestion)
+    expect(reexport?.message).toContain('runtime re-export of')
+    expect(reexport?.message).toContain('should be a type-only re-export')
+    expect(staticImport?.message).toContain('a value import from')
+    expect(staticImport?.message).toContain('should be a type-only import')
   })
 })
 
@@ -238,11 +324,24 @@ describe('item 12 — each kind names itself, so no finding is absorbed', () => 
       .notImportFrom(BANNED)
       .violations()
 
-    // Both edges are reported, at their own lines.
-    expect(identify(found)).toEqual(['src/mixed.ts:4', 'src/mixed.ts:5'])
-    // …and they are distinct to a baseline.
-    const identities = new Set(found.map((v) => hashViolation(v, fixtureRoot)))
-    expect(identities.size).toBe(2)
+    // Three edges: two imports (lines 4 and 11) and a re-export (line 5).
+    expect(identify(found)).toEqual(['src/mixed.ts:11', 'src/mixed.ts:4', 'src/mixed.ts:5'])
+
+    // **Two** identities, not three — and that is the honest number. The two
+    // IMPORTS of the same module produce byte-identical messages and therefore one
+    // hash: that is bug 0028, pre-existing and out of scope here, and it must not be
+    // mistaken for something this release fixed.
+    //
+    // What §4 DOES fix is the third: the re-export no longer collides with either
+    // import, because its verb differs. Asserted as the pair below rather than a
+    // bare count, so the distinction cannot be lost by a future edit.
+    const identityOf = (line: number): string | undefined => {
+      const v = found.find((x) => x.line === line)
+      return v === undefined ? undefined : hashViolation(v, fixtureRoot)
+    }
+    expect(new Set(found.map((v) => hashViolation(v, fixtureRoot))).size).toBe(2)
+    expect(identityOf(4)).toBe(identityOf(11)) // two imports collide — bug 0028
+    expect(identityOf(5)).not.toBe(identityOf(4)) // the re-export does not — §4
   })
 
   it('keeps the `import` message byte-identical, so existing baselines survive', () => {
@@ -317,6 +416,9 @@ describe('items 14 and 21 — the predicates move subjects in opposite direction
     // Full-set equality, not a `not.toContain`: an anti-monotone change that
     // dropped EVERY subject would satisfy the negative assertion.
     expect(selected).toEqual([
+      // Its only edge is a bare `import('node:path')`, which matches no banned
+      // glob, so it is retained.
+      'bare-dynamic.ts',
       // `require` is excluded from the predicate too, so these two stay even
       // though both carry a banned edge.
       'cjs-consumer.js',
@@ -373,24 +475,221 @@ describe('item 9 — notHaveAliasedImports is deliberately NOT widened', () => {
    * is a plain expected-list test, which is worth having on its own.
    */
   it('flags the aliased import and not the aliased re-export', () => {
+    // `mixed.ts` carries BOTH shapes: `import { SECRET as Hidden } from` and
+    // `export { SECRET as Reexported } from`. Exactly one is an import alias.
+    //
+    // This block used to make two `toEqual([])` assertions against a fixture with no
+    // aliased import in it at all — so `notHaveAliasedImports` could have returned
+    // `[]` unconditionally and it passed, under a title promising a positive finding.
     const found = modules(p)
       .that()
       .resideInFile(inFixture('mixed.ts'))
       .should()
       .notHaveAliasedImports()
       .violations()
-    // `mixed.ts` has `export { SECRET as Reexported } from` and a plain import,
-    // so exactly zero aliased *imports*.
-    expect(found).toEqual([])
 
-    const aliased = modules(p)
+    expect(found).toHaveLength(1)
+    expect(found[0]?.message).toContain('aliases "SECRET" as "Hidden"')
+    // The re-export alias in the same file is NOT flagged — the arbitrary boundary
+    // this condition deliberately does not cross.
+    expect(found[0]?.message).not.toContain('Reexported')
+
+    // A file whose only alias is a re-export reports nothing.
+    const reexportOnly = modules(p)
       .that()
       .resideInFile(inFixture('clean.ts'))
       .should()
       .notHaveAliasedImports()
       .violations()
-    // `clean.ts` has `export { OK as Fine } from` — a re-export alias, still not
-    // an import alias.
-    expect(aliased).toEqual([])
+    expect(reexportOnly).toEqual([])
+  })
+})
+
+/**
+ * `onlyImportFrom` — the condition the whole release is measured by, and until this
+ * block it was **completely unguarded**.
+ *
+ * Measured: reverting its loop to `if (edge.kind !== 'import') continue` left all
+ * 2556 tests green, exit 0, no failing file. Its three siblings all fail their own
+ * un-widening (`notImportFrom` 7 tests, `dependOn` 2, `onlyHaveTypeImportsFrom` 2);
+ * this one failed nothing, because not one of the six new test files invoked it.
+ *
+ * It is the condition behind `preset/boundaries/no-cross-boundary` and
+ * `preset/layered/restricted-packages` — i.e. `strictBoundaries` and `layered` —
+ * and the green→red monotone direction that produces the findings a consumer
+ * actually sees on upgrade.
+ */
+describe('onlyImportFrom sees every kind (the release`s headline condition)', () => {
+  it('reports every kind that is not on the allowlist', () => {
+    const found = modules(p).should().onlyImportFrom(inFixture('allowed/*')).violations()
+
+    expect(identify(found)).toEqual([
+      'src/bare-dynamic.ts:9',
+      'src/consumer-dynamic.ts:2',
+      'src/consumer-import.ts:1',
+      'src/consumer-reexport-type.ts:2',
+      'src/consumer-reexport.ts:3',
+      'src/consumer-star.ts:2',
+      'src/consumer-type-expr.ts:2',
+      'src/imports-twice.ts:5',
+      'src/imports-twice.ts:6',
+      'src/mixed.ts:11',
+      'src/mixed.ts:4',
+      'src/mixed.ts:5',
+      'src/twice.ts:4',
+      'src/twice.ts:5',
+    ])
+    // `require`, both spellings, stay excluded here too — the same set as its
+    // siblings, or the two definitions of "an import" are back.
+    expect(identify(found)).not.toContain('src/cjs-consumer.js:3')
+    expect(identify(found)).not.toContain('src/equals-consumer.d.ts:3')
+  })
+
+  it('names each kind with its own verb, so no finding is absorbed', () => {
+    const byFile = new Map(
+      modules(p)
+        .should()
+        .onlyImportFrom(inFixture('allowed/*'))
+        .violations()
+        .map((v) => [path.basename(v.file), v.message]),
+    )
+    expect(byFile.get('consumer-reexport.ts')).toContain(' re-exports ')
+    expect(byFile.get('consumer-dynamic.ts')).toContain(' dynamically imports ')
+    expect(byFile.get('consumer-type-expr.ts')).toContain(' references the type from ')
+    // Anchored on the element name: ' imports "' is a substring of ' dynamically
+    // imports "', so a bare toContain passes on both.
+    expect(byFile.get('consumer-reexport.ts')).not.toMatch(/consumer-reexport\.ts imports "/)
+  })
+
+  it('keeps the `import` sentence byte-identical, so existing baselines survive', () => {
+    const found = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-import.ts'))
+      .should()
+      .onlyImportFrom(inFixture('allowed/*'))
+      .violations()
+    expect(found).toHaveLength(1)
+    expect(found[0]?.message).toBe(
+      `consumer-import.ts imports "${path.join(fixtureRoot, 'src/banned/secret.ts')}" ` +
+        `which does not match any of [${inFixture('allowed/*')}]`,
+    )
+  })
+
+  /**
+   * Item 17. A **bare** dynamic import, in both option states.
+   *
+   * `import('node:path')` does not resolve here, so `resolvedPath` is `undefined`
+   * and the specifier as written is the only candidate. Draft 3 specified
+   * `import('picomatch')` for this — measured, that RESOLVES, because it is a
+   * direct dependency with `@types/picomatch` installed, so it carries two
+   * candidates and is the worst possible choice of example.
+   */
+  it('item 17 — reports a bare unresolved dynamic import by its specifier', () => {
+    const strict = modules(p)
+      .that()
+      .resideInFile(inFixture('bare-dynamic.ts'))
+      .should()
+      .onlyImportFrom(inFixture('allowed/*'))
+      .violations()
+    const lenient = modules(p)
+      .that()
+      .resideInFile(inFixture('bare-dynamic.ts'))
+      .should()
+      .onlyImportFromWithOptions([inFixture('allowed/*')], { ignoreTypeImports: true })
+      .violations()
+
+    for (const found of [strict, lenient]) {
+      expect(found).toHaveLength(1)
+      // The SPECIFIER, not a resolved path — there is no resolved path. A dynamic
+      // import is always runtime, so the option state cannot change this.
+      expect(found[0]?.message).toContain('"node:path"')
+      expect(found[0]?.message).not.toContain('node_modules')
+    }
+  })
+
+  it('the erased kinds drop out under ignoreTypeImports, and the runtime ones do not', () => {
+    const lenient = identify(
+      modules(p)
+        .should()
+        .onlyImportFromWithOptions([inFixture('allowed/*')], { ignoreTypeImports: true })
+        .violations(),
+    )
+    expect(lenient).not.toContain('src/consumer-reexport-type.ts:2')
+    expect(lenient).not.toContain('src/consumer-type-expr.ts:2')
+    expect(lenient).not.toContain('src/imports-twice.ts:6')
+    expect(lenient).toContain('src/consumer-reexport.ts:3')
+    expect(lenient).toContain('src/consumer-dynamic.ts:2')
+    expect(lenient).toHaveLength(11)
+  })
+})
+
+/**
+ * §4's per-kind message contract, applied to the **second** condition.
+ *
+ * Item 12 pins `edgeVerb` for `notImportFrom`. Nothing pinned `edgeValuePhrase` or
+ * `edgeVerb('type-expression')`, and three reverts were measured green against the
+ * whole 2556-test suite:
+ *
+ * | revert                                                  | consequence                            |
+ * | ------------------------------------------------------- | -------------------------------------- |
+ * | `edgeValuePhrase('reexport')` → `'a value import from'` | `mixed.ts` 3 findings, one MORE collision |
+ * | `edgeValuePhrase('import')` → anything else             | every baselined finding invalidated    |
+ * | `edgeVerb('type-expression')` → `'imports'`             | collides with the `import` finding     |
+ *
+ * The first is §4's absorption failure verbatim, and this condition is reachable
+ * from the shipped `preset/layered/type-imports-only`.
+ */
+describe('onlyHaveTypeImportsFrom names each kind too', () => {
+  it('keeps the re-export distinct from the imports of the same module', () => {
+    const found = modules(p)
+      .that()
+      .resideInFile(inFixture('mixed.ts'))
+      .should()
+      .onlyHaveTypeImportsFrom(BANNED)
+      .violations()
+
+    expect(identify(found)).toEqual(['src/mixed.ts:11', 'src/mixed.ts:4', 'src/mixed.ts:5'])
+    const identityOf = (line: number): string | undefined => {
+      const v = found.find((x) => x.line === line)
+      return v === undefined ? undefined : hashViolation(v, fixtureRoot)
+    }
+    // Same shape as item 12: the two imports collide (bug 0028), the re-export does
+    // not. Reverting `edgeValuePhrase('reexport')` to the import phrase collapses
+    // the second assertion.
+    expect(identityOf(4)).toBe(identityOf(11))
+    expect(identityOf(5)).not.toBe(identityOf(4))
+  })
+
+  it('keeps the `import` sentence byte-identical, so existing baselines survive', () => {
+    const found = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-import.ts'))
+      .should()
+      .onlyHaveTypeImportsFrom(BANNED)
+      .violations()
+    expect(found).toHaveLength(1)
+    expect(found[0]?.message).toBe(
+      `consumer-import.ts has a value import from ` +
+        `"${path.join(fixtureRoot, 'src/banned/secret.ts')}" which should be a type-only import`,
+    )
+  })
+
+  it('gives type-expression its own verb, distinct from an import of the same target', () => {
+    const typeExpr = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-type-expr.ts'))
+      .should()
+      .notImportFrom(BANNED)
+      .violations()
+    const plain = modules(p)
+      .that()
+      .resideInFile(inFixture('consumer-import.ts'))
+      .should()
+      .notImportFrom(BANNED)
+      .violations()
+
+    expect(typeExpr[0]?.message).toContain(' references the type from ')
+    expect(typeExpr[0]?.message).not.toMatch(/consumer-type-expr\.ts imports "/)
+    expect(typeExpr[0]?.message).not.toBe(plain[0]?.message)
   })
 })

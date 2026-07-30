@@ -251,7 +251,18 @@ Each kind a condition can report gets its own verb: `re-exports`, `dynamically i
 
 **Not to be confused with [bug 0028](../bugs/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).** Measured on the _current_ build, 8 of 47 findings already collide — every pair `import`/`import`. On a full `strictBoundaries` run the rate is **362 findings / 329 distinct identities / 33 collided groups / 66 findings in collisions — 18%**. Per-kind verbs do **not** fix those. Pre-existing, filed separately, and its preferred fix (producer-set `identity`) changes no printed text, so it needs no sequencing against this plan.
 
-**But §4 creates exactly one _new_ within-kind collision, and it is worth the number.** Measured over this repo: 102 runtime re-export edges, of which exactly **one** importer has two to the same target — `src/graphql/index.ts → src/graphql/resolver-rule-builder.ts`, twice. So one new finding will be absorbed by another's baseline hash, and item 13's "the new-kind findings are reported as new" is false for that one pair. Volume-wise §4 still needs no sequencing; put the number in so nobody rediscovers it as a bug.
+**§4 makes bug 0028's incidence much worse, and the first number here was wrong by two orders of magnitude.** Draft 4 said "exactly one new within-kind collision", from a proxy that grouped `(importer, kind, target)` over runtime re-exports and found one pair. That proxy **filtered out `typeOnly` edges, which is exactly where the collisions are**: `export { X } from './core/project.js'` and `export type { Y } from './core/project.js'` both render `index.ts re-exports "…/project.ts" …`, byte-identical, so they share a hash.
+
+Measured on the real identity, over this repo's own barrel:
+
+```
+src/index.ts: 114 findings, 87 distinct identities
+  26 colliding groups, 53 findings inside them  ->  46.5% share an identity
+```
+
+So the incidence moves from "two imports of one module, uncommon" to **"the barrel, always"** — on the very file this release makes dependency-bearing. The consequence is an instruction, not a statistic: **do not baseline a barrel.** Accepting one entry accepts its siblings, and a re-export added later is silently pre-accepted. Exclude the barrel by path or downgrade it to `warn` instead. This belongs in the changelog and in `docs/upgrading.md`'s 0.28.0 row, not only here.
+
+Per-kind verbs still earn their place — they stop a re-export colliding with an _import_ of the same module, which is the migration promise — and bug 0028 remains the right owner for same-kind collisions.
 
 ## Guards
 

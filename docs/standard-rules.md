@@ -265,6 +265,13 @@ modules(p)
   .check()
 ```
 
+> **Careful with `.excluding('index.ts')` in a _dependency_ rule.** `element` is matched
+> as a **basename**, so that silences every `index.ts` in the project at once — including
+> their legitimate imports. It is safe here, in a reverse-graph rule about entry points.
+> Since v0.28.0 barrels carry dependencies (this repo's own `src/index.ts` went from 0 to
+> 114), so it is the line teams reach for on their first red, in the wrong place. Use a
+> path glob — `'**/src/index.ts'` — see [Setup Best Practices](/setup-best-practices).
+
 **Note:** Every form that names a module is resolved: static `import`, `export … from`, dynamic `import()` (including a plain template literal, ``import(`./x.js`)``), `type X = import('…').Y`, and `require()` — both `require('s')` in a `.js` file and `import x = require('s')`. Only a **computed** specifier is not resolved (`import('./' + name)`), because there is no specifier to resolve. A `declare module './rel.js' { … }` augmentation is also invisible: the compiler routes it away from the module-specifier list, so nothing here can see it.
 
 **A hole, stated:** no _dependency_ condition enforces `require`. `notImportFrom` and its siblings classify a `require` edge and then skip it, because CJS reds land in interop and generated `.d.ts` where the remedy is usually "nothing you can do". The reverse-graph conditions on this page — `beImported()`, `noDeadModules()`, `onlyBeImportedVia()` — **do** count it, because there the question is "is anything referencing this file", and a `require` means yes. The sanctioned forward alternative is `modules(p).should().notContain(call('require'))`, with two limits: it cannot express a path glob, and it does **not** match `import x = require('s')` at all, which is an `ExternalModuleReference` rather than a call. So for that one form there is no way, sanctioned or otherwise, to ban a path.

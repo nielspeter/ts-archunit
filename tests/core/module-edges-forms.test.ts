@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
-import { Project } from 'ts-morph'
+import { Node, Project } from 'ts-morph'
 import { edgesOf, moduleEdges } from '../../src/core/module-edges.js'
 import type { ModuleEdge } from '../../src/core/module-edges.js'
 
@@ -227,5 +227,47 @@ describe('moduleEdges over many files', () => {
     }
     expect(map.get(project.getSourceFileOrThrow('target.ts').getFilePath())).toEqual([])
     expect(map.get(project.getSourceFileOrThrow('forms.ts').getFilePath())).toHaveLength(24)
+  })
+})
+
+describe('the fixture still carries the property it is asserted for', () => {
+  /**
+   * The multi-line forms are the ONLY thing distinguishing a statement/carrier line
+   * from a literal line, and they are one `prettier --write` away from being gone.
+   *
+   * `.prettierignore` holds that today — measured, and it works. But if the fixture
+   * were ever collapsed, the 24-row expected list above becomes byte-identical under
+   * both `line` derivations, and the cheapest way to make a 24-row line diff green is
+   * to regenerate the list — after which `line = literal.getStartLineNumber()` passes
+   * everything.
+   *
+   * So this derives the property from the fixture instead of restating line numbers:
+   * a regenerated expected list cannot satisfy it.
+   */
+  it('has a form of every kind whose carrier line differs from its literal line', () => {
+    const sourceFile = project.getSourceFileOrThrow('forms.ts')
+    const moved = new Set<string>()
+    for (const literal of sourceFile.getImportStringLiterals()) {
+      const carrier = literal.getFirstAncestor(
+        (a) =>
+          Node.isImportDeclaration(a) ||
+          Node.isExportDeclaration(a) ||
+          Node.isImportEqualsDeclaration(a) ||
+          Node.isCallExpression(a) ||
+          Node.isImportTypeNode(a),
+      )
+      if (carrier !== undefined && carrier.getStartLineNumber() !== literal.getStartLineNumber()) {
+        moved.add(carrier.getKindName())
+      }
+    }
+    // One per kind. `getKindName()` says `ImportType` where the ts-morph guard is
+    // `isImportTypeNode` — asserted as the kind name, not the guard name. If a
+    // formatter collapses the fixture this list shrinks and names the cause.
+    expect([...moved].sort()).toEqual([
+      'CallExpression',
+      'ExportDeclaration',
+      'ImportDeclaration',
+      'ImportType',
+    ])
   })
 })

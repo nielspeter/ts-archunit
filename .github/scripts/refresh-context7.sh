@@ -23,6 +23,20 @@
 # `{"error":"unauthorized","message":"… provide a valid API key"}` and Clerk auth
 # headers, so Context7 now requires authentication that the action never sent.
 #
+# ## The body contract, measured with a live key on 2026-07-30
+#
+#   {"libraryName":"/nielspeter/ts-archunit"}  -> 200 {"message":"Refresh started successfully"}
+#   {"libraryName":"nielspeter/ts-archunit"}   -> 404 library_not_found  (leading slash required)
+#   {"libraryName":"ts-archunit"}              -> 404 library_not_found
+#   {"requestedLibrary":"…"}                   -> 400 validation_error
+#
+# The field is `libraryName` and the value is the full id including the leading
+# slash. This script's first version sent `requestedLibrary` and every unauthed
+# probe answered 401 before validation ran, so the wrong field name was invisible
+# until a real key existed — the 401 masked a 400. The field name was recovered by
+# sending a NUMBER and watching the error change from "received undefined" to
+# "received number", which is the only way this API names its schema.
+#
 # ## The two honesty guards
 #
 # 1. **Content type, not just status.** A 200 that is not JSON is the page route,
@@ -35,12 +49,18 @@
 set -euo pipefail
 
 LIBRARY="${CONTEXT7_LIBRARY:-/nielspeter/ts-archunit}"
-SEARCH="https://context7.com/api/v1/search?query=$(basename "$LIBRARY")"
+SEARCH="https://context7.com/api/v1/search?query=${LIBRARY}"
 POLL_ATTEMPTS="${CONTEXT7_POLL_ATTEMPTS:-6}"
 POLL_SECONDS="${CONTEXT7_POLL_SECONDS:-30}"
 
 fail() {
   echo "::error title=Context7 refresh failed::$1"
+  # Restored from the step this script replaced. It is release-specific, so it is
+  # opt-in via env rather than always printed — `context7.yml` has no publish to
+  # protect and the sentence would be false there.
+  if [ -n "${CONTEXT7_RELEASE_CONTEXT:-}" ]; then
+    echo "::error title=The package published fine::This job is the DOCS INDEX only. The npm publish and the GitHub release already succeeded and are immutable. Fix: run the 'Update Context7 Docs' workflow once this is resolved. Do NOT re-run this run's publish job — npm rejects a version that already exists."
+  fi
   exit 1
 }
 
@@ -50,20 +70,40 @@ fi
 
 # The index's own timestamp BEFORE the refresh, so the check below compares two
 # independently produced values rather than trusting the refresh's self-report.
-current_update_date() {
-  curl -sS --max-time 60 "$SEARCH" \
+# Read the index once. Prints `<lastUpdateDate>|<state>`, or the sentinel
+# `UNREADABLE` when the request or the parse failed.
+#
+# Never fails the script: `set -e` plus `$(…)` means a DNS blip or a 5xx would hard
+# exit — including AFTER a successful refresh, reding a release run that already did
+# its job, with no remedy text. And an empty answer is NOT the same as an unreadable
+# one: "the library is not in the results" and "we could not ask" lead to different
+# verdicts, and the first version of this reported both as "the index did not move".
+read_index() {
+  curl -sS --max-time 30 "$SEARCH" 2>/dev/null \
     | python3 -c "
 import json,sys
 library = sys.argv[1]
 try:
     results = json.load(sys.stdin).get('results', [])
 except Exception:
-    print(''); raise SystemExit(0)
+    print('UNREADABLE'); raise SystemExit(0)
 for entry in results:
     if entry.get('id') == library:
-        print(entry.get('lastUpdateDate', '')); raise SystemExit(0)
-print('')
-" "$LIBRARY"
+        print(f\"{entry.get('lastUpdateDate','')}|{entry.get('state','')}\"); raise SystemExit(0)
+print('|')
+" "$LIBRARY" 2>/dev/null || echo 'UNREADABLE'
+}
+
+current_update_date() {
+  local raw; raw="$(read_index)"
+  if [ "$raw" = 'UNREADABLE' ]; then echo 'UNREADABLE'; else echo "${raw%%|*}"; fi
+}
+
+# `state` separates "still indexing" from "nothing happened" — a materially
+# different verdict, and free in the same response.
+current_state() {
+  local raw; raw="$(read_index)"
+  if [ "$raw" = 'UNREADABLE' ]; then echo 'unknown'; else echo "${raw##*|}"; fi
 }
 
 before="$(current_update_date)"
@@ -72,12 +112,12 @@ echo "Indexed update at:  ${before:-<not indexed>}"
 
 echo "Requesting a refresh…"
 status_and_type="$(
-  curl -sS --max-time 900 -o /tmp/context7-response \
+  curl -sS --max-time 60 -o /tmp/context7-response \
     -w '%{http_code} %{content_type}' \
     -X POST 'https://context7.com/api/v1/refresh' \
     -H "Authorization: Bearer ${CONTEXT7_API_KEY}" \
     -H 'Content-Type: application/json' \
-    -d "{\"requestedLibrary\":\"${LIBRARY}\"}"
+    -d "{\"libraryName\":\"${LIBRARY}\"}"
 )"
 code="${status_and_type%% *}"
 content_type="${status_and_type#* }"
@@ -90,18 +130,30 @@ case "$content_type" in
   application/json*) ;;
   *) fail "HTTP $code but the response is '$content_type', not JSON. A non-JSON 200 means the request reached a page route rather than the API — that is what makes the upstream action report success while refreshing nothing." ;;
 esac
-[ "$code" = "200" ] || fail "HTTP $code from POST /api/v1/refresh. 401 means the API key is missing or expired; 405 means the endpoint moved again."
+[ "$code" = "200" ] || fail "HTTP $code from POST /api/v1/refresh. 400 = the request body no longer matches the schema (the field is \`libraryName\`, and a wrong name here is how this script shipped broken once already); 401 = the API key is missing, malformed or expired; 404 = \`$LIBRARY\` is not indexed at all, so add it at https://context7.com/add-library rather than refreshing it; 405 = the endpoint moved again."
 
 # Guard 2: the index has to actually move.
 echo "Waiting for the index to update (up to $((POLL_ATTEMPTS * POLL_SECONDS))s)…"
+unreadable=0
 for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
-  sleep "$POLL_SECONDS"
   after="$(current_update_date)"
-  if [ -n "$after" ] && [ "$after" != "$before" ]; then
+  if [ "$after" = 'UNREADABLE' ]; then
+    unreadable=$((unreadable + 1))
+    echo "  attempt $attempt/$POLL_ATTEMPTS: could not read the index (retrying)"
+  elif [ -n "$after" ] && [ "$after" != "$before" ]; then
     echo "::notice title=Context7 refreshed::$LIBRARY updated at $after (was ${before:-<not indexed>})"
     exit 0
+  else
+    echo "  attempt $attempt/$POLL_ATTEMPTS: state=$(current_state), still ${after:-<not indexed>}"
   fi
-  echo "  attempt $attempt/$POLL_ATTEMPTS: still ${after:-<not indexed>}"
+  [ "$attempt" -lt "$POLL_ATTEMPTS" ] && sleep "$POLL_SECONDS"
 done
 
-fail "The refresh was accepted (HTTP 200) but the index still reports ${before:-<not indexed>} after $((POLL_ATTEMPTS * POLL_SECONDS))s. The request was received and the index did not move, so nothing downstream should treat these docs as current."
+# Three different verdicts, which one message used to conflate.
+if [ "$unreadable" -eq "$POLL_ATTEMPTS" ]; then
+  fail "The refresh was accepted (HTTP 200) but the index could not be read back even once in $((POLL_ATTEMPTS * POLL_SECONDS))s. That is a failure to VERIFY, not a failure to refresh — the docs may well be current. Re-run this job before assuming anything."
+fi
+if [ "$(current_state)" != 'finalized' ]; then
+  fail "The refresh was accepted and the library reports state='$(current_state)', i.e. still indexing after $((POLL_ATTEMPTS * POLL_SECONDS))s. Nothing is wrong; the poll budget is too short. Raise CONTEXT7_POLL_ATTEMPTS and re-run — do NOT re-run the publish job."
+fi
+fail "The refresh was accepted (HTTP 200), the library reports state='finalized', and \`lastUpdateDate\` is unchanged at ${before:-<not indexed>} after $((POLL_ATTEMPTS * POLL_SECONDS))s. Either the request did nothing, or this release changed nothing Context7 indexes (a src/-only release with no docs/ or *.md edits legitimately leaves the timestamp alone). Check the diff before treating this as broken."

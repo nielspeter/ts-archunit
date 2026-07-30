@@ -2,7 +2,7 @@ import picomatch from 'picomatch'
 import { type SourceFile, type Project, Node } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
-import { edgesOf } from '../core/module-edges.js'
+import { moduleEdges } from '../core/module-edges.js'
 
 // ─── Reverse import graph (cached per ts-morph Project) ──────────
 
@@ -38,38 +38,6 @@ function addToGraph(graph: ReverseImportGraph, targetPath: string, sf: SourceFil
   }
 }
 
-/**
- * Index every module edge leaving `sf` into the reverse graph.
- *
- * Replaces three hand-rolled collectors — static imports via
- * `getModuleSpecifierSourceFile()`, re-exports the same way, and dynamic imports
- * via a bespoke `resolveDynamicImport` that tried eight filename candidates and
- * skipped every non-relative specifier. That last one was bug 0014 in the reverse
- * direction: `import('some-installed-pkg')` resolved to nothing, so a module
- * reachable only that way looked dead.
- *
- * **Every kind counts here, `require` and `type-expression` included** — which is
- * the opposite of the forward conditions, and deliberately so. The two directions
- * ask different questions:
- *
- * | direction | question                                  | a `require` edge means            |
- * | --------- | ----------------------------------------- | --------------------------------- |
- * | forward   | does this file depend on something banned? | a finding with no usable remedy   |
- * | reverse   | is anything referencing this file?         | **yes** — it is not dead          |
- *
- * Excluding `require` here would report a module that CJS code requires as an
- * orphan, and excluding `type-expression` would report one that only a type
- * position references — both are false positives, and deleting either module
- * breaks the build. The forward exclusion avoids an unactionable finding; the same
- * exclusion here would manufacture a wrong one.
- */
-function indexEdges(graph: ReverseImportGraph, sf: SourceFile): void {
-  for (const edge of edgesOf(sf)) {
-    if (edge.resolvedPath === undefined) continue
-    addToGraph(graph, edge.resolvedPath, sf)
-  }
-}
-
 function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
   if (sourceFiles.length === 0) return new Map()
 
@@ -81,8 +49,31 @@ function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
 
   const graph: ReverseImportGraph = new Map()
 
-  for (const sf of sourceFiles) {
-    indexEdges(graph, sf)
+  // **Every kind counts here, `require` and `type-expression` included** — the
+  // opposite of the forward conditions, and deliberately so. The two directions
+  // ask different questions:
+  //
+  // | direction | question                                   | a `require` edge means          |
+  // | --------- | ------------------------------------------ | ------------------------------- |
+  // | forward   | does this file depend on something banned? | a finding with no usable remedy |
+  // | reverse   | is anything referencing this file?          | **yes** — it is not dead        |
+  //
+  // Excluding `require` here would report a module that CJS code requires as an
+  // orphan, and excluding `type-expression` would report one that only a type
+  // position references — both false positives, and deleting either module breaks
+  // the build. The forward exclusion avoids an unactionable finding; the same
+  // exclusion here would manufacture a wrong one.
+  //
+  // The one caller that genuinely has a file SET, so it is the one that uses the
+  // bulk entry point. `moduleEdges` was previously called by nothing in `src/` —
+  // every site used the per-file `edgesOf`, including this loop — which made its
+  // "one crossing rather than N" docstring a claim about code that did not exist.
+  const byFile = moduleEdges(sourceFiles)
+  for (const importer of sourceFiles) {
+    for (const edge of byFile.get(importer.getFilePath()) ?? []) {
+      if (edge.resolvedPath === undefined) continue
+      addToGraph(graph, edge.resolvedPath, importer)
+    }
   }
 
   graphCache.set(project, graph)
@@ -100,8 +91,15 @@ function getReverseImportGraph(sourceFiles: SourceFile[]): ReverseImportGraph {
  * Modules with zero importers pass vacuously. Chain `.andShould().beImported()`
  * if you also want to catch orphaned files.
  *
- * Both static `import` declarations and dynamic `import()` expressions with
- * string-literal specifiers are resolved. `require()` calls are not resolved.
+ * **Every kind of reference counts here**: `import`, `export … from`, `import()`,
+ * `type X = import('…').Y`, and **`require()`** — both `require('s')` in a `.js`
+ * file and `import x = require('s')`. Only a computed specifier
+ * (`import('./' + name)`) is invisible, because there is no specifier to
+ * resolve, along with a `declare module './rel.js'` augmentation.
+ *
+ * That is wider than the *forward* dependency conditions, which exclude
+ * `require` — deliberately, and see `indexEdges` for why the same exclusion
+ * would be wrong here.
  */
 export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
   const matchers = globs.map((g) => picomatch(g))
@@ -143,9 +141,15 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
  * Detects dead/orphaned modules that nobody references.
  * Use `.excluding('index.ts', 'main.ts')` to skip entry points.
  *
- * Both static `import` declarations and dynamic `import()` expressions with
- * string-literal specifiers are resolved. Modules loaded via `require()` or
- * dynamic imports with computed specifiers will still be falsely reported.
+ * **A module referenced by any kind of edge is not dead**, including
+ * `export … from`, `import()`, a type-only reference, and `require()` in either
+ * spelling. Since v0.28.0 that means **fewer** false orphans than before — if
+ * you carry `.excluding()` entries for modules only reachable via `require()` or
+ * a re-export, they are no longer needed.
+ *
+ * Two shapes are still invisible and will be falsely reported: a computed
+ * specifier (`import('./' + name)`), and a module referenced only from a
+ * `declare module './rel.js'` augmentation.
  */
 export function beImported(): Condition<SourceFile> {
   return {

@@ -172,3 +172,70 @@ describe('item 22 — a relative specifier resolves to where the path says', () 
     ])
   })
 })
+
+/**
+ * Item 18 — the positive control the dogfood suite could not be.
+ *
+ * `tests/archunit/arch-rules.test.ts` passes **39/39 with `edgesOf` returning
+ * `[]`** — measured, both before and after this release. Those are this repo's own
+ * architecture rules, and they are the one place the walk could be checked against
+ * real code at corpus scale; instead nothing there notices if it collects nothing.
+ *
+ * **Count floors and named structural edges, not a `relpath:line` snapshot.** Draft
+ * 3 specified a list derived from `src/` after the widening, which is a snapshot pin
+ * (ADR-008) — it churns on any import moving, and the cheapest way to green a churn
+ * is to regenerate it, which is how a guard stops guarding.
+ */
+describe('item 18 — the walk sees this repository`s own real edges', () => {
+  const srcEdges = (): { kind: string; from: string; to: string | undefined }[] => {
+    const rows: { kind: string; from: string; to: string | undefined }[] = []
+    for (const sf of sourceFiles) {
+      const from = sf.getFilePath()
+      if (!from.includes('/src/') || from.includes('/tests/')) continue
+      for (const edge of edgesOf(sf)) {
+        rows.push({ kind: edge.kind, from, to: edge.resolvedPath })
+      }
+    }
+    return rows
+  }
+
+  it('meets a floor for every kind `src/` actually contains', () => {
+    const rows = srcEdges()
+    const count = (kind: string): number => rows.filter((r) => r.kind === kind).length
+
+    // Floors, well below the measured 607 / 153, so ordinary churn does not move
+    // them and a collapse to zero cannot hide.
+    expect(count('import')).toBeGreaterThan(400)
+    expect(count('reexport')).toBeGreaterThan(100)
+    // `src/` contains zero of the other three — asserted so that a future one
+    // arrives visibly rather than silently.
+    expect(count('dynamic')).toBe(0)
+    expect(count('require')).toBe(0)
+    expect(count('type-expression')).toBe(0)
+  })
+
+  it('sees named structural edges that survive unrelated code moving', () => {
+    const rows = srcEdges()
+    const has = (fromEnds: string, toEnds: string, kind: string): boolean =>
+      rows.some(
+        (r) => r.from.endsWith(fromEnds) && r.to?.endsWith(toEnds) === true && r.kind === kind,
+      )
+
+    // The barrel re-exporting the project loader: structural, and the shape this
+    // whole release exists to see. It was invisible before v0.28.0.
+    expect(has('/src/index.ts', '/src/core/project.ts', 'reexport')).toBe(true)
+    // A plain import that has to exist for the library to function at all.
+    expect(has('/src/conditions/dependency.ts', '/src/core/module-edges.ts', 'import')).toBe(true)
+    expect(
+      has('/src/conditions/reverse-dependency.ts', '/src/core/module-edges.ts', 'import'),
+    ).toBe(true)
+  })
+
+  it('resolves nearly every edge in `src/`, so a silent resolution failure shows', () => {
+    const rows = srcEdges()
+    const unresolved = rows.filter((r) => r.to === undefined)
+    // Bare package specifiers legitimately do not resolve, so this is a ratio rather
+    // than zero — but a broken `getSymbol()` would send it toward 100%.
+    expect(unresolved.length / rows.length).toBeLessThan(0.2)
+  })
+})

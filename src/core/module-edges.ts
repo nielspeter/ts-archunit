@@ -117,12 +117,18 @@ export interface ModuleEdge {
  * reports a multiple-slowdown, the fix is a cache of **resolution**, not of the
  * walk.
  *
- * A bulk signature with no single-file sibling, deliberately: `Predicate<T>` is
- * per-element, so the predicate sites call this with one file at a time. That is
- * not the N-crossings problem ADR-007 rule 2 addresses — the walk has no
- * per-project setup, so N calls of one file cost the same total as one call of N
- * files, and the checker warm-up is shared. What it forecloses is batching a
- * resolution cache later, which is recorded rather than hidden.
+ * **Used by the reverse graph**, which is the one caller holding a whole file set
+ * (`conditions/reverse-dependency.ts`). The four conditions and two predicates
+ * call the per-file {@link edgesOf} instead, because `Predicate<T>` is
+ * per-element by construction.
+ *
+ * Having both is not an ADR-007 rule-2 down-payment and this docstring used to
+ * claim it was. Measured: the walk has no per-project setup, so N calls of one
+ * file cost the same total as one call of N files — 509 single-file calls and one
+ * bulk call both land in the same 10.8–16.7ms warm band, and the ~193ms cold cost
+ * is checker warm-up that is shared either way. The genuine down-payment is the
+ * **ts-morph-free return type**; this signature's value is that it is where a
+ * resolution cache would go, and it now has a real caller to hang one on.
  */
 export function moduleEdges(
   files: readonly SourceFile[],
@@ -141,15 +147,21 @@ export function moduleEdges(
  * would otherwise build a one-entry `Map` per file just to read it back out.
  */
 export function edgesOf(sourceFile: SourceFile): readonly ModuleEdge[] {
-  const edges: ModuleEdge[] = []
+  const edges: (ModuleEdge & { pos: number })[] = []
   for (const literal of sourceFile.getImportStringLiterals()) {
     const parent = literal.getParent()
     if (parent === undefined) continue
     const kind = kindOf(parent)
     if (kind === undefined) continue
     edges.push({
+      // The literal's absolute position, so the sort below is genuine source
+      // order. It is dropped from the public shape by the `map` at the end.
+      pos: literal.getPos(),
       kind,
-      // NOT `getLiteralValue()`, and NOT narrowed: see the module docstring.
+      // NOT narrowed: see the module docstring. (`getLiteralValue()` would also
+      // work — measured, both accessors return the same cooked text for both
+      // literal kinds. The hazard is the narrowing, not the accessor; an earlier
+      // version of this comment forbade the sibling accessor on no evidence.)
       specifier: literal.getLiteralText(),
       resolvedPath: resolve(literal),
       line: statementLine(literal),
@@ -163,9 +175,20 @@ export function edgesOf(sourceFile: SourceFile): readonly ModuleEdge[] {
       // would not be, and item 8's fixture is exactly such a file.
     })
   }
-  return edges.length > 1
-    ? [...edges].sort((a, b) => a.line - b.line || a.specifier.localeCompare(b.specifier))
-    : edges
+  // Source order, by the literal's absolute position.
+  //
+  // This used to be `(line, specifier.localeCompare(...))`, which was two defects
+  // in one line. The comment claimed "the literal's absolute position" and the
+  // code did not use it — measured, `import { Z } from './z.js'; import { A } from
+  // './a.js'` on ONE line came back `./a.js, ./z.js` against declaration order
+  // `./z.js, ./a.js`, which is one same-line double import away from a false red
+  // in the corpus sequence-equality test. And `localeCompare` is ICU/locale
+  // sensitive — exactly the machine-dependent ordering `conditions/slice.ts` goes
+  // out of its way to eliminate, because a value that differs per machine gives
+  // one finding two identities.
+  return (edges.length > 1 ? [...edges].sort((a, b) => a.pos - b.pos) : edges).map(
+    ({ pos: _pos, ...edge }) => edge,
+  )
 }
 
 /** Which of the five forms this literal belongs to, or `undefined` if none. */
@@ -218,19 +241,33 @@ function resolve(literal: Node): string | undefined {
 /**
  * The line of the statement carrying the edge, not of the literal.
  *
- * The nearest `Statement` ancestor, which is the `ImportDeclaration` or
- * `ExportDeclaration` itself for the declaration forms, the `VariableStatement`
- * for `const x = await import(…)`, the `TypeAliasDeclaration` for `type A =
- * import(…).X`, and the `ImportEqualsDeclaration` for `import x = require(…)`.
- * Verified for a multi-line form of each.
+ * The nearest **edge-carrying node** — the declaration, call or import-type that
+ * names the module — not the nearest enclosing `Statement`.
  *
- * Falls back to the literal's own line for a literal with no statement ancestor
- * — which the 20-form corpus does not produce, so the fallback is a guard rather
- * than a path.
+ * For the declaration forms the two are the same node, so `import` still equals
+ * `decl.getStartLineNumber()` and the corpus equality test holds. They diverge
+ * for an expression form nested inside a larger statement, and there the
+ * statement is the wrong answer: measured, `register({ handlers: { a: () =>
+ * import('./banned.js') } })` spanning lines 3–7 reported **line 3**, pointing the
+ * code frame at `register(` rather than at the import, and a class property
+ * `loader = import('./x.js')` reported the `ClassDeclaration`'s line because a
+ * `PropertyDeclaration` is not a `Statement`. A lazily-loaded route inside an
+ * object literal is the commonest real dynamic import, so that was the common
+ * case rather than a corner.
+ *
+ * Falls back to the literal's own line if no carrier is found, which the 20-form
+ * corpus does not produce — a guard, not a path.
  */
 function statementLine(literal: Node): number {
-  const statement = literal.getFirstAncestor((ancestor) => Node.isStatement(ancestor))
-  return (statement ?? literal).getStartLineNumber()
+  const carrier = literal.getFirstAncestor(
+    (a) =>
+      Node.isImportDeclaration(a) ||
+      Node.isExportDeclaration(a) ||
+      Node.isImportEqualsDeclaration(a) ||
+      Node.isCallExpression(a) ||
+      Node.isImportTypeNode(a),
+  )
+  return (carrier ?? literal).getStartLineNumber()
 }
 
 /**
@@ -352,11 +389,22 @@ export function edgeValuePhrase(kind: ModuleEdgeKind): string {
  * the same reason: there is no remedy at all. You cannot erase an
  * `await import(…)`.
  */
-export function edgeTypeOnlyRemedy(kind: ModuleEdgeKind): string {
-  switch (kind) {
+export function edgeTypeOnlyRemedy(edge: Pick<ModuleEdge, 'kind' | 'names'>): string {
+  switch (edge.kind) {
     case 'import':
       return 'Change it to `import type { … }` so the dependency is erased at compile time.'
     case 'reexport':
+      // A STAR re-export has no names to put in the braces, and telling the reader
+      // to write `export type { … } from` there asks them to enumerate the target's
+      // entire export list — which an agent will invent rather than look up.
+      // `export type * from` is the one-token fix, and `isTypeOnlyReExport`
+      // already recognises it.
+      if (edge.names.length === 0) {
+        return (
+          'Change it to `export type * from …`, which erases the dependency. Note this removes the ' +
+          'runtime re-exports too — check no consumer imports any of them as a value.'
+        )
+      }
       return (
         'Change it to `export type { … } from …`, which erases the dependency but also removes a ' +
         'runtime export — check no consumer imports it as a value. If one does, re-export it from ' +
@@ -368,5 +416,25 @@ export function edgeTypeOnlyRemedy(kind: ModuleEdgeKind): string {
       return 'This edge is already erased; no change is needed.'
     case 'require':
       return 'Convert the `require` to an `import type { … }`, or move the dependency.'
+  }
+}
+
+/**
+ * The noun for this kind of edge, for `onlyHaveTypeImportsFrom`'s sentence tail.
+ *
+ * `edgeValuePhrase` was made per-kind and the tail was not, so a re-export read
+ * "has a runtime re-export of … which should be a type-only **import**". The two
+ * halves have to agree or the sentence contradicts itself.
+ */
+export function edgeTypeOnlyNoun(kind: ModuleEdgeKind): string {
+  switch (kind) {
+    case 'import':
+    case 'dynamic':
+    case 'require':
+      return 'import'
+    case 'reexport':
+      return 're-export'
+    case 'type-expression':
+      return 'reference'
   }
 }

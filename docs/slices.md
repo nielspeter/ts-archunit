@@ -1,4 +1,17 @@
-# Slices & Layers
+# Slices
+
+::: warning The slice graph sees static imports only
+`beFreeOfCycles()`, `notDependOn()` and `respectLayerOrder()` build their dependency
+graph from static `import` declarations. Since v0.28.0 that is **narrower** than the
+module conditions: `export { x } from './b.js'` is a dependency to `notImportFrom`
+and invisible here.
+
+A barrel re-export is _the_ classic cycle shape, so `a → barrel → a` is exactly what
+the cycle check cannot see — and the asymmetry shows up inside one `strictBoundaries`
+run, which will report a barrel re-export as a cross-boundary violation and the cycle
+it creates as absent. Deliberate; a cycle finding is the hardest class to remedy and
+belongs to its own release.
+::: & Layers
 
 ::: tip Rule file or test file?
 Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.

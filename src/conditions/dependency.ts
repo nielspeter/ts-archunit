@@ -6,6 +6,7 @@ import { candidatesFor, matchedCandidate } from '../core/import-candidates.js'
 import {
   edgeTypeOnlyRemedy,
   edgeValuePhrase,
+  edgeTypeOnlyNoun,
   edgeVerb,
   edgesOf,
   type ModuleEdge,
@@ -208,9 +209,36 @@ export function notImportFrom(
  * Completes the import-condition family: onlyImportFrom (all),
  * notImportFrom (none), dependOn (at least one).
  *
- * Only considers static `import` declarations. Dynamic `import()`
- * expressions are not checked — use `beImported()` for import-graph
- * analysis that includes dynamic imports.
+ * **Sees every kind of module edge**, not just static imports: `import`,
+ * `export … from`, `import()` and `type X = import('…').Y`. (CJS `require` is
+ * classified and deliberately not enforced — see `DEPENDENCY_KINDS`.)
+ *
+ * **What counts as a dependency differs per kind, and the asymmetry is
+ * deliberate.** This is the only condition in the library where it does:
+ *
+ * | edge                              | satisfies `dependOn`?              |
+ * | --------------------------------- | ---------------------------------- |
+ * | `import { x } from '…'`           | yes                                |
+ * | `import type { X } from '…'`      | **yes** — unchanged; opt out with `{ ignoreTypeImports: true }` |
+ * | `export { x } from '…'`           | yes                                |
+ * | `export type { X } from '…'`      | **no** — erased, so nothing loads  |
+ * | `await import('…')`               | yes                                |
+ * | `type X = import('…').Y`          | **no** — erased                    |
+ *
+ * For `kind === 'import'` the behaviour is exactly what it was before v0.28.0:
+ * an `import type` of the target satisfies the rule, and `{ ignoreTypeImports:
+ * true }` is the shipped opt-in that makes it fail. Requiring runtime there
+ * would be a green→red change to a contract that already has an opt-out.
+ *
+ * For the other kinds it requires **runtime**, because the alternative creates a
+ * new false green: `export type { SecurityConfig } from './security.js'` would
+ * satisfy `dependOn('**\/security/**')` while the server installs nothing — and
+ * on the baseline side that reads as "the violation was fixed".
+ *
+ * **This is a red→green reversal from v0.27.0.** Before v0.28.0 a runtime
+ * re-export or dynamic import left this condition *unsatisfied*, so rules that
+ * failed may now pass. That is the fix, not a regression: the dependency was
+ * always there and the condition could not see it.
  *
  * @example
  * modules(p)
@@ -333,17 +361,29 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
           if (!TYPE_IMPORT_KINDS[edge.kind]) continue
           const importPath = matchedCandidate(edgeCandidates(edge), matchers)
           if (importPath !== undefined && !edge.typeOnly) {
-            violations.push({
-              ...edgeViolation(
-                sf,
-                edge,
-                `${sf.getBaseName()} has ${edgeValuePhrase(edge.kind)} "${importPath}" which should be a type-only import`,
-                context,
-              ),
-              // Per-kind, because a re-export's remedy removes a runtime export
-              // and the reader has to know that before following it.
-              suggestion: edgeTypeOnlyRemedy(edge.kind),
-            })
+            const violation = edgeViolation(
+              sf,
+              edge,
+              `${sf.getBaseName()} has ${edgeValuePhrase(edge.kind)} "${importPath}" which should be a type-only ${edgeTypeOnlyNoun(edge.kind)}`,
+              context,
+            )
+            // A producer-set `suggestion` WINS over the rule author's, because
+            // `execute-rule.ts` resolves `v.suggestion ?? meta?.suggestion`. So it
+            // is set only for the kinds this release introduces, where no remedy
+            // existed before and a per-kind one is strictly better.
+            //
+            // NOT for `kind === 'import'`. Doing so replaced the shipped
+            // `layered/type-imports-only` remedy — which offers "or move the value
+            // you need into a layer this one is allowed to depend on", the only
+            // followable action when the value is needed at runtime — with a
+            // one-option remedy, and silently discarded any consumer's own
+            // `.rule({ suggestion })`. Invisible to the message-identity guards
+            // because `suggestion` is not hashed.
+            violations.push(
+              edge.kind === 'import'
+                ? violation
+                : { ...violation, suggestion: edgeTypeOnlyRemedy(edge) },
+            )
           }
         }
       }

@@ -46,6 +46,24 @@ function canonicalizeCycle(names: readonly (string | undefined)[]): string[] {
   return [...present.slice(start), ...present.slice(0, start)]
 }
 
+/**
+ * Every slice must be free of dependency cycles.
+ *
+ * **The slice graph sees static `import` declarations only**, and since v0.28.0
+ * that is narrower than the module conditions beside it. `export { x } from
+ * './b.js'` is a dependency to `notImportFrom` and invisible here.
+ *
+ * That matters most for the shape it misses: **a barrel re-export is *the* classic
+ * cycle**, so `a → barrel → a` through `export … from` is exactly what this
+ * condition cannot see. And the asymmetry is visible inside a single run —
+ * `strictBoundaries` will report a barrel re-export as a cross-boundary violation
+ * from `no-cross-boundary` and report the cycle it creates as absent from
+ * `no-cycles`.
+ *
+ * Deliberate, not an oversight (plan 0071, Out of scope): a cycle finding is the
+ * hardest class to remedy and belongs to its own upgrade story. Recorded here
+ * because this docstring is read when the rule fails, and a changelog is read once.
+ */
 export function beFreeOfCycles(): Condition<Slice> {
   return {
     description: 'be free of cycles',

@@ -93,12 +93,12 @@ Available on all entry points via `.that()`.
 
 ## Module Predicates
 
-| Export                   | Signature                                                      | Description                                                                        |
-| ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `importFrom`             | `importFrom(...globs)` or `importFrom(globs[], options)`       | Module imports from files matching glob. Options: `{ ignoreTypeImports }`.         |
-| `predicateNotImportFrom` | `notImportFrom(...globs)` or `notImportFrom(globs[], options)` | Module does not import from files matching glob. Options: `{ ignoreTypeImports }`. |
-| `exportSymbolNamed`      | `exportSymbolNamed(name: string)`                              | Module exports a symbol with the name.                                             |
-| `havePathMatching`       | `havePathMatching(glob: string)`                               | Module file path matches the glob.                                                 |
+| Export                   | Signature                                                      | Description                                                                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `importFrom`             | `importFrom(...globs)` or `importFrom(globs[], options)`       | Module has any edge to a path matching glob — `import`, `export … from`, `import()` or `type X = import(…)`. Options: `{ ignoreTypeImports }`. **Selects MORE files since v0.28.0.** |
+| `predicateNotImportFrom` | `notImportFrom(...globs)` or `notImportFrom(globs[], options)` | Module does not import from files matching glob. Options: `{ ignoreTypeImports }`.                                                                                                   |
+| `exportSymbolNamed`      | `exportSymbolNamed(name: string)`                              | Module exports a symbol with the name.                                                                                                                                               |
+| `havePathMatching`       | `havePathMatching(glob: string)`                               | Module file path matches the glob.                                                                                                                                                   |
 
 ## Class Predicates
 
