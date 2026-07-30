@@ -83,7 +83,7 @@ function edgeViolation(
     message,
     because: context.because,
     // `identity` — the canonical form that supersedes `element::message` in the
-    // baseline hash. [Bug 0028](../../bugs/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).
+    // baseline hash. [Bug 0028](../../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).
     //
     // The message carries the basename and the resolved target and nothing else, so
     // two edges from one file to one module are byte-identical and share a hash.

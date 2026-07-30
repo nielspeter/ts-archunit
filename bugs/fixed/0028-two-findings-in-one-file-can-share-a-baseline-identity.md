@@ -1,7 +1,7 @@
 # Bug 0028: two findings in one file can share a baseline identity
 
 **Reported:** 2026-07-29
-**Fixed:** 2026-07-30 — **not yet released**, and it is baseline-invalidating; see below.
+**Fixed:** 2026-07-30, released in **v0.29.0**. Baseline-invalidating; see below.
 **Found in:** all versions through v0.26.0
 **Severity:** Medium — a baseline entry can accept a violation that is not the one it recorded. Not a false green today (the surviving finding is still a real violation), but it makes a baseline's contents untrustworthy as a record, and it silently defeats "accept this one, fix that one".
 

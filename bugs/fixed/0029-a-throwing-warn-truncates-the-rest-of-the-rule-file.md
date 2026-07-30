@@ -1,7 +1,7 @@
 # Bug 0029: a throwing `.warn()` truncates the rest of the rule file, silently
 
 **Reported:** 2026-07-30
-**Fixed:** 2026-07-30
+**Fixed:** 2026-07-30, released in **v0.29.0**
 **Found in:** v0.20.0 (R3a's warn-throw) through v0.26.0
 **Status:** **FIXED** — the CLI now reports the truncation, and each finding is reported once. Guarded by `tests/cli/rule-file-truncation.test.ts` against **real** rule files on disk, with the `export default [...]` control as the discriminator. Six reverts, all caught.
 **Severity:** High — silent coverage loss, shipped by the release whose thesis is that silent

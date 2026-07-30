@@ -231,6 +231,12 @@ those execute the rule immediately and return `undefined`, which the CLI silentl
 skips (the rule never runs in the aggregated report). Use the non-terminal
 `.asSeverity('warn')` to mark a rule as a warning. (Test files are the opposite:
 there you _do_ call `.check()`.)
+
+Since **0.29.0** the CLI also tells you when it happened the other way. A terminal at
+module scope that throws — `.warn()` on a configuration finding does, since 0.23.0 —
+aborts the module, so every rule declared **after** it is never evaluated. The run used
+to look entirely ordinary; it now reports the truncation and names the rule file, because
+"fewer findings than yesterday" is the one outcome you must not read as progress.
 :::
 
 ## JSON output (`--format json`)
