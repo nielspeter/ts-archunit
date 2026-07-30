@@ -158,7 +158,11 @@ modules(p)
   .check()
 ```
 
-`dependOn()` completes the import-condition family: `onlyImportFrom` (all imports must match), `notImportFrom` (no imports may match), `dependOn` (at least one import must match). Like the others, it supports `{ ignoreTypeImports: true }` to exclude type-only imports. All three check static `import` declarations only — for import-graph analysis that includes dynamic `import()`, use `beImported()` or `noDeadModules()`.
+`dependOn()` completes the import-condition family: `onlyImportFrom` (all edges must match), `notImportFrom` (no edge may match), `dependOn` (at least one edge must match). Like the others, it supports `{ ignoreTypeImports: true }` to exclude type-only edges.
+
+**All three see every kind of module edge** — static `import`, `export … from`, dynamic `import()` and `type X = import('…').Y` — not just static imports. Before v0.28.0 they saw static imports only, so `export { x } from './banned.js'` crossed a banned boundary unflagged. `require` edges are classified and deliberately not enforced; see [Standard Rules](/standard-rules#unused-export-detection) for why and for the sanctioned alternative.
+
+`dependOn` is the one condition where "counts as a dependency" differs per kind. A plain `import type` **satisfies** it, exactly as before, and `{ ignoreTypeImports: true }` is the opt-in that makes it fail. But a **type-only re-export does not satisfy it** — `export type { Config } from './security.js'` is erased, so the module it claims to depend on is never loaded, and treating that as satisfied would be a false green rather than a convenience.
 
 ### Type-Only Imports from Domain
 

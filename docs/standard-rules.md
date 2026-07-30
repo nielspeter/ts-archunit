@@ -265,7 +265,9 @@ modules(p)
   .check()
 ```
 
-**Note:** Both static `import` declarations and dynamic `import()` expressions with string-literal specifiers are resolved. Only `require()` calls and dynamic imports with computed specifiers (variables, template literals with substitutions) are not resolved.
+**Note:** Every form that names a module is resolved: static `import`, `export … from`, dynamic `import()` (including a plain template literal, ``import(`./x.js`)``), `type X = import('…').Y`, and `require()` — both `require('s')` in a `.js` file and `import x = require('s')`. Only a **computed** specifier is not resolved (`import('./' + name)`), because there is no specifier to resolve. A `declare module './rel.js' { … }` augmentation is also invisible: the compiler routes it away from the module-specifier list, so nothing here can see it.
+
+**A hole, stated:** no _dependency_ condition enforces `require`. `notImportFrom` and its siblings classify a `require` edge and then skip it, because CJS reds land in interop and generated `.d.ts` where the remedy is usually "nothing you can do". The reverse-graph conditions on this page — `beImported()`, `noDeadModules()`, `onlyBeImportedVia()` — **do** count it, because there the question is "is anything referencing this file", and a `require` means yes. The sanctioned forward alternative is `modules(p).should().notContain(call('require'))`, with two limits: it cannot express a path glob, and it does **not** match `import x = require('s')` at all, which is an `ExternalModuleReference` rather than a call. So for that one form there is no way, sanctioned or otherwise, to ban a path.
 
 **Monorepo note:** In a multi-workspace project, exports consumed by sibling workspaces are invisible to a single `project()` call. Use `workspace()` to unify the import graph across workspaces. See [Modules — Monorepo Setup](/modules#monorepo-setup).
 

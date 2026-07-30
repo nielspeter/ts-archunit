@@ -32,9 +32,9 @@ describe('item 13 — a frozen 0.27.0 baseline replays correctly', () => {
    * from the released version's own output is what makes it a check rather than a
    * restatement.
    */
-  it('was written by v0.27.0 and contains only the two static findings', () => {
+  it('was written by v0.27.0 and contains only the static-import findings', () => {
     const parsed: unknown = JSON.parse(fs.readFileSync(frozen, 'utf-8'))
-    expect(parsed).toMatchObject({ count: 2, hashVersion: 2 })
+    expect(parsed).toMatchObject({ count: 4, hashVersion: 2 })
   })
 
   it('absorbs every pre-existing import finding and reports the new kinds as new', () => {
@@ -42,8 +42,8 @@ describe('item 13 — a frozen 0.27.0 baseline replays correctly', () => {
     const baseline = withBaseline(frozen, { root: fixtureRoot })
     const fresh = baseline.filterNew(all)
 
-    // The whole run, then the delta. 10 total, 2 already accepted, 8 new.
-    expect(all).toHaveLength(10)
+    // The whole run, then the delta. 12 total, 4 already accepted, 8 new.
+    expect(all).toHaveLength(12)
     expect(fresh).toHaveLength(8)
 
     const newIdentities = fresh
@@ -59,10 +59,12 @@ describe('item 13 — a frozen 0.27.0 baseline replays correctly', () => {
       'src/twice.ts:4',
       'src/twice.ts:5',
     ])
-    // The two the baseline accounts for are exactly the static imports, and NOT
+    // The four the baseline accounts for are exactly the static imports, and NOT
     // the re-export on the adjacent line of the same file.
     expect(newIdentities).not.toContain('src/consumer-import.ts:1')
     expect(newIdentities).not.toContain('src/mixed.ts:4')
+    expect(newIdentities).not.toContain('src/imports-twice.ts:5')
+    expect(newIdentities).not.toContain('src/imports-twice.ts:6')
   })
 
   /**

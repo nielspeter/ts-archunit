@@ -106,31 +106,12 @@ jobs:
       # `publish`, which checks out at the top; a separate job starts empty.
       - uses: actions/checkout@v6
 
-      - name: Add/Refresh Context7 Documentation
-        id: context7
-        # Not `continue-on-error`: this job exists to be red when the index is
-        # stale. The action's own failure is not trusted as the signal either —
-        # see the explicit check below.
+      - name: Refresh the Context7 docs index
         env:
-          # rennf93/upsert-context7@1.1 internally uses actions/setup-python@v5 (Node 20)
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-        uses: rennf93/upsert-context7@1.1
-        with:
-          operation: add
-
-      - name: Fail if the index was not refreshed
-        # `if: always()` so this runs even when the action above failed, and the
-        # verdict comes from the action's OWN reported outcome rather than only
-        # from its exit status — v0.23.0's run had `success: false` alongside
-        # annotations, and a check that trusted the exit code alone would have
-        # had nothing to read. An empty `success` output counts as failure: a
-        # missing measurement is not a passing one.
-        if: always()
-        run: |
-          echo "Success: ${{ steps.context7.outputs.success }}"
-          echo "Status: ${{ steps.context7.outputs.status-code }}"
-          echo "Message: ${{ steps.context7.outputs.message }}"
-          if [ "${{ steps.context7.outputs.success }}" != "true" ]; then
-            echo "::error title=Context7 docs index not refreshed::The package published fine and the release is immutable — this is the DOCS INDEX only, and it is still serving the previous version to every agent that asks. Fix: run the 'Update Context7 Docs' workflow (Actions -> Update Context7 Docs -> Run workflow), which re-indexes without cutting a release. Do NOT re-run this run's publish job — npm rejects a version that already exists. Status: ${{ steps.context7.outputs.status-code }}"
-            exit 1
-          fi
+          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+        # `rennf93/upsert-context7@1.1` is gone from here on purpose. Measured
+        # 2026-07-30: its `add` endpoint answers 405, and its `refresh` endpoint is
+        # a page route that answers 200 with HTML — which the action reports as
+        # success. The script checks the content type and then reads the index's
+        # own timestamp back, so neither failure can present as green.
+        run: .github/scripts/refresh-context7.sh

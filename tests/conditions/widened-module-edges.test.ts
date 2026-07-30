@@ -43,6 +43,10 @@ describe('notImportFrom sees every kind (the widening itself)', () => {
       'src/consumer-reexport.ts:3',
       'src/consumer-star.ts:2',
       'src/consumer-type-expr.ts:2',
+      // Two static imports of one target from one file — the reverse graph's
+      // dedup shape (item 20), and both are forward findings.
+      'src/imports-twice.ts:5',
+      'src/imports-twice.ts:6',
       'src/mixed.ts:4',
       'src/mixed.ts:5',
       'src/twice.ts:4',
@@ -343,6 +347,7 @@ describe('items 14 and 21 — the predicates move subjects in opposite direction
       'consumer-reexport.ts',
       'consumer-star.ts',
       'consumer-type-expr.ts',
+      'imports-twice.ts',
       'mixed.ts',
       'twice.ts',
     ])
