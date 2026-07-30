@@ -42,7 +42,7 @@ as a gap.
 
 ## Why plan 0069 does not close it
 
-[Plan 0069](../plans/0069-no-rule-may-certify-nothing.md) guards globs that cannot
+[Plan 0069](../plans/completed/0069-no-rule-may-certify-nothing.md) guards globs that cannot
 match the project. This is a different failure: the glob may be perfectly
 satisfiable and the rule still certifies nothing, because the **subject has no
 edges to test**. A typo'd allowlist glob is the loud case — every import falls
@@ -120,7 +120,7 @@ population is legitimate.
 
 **Do not confuse this with a never-exercised glob.** Plan 0071 draft 2 briefly re-aimed this bug
 at "a denylist glob that matched no edge", which is a glob-declaration fault and belongs to
-[plan 0069](../plans/0069-no-rule-may-certify-nothing.md) R3b — this bug's own "Why plan 0069
+[plan 0069](../plans/completed/0069-no-rule-may-certify-nothing.md) R3b — this bug's own "Why plan 0069
 does not close it" section says exactly that the two mechanisms differ. Two diagnostics, two
 owners:
 

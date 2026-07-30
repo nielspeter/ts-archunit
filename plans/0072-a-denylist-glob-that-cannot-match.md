@@ -2,7 +2,7 @@
 
 **Status:** **REFUTED, 2026-07-30.** Two mechanisms were proposed and both died on
 measurement, and the question was already settled correctly in
-[plan 0069](./0069-no-rule-may-certify-nothing.md)'s decision table before this plan
+[plan 0069](./completed/0069-no-rule-may-certify-nothing.md)'s decision table before this plan
 re-opened it. What survives is a successor with a different shape — an **author-declared
 expectation**, not a diagnosis — specified in "What is actually left" below.
 **Prerequisite for anything here:** [plan 0073](./0073-conditions-declare-their-globs.md).

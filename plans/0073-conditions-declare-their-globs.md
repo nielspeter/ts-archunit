@@ -3,7 +3,7 @@
 **Status:** READY. Smaller than it looks: the interface, the gathering and the stamping all
 exist already and no condition uses them.
 **Priority:** Medium. Not a false green on its own — nothing reports a condition glob today,
-so nothing reports one wrongly. It is the missing half of [plan 0069](./0069-no-rule-may-certify-nothing.md)'s
+so nothing reports one wrongly. It is the missing half of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)'s
 glob model, and the prerequisite for anything that wants to reason about condition globs at
 all.
 **Blocks:** [plan 0072](./0072-a-denylist-glob-that-cannot-match.md)'s successor, if that is
