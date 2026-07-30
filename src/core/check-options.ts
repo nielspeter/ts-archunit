@@ -25,6 +25,20 @@ export interface BaselineFilter {
 export interface DiffFilterLike {
   /** Filter violations to only those in changed files. */
   filterToChanged(violations: ArchViolation[]): ArchViolation[]
+  /**
+   * How many files this filter considers changed, or a negative number when it
+   * could not tell (`DiffFilter` returns -1 when git was unavailable).
+   *
+   * **Optional, and the disclosure degrades rather than guesses.** This is a
+   * structural interface, so a consumer may pass any object with
+   * `filterToChanged`; when `size` is absent the suppression notice omits the
+   * file count instead of inventing one. What it never omits is the suppressed
+   * count itself, because the caller derives that by subtraction rather than
+   * asking the filter (see `core/diff-disclosure.ts`).
+   */
+  readonly size?: number
+  /** The branch diffed against, when the filter knows it. Optional, as `size`. */
+  readonly baseBranch?: string
 }
 
 /**

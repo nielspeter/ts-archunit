@@ -4,6 +4,8 @@ import { diffAware } from '../../helpers/diff-aware.js'
 import type { OutputFormat } from '../../core/check-options.js'
 import type { ArchViolation } from '../../core/violation.js'
 import { writeReport } from '../../core/execute-rule.js'
+import { suppressionNotice } from '../../core/diff-disclosure.js'
+import { writeStderr } from '../../core/stderr.js'
 import { loadRuleFiles } from '../load-rules.js'
 import { attributeToRuleFile, failureOrViolations } from '../rule-file-findings.js'
 
@@ -63,11 +65,33 @@ export async function runCheck(args: CheckArgs): Promise<number> {
 
   let filtered = collected
   if (baseline) filtered = baseline.filterNew(filtered)
-  if (diff) filtered = diff.filterToChanged(filtered)
+
+  // The one surface that can count. `filterToChanged` runs once here over every
+  // collected violation, so `before - after` is the whole run's suppression —
+  // unlike the per-rule terminals, which see one rule each (plan 0071,
+  // `core/diff-disclosure.ts`). Derived by subtraction rather than asked of the
+  // filter, so it holds for a caller-supplied `DiffFilterLike` too.
+  let notice: string | undefined
+  if (diff) {
+    const before = filtered.length
+    filtered = diff.filterToChanged(filtered)
+    notice = suppressionNotice(before - filtered.length, diff.size, diff.baseBranch)
+    if (notice !== undefined) writeStderr(notice)
+  }
 
   // writeReport handles empties: json always emits one document (so a clean run
-  // is still parseable), terminal/github emit nothing.
-  writeReport(filtered, format)
+  // is still parseable), terminal/github emit nothing. The notice rides along as
+  // `summary.reason` so a `--format json` consumer reading only stdout still
+  // learns the report is partial — stderr and stdout are different streams, and
+  // an agent piping one of them would otherwise see `total: 0` and stop.
+  // `reason` is rendered as each violation's "Why:" line on the terminal path
+  // (`format.ts`: `v.because ?? reason`), so a RUN-level notice must not travel
+  // that way — it would appear as the justification for an unrelated finding.
+  // `summary.reason` in JSON is genuinely run-level, so it goes there, and
+  // stderr carries it for every other format. Found by sabotage: removing the
+  // `writeStderr` call left the tests green because the notice was reaching
+  // stderr through the "Why:" line instead.
+  writeReport(filtered, format, format === 'json' ? notice : undefined)
 
   // Exit code = error-severity count; warns are reported but never fail.
   return filtered.filter((v) => (v.severity ?? 'error') === 'error').length

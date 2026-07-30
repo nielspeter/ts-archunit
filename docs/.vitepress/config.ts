@@ -62,6 +62,7 @@ export default defineConfig({
         items: [
           { text: 'CLI', link: '/cli' },
           { text: 'Explain Command', link: '/explain' },
+          { text: 'Upgrading', link: '/upgrading' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
           { text: 'API Reference', link: '/api-reference' },
         ],

@@ -1,9 +1,9 @@
 # Plan 0069 — No rule may certify nothing
 
-**Status:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)** (its 0.22.0 instrument is built and awaiting tag; its 0.23.0 flip closes both bugs), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
+**Status:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)** (**both released** — v0.22.0 shipped the instrument, v0.23.0 the flip; the plan is in `plans/completed/` and bugs 0019/0020 are closed), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
 **Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
 **Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); ~~absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md)~~ — **019 moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)**; closes [bug 0011](../bugs/fixed/0011-dogfood-rules-select-nothing.md).
-**Prerequisites:** [bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) ships first, alone. The single-root refactor (`spike/0014-rule-census`, +456/−165) is **unmerged** and lands as its own commit with its own test pass.
+**Prerequisites: both satisfied.** [Bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) shipped. The single-root refactor **landed** as `85be8ce refactor(core): one root for every builder`, via `feat/0069-r2a-glob-model` rather than the `spike/0014-rule-census` branch this header used to name — that branch still exists and is **not** an ancestor of `main`, so do not read it as the source of truth. Everything since depends on the single root: plan 0070's assertion gate hangs off `TerminalBuilder`, which is what made one hook reach all fifteen builders.
 
 ## Corrections carried into draft 7
 
@@ -318,6 +318,32 @@ So the keyword grep is a starting point, not the checklist. Draft 6 said the che
 
 ---
 
+## R3b gained a fault, 2026-07-30
+
+From [plan 0071](./0071-one-definition-of-a-module-edge.md) and the refutation recorded in
+[bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md): **a glob
+that is satisfiable but matched no edge** belongs to R3b, and it is a different fault from the
+one 0069 already covers.
+
+| Fault                                                                    | Owner                 |
+| ------------------------------------------------------------------------ | --------------------- |
+| A glob that **cannot** match anything in the project (unsatisfiable)     | R3b, already designed |
+| A glob that **can** match but **matched no edge** in this run            | **R3b, new**          |
+| A subject set with no edges at all, so the allowlist was never exercised | bug 0015              |
+
+The new row is the silent one, and 0071's measurement is what shows which case is worth
+reporting: `onlyImportFrom('**/nowhere/**')` over 19 edge-bearing subjects produces **96
+violations** — an allowlist typo is maximally loud and needs no diagnostic. A **denylist** typo is
+the opposite: `notImportFrom('**/legcay/**')` reports zero forever, and that is indistinguishable
+from a ban being respected. So the polarity matters, and `GlobSite` already carries it.
+
+Two prerequisites, so whoever picks this up is not surprised: `diagnose()` currently promises to
+report _"without running any of them"_ and a glob-exercise tally requires running; and `doctor`
+cannot load a rule file that imports vitest, which is a co-equal documented authoring path. Note
+also `src/core/diagnose.ts`'s deliberate skip — _"a positive condition glob is indistinguishable
+from an armed tripwire that has not fired"_ — which is this fault's precedent and must not be
+"fixed" without replacing the reasoning.
+
 ## Releases
 
 **R-any — a commit, not a release. Two edits, not one.** Moving `havePathMatching` from `src/predicates/module.ts:97` to `src/predicates/identity.ts` does **not** close `api/no-single-glob-predicates`: its selector is `resideInFolder('**/src/predicates/module**')`, which matches 0 parent directories before the move and 0 after. The selector must also be retyped to a file kind — `resideInFile('**/src/predicates/module.ts')` — and must stay module-specific, since widening to `'**/src/predicates/**'` would red on `identity.ts` once `havePathMatching` lands there. Verify by running the census on the same commit: it must no longer print `DEAD …:567`. The move itself is API-invisible (`src/index.ts:62` re-exports; there is no `./predicates` subpath in `package.json` exports). Do **not** make `havePathMatching` variadic unless the tree lands first. The other 13 rules are rescoped by construction in the same commit.
@@ -351,6 +377,8 @@ R3a ships first and may ship alone, so it cannot borrow R3b's notes. Three sente
 3. **`.violations()` is the non-throwing surface** if you need to inspect rather than fail.
 
 Plus one hazard that is genuinely new and easy to miss: **in a self-executing rule file, a throwing `.warn()` truncates the rest of the module.** Today `rule1.warn(); rule2.check()` evaluates both, because `.warn()` cannot throw. After R3a a meta-finding in `rule1` aborts module evaluation, the CLI's catch (`src/cli/commands/check.ts:41-50`) folds `rule1`'s finding into the run and the output looks entirely normal — while `rule2` was never registered. Silent coverage loss, shipped by the release whose thesis is that silent coverage loss is the defect. `.check()` already has this hazard; R3a extends it to the surface documented as "logs, does not throw". The `export default [rule1, rule2]` shape is unaffected. R3a states the semantics, and the CLI **reports the truncation rather than absorbing it**.
+
+> **Shipped without the second half — filed as [bug 0029](../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md), 2026-07-30.** R3a's semantics shipped in v0.23.0; the CLI reporting never got built, and the hazard above is now reachable with shipped features. Measured at v0.26.0 against a real self-executing rule file: rule 1 warns on a dead `.expectNonEmpty()` selector, rule 2 has four real violations, and **all four are absent** from the terminal and from `--format json`. A `.violations()` control reports all four, isolating the cause to the throw. The reporting is bug 0029's remedy, not R3b's — it belongs to the release that acknowledges it rather than to the next feature.
 
 ### R3b's Upgrading section, ordered — and the order is the point
 

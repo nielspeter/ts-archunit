@@ -661,6 +661,7 @@ describe('Hygiene', () => {
       .excluding(
         'getVersion', // CLI: reads package.json version
         'withBaseline', // baseline: parses baseline JSON file
+        'readPriorHashes', // baseline: parses the file about to be overwritten, for the delta (plan 0071)
         'readJsonc', // init: parses the user's tsconfig for source-root detection
         'planPackageJson', // init: parses the user's package.json to merge scripts
         'declaresWorkspaces', // identity root: reads package.json to detect a monorepo root

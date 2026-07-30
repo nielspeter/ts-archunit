@@ -72,3 +72,69 @@ third mechanism.
 R3's changelog must scope its claim to **path globs**. "Rules that enforce
 nothing now fail" would be false while this is open, and the counter-example
 sits in the canonical layered-architecture rule.
+
+## Option 1 is refuted — measured, 2026-07-29
+
+This bug filed two options and said the choice should wait for plan 0069's reporting surface.
+That deciding is done: **option 1 (fail on an edgeless subject) is refuted, and so is a
+rule-level version of it.** The evidence lives here rather than in
+[plan 0071](../plans/0071-one-definition-of-a-module-edge.md), which designed and then withdrew
+it — plans move to `completed/`, and this bug was filed separately precisely so its reasoning
+would not live only inside one.
+
+**Per-subject failure has no statable remedy.** 14 of this repo's 138 `src/` files have zero
+static imports and 10 are pure leaf modules — `tarjan.ts`, `ansi.ts`, `code-frame.ts`,
+`stderr.ts`, `shallow-clone.ts` and siblings. `tarjan.ts` is a dependency-free algorithm, the
+ideal innermost-layer citizen, and would fail `layered/innermost-isolation` at **error**
+severity. Ask ADR-008 rule 2 for the remedy: add an import (harmful, and what an agent picks),
+exclude a working rule, narrow the selector, or delete the rule. None improve anything, because
+nothing is wrong with the code. For the `only*` family **zero edges is maximal compliance**, not
+absent evidence.
+
+**The rule-level version fails too, three ways:**
+
+1. **Preset multiplication.** Six boundaries and one dependency-free `src/shared/constants.ts`:
+   `strictBoundaries` generates 13 rules, **12** of which have subjects and zero edges.
+   `applySharedIsolation` emits one rule per (sharedGlob × boundaryFolder), so one legitimate
+   file yields one finding per boundary.
+2. **A real layered demo.** A pure-entity innermost layer: 2 subjects, 0 edges → unsuppressible
+   error. An i18n loader whose locales import nothing: 3 subjects, 0 edges.
+3. **The `ignoreTypeImports` inversion.** Counting edges _after_ the filter — which the design
+   required — means a layer whose only dependency is `import type` counts zero and fires on the
+   **best possible** outcome, under the very option the docs recommend for layer isolation.
+
+The ROADMAP already records the precedent: the slice discovery guards were **built and withdrawn
+from 0.18.1 because they fire on legitimate projects with no opt-out**, and their stated price of
+readmission is an opt-out on the model of `correspondence().allowEmpty()`.
+
+It also could not have shipped as designed. `collectWithAssertionGuard`
+(`src/core/terminal-builder.ts`) is element-type-agnostic and cannot count edges, and
+`Condition<T>` is a **public exported type** backing the documented `defineCondition()`, so
+extending it is a public API change.
+
+## Option 2 is the remedy, and it is this bug's own mechanism
+
+Report the edgeless-subject count on the reporting surface (`explain`, `--format json`,
+`diagnose()`), where the reader can judge it — ADR-008 rule 1's discriminator, since an edge-free
+population is legitimate.
+
+**Do not confuse this with a never-exercised glob.** Plan 0071 draft 2 briefly re-aimed this bug
+at "a denylist glob that matched no edge", which is a glob-declaration fault and belongs to
+[plan 0069](../plans/0069-no-rule-may-certify-nothing.md) R3b — this bug's own "Why plan 0069
+does not close it" section says exactly that the two mechanisms differ. Two diagnostics, two
+owners:
+
+| Fault                                                             | Owner         |
+| ----------------------------------------------------------------- | ------------- |
+| A subject set with no edges, so the allowlist was never exercised | **this bug**  |
+| A glob that is satisfiable but matched no edge                    | plan 0069 R3b |
+
+Two prerequisites for either, so the implementer is not surprised: `diagnose()` currently
+promises to report _"without running any of them"_ and a glob-exercise tally requires running;
+and `doctor` cannot load a rule file that imports vitest, which is the authoring shape this bug
+is about.
+
+**And one caution measured while refuting option 1:** `onlyImportFrom('**/nowhere/**')` over 19
+edge-bearing subjects produces **96 violations** — maximally loud. The allowlist typo this bug
+cites as motivation is already caught by the rule firing on every edge. The silent case is the
+**denylist**.

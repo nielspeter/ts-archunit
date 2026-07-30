@@ -15,8 +15,17 @@ import { writeStderr } from '../core/stderr.js'
 export class DiffFilter {
   private readonly changedFiles: Set<string> | null
 
-  constructor(changedFiles: Set<string> | null) {
+  /**
+   * The branch this filter diffed against, for the suppression notice plan
+   * 0071 added. Defaulted rather than required: the constructor is public API
+   * (`src/index.ts` exports `DiffFilter`), so an existing
+   * `new DiffFilter(files)` must keep compiling.
+   */
+  readonly baseBranch: string
+
+  constructor(changedFiles: Set<string> | null, baseBranch: string = 'the base branch') {
     this.changedFiles = changedFiles
+    this.baseBranch = baseBranch
   }
 
   /**
@@ -66,17 +75,17 @@ export function diffAware(baseBranch: string = 'main'): DiffFilter {
     writeStderr(
       `[ts-archunit] Could not run git diff against '${baseBranch}'. All violations will be reported.`,
     )
-    return new DiffFilter(null)
+    return new DiffFilter(null, baseBranch)
   }
 
   if (output === '') {
     // No changes — empty set means nothing is "changed", so all violations are filtered out
-    return new DiffFilter(new Set())
+    return new DiffFilter(new Set(), baseBranch)
   }
 
   const changedFiles = new Set(
     output.split('\n').map((relativePath) => path.resolve(cwd, relativePath)),
   )
 
-  return new DiffFilter(changedFiles)
+  return new DiffFilter(changedFiles, baseBranch)
 }
