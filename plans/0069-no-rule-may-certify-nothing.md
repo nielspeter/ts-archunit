@@ -1,6 +1,8 @@
 # Plan 0069 — No rule may certify nothing
 
 **Status:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)** (**both released** — v0.22.0 shipped the instrument, v0.23.0 the flip; the plan is in `plans/completed/` and bugs 0019/0020 are closed), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
+
+**Two changes on 2026-07-30.** The "new fault" recorded below — a satisfiable glob that matched no edge — is **refuted and has moved to [plan 0072](./0072-a-denylist-glob-that-cannot-match.md)**: a glob-exercise tally cannot distinguish a typo'd denylist from a respected ban, because both produce tested>0 and matched==0. R3b's own scope is unchanged by that. And R3a shipped **without its second half**: it states the warn-throw semantics and the CLI never got the truncation reporting the same section requires, which is now [bug 0029](../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md) — reachable, measured, and this plan's outstanding debt rather than a new feature.
 **Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
 **Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); ~~absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md)~~ — **019 moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)**; closes [bug 0011](../bugs/fixed/0011-dogfood-rules-select-nothing.md).
 **Prerequisites: both satisfied.** [Bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) shipped. The single-root refactor **landed** as `85be8ce refactor(core): one root for every builder`, via `feat/0069-r2a-glob-model` rather than the `spike/0014-rule-census` branch this header used to name — that branch still exists and is **not** an ancestor of `main`, so do not read it as the source of truth. Everything since depends on the single root: plan 0070's assertion gate hangs off `TerminalBuilder`, which is what made one hook reach all fifteen builders.
@@ -337,12 +339,24 @@ violations** — an allowlist typo is maximally loud and needs no diagnostic. A 
 the opposite: `notImportFrom('**/legcay/**')` reports zero forever, and that is indistinguishable
 from a ban being respected. So the polarity matters, and `GlobSite` already carries it.
 
-Two prerequisites, so whoever picks this up is not surprised: `diagnose()` currently promises to
-report _"without running any of them"_ and a glob-exercise tally requires running; and `doctor`
-cannot load a rule file that imports vitest, which is a co-equal documented authoring path. Note
-also `src/core/diagnose.ts`'s deliberate skip — _"a positive condition glob is indistinguishable
-from an armed tripwire that has not fired"_ — which is this fault's precedent and must not be
-"fixed" without replacing the reasoning.
+> **Superseded, 2026-07-30 — the mechanism above is refuted. See
+> [plan 0072](./0072-a-denylist-glob-that-cannot-match.md).**
+>
+> This section stated the fault as a **glob-exercise tally** ("matched no edge in this run") and
+> recorded two prerequisites from it: `diagnose()` promises to report _"without running any of
+> them"_ and a tally requires running; and `doctor` cannot load a rule file that imports vitest.
+>
+> **A tally cannot work.** Measured: for `notImportFrom('**/legcay/**')` every edge _is_ tested
+> against the glob — the condition iterates all edges and matches each. Tested-count is non-zero
+> and match-count is zero, which is byte-for-byte what a **respected ban** produces. So both
+> prerequisites are moot, and neither blocks anything.
+>
+> The real discriminator is **satisfiability**, and it is static: an unsatisfiable glob cannot be an
+> armed tripwire, because a tripwire has to be armed against something that exists. That preserves
+> `src/core/diagnose.ts:165-168`'s reasoning rather than replacing it — the skip there is not wrong,
+> it is applied to every `position === 'condition'` glob when the argument only justifies skipping
+> the _satisfiable_ ones. The obstacle turned out to be that `import-target` globs have no path
+> universe at all, deliberately, so the fix is a shape discriminator. 0072 carries it.
 
 ## Releases
 

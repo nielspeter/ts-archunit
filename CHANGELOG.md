@@ -5,9 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.28.0] - 2026-07-30
+
+The second of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0071-one-definition-of-a-module-edge.md)'s two releases: **one definition of a module edge**, closing [bug 0022](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md). This release **changes enforcement**. Read [Upgrading](https://nielspeter.github.io/ts-archunit/upgrading) first.
+
+**Before upgrading, on 0.27.x:** refresh the baseline, commit it separately, and record your finding count.
+
+```bash
+npx ts-archunit baseline --output arch-baseline.json   # prints the delta it accepted
+npx ts-archunit check 'rules/**/*.rules.ts' --format json > before-upgrade.json
+git commit -am 'chore: refresh arch baseline before upgrade'
+```
+
+### Changed
+
+- **Dependency conditions see every kind of module edge**, not just static `import` declarations. `notImportFrom`, `onlyImportFrom`, `dependOn` and `onlyHaveTypeImportsFrom` now also see `export … from`, `import()` and `type X = import('…').Y`. Before this, `export { x } from './banned.js'` crossed a banned boundary unflagged while the reverse graph saw it — one library, two definitions of "an import". Measured on this repository: **662 import declarations → 835 edges (+26%)**.
+- **Barrels become dependency-bearing.** This repo's own `src/index.ts` went from **0 to 114** dependencies. That is the sentence that lets you predict your own diff: if you have barrels, they are where the new findings are.
+- **`notImportFrom` / `importFrom` in _predicate_ position** (`.that().notImportFrom(…)`) see the same widened edge set, and they move subject sets in **opposite** directions. `notImportFrom` selects **fewer** subjects — a file whose only matching edge is a re-export now fails the predicate and drops out — so some rules quietly check less. `importFrom` selects more.
+- **The reverse graph shares the same walk**, and counts `require` and type-only references as references. So `beImported()` / `noDeadModules()` report **fewer** orphans, and `.excluding()` entries you carry for modules only reachable via `require()` or a re-export are no longer needed.
+- **`onlyBeImportedVia` no longer double-reports.** One importer with two edges to one target produced two byte-identical violations at the same `file:line`, and therefore two identical baseline hashes for one fact.
+- Each new kind names itself in its message — `re-exports`, `dynamically imports`, `references the type from`. **`import` messages are byte-identical**, so existing baselined findings survive; the new kinds get distinct verbs precisely so they are reported as new rather than absorbed by an existing entry for the same module.
+- `onlyHaveTypeImportsFrom` carries a **per-kind remedy** for the new kinds. A re-export's fix erases the dependency _and removes a runtime export_, so the remedy says to check consumers; for `export *` it is `export type * from`, the one-token form.
+
+### Fixed
+
+- Blinding the two main conditions now fails **110 tests across 25 files**, up from 38 across 12. Re-run per the plan's own instruction, because a release that added visibility without coverage would leave that number where it was.
+- The dynamic-import resolver in the reverse graph was hand-rolled and skipped every non-relative specifier — bug 0014 in the reverse direction, so a module reachable only via `import('some-installed-pkg')` looked dead.
+
+### ⚠️ Reversals — things that used to fail and now pass
+
+- **`dependOn` is the one _guarantee_ reversal.** A runtime re-export or dynamic import now **satisfies** it, where before neither did. A **type-only** re-export still does not — `export type { X } from` is erased, so the module it claims to depend on never loads. Its JSDoc carries the per-kind table.
+- `noDeadModules()` / `beImported()` report fewer orphans (above). One caveat in the other direction: resolution is now uniform through the compiler, which drops the old resolver's filename guessing — a module imported as `import('./foo')` **without** an extension now resolves to nothing and may be reported as dead. That only happens on code that already fails `tsc` (TS2835/2834).
+
+### ⚠️ Do not baseline a barrel
+
+Measured on this repo's `src/index.ts`: **114 findings, 87 distinct identities — 46.5% share an identity with a sibling.** A barrel re-exports many names from the same module, and a dependency message carries the basename and the resolved target only, so those findings are byte-identical and hash the same. Accept one entry and you accept its siblings, and a re-export added later is silently pre-accepted. Exclude the barrel by path — `.excluding()` matches `element` as a **basename**, so `.excluding('index.ts')` silences every `index.ts` in the project at once — or downgrade it with `.asSeverity('warn')`, which keeps printing. This is [bug 0028](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0028-two-findings-in-one-file-can-share-a-baseline-identity.md); the release does not create it, but it moves its incidence from "uncommon" to "every barrel".
+
+### What this release does NOT widen
+
+Stated by name, because a partial widening that reads as complete is the same defect class it closes.
+
+- **The slice graph** — `beFreeOfCycles()`, `notDependOn()`, `respectLayerOrder()` are still static-import-only. A barrel re-export is _the_ classic cycle, so `strictBoundaries` will report a barrel as a cross-boundary violation and the cycle it creates as absent, **in the same run**. Both `no-cycles` rules and `beFreeOfCycles()`'s JSDoc say so on every failure.
+- **`require`** — classified and enforced by no dependency condition. `notContain(call('require'))` is the alternative, and it cannot express a path glob and does not match `import x = require('s')` at all. For that one form there is no way to ban a path.
+- **`declare module './rel.js'`** — the compiler routes it away from the module-specifier list, so the walk structurally cannot see it.
+- **Conditions you wrote with `defineCondition()`** — they still see whatever they ask for. If yours calls `getImportDeclarations()`, it reproduces bug 0022 inside your repository. `ModuleEdge` is not exported yet; say so on the issue tracker if you need it.
+- **`import()` has no opt-out.** There is no `ignoreDynamicImports`, so "no static dependency on X, lazy loading allowed" is not expressible. If you rely on `import()` as a decoupling mechanism (`React.lazy`, route splitting, plugin registries), open an issue — that is the signal that decides whether the option ships.
+
+### Performance
+
+The walk is uncached. Measured **25–29%** over a preset run (34–40ms on a 137ms baseline), because the incremental cost over the old mechanism is near-zero — both pay the same checker warm-up. Two shapes cost more: a selector spanning the whole project (`modules(p).should().notImportFrom(…)` with no `.that()`), up to **4.8×**; and `.that().notImportFrom(…)` in predicate position, which walks every file one at a time. If a run got noticeably slower, that is where the time went, and the fix is a cache of resolution rather than of the walk.
+
+### Re-run `explain --format agent`
+
+Preset `imperative` strings now mean something wider. If you paste that output into a `CLAUDE.md` or similar, regenerate it — there is no refresh mechanism.
+
 ## [0.27.0] - 2026-07-30
 
-The first of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/0071-one-definition-of-a-module-edge.md)'s two releases: the instruments an adopter needs **before** 0.28.0 widens what counts as a module edge. Nothing here changes which findings a rule reports.
+The first of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0071-one-definition-of-a-module-edge.md)'s two releases: the instruments an adopter needs **before** 0.28.0 widens what counts as a module edge. Nothing here changes which findings a rule reports.
 
 ### Added
 

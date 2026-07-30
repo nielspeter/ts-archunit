@@ -22,3 +22,9 @@ jobs:
       - run: npm run format:check
       - run: npm run test
       - run: npm run build
+
+      # The repo's shell scripts are covered by nothing else: `format:check`'s
+      # pathspec list has no `*.sh`, ESLint ignores them, and `typecheck` cannot see
+      # them. One of them holds a secret in the release path. shellcheck is
+      # preinstalled on ubuntu-latest.
+      - run: shellcheck -x .github/scripts/*.sh scripts/*.sh

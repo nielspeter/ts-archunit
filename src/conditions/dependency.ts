@@ -2,11 +2,87 @@ import picomatch from 'picomatch'
 import type { SourceFile, ImportDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
-import { isTypeOnlyImport } from '../core/import-options.js'
-import { importCandidates, matchedCandidate } from '../core/import-candidates.js'
+import { candidatesFor, matchedCandidate } from '../core/import-candidates.js'
+import {
+  edgeTypeOnlyRemedy,
+  edgeValuePhrase,
+  edgeTypeOnlyNoun,
+  edgeStream,
+  edgeVerb,
+  edgesOf,
+  FORWARD_EDGE_KINDS,
+  type ModuleEdge,
+  type ModuleEdgeKind,
+} from '../core/module-edges.js'
 
 export type { ImportOptions } from '../core/import-options.js'
 import type { ImportOptions } from '../core/import-options.js'
+
+/**
+ * Which edge kinds a forward dependency condition reports on.
+ *
+ * **An exhaustive `Record`, not an allowlist filter** (plan 0071 §3). "Each site
+ * filters to the kinds it handles" is fail-open for a sixth kind: one added in a
+ * later release would be silently excluded everywhere, which is the same false
+ * green this release closes. A full `Record<ModuleEdgeKind, boolean>` makes a new
+ * union member a compile error here.
+ *
+ * `require` is **false at every site**. The kind exists so a 4-way branch cannot
+ * mark a CJS runtime dependency as erased, not to enforce CJS — that is a
+ * different upgrade story, whose reds land in interop and generated `.d.ts` where
+ * the remedy is usually "nothing you can do". The trade is a known false
+ * negative over a mislabelled true positive, and it is stated in
+ * `docs/standard-rules.md` and `docs/modules.md` rather than sold as coverage.
+ */
+const DEPENDENCY_KINDS = FORWARD_EDGE_KINDS
+
+/**
+ * Which kinds `onlyHaveTypeImportsFrom` reports on.
+ *
+ * Excludes `dynamic` on ADR-008 rule 2: the condition's remedy is "make the
+ * dependency erased", and there is **no** way to do that for `await import(…)`.
+ * A finding whose remedy cannot be followed is not a finding.
+ *
+ * Keeps `reexport`, where a remedy does exist but is not purely local — see
+ * {@link edgeTypeOnlyRemedy}. Excludes `type-expression` because it is already
+ * erased and can never violate a type-only rule, so the row is unreachable
+ * rather than a judgement.
+ */
+const TYPE_IMPORT_KINDS: Record<ModuleEdgeKind, boolean> = {
+  import: true,
+  reexport: true,
+  dynamic: false,
+  'type-expression': false,
+  require: false,
+}
+
+/** The strings this edge's globs may be matched against, primary first. */
+function edgeCandidates(edge: ModuleEdge): ReturnType<typeof candidatesFor> {
+  return candidatesFor(edge.specifier, edge.resolvedPath)
+}
+
+/**
+ * Create a violation for one module edge.
+ *
+ * `line` comes from the edge, which is the **statement** line — the same value
+ * `decl.getStartLineNumber()` produced before this release for `kind ===
+ * 'import'`, so no existing finding moves.
+ */
+function edgeViolation(
+  sourceFile: SourceFile,
+  edge: ModuleEdge,
+  message: string,
+  context: ConditionContext,
+): ArchViolation {
+  return {
+    rule: context.rule,
+    element: sourceFile.getBaseName(),
+    file: sourceFile.getFilePath(),
+    line: edge.line,
+    message,
+    because: context.because,
+  }
+}
 
 /**
  * Create a violation for a source file with a specific offending import.
@@ -54,16 +130,17 @@ export function onlyImportFrom(
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
-        for (const decl of sf.getImportDeclarations()) {
-          if (ignoreType && isTypeOnlyImport(decl)) continue
-          const candidates = importCandidates(decl)
+        for (const edge of edgesOf(sf)) {
+          if (!DEPENDENCY_KINDS[edge.kind]) continue
+          if (ignoreType && edge.typeOnly) continue
+          const candidates = edgeCandidates(edge)
           const importPath = candidates[0]
           if (matchedCandidate(candidates, matchers) === undefined) {
             violations.push(
-              importViolation(
+              edgeViolation(
                 sf,
-                decl,
-                `${sf.getBaseName()} imports "${importPath}" which does not match any of [${globs.join(', ')}]`,
+                edge,
+                `${sf.getBaseName()} ${edgeVerb(edge.kind)} "${importPath}" which does not match any of [${globs.join(', ')}]`,
                 context,
               ),
             )
@@ -102,15 +179,16 @@ export function notImportFrom(
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
-        for (const decl of sf.getImportDeclarations()) {
-          if (ignoreType && isTypeOnlyImport(decl)) continue
-          const importPath = matchedCandidate(importCandidates(decl), matchers)
+        for (const edge of edgesOf(sf)) {
+          if (!DEPENDENCY_KINDS[edge.kind]) continue
+          if (ignoreType && edge.typeOnly) continue
+          const importPath = matchedCandidate(edgeCandidates(edge), matchers)
           if (importPath !== undefined) {
             violations.push(
-              importViolation(
+              edgeViolation(
                 sf,
-                decl,
-                `${sf.getBaseName()} imports "${importPath}" which matches forbidden [${globs.join(', ')}]`,
+                edge,
+                `${sf.getBaseName()} ${edgeVerb(edge.kind)} "${importPath}" which matches forbidden [${globs.join(', ')}]`,
                 context,
               ),
             )
@@ -127,9 +205,36 @@ export function notImportFrom(
  * Completes the import-condition family: onlyImportFrom (all),
  * notImportFrom (none), dependOn (at least one).
  *
- * Only considers static `import` declarations. Dynamic `import()`
- * expressions are not checked — use `beImported()` for import-graph
- * analysis that includes dynamic imports.
+ * **Sees every kind of module edge**, not just static imports: `import`,
+ * `export … from`, `import()` and `type X = import('…').Y`. (CJS `require` is
+ * classified and deliberately not enforced — see `DEPENDENCY_KINDS`.)
+ *
+ * **What counts as a dependency differs per kind, and the asymmetry is
+ * deliberate.** This is the only condition in the library where it does:
+ *
+ * | edge                              | satisfies `dependOn`?              |
+ * | --------------------------------- | ---------------------------------- |
+ * | `import { x } from '…'`           | yes                                |
+ * | `import type { X } from '…'`      | **yes** — unchanged; opt out with `{ ignoreTypeImports: true }` |
+ * | `export { x } from '…'`           | yes                                |
+ * | `export type { X } from '…'`      | **no** — erased, so nothing loads  |
+ * | `await import('…')`               | yes                                |
+ * | `type X = import('…').Y`          | **no** — erased                    |
+ *
+ * For `kind === 'import'` the behaviour is exactly what it was before v0.28.0:
+ * an `import type` of the target satisfies the rule, and `{ ignoreTypeImports:
+ * true }` is the shipped opt-in that makes it fail. Requiring runtime there
+ * would be a green→red change to a contract that already has an opt-out.
+ *
+ * For the other kinds it requires **runtime**, because the alternative creates a
+ * new false green: `export type { SecurityConfig } from './security.js'` would
+ * satisfy `dependOn('**\/security/**')` while the server installs nothing — and
+ * on the baseline side that reads as "the violation was fixed".
+ *
+ * **This is a red→green reversal from v0.27.0.** Before v0.28.0 a runtime
+ * re-export or dynamic import left this condition *unsatisfied*, so rules that
+ * failed may now pass. That is the fix, not a regression: the dependency was
+ * always there and the condition could not see it.
  *
  * @example
  * modules(p)
@@ -152,10 +257,38 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
-        const hasMatch = sf.getImportDeclarations().some((decl) => {
-          if (ignoreType && isTypeOnlyImport(decl)) return false
-          return matchedCandidate(importCandidates(decl), matchers) !== undefined
-        })
+        // A `for … of` over `edgeStream`, not `edgesOf(sf).some(...)`.
+        //
+        // `edgesOf` builds and RESOLVES every edge in the file before returning, so
+        // `.some()` on its result pays a `getSymbol()` per literal even when the
+        // first one answers the question — 100 checker calls on a 100-import file
+        // where the pre-0.28.0 code made 1. Spreading the generator
+        // (`[...edgeStream(sf)].some(...)`) has the same defect and looks lazy, so
+        // the loop is written out.
+        let hasMatch = false
+        for (const edge of edgeStream(sf)) {
+          if (!DEPENDENCY_KINDS[edge.kind]) continue
+          // `typeOnly` means something DIFFERENT per kind on this one condition,
+          // and that asymmetry is deliberate (plan 0071 §3).
+          //
+          // For `import`, behaviour is exactly as before: an `import type` of the
+          // target SATISFIES `dependOn`, and `{ ignoreTypeImports: true }` is the
+          // shipped opt-in that makes it fail. Requiring runtime here would be a
+          // green→red change to a contract that already has an opt-out — a docs
+          // gap, not a behaviour gap.
+          //
+          // For the new kinds it must require runtime, or this release CREATES a
+          // false green: `export type { SecurityConfig } from './security.js'`
+          // would satisfy `dependOn('**/security/**')` while the server installs
+          // nothing. Measured against `docs/modules.md`'s own teaching example, a
+          // naive widening turns a real violation into a pass — and on the
+          // baseline side that reads as "the violation was fixed".
+          if (edge.kind === 'import' ? ignoreType && edge.typeOnly : edge.typeOnly) continue
+          if (matchedCandidate(edgeCandidates(edge), matchers) !== undefined) {
+            hasMatch = true
+            break
+          }
+        }
         if (!hasMatch) {
           violations.push({
             rule: context.rule,
@@ -232,16 +365,32 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
-        for (const decl of sf.getImportDeclarations()) {
-          const importPath = matchedCandidate(importCandidates(decl), matchers)
-          if (importPath !== undefined && !isTypeOnlyImport(decl)) {
+        for (const edge of edgesOf(sf)) {
+          if (!TYPE_IMPORT_KINDS[edge.kind]) continue
+          const importPath = matchedCandidate(edgeCandidates(edge), matchers)
+          if (importPath !== undefined && !edge.typeOnly) {
+            const violation = edgeViolation(
+              sf,
+              edge,
+              `${sf.getBaseName()} has ${edgeValuePhrase(edge.kind)} "${importPath}" which should be a type-only ${edgeTypeOnlyNoun(edge.kind)}`,
+              context,
+            )
+            // A producer-set `suggestion` WINS over the rule author's, because
+            // `execute-rule.ts` resolves `v.suggestion ?? meta?.suggestion`. So it
+            // is set only for the kinds this release introduces, where no remedy
+            // existed before and a per-kind one is strictly better.
+            //
+            // NOT for `kind === 'import'`. Doing so replaced the shipped
+            // `layered/type-imports-only` remedy — which offers "or move the value
+            // you need into a layer this one is allowed to depend on", the only
+            // followable action when the value is needed at runtime — with a
+            // one-option remedy, and silently discarded any consumer's own
+            // `.rule({ suggestion })`. Invisible to the message-identity guards
+            // because `suggestion` is not hashed.
             violations.push(
-              importViolation(
-                sf,
-                decl,
-                `${sf.getBaseName()} has a value import from "${importPath}" which should be a type-only import`,
-                context,
-              ),
+              edge.kind === 'import'
+                ? violation
+                : { ...violation, suggestion: edgeTypeOnlyRemedy(edge) },
             )
           }
         }

@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-07-30T08:39:44.207Z",
+  "hashVersion": 2,
+  "root": ".",
+  "count": 5,
+  "violations": [
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/consumer-import.ts",
+      "line": 1,
+      "hash": "9b425ad157bd267a",
+      "subject": "8ea4aa10d5f06191"
+    },
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/imports-twice.ts",
+      "line": 5,
+      "hash": "7100371a6f09bb2f",
+      "subject": "cf39319c8d10c9ef"
+    },
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/imports-twice.ts",
+      "line": 6,
+      "hash": "7100371a6f09bb2f",
+      "subject": "cf39319c8d10c9ef"
+    },
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/mixed.ts",
+      "line": 4,
+      "hash": "cd61b80a852154fd",
+      "subject": "099d6675f8bfb8cd"
+    },
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/mixed.ts",
+      "line": 11,
+      "hash": "cd61b80a852154fd",
+      "subject": "099d6675f8bfb8cd"
+    }
+  ]
+}

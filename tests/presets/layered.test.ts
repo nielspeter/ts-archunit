@@ -88,6 +88,30 @@ describe('layeredArchitecture preset', () => {
       spy.mockRestore()
     })
 
+    /**
+     * Item 19. Which import is exempt, by identity.
+     *
+     * The four existing assertions are all `.some(v => v.ruleId === …)` — they say a
+     * finding of this rule exists, never which edges produced it. So a build that
+     * reported the erased edges too, or reported the wrong file, satisfies every one
+     * of them. After v0.28.0 this condition also sees `export … from`, which widens
+     * exactly what "which import" means.
+     */
+    it('exempts the erased edges and reports only the value import, by identity', () => {
+      const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+      const rules = run({ layers: ordered, typeImportsAllowed: ['**/routes/**'] })
+      const found = warns(rules)
+        .filter((v) => v.ruleId === 'preset/layered/type-imports-only')
+        .map((v) => `${path.basename(v.file)}:${String(v.line)}`)
+        .sort((a, b) => a.localeCompare(b))
+      spy.mockRestore()
+
+      // `user-route.ts:1` is a value import across a layer boundary — reported.
+      // `type-only-route.ts` carries an `import type` AND a type-only re-export of
+      // the same module — both erased, so neither may appear.
+      expect(found).toEqual(['user-route.ts:1'])
+    })
+
     it('no warn when the type-imports layer has no value imports from others', () => {
       const rules = run({
         layers: { ...ordered, shared: '**/shared/**' },

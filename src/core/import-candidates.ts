@@ -36,10 +36,30 @@ export type ImportCandidates = readonly [primary: string, ...alternates: string[
  * A test asserts the equivalence across the whole fixture corpus.
  */
 export function importCandidates(decl: ImportDeclaration): ImportCandidates {
-  const specifier = decl.getModuleSpecifierValue()
-  const resolved = decl.getModuleSpecifierSourceFile()
-  if (!resolved) return [specifier]
-  const resolvedPath = resolved.getFilePath()
+  return candidatesFor(
+    decl.getModuleSpecifierValue(),
+    decl.getModuleSpecifierSourceFile()?.getFilePath(),
+  )
+}
+
+/**
+ * The same candidates, from the two values a `ModuleEdge` already carries.
+ *
+ * This is why `ModuleEdge` has **no `candidates` field** (plan 0071 §1):
+ * candidates are a function of `specifier` and `resolvedPath`, so storing them
+ * beside their own two inputs would be two representations of one fact, free to
+ * disagree. The function is exposed instead.
+ *
+ * `importCandidates` above is now a thin wrapper over this, which is what lets
+ * `tests/core/module-edges-corpus.test.ts` compare the two derivations across
+ * the whole repository: same rule, reached from a declaration on one side and
+ * from an edge on the other.
+ */
+export function candidatesFor(
+  specifier: string,
+  resolvedPath: string | undefined,
+): ImportCandidates {
+  if (resolvedPath === undefined) return [specifier]
   if (isRelativeSpecifier(specifier)) return [resolvedPath]
   return [resolvedPath, specifier]
 }

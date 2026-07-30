@@ -9,6 +9,7 @@ import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import type { GlobSite, Located, Predicate } from '../../src/index.js'
 import { isDeadSite } from '../../src/core/glob-evaluator.js'
+import { edgesOf } from '../../src/core/module-edges.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
 import { noAnyProperties, noTypeAssertions } from '../../src/rules/typescript.js'
@@ -67,6 +68,51 @@ function inProjectSrc<T extends Located>(): Predicate<T> {
 // gets its own guard with an INDEPENDENT derivation: ts-morph's module graph
 // on one side, a filesystem walk on the other. A bug that empties one cannot
 // empty the other.
+
+/**
+ * Do the 39 rules below actually see anything?
+ *
+ * **Measured: with `edgesOf` returning `[]`, every rule in this file passes —
+ * 39/39, exit 0.** Twenty-two of them are dependency rules. So a blind engine
+ * produces a fully green architecture suite, and by this project's own standard
+ * (ADR-008: a check that cannot fail is counted as coverage, and that is a lie)
+ * that is a defect in *this file*, not merely a gap somewhere else.
+ *
+ * The temptation is to answer it in the module-edge tests, where the walk is the
+ * subject. That is where the equivalent control also lives — but it is the wrong
+ * place for *this* file's reader: someone opening `arch-rules.test.ts` and seeing
+ * 39 green needs the non-vacuity assurance here, next to the rules it protects,
+ * the same way every corpus loop in this repo carries its own `checked > N`.
+ *
+ * This is not a test of the walk. It is the anchor that stops the 39 below from
+ * being vacuous, and it is deliberately crude: floors far below the real counts,
+ * so ordinary churn never touches it and only a collapse toward zero trips it.
+ */
+describe('the rules in this file are not vacuous', () => {
+  it('sees real dependency edges in our own src/', () => {
+    // Scoped by the SAME predicate the 39 rules use, not a second derivation of
+    // "our src/" that could drift away from theirs.
+    const kinds = new Map<string, number>()
+    for (const sourceFile of modules(p).that().satisfy(inProjectSrc()).subjects()) {
+      for (const edge of edgesOf(sourceFile)) {
+        kinds.set(edge.kind, (kinds.get(edge.kind) ?? 0) + 1)
+      }
+    }
+    // Measured at 607 imports / 153 re-exports over src/. Floors, not counts.
+    expect(kinds.get('import') ?? 0).toBeGreaterThan(400)
+    expect(kinds.get('reexport') ?? 0).toBeGreaterThan(100)
+  })
+
+  it('selects real subjects for the scoping predicate all 39 rules share', () => {
+    // `inProjectSrc()` is the predicate every rule below is scoped by (bug 0011).
+    // If it selected nothing, all 39 would pass over the empty set.
+    // Measured 140 / 822 / 25. Floors well below, so ordinary churn never touches
+    // them and only a collapse toward zero — which is bug 0011's shape — trips them.
+    expect(modules(p).that().satisfy(inProjectSrc()).subjects().length).toBeGreaterThan(100)
+    expect(functions(p).that().satisfy(inProjectSrc()).subjects().length).toBeGreaterThan(500)
+    expect(classes(p).that().satisfy(inProjectSrc()).subjects().length).toBeGreaterThan(15)
+  })
+})
 
 describe('rule scope (bug 0011)', () => {
   it('inProjectSrc() selects exactly the TypeScript on disk under src/', () => {

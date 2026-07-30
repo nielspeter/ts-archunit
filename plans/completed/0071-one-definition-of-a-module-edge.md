@@ -1,7 +1,7 @@
 # Plan 0071 — Forward dependency conditions see every module edge
 
-**Status:** **0.27.0 SHIPPED** (2026-07-30) — the three instruments are released; §Test inventory items 1-3 are done, with 29 tests and a 15-revert sabotage matrix. **0.28.0 — the widening — is the remaining work**, and DRAFT 4 is its spec. Drafts 1–3 each had claims measured wrong; that history is in this branch's commit messages and in the two bug files, not here. **Draft 4 exists because two independent reviewers, working from opposite ends, found the same thing: item 7 — the release's headline guard — was green with bug 0022 fully reinstated.**
-**Priority:** High. [Bug 0022](../bugs/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
+**Status:** **DONE — both releases shipped** (v0.27.0 instruments, v0.28.0 the widening, 2026-07-30) — the three instruments are released; §Test inventory items 1-3 are done, with 29 tests and a 15-revert sabotage matrix. Both releases shipped. Five reviewers audited the widening before it went out; 60 diff-derived reverts, and the four survivors that mattered were all missing tests — including `onlyImportFrom`, whose widening no test invoked at all. **Draft 4 exists because two independent reviewers, working from opposite ends, found the same thing: item 7 — the release's headline guard — was green with bug 0022 fully reinstated.**
+**Priority:** High. [Bug 0022](../bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
 **Closes:** bug 0022. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **out of scope** — its option 1 is refuted and the evidence lives in that file.
 
 **Two releases, deliberately:**
@@ -251,7 +251,18 @@ Each kind a condition can report gets its own verb: `re-exports`, `dynamically i
 
 **Not to be confused with [bug 0028](../bugs/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).** Measured on the _current_ build, 8 of 47 findings already collide — every pair `import`/`import`. On a full `strictBoundaries` run the rate is **362 findings / 329 distinct identities / 33 collided groups / 66 findings in collisions — 18%**. Per-kind verbs do **not** fix those. Pre-existing, filed separately, and its preferred fix (producer-set `identity`) changes no printed text, so it needs no sequencing against this plan.
 
-**But §4 creates exactly one _new_ within-kind collision, and it is worth the number.** Measured over this repo: 102 runtime re-export edges, of which exactly **one** importer has two to the same target — `src/graphql/index.ts → src/graphql/resolver-rule-builder.ts`, twice. So one new finding will be absorbed by another's baseline hash, and item 13's "the new-kind findings are reported as new" is false for that one pair. Volume-wise §4 still needs no sequencing; put the number in so nobody rediscovers it as a bug.
+**§4 makes bug 0028's incidence much worse, and the first number here was wrong by two orders of magnitude.** Draft 4 said "exactly one new within-kind collision", from a proxy that grouped `(importer, kind, target)` over runtime re-exports and found one pair. That proxy **filtered out `typeOnly` edges, which is exactly where the collisions are**: `export { X } from './core/project.js'` and `export type { Y } from './core/project.js'` both render `index.ts re-exports "…/project.ts" …`, byte-identical, so they share a hash.
+
+Measured on the real identity, over this repo's own barrel:
+
+```
+src/index.ts: 114 findings, 87 distinct identities
+  26 colliding groups, 53 findings inside them  ->  46.5% share an identity
+```
+
+So the incidence moves from "two imports of one module, uncommon" to **"the barrel, always"** — on the very file this release makes dependency-bearing. The consequence is an instruction, not a statistic: **do not baseline a barrel.** Accepting one entry accepts its siblings, and a re-export added later is silently pre-accepted. Exclude the barrel by path or downgrade it to `warn` instead. This belongs in the changelog and in `docs/upgrading.md`'s 0.28.0 row, not only here.
+
+Per-kind verbs still earn their place — they stop a re-export colliding with an _import_ of the same module, which is the migration promise — and bug 0028 remains the right owner for same-kind collisions.
 
 ## Guards
 
@@ -338,6 +349,15 @@ Built and verified: pristine passes; the **star/star swap fails**; `resolvedPath
 22. **The path-join derivation** (Guards): every relative specifier of every kind, `checked > 0`.
 
 **On `type-expression`:** measured **0 instances** anywhere the tsconfig reaches, including `node_modules`. Classifying every literal across 471 files: `ImportDeclaration` 1756, `ExportDeclaration` 155, `CallExpression`/`StringLiteral` 6, `CallExpression`/`NoSubstitutionTemplateLiteral` 2, and **zero** `LiteralType`, `ExternalModuleReference` or `require()`-in-`.js`. So items 6, 8, **and 16/16b** all need dedicated fixtures — draft 3 named only 6 and 8. One fixture covers the forms (a reviewer built it: 18 edges from 22 candidate lines, with `declare module './t.js'`, `declare module 'virtual-thing'` and `import('./' + n)` correctly absent).
+
+## What 0.28.0's implementation found that draft 4 did not predict
+
+1. **`export * as NS` needed a decision draft 4 half-made.** The plan noted it is statically knowable and contributes one name; implementation had to choose whether it is a star. It is **not**: it takes the named branch with `names: ['NS']`, because treating it as a star would put a knowable name into the residual that no star target publishes, and item 7's third assertion would fail on a correct build.
+2. **`line` needs the nearest `Statement` ancestor, and ts-morph has `Node.isStatement`.** Measured, that resolves to the `ImportDeclaration` (so item 15's exact-equality holds), the `VariableStatement` for `const x = await import(…)`, the `TypeAliasDeclaration` for a type expression, and the `ImportEqualsDeclaration` for `import x = require(…)`. Draft 4 named the requirement and not the mechanism, and the plan's own note that `ImportTypeNode.getStartLineNumber()` is the wrong line is why it matters.
+3. **The forward `require` exclusion must NOT be mirrored in the reverse graph**, which draft 4 did not distinguish. Forward asks "does this file depend on something banned" — a `require` finding there has no usable remedy. Reverse asks "is anything referencing this file" — a `require` means **yes**, and excluding it reports a module that CJS code requires as an orphan. Same for `type-expression`. One exclusion avoids an unactionable finding; the same exclusion in the other direction manufactures a wrong one.
+4. **C3 was overstated and the correction is recorded in the source.** A review called `getDeclarations()[0]` a certain field false positive on any project using module augmentation. Measured across four shapes — the augmenting file sorting first, two augmentations, a `.d.ts` target, and the augmentation inside the importer — the `SourceFile` came first every time. `.find(Node.isSourceFile)` stays because it costs nothing and cannot be wrong, but it is defence against a documented ordering that nothing here reproduces.
+5. **Prettier owns the fixture whose line numbers are the assertion.** `tests/fixtures/module-edge-forms/` is now in `.prettierignore`: prettier collapses the deliberately multi-line forms, which silently deletes the only thing distinguishing a statement line from a literal line. A "do not reflow" comment cannot stop a formatter.
+6. **A sabotage harness that mutates `src/` must run in a git worktree.** Two foreground test runs were diagnosed as regressions when they were reading files a background matrix was mid-revert on, and a killed run left a revert on disk twice. The harness now asserts the tree matches git before trusting a single verdict, and the final run was executed in a detached worktree. This cost more time than any finding in the release.
 
 ## What 0.27.0's implementation found that draft 4 did not predict
 

@@ -201,7 +201,7 @@ export function strictBoundaries(
         {
           id: 'preset/boundaries/no-cycles',
           because:
-            'boundaries in a cycle cannot be built, tested, released or reasoned about separately, which is the whole point of having them',
+            'boundaries in a cycle cannot be built, tested, released or reasoned about separately, which is the whole point of having them. Note the cycle check sees static `import` declarations only: a cycle formed by `export … from` (a barrel) is not detected, while the boundary rules in this same preset do see it.',
           suggestion:
             'Break the cycle at its weakest edge: move the shared type or helper into the shared module, or invert one direction with an interface owned by the depended-on side.',
           imperative: 'Do NOT create an import cycle between boundaries',

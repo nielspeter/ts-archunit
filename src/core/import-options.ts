@@ -1,4 +1,4 @@
-import type { ImportDeclaration } from 'ts-morph'
+import type { ExportDeclaration, ImportDeclaration } from 'ts-morph'
 
 /**
  * Options for import-related conditions and predicates.
@@ -39,5 +39,31 @@ export function isTypeOnlyImport(decl: ImportDeclaration): boolean {
   if (decl.getNamespaceImport()) return false
   // All named specifiers must be individually type-only
   const specifiers = decl.getNamedImports()
+  return specifiers.length > 0 && specifiers.every((s) => s.isTypeOnly())
+}
+
+/**
+ * Check whether a re-export is purely type-only (no runtime dependency).
+ *
+ * The `export … from` analogue of {@link isTypeOnlyImport}, and **both halves of
+ * the disjunction are needed** — measured, the two spellings put the flag in
+ * different places:
+ *
+ * | form                            | `decl.isTypeOnly()` | specifiers |
+ * | ------------------------------- | ------------------- | ---------- |
+ * | `export type { X } from 's'`    | **true**            | false      |
+ * | `export { type X } from 's'`    | false               | **true**   |
+ * | `export type * from 's'`        | **true**            | (none)     |
+ * | `export { X } from 's'`         | false               | false      |
+ *
+ * No default or namespace analogue exists, verified: there is no way to write a
+ * re-export that binds a runtime value while every named specifier is
+ * type-only, so this needs none of {@link isTypeOnlyImport}'s guards. A bare
+ * `export * from 's'` has no named specifiers and is runtime, which is why the
+ * second half requires a non-empty list.
+ */
+export function isTypeOnlyReExport(decl: ExportDeclaration): boolean {
+  if (decl.isTypeOnly()) return true
+  const specifiers = decl.getNamedExports()
   return specifiers.length > 0 && specifiers.every((s) => s.isTypeOnly())
 }

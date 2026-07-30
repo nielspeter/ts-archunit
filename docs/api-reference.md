@@ -93,12 +93,12 @@ Available on all entry points via `.that()`.
 
 ## Module Predicates
 
-| Export                   | Signature                                                      | Description                                                                        |
-| ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `importFrom`             | `importFrom(...globs)` or `importFrom(globs[], options)`       | Module imports from files matching glob. Options: `{ ignoreTypeImports }`.         |
-| `predicateNotImportFrom` | `notImportFrom(...globs)` or `notImportFrom(globs[], options)` | Module does not import from files matching glob. Options: `{ ignoreTypeImports }`. |
-| `exportSymbolNamed`      | `exportSymbolNamed(name: string)`                              | Module exports a symbol with the name.                                             |
-| `havePathMatching`       | `havePathMatching(glob: string)`                               | Module file path matches the glob.                                                 |
+| Export                   | Signature                                                      | Description                                                                                                                                                                                                                                     |
+| ------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `importFrom`             | `importFrom(...globs)` or `importFrom(globs[], options)`       | Module has any edge to a path matching glob — `import`, `export … from`, `import()` or `type X = import(…)`. Options: `{ ignoreTypeImports }`. **Selects MORE files since v0.28.0.**                                                            |
+| `predicateNotImportFrom` | `notImportFrom(...globs)` or `notImportFrom(globs[], options)` | Module has no edge to a path matching glob — every kind counts. Options: `{ ignoreTypeImports }`. **Selects FEWER files since v0.28.0**: a file whose only matching edge is a re-export now fails the predicate and drops out of the selection. |
+| `exportSymbolNamed`      | `exportSymbolNamed(name: string)`                              | Module exports a symbol with the name.                                                                                                                                                                                                          |
+| `havePathMatching`       | `havePathMatching(glob: string)`                               | Module file path matches the glob.                                                                                                                                                                                                              |
 
 ## Class Predicates
 
@@ -218,13 +218,13 @@ Available on all entry points via `.that()`.
 
 ## Dependency Conditions
 
-| Export                    | Signature                                          | Description                                                                           |
-| ------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `onlyImportFrom`          | `onlyImportFrom(...globs)` or `(globs[], options)` | Module may only import from listed paths. Options: `{ ignoreTypeImports }`.           |
-| `conditionNotImportFrom`  | `notImportFrom(...globs)` or `(globs[], options)`  | Module must not import from listed paths. Options: `{ ignoreTypeImports }`.           |
-| `dependOn`                | `dependOn(...globs)` or `(globs[], options)`       | Module must import from at least one matching path. Options: `{ ignoreTypeImports }`. |
-| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])`      | Imports from matching paths must use `import type`.                                   |
-| `notHaveAliasedImports`   | `notHaveAliasedImports()`                          | No named import may use an alias (`import { x as y }`).                               |
+| Export                    | Signature                                          | Description                                                                                                                                                                              |
+| ------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onlyImportFrom`          | `onlyImportFrom(...globs)` or `(globs[], options)` | Module may have no edge outside the listed paths — every kind counts. Options: `{ ignoreTypeImports }`. **Reports MORE findings since v0.28.0.**                                         |
+| `conditionNotImportFrom`  | `notImportFrom(...globs)` or `(globs[], options)`  | Module must have no edge to the listed paths — `import`, `export … from`, `import()` or `type X = import(…)`. Options: `{ ignoreTypeImports }`. **Reports MORE findings since v0.28.0.** |
+| `dependOn`                | `dependOn(...globs)` or `(globs[], options)`       | Module must import from at least one matching path. Options: `{ ignoreTypeImports }`.                                                                                                    |
+| `onlyHaveTypeImportsFrom` | `onlyHaveTypeImportsFrom(...globs: string[])`      | Imports from matching paths must use `import type`.                                                                                                                                      |
+| `notHaveAliasedImports`   | `notHaveAliasedImports()`                          | No named import may use an alias (`import { x as y }`).                                                                                                                                  |
 
 ## Body Analysis Matchers
 
