@@ -171,11 +171,37 @@ for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
   [ "$attempt" -lt "$POLL_ATTEMPTS" ] && sleep "$POLL_SECONDS"
 done
 
-# Three different verdicts, which one message used to conflate.
+# Three verdicts, and only two of them are failures.
+#
+# The split is the point. A red job has to mean "someone must act", or it becomes
+# noise — and noise is how the previous false green survived 17 releases: nobody was
+# reading a signal that never said anything useful.
+
 if [ "$unreadable" -eq "$POLL_ATTEMPTS" ]; then
-  fail "The refresh was accepted (HTTP 200) but the index could not be read back even once in $((POLL_ATTEMPTS * POLL_SECONDS))s. That is a failure to VERIFY, not a failure to refresh — the docs may well be current. Re-run this job before assuming anything."
+  fail "The refresh was accepted (HTTP 200) but the index could not be read back even once in $((POLL_ATTEMPTS * POLL_SECONDS))s. That is a failure to VERIFY, not a failure to refresh — the docs may well be current, and the search API being unreachable for that long is itself worth a look. Re-run this job before assuming anything."
 fi
+
 if [ "$(current_state)" != 'finalized' ]; then
-  fail "The refresh was accepted and the library reports state='$(current_state)', i.e. still indexing after $((POLL_ATTEMPTS * POLL_SECONDS))s. Nothing is wrong; the poll budget is too short. Raise CONTEXT7_POLL_ATTEMPTS and re-run — do NOT re-run the publish job."
+  fail "The refresh was accepted and the library reports state='$(current_state)', i.e. still indexing after $((POLL_ATTEMPTS * POLL_SECONDS))s. The refresh is working and the poll budget is too short. Raise CONTEXT7_POLL_ATTEMPTS and re-run — do NOT re-run the publish job."
 fi
-fail "The refresh was accepted (HTTP 200), the library reports state='finalized', and \`lastUpdateDate\` is unchanged at ${before:-<not indexed>} after $((POLL_ATTEMPTS * POLL_SECONDS))s. Either the request did nothing, or this release changed nothing Context7 indexes (a src/-only release with no docs/ or *.md edits legitimately leaves the timestamp alone). Check the diff before treating this as broken."
+
+# Accepted, finalized, timestamp unchanged: a WARNING, not a failure.
+#
+# Measured on the v0.28.0 release run, which was the first time this path ever
+# executed: `{"message":"Refresh started successfully"}`, then `state=finalized` for
+# all 450s with `lastUpdateDate` frozen at a re-crawl four hours earlier — and still
+# frozen fifteen minutes after the job gave up. A larger budget would have failed
+# identically, so this is not a timing problem.
+#
+# The likeliest cause is a server-side rate limit or debounce: the 200 acknowledges
+# the request, it does not promise a crawl. Whatever the cause, `lastUpdateDate`
+# moving is **not** a property this job can require on every release — a release that
+# changes no indexed content legitimately leaves it alone too.
+#
+# So it warns and exits 0. Hard-failing here would red a correct run, and by ADR-008
+# a guard nobody will act on is worse than no guard: it teaches people to skip the
+# whole release run, which is exactly the habit that let the old silent no-op survive.
+# The two cases above still fail, because both name something to do.
+echo "::warning title=Context7 index unchanged::The refresh was accepted (HTTP 200) and the library reports state='finalized', but \`lastUpdateDate\` is still ${before:-<not indexed>} after $((POLL_ATTEMPTS * POLL_SECONDS))s. Not treated as a failure: the API acknowledges a refresh without promising a crawl, and a release that changed no indexed content would look the same. If the docs stay stale across several releases, check for a rate limit before assuming this job is broken."
+echo "Indexed content is unchanged as far as this job can tell. Not failing — see the warning above."
+exit 0
