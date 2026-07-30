@@ -48,7 +48,22 @@
 #    second derivation can see it.
 set -euo pipefail
 
-LIBRARY="${CONTEXT7_LIBRARY:-/nielspeter/ts-archunit}"
+# Derived from `context7.json` — the file Context7's own crawler reads — so a repo
+# rename updates one place rather than two. Falls back to the literal only if that
+# file is unreadable, and says which it used.
+LIBRARY="${CONTEXT7_LIBRARY:-}"
+if [ -z "$LIBRARY" ] && [ -r context7.json ]; then
+  LIBRARY="$(python3 -c "
+import json,sys
+try:
+    url = json.load(open('context7.json')).get('url','')
+except Exception:
+    sys.exit(0)
+if url.startswith('https://github.com/'):
+    print('/' + url.removeprefix('https://github.com/').rstrip('/'))
+" 2>/dev/null || true)"
+fi
+LIBRARY="${LIBRARY:-/nielspeter/ts-archunit}"
 SEARCH="https://context7.com/api/v1/search?query=${LIBRARY}"
 POLL_ATTEMPTS="${CONTEXT7_POLL_ATTEMPTS:-6}"
 POLL_SECONDS="${CONTEXT7_POLL_SECONDS:-30}"
@@ -63,6 +78,13 @@ fail() {
   fi
   exit 1
 }
+
+# A mis-pasted key (trailing newline, truncated copy) currently surfaces only as a
+# bare `HTTP 401`, which reads like an expiry rather than a paste. The API's own 401
+# body names `ctx7sk` as the expected prefix, so the shape is checkable.
+if [ -n "${CONTEXT7_API_KEY:-}" ] && [ "${CONTEXT7_API_KEY#ctx7sk}" = "${CONTEXT7_API_KEY}" ]; then
+  fail "CONTEXT7_API_KEY does not start with 'ctx7sk'. Context7's own 401 body names that prefix, so this is a wrong or mis-pasted value rather than an expired one — check for a truncated copy or a trailing newline in the secret."
+fi
 
 if [ -z "${CONTEXT7_API_KEY:-}" ]; then
   fail "CONTEXT7_API_KEY is not set. Context7 moved to an authenticated API: POST /api/v1/refresh answers 401 without a key, and the old unauthenticated POST /api/v1/add answers 405. Create a key at https://context7.com (sign in, then Account -> API keys) and add it as the repository secret CONTEXT7_API_KEY. Until then the docs index cannot be refreshed and this job will keep failing, which is the honest state — do NOT swap in rennf93/upsert-context7's 'refresh' operation to make it green: that endpoint returns an HTML page with status 200 and the action reports success for it."

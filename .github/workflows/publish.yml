@@ -99,16 +99,29 @@ jobs:
   # is red so somebody acts.
   docs-index:
     needs: publish
+    # The script's bounds are ~60s for the POST plus the poll budget; 10 minutes has
+    # headroom now that the POST is no longer allowed 900s on its own.
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      # The action reads the repo. It had this for free as a step inside
-      # `publish`, which checks out at the top; a separate job starts empty.
+      # Needed because `run:` executes a file from this repo — no action reads it
+      # any more. It came free as a step inside `publish`, which checks out at the
+      # top; a separate job starts empty.
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+            context7.json
 
       - name: Refresh the Context7 docs index
         env:
           CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+          # Turns on the release-specific remedy: the publish already succeeded and
+          # is immutable, so "re-run the publish job" is the wrong advice here.
+          CONTEXT7_RELEASE_CONTEXT: '1'
         # `rennf93/upsert-context7@1.1` is gone from here on purpose. Measured
         # 2026-07-30: its `add` endpoint answers 405, and its `refresh` endpoint is
         # a page route that answers 200 with HTML — which the action reports as

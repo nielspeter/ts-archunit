@@ -426,6 +426,63 @@ export function edgeTypeOnlyRemedy(edge: Pick<ModuleEdge, 'kind' | 'names'>): st
  * "has a runtime re-export of … which should be a type-only **import**". The two
  * halves have to agree or the sentence contradicts itself.
  */
+/**
+ * The kinds a **forward** dependency site reports on.
+ *
+ * One constant, because there were two: `DEPENDENCY_KINDS` in
+ * `conditions/dependency.ts` and `PREDICATE_KINDS` in `predicates/module.ts`, whose
+ * docstring said "the same set as the conditions … and it has to be" with prose as
+ * the only enforcement. `notImportFrom` is one identifier with two definitions
+ * chosen by chain position, so a predicate that disagreed with its own condition
+ * about what an import is would be this release's Problem statement in miniature.
+ *
+ * **Exhaustive, not an allowlist filter.** A sixth `ModuleEdgeKind` is a compile
+ * error here rather than a kind silently excluded everywhere — that fail-open is the
+ * same false green this release closes.
+ *
+ * `require` is `false`: the kind exists so a 4-way branch cannot mark a CJS runtime
+ * dependency as erased, not to enforce CJS. The **reverse** graph counts it, which
+ * is the opposite disposition and deliberately so — see `indexEdges`'s reasoning.
+ * `onlyHaveTypeImportsFrom` diverges further still (`TYPE_IMPORT_KINDS`), and that
+ * one divergence is intentional and documented at its own site.
+ */
+export const FORWARD_EDGE_KINDS: Record<ModuleEdgeKind, boolean> = {
+  import: true,
+  reexport: true,
+  dynamic: true,
+  'type-expression': true,
+  require: false,
+}
+
+/**
+ * Every module edge leaving one file, **lazily and unsorted**.
+ *
+ * For a caller that only asks "is there any edge matching X". `edgesOf` builds and
+ * resolves the whole array before returning, so `edgesOf(sf).some(...)` pays a
+ * `getSymbol()` for every literal in the file even when the first one answers the
+ * question — on a 100-import file whose first import matches, 100 checker calls
+ * where the pre-0.28.0 code made 1.
+ *
+ * Unsorted, because a `.some()` cannot observe order. Anything that reports a
+ * finding must use {@link edgesOf}, whose source ordering is part of its contract.
+ */
+export function* edgeStream(sourceFile: SourceFile): Generator<ModuleEdge> {
+  for (const literal of sourceFile.getImportStringLiterals()) {
+    const parent = literal.getParent()
+    if (parent === undefined) continue
+    const kind = kindOf(parent)
+    if (kind === undefined) continue
+    yield {
+      kind,
+      specifier: literal.getLiteralText(),
+      resolvedPath: resolve(literal),
+      line: statementLine(literal),
+      typeOnly: isErased(kind, parent),
+      names: namesOf(kind, parent),
+    }
+  }
+}
+
 export function edgeTypeOnlyNoun(kind: ModuleEdgeKind): string {
   switch (kind) {
     case 'import':

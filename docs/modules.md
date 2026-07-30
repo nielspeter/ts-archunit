@@ -160,7 +160,24 @@ modules(p)
 
 `dependOn()` completes the import-condition family: `onlyImportFrom` (all edges must match), `notImportFrom` (no edge may match), `dependOn` (at least one edge must match). Like the others, it supports `{ ignoreTypeImports: true }` to exclude type-only edges.
 
-**All three see every kind of module edge** — static `import`, `export … from`, dynamic `import()` and `type X = import('…').Y` — not just static imports. Before v0.28.0 they saw static imports only, so `export { x } from './banned.js'` crossed a banned boundary unflagged. `require` edges are classified and deliberately not enforced; see [Standard Rules](/standard-rules#unused-export-detection) for why and for the sanctioned alternative.
+**All three see every kind of module edge** — static `import`, `export … from`, dynamic `import()` and `type X = import('…').Y` — not just static imports. Before v0.28.0 they saw static imports only, so `export { x } from './banned.js'` crossed a banned boundary unflagged. `require` edges are classified and deliberately **not enforced** by any dependency condition — see below.
+
+::: warning `require` cannot be banned by path
+A `require` edge is classified and then skipped by `notImportFrom`, `onlyImportFrom`,
+`dependOn` and `onlyHaveTypeImportsFrom`. CJS reds land in interop and generated
+`.d.ts` where the remedy is usually "nothing you can do", so this trades a known
+false negative for a mislabelled true positive.
+
+The reverse-graph conditions — `beImported()`, `noDeadModules()`,
+`onlyBeImportedVia()` — **do** count it, because there the question is "is anything
+referencing this file" and a `require` means yes.
+
+The sanctioned forward alternative is
+`modules(p).should().notContain(call('require'))`, with two limits: it cannot express
+a path glob, and it does **not** match `import x = require('s')` at all, which is an
+`ExternalModuleReference` rather than a call. So for that one form there is no way,
+sanctioned or otherwise, to ban a path.
+:::
 
 `dependOn` is the one condition where "counts as a dependency" differs per kind. A plain `import type` **satisfies** it, exactly as before, and `{ ignoreTypeImports: true }` is the opt-in that makes it fail. But a **type-only re-export does not satisfy it** — `export type { Config } from './security.js'` is erased, so the module it claims to depend on is never loaded, and treating that as satisfied would be a false green rather than a convenience.
 

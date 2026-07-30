@@ -12,8 +12,25 @@ on:
 jobs:
   update-docs:
     runs-on: ubuntu-latest
+    # The script's own curl timeouts bound this to a few minutes; the default is 360.
+    timeout-minutes: 15
+    # This job writes a third-party secret to a curl invocation and needs no git
+    # credentials of its own.
+    permissions:
+      contents: read
+    # A second dispatch while one is polling would race two refreshes of the same
+    # library.
+    concurrency:
+      group: context7-refresh
+      cancel-in-progress: false
     steps:
+      # Needed only because `run:` executes a file from this repo.
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+            context7.json
 
       - name: Refresh the Context7 docs index
         env:

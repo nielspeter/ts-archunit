@@ -32,6 +32,18 @@ describe('item 15 — the import half is unchanged, per edge, over the whole rep
    * What this DOES catch, measured: `line` taken from the literal, `resolvedPath`
    * always undefined, `resolvedPath` set to the importer's own path, and reversed
    * per-file edge order.
+   *
+   * **And what it does NOT, for the same reason `typeOnly` was dropped:**
+   * `importCandidates` is now a wrapper over `candidatesFor`, so both sides of the
+   * `candidates` comparison call one function and the *candidates rule* is
+   * `f(x) === f(x)` too. Reverting `candidatesFor`'s relative-specifier branch is
+   * caught by `tests/conditions/bare-package-imports.test.ts`, **not** here.
+   *
+   * What remains genuinely cross-derived is the two **inputs**: `getSymbol()` on
+   * one side against `getModuleSpecifierSourceFile()` on the other. That is the
+   * real content of this test, and it is worth having — but the docstring used to
+   * enumerate what it catches while omitting this, which is the same tautology it
+   * explicitly rescoped `typeOnly` out for one paragraph above.
    */
   it('agrees with getImportDeclarations() on line and candidates', () => {
     const mismatches: string[] = []
@@ -119,8 +131,10 @@ describe('item 22 — a relative specifier resolves to where the path says', () 
       const importerDir = path.dirname(sf.getFilePath())
       for (const edge of edgesOf(sf)) {
         if (!edge.specifier.startsWith('.')) continue
-        // Unresolved relative specifiers are a separate fault and are asserted
-        // below; skipping them here keeps this test about the joined path.
+        // Unresolved relative specifiers are skipped so this test stays about the
+        // joined path. The test below asserts only that each kind has at least ONE
+        // resolved relative edge — so it catches TOTAL per-kind unresolution and not
+        // a partial one. Stated because "asserted below" overclaimed it.
         if (edge.resolvedPath === undefined) continue
         checked += 1
 

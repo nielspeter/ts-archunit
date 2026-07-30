@@ -7,8 +7,10 @@ import {
   edgeTypeOnlyRemedy,
   edgeValuePhrase,
   edgeTypeOnlyNoun,
+  edgeStream,
   edgeVerb,
   edgesOf,
+  FORWARD_EDGE_KINDS,
   type ModuleEdge,
   type ModuleEdgeKind,
 } from '../core/module-edges.js'
@@ -32,13 +34,7 @@ import type { ImportOptions } from '../core/import-options.js'
  * negative over a mislabelled true positive, and it is stated in
  * `docs/standard-rules.md` and `docs/modules.md` rather than sold as coverage.
  */
-const DEPENDENCY_KINDS: Record<ModuleEdgeKind, boolean> = {
-  import: true,
-  reexport: true,
-  dynamic: true,
-  'type-expression': true,
-  require: false,
-}
+const DEPENDENCY_KINDS = FORWARD_EDGE_KINDS
 
 /**
  * Which kinds `onlyHaveTypeImportsFrom` reports on.
@@ -261,8 +257,17 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
       for (const sf of sourceFiles) {
-        const hasMatch = edgesOf(sf).some((edge) => {
-          if (!DEPENDENCY_KINDS[edge.kind]) return false
+        // A `for … of` over `edgeStream`, not `edgesOf(sf).some(...)`.
+        //
+        // `edgesOf` builds and RESOLVES every edge in the file before returning, so
+        // `.some()` on its result pays a `getSymbol()` per literal even when the
+        // first one answers the question — 100 checker calls on a 100-import file
+        // where the pre-0.28.0 code made 1. Spreading the generator
+        // (`[...edgeStream(sf)].some(...)`) has the same defect and looks lazy, so
+        // the loop is written out.
+        let hasMatch = false
+        for (const edge of edgeStream(sf)) {
+          if (!DEPENDENCY_KINDS[edge.kind]) continue
           // `typeOnly` means something DIFFERENT per kind on this one condition,
           // and that asymmetry is deliberate (plan 0071 §3).
           //
@@ -278,9 +283,12 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
           // nothing. Measured against `docs/modules.md`'s own teaching example, a
           // naive widening turns a real violation into a pass — and on the
           // baseline side that reads as "the violation was fixed".
-          if (edge.kind === 'import' ? ignoreType && edge.typeOnly : edge.typeOnly) return false
-          return matchedCandidate(edgeCandidates(edge), matchers) !== undefined
-        })
+          if (edge.kind === 'import' ? ignoreType && edge.typeOnly : edge.typeOnly) continue
+          if (matchedCandidate(edgeCandidates(edge), matchers) !== undefined) {
+            hasMatch = true
+            break
+          }
+        }
         if (!hasMatch) {
           violations.push({
             rule: context.rule,

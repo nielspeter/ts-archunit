@@ -28,6 +28,7 @@ interface Row {
   kind: string
   typeOnly: boolean
   names: string
+  specifier: string
   resolved: string
 }
 
@@ -37,6 +38,10 @@ const rows = (edges: readonly ModuleEdge[]): Row[] =>
     kind: e.kind,
     typeOnly: e.typeOnly,
     names: e.names.join(','),
+    // `specifier` is included so the field has a guard at all: every consumer path
+    // goes through `resolvedPath`, and `candidatesFor` returns `[resolvedPath]`
+    // alone for a relative specifier, so nothing else compares it.
+    specifier: e.specifier,
     resolved: e.resolvedPath === undefined ? 'UNRESOLVED' : path.basename(e.resolvedPath),
   }))
 
@@ -46,70 +51,232 @@ describe('every edge-carrying form (items 4, 5, 6, 8)', () => {
   it('classifies all 24 edges in forms.ts, by line, kind, typeOnly and names', () => {
     expect(rows(file('forms.ts'))).toEqual([
       // --- static imports -----------------------------------------------------
-      { line: 5, kind: 'import', typeOnly: false, names: 'RUNTIME', resolved: 'target.ts' },
-      { line: 6, kind: 'import', typeOnly: true, names: 'Erased', resolved: 'target.ts' },
-      { line: 7, kind: 'import', typeOnly: true, names: 'Second', resolved: 'target.ts' },
+      {
+        line: 5,
+        kind: 'import',
+        typeOnly: false,
+        names: 'RUNTIME',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 6,
+        kind: 'import',
+        typeOnly: true,
+        names: 'Erased',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 7,
+        kind: 'import',
+        typeOnly: true,
+        names: 'Second',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // side-effect import: runtime, no names
-      { line: 8, kind: 'import', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 8,
+        kind: 'import',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // `import {} from`: runtime, zero specifiers — NOT type-only, because
       // `every()` over an empty list is true and the length guard is what stops it
-      { line: 9, kind: 'import', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 9,
+        kind: 'import',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // namespace and default bindings contribute NO names, by design
-      { line: 10, kind: 'import', typeOnly: false, names: '', resolved: 'target.ts' },
-      { line: 11, kind: 'import', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 10,
+        kind: 'import',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 11,
+        kind: 'import',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // `import MIXED, { type Erased as E2 }` is a RUNTIME edge. This is the row
       // §2 calls load-bearing: a formula without `isTypeOnlyImport`'s
       // getDefaultImport()/getNamespaceImport() guards calls it type-only and
       // skips it under `ignoreTypeImports` — a lost existing finding.
-      { line: 12, kind: 'import', typeOnly: false, names: 'Erased', resolved: 'target.ts' },
+      {
+        line: 12,
+        kind: 'import',
+        typeOnly: false,
+        names: 'Erased',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // an aliased import reports the INWARD name, `RUNTIME`, not `ALIASED`
-      { line: 13, kind: 'import', typeOnly: false, names: 'RUNTIME', resolved: 'target.ts' },
+      {
+        line: 13,
+        kind: 'import',
+        typeOnly: false,
+        names: 'RUNTIME',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
 
       // --- re-exports ---------------------------------------------------------
-      { line: 14, kind: 'reexport', typeOnly: false, names: 'OTHER', resolved: 'target.ts' },
+      {
+        line: 14,
+        kind: 'reexport',
+        typeOnly: false,
+        names: 'OTHER',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // an aliased re-export reports the OUTWARD name, `OUTWARD`, not `OTHER`:
       // that is the key the re-exporting module's runtime namespace carries, and
       // item 7 compares against a runtime namespace
-      { line: 15, kind: 'reexport', typeOnly: false, names: 'OUTWARD', resolved: 'target.ts' },
+      {
+        line: 15,
+        kind: 'reexport',
+        typeOnly: false,
+        names: 'OUTWARD',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // bare `export *`: no names, deliberately — see ModuleEdge.names
-      { line: 16, kind: 'reexport', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 16,
+        kind: 'reexport',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // `export * as NS` is NOT a star for this purpose: one statically-known
       // name, no recursion. `isNamespaceExport()` is true for BOTH forms, so
       // `getNamespaceExport()` is the only thing that tells them apart.
-      { line: 17, kind: 'reexport', typeOnly: false, names: 'STAR_NS', resolved: 'target.ts' },
-      { line: 18, kind: 'reexport', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 17,
+        kind: 'reexport',
+        typeOnly: false,
+        names: 'STAR_NS',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 18,
+        kind: 'reexport',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // both §2 trap rows: decl-level type-only, then specifier-level type-only
-      { line: 19, kind: 'reexport', typeOnly: true, names: 'ErasedOut', resolved: 'target.ts' },
-      { line: 20, kind: 'reexport', typeOnly: true, names: 'SecondOut', resolved: 'target.ts' },
+      {
+        line: 19,
+        kind: 'reexport',
+        typeOnly: true,
+        names: 'ErasedOut',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 20,
+        kind: 'reexport',
+        typeOnly: true,
+        names: 'SecondOut',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // `export type *`: type-only star
-      { line: 21, kind: 'reexport', typeOnly: true, names: '', resolved: 'target.ts' },
+      {
+        line: 21,
+        kind: 'reexport',
+        typeOnly: true,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
 
       // --- dynamic ------------------------------------------------------------
-      { line: 22, kind: 'dynamic', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 22,
+        kind: 'dynamic',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       // The NoSubstitutionTemplateLiteral row. `Node.isStringLiteral()` is FALSE
       // for this literal while `getImportStringLiterals()` is declared
       // `StringLiteral[]`, so a defensive narrow drops the edge and tsc says
       // nothing. On its own line, because two dynamic edges on one line are
       // indistinguishable in every field.
-      { line: 23, kind: 'dynamic', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 23,
+        kind: 'dynamic',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
 
       // --- type expression ----------------------------------------------------
       // Resolves to the NAMED module. Following the type symbol instead lands on
       // whatever declares `Erased`, which would make notImportFrom fire on a file
       // the source never names.
-      { line: 24, kind: 'type-expression', typeOnly: true, names: '', resolved: 'target.ts' },
+      {
+        line: 24,
+        kind: 'type-expression',
+        typeOnly: true,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
 
       // --- the multi-line forms: STATEMENT lines, not literal lines ------------
-      { line: 28, kind: 'import', typeOnly: false, names: 'OTHER', resolved: 'target.ts' },
+      {
+        line: 28,
+        kind: 'import',
+        typeOnly: false,
+        names: 'OTHER',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
       {
         line: 31,
         kind: 'reexport',
         typeOnly: false,
         names: 'MULTILINE_REEXPORT',
+        specifier: './target.js',
         resolved: 'target.ts',
       },
-      { line: 34, kind: 'dynamic', typeOnly: false, names: '', resolved: 'target.ts' },
-      { line: 37, kind: 'type-expression', typeOnly: true, names: '', resolved: 'target.ts' },
+      {
+        line: 34,
+        kind: 'dynamic',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 37,
+        kind: 'type-expression',
+        typeOnly: true,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
     ])
   })
 
@@ -158,7 +325,14 @@ describe('the two classification traps (item 16)', () => {
    */
   it('classifies `import x = require()` as require and RUNTIME, not type-expression', () => {
     expect(rows(file('equals.d.ts'))).toEqual([
-      { line: 3, kind: 'require', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 3,
+        kind: 'require',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
     ])
   })
 
@@ -167,8 +341,22 @@ describe('the two classification traps (item 16)', () => {
     // `getExpression().getKind() === ImportKeyword` tells them apart, and getting
     // that wrong makes every CJS require look like a dynamic import.
     expect(rows(file('cjs.js'))).toEqual([
-      { line: 4, kind: 'require', typeOnly: false, names: '', resolved: 'target.ts' },
-      { line: 5, kind: 'require', typeOnly: false, names: '', resolved: 'target.ts' },
+      {
+        line: 4,
+        kind: 'require',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
+      {
+        line: 5,
+        kind: 'require',
+        typeOnly: false,
+        names: '',
+        specifier: './target.js',
+        resolved: 'target.ts',
+      },
     ])
   })
 })

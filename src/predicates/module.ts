@@ -4,7 +4,7 @@ import type { Predicate } from '../core/predicate.js'
 import { globAnyOf } from '../core/glob-site.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { candidatesFor } from '../core/import-candidates.js'
-import { edgesOf, type ModuleEdgeKind } from '../core/module-edges.js'
+import { edgesOf, FORWARD_EDGE_KINDS } from '../core/module-edges.js'
 
 /**
  * Which edge kinds these predicates see.
@@ -15,13 +15,7 @@ import { edgesOf, type ModuleEdgeKind } from '../core/module-edges.js'
  * disagreed with its own condition about what an import is would be this plan's
  * Problem statement inside one method name.
  */
-const PREDICATE_KINDS: Record<ModuleEdgeKind, boolean> = {
-  import: true,
-  reexport: true,
-  dynamic: true,
-  'type-expression': true,
-  require: false,
-}
+const PREDICATE_KINDS = FORWARD_EDGE_KINDS
 
 /**
  * Every string a glob may be matched against, across every edge in the file.
