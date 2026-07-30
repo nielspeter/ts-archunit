@@ -411,13 +411,13 @@ correspondence(p)
 
 ## Extension API
 
-| Export            | Signature                                    | Description                                            |
-| ----------------- | -------------------------------------------- | ------------------------------------------------------ |
-| `definePredicate` | `definePredicate<T>(desc, fn): Predicate<T>` | Create a custom predicate.                             |
-| `defineCondition` | `defineCondition<T>(desc, fn): Condition<T>` | Create a custom condition.                             |
-| `and`             | `and(...inputs): Predicate \| TypeMatcher`   | Combine with AND. Accepts predicates or type matchers. |
-| `or`              | `or(...inputs): Predicate \| TypeMatcher`    | Combine with OR. Accepts predicates or type matchers.  |
-| `not`             | `not(input): Predicate \| TypeMatcher`       | Negate. Accepts a predicate or type matcher.           |
+| Export            | Signature                                            | Description                                                                                                                                                             |
+| ----------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `definePredicate` | `definePredicate<T>(desc, fn, globs?): Predicate<T>` | Create a custom predicate. `globs` declares the path globs it matches against, so `doctor` can report a dead one — see [Custom rules](./custom-rules#declaring-a-glob). |
+| `defineCondition` | `defineCondition<T>(desc, fn, globs?): Condition<T>` | Create a custom condition. `globs` makes them visible to `explain`; a dead condition glob is deliberately not a finding.                                                |
+| `and`             | `and(...inputs): Predicate \| TypeMatcher`           | Combine with AND. Accepts predicates or type matchers.                                                                                                                  |
+| `or`              | `or(...inputs): Predicate \| TypeMatcher`            | Combine with OR. Accepts predicates or type matchers.                                                                                                                   |
+| `not`             | `not(input): Predicate \| TypeMatcher`               | Negate. Accepts a predicate or type matcher.                                                                                                                            |
 
 ## Utilities
 

@@ -74,7 +74,7 @@ git commit -am 'chore: refresh arch baseline before upgrade'
 
 - `elementCondition` and `functionCondition` take an optional `globs` argument. Internal, but
   named here because the **public** `definePredicate` / `defineCondition` did **not** get one —
-  see [bug 0030](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0030-user-defined-predicates-and-conditions-cannot-declare-globs.md).
+  see [bug 0030](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0030-user-defined-predicates-and-conditions-cannot-declare-globs.md).
   A custom path-matching predicate's glob is still invisible to `doctor`, which is a
   present-tense detection gap rather than a latent one.
 
