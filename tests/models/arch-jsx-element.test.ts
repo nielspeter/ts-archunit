@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Project, SyntaxKind } from 'ts-morph'
+import { Project, SyntaxKind, ts } from 'ts-morph'
 import {
   fromJsxElement,
   fromJsxSelfClosingElement,
@@ -10,7 +10,7 @@ import {
 function createTsxProject(code: string, fileName = 'test.tsx') {
   const project = new Project({
     useInMemoryFileSystem: true,
-    compilerOptions: { jsx: 2 /* React */, strict: true },
+    compilerOptions: { jsx: ts.JsxEmit.React, strict: true },
   })
   const sf = project.createSourceFile(fileName, code)
   return { project, sf }
@@ -217,7 +217,7 @@ describe('ArchJsxElement model', () => {
     it('returns empty for .ts files', () => {
       const project = new Project({
         useInMemoryFileSystem: true,
-        compilerOptions: { jsx: 2, strict: true },
+        compilerOptions: { jsx: ts.JsxEmit.React, strict: true },
       })
       const sf = project.createSourceFile('test.ts', `const x = 1`)
       expect(collectJsxElements(sf)).toEqual([])
@@ -226,7 +226,7 @@ describe('ArchJsxElement model', () => {
     it('returns empty for .js files', () => {
       const project = new Project({
         useInMemoryFileSystem: true,
-        compilerOptions: { jsx: 2, strict: true, allowJs: true },
+        compilerOptions: { jsx: ts.JsxEmit.React, strict: true, allowJs: true },
       })
       const sf = project.createSourceFile('test.js', `const x = 1`)
       expect(collectJsxElements(sf)).toEqual([])
@@ -235,7 +235,7 @@ describe('ArchJsxElement model', () => {
     it('collects from .jsx files', () => {
       const project = new Project({
         useInMemoryFileSystem: true,
-        compilerOptions: { jsx: 2, strict: true, allowJs: true },
+        compilerOptions: { jsx: ts.JsxEmit.React, strict: true, allowJs: true },
       })
       const sf = project.createSourceFile('test.jsx', `const x = <div>hello</div>`)
       const elements = collectJsxElements(sf)

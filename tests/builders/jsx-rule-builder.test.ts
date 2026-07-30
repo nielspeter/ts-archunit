@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Project } from 'ts-morph'
+import { Project, ts } from 'ts-morph'
 import { jsxElements } from '../../src/builders/jsx-rule-builder.js'
 import { not } from '../../src/core/combinators.js'
 import { areComponents } from '../../src/predicates/jsx.js'
@@ -9,7 +9,7 @@ import type { ArchProject } from '../../src/core/project.js'
 function createProject(files: Record<string, string>): ArchProject {
   const project = new Project({
     useInMemoryFileSystem: true,
-    compilerOptions: { jsx: 2, strict: true },
+    compilerOptions: { jsx: ts.JsxEmit.React, strict: true },
   })
   for (const [name, code] of Object.entries(files)) {
     project.createSourceFile(name, code)
