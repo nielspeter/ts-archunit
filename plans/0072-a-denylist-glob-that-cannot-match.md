@@ -1,166 +1,164 @@
 # Plan 0072 — A denylist glob that cannot match anything
 
-**Status:** DRAFT 1. Mechanism settled by measurement; the measurement **refutes the design
-[plan 0069](./0069-no-rule-may-certify-nothing.md) recorded for this fault**, so read
-"What 0069 got wrong" before anything else.
-**Priority:** Medium. A silent false green, but a narrow one — it needs a path-shaped denylist glob
-that matches nothing, which is a typo rather than a design error.
-**Depends on:** nothing. 0069's R3b (the designed static guard) and this are independent; this does
-**not** need R3b's adopting-codebase gate, and it does **not** need plan 0071's widening.
+**Status:** **REFUTED, 2026-07-30.** Two mechanisms were proposed and both died on
+measurement, and the question was already settled correctly in
+[plan 0069](./0069-no-rule-may-certify-nothing.md)'s decision table before this plan
+re-opened it. What survives is a successor with a different shape — an **author-declared
+expectation**, not a diagnosis — specified in "What is actually left" below.
+**Prerequisite for anything here:** [plan 0073](./0073-conditions-declare-their-globs.md).
+Condition globs are invisible to the diagnosis machinery today, which is a defect worth
+fixing on its own terms and is _not_ a route to this fault.
 
-## Problem
+## The fault, which is real
 
-`notImportFrom('**/legcay/**')` reports zero violations forever, and that is indistinguishable from
-a ban being respected. Measured on `tests/fixtures/module-edge-conditions`:
+`notImportFrom('**/legcay/**')` reports zero violations forever, and that is
+indistinguishable from a ban being respected. Measured on
+`tests/fixtures/module-edge-conditions`, a real glob against a one-character typo:
 
-| rule                                          | violations | `diagnose()` |
-| --------------------------------------------- | ---------- | ------------ |
-| `notImportFrom('**/bannned/**')` — **a typo** | 0          | **0**        |
-| `notImportFrom('**/banned/**')` — a real ban  | 0          | **0**        |
+| condition                    | real glob | typo'd glob | verdict    |
+| ---------------------------- | --------- | ----------- | ---------- |
+| `notImportFrom`              | 13        | **0**       | **silent** |
+| `onlyHaveTypeImportsFrom`    | 9         | **0**       | **silent** |
+| `onlyImportFrom`             | 3         | 16          | loud       |
+| `dependOn`                   | 8         | 15          | loud       |
+| `onlyBeImportedVia`          | 5         | 11          | loud       |
+| `resideInFile` (condition)   | 0         | 2           | loud       |
+| `resideInFolder` (condition) | 0         | 2           | loud       |
 
-The second row is correct and must stay silent: a ban nobody violates is a rule doing its job. The
-first row is a rule that **cannot fire**, counted as coverage.
+**Two conditions, not one.** Draft 1 named only the denylist. `onlyHaveTypeImportsFrom`
+has the identical shape — its glob _scopes_ which imports must be type-only, so a glob
+matching nothing puts no import in scope and the rule cannot fire. Any successor must
+cover both.
 
-**Polarity decides the scope, and it is measured.** The same typo in the allowlist direction is
-maximally loud, so it needs no diagnostic at all:
+`onlyBeImportedVia`'s row needed a second measurement to establish: with a glob that
+genuinely matches some importers it reports 5, with a typo 11, with `**/*` zero. The first
+attempt used a glob matching nothing either way and produced 11 twice, which proved
+nothing.
 
-| glob                              | findings | reads as               |
-| --------------------------------- | -------- | ---------------------- |
-| `onlyImportFrom('**/bannned/**')` | **14**   | screaming              |
-| `notImportFrom('**/bannned/**')`  | **0**    | "the ban is respected" |
+## Why the static mechanism cannot work
 
-Plan 0071's widening made the allowlist case _louder_ (more edges, so more non-matching edges) while
-the denylist case stays at exactly 0 forever. So this plan is **negative-polarity condition globs
-only**. `GlobSite.polarity` already carries the distinction (`src/core/glob-site.ts:85`).
+Draft 1 proposed: report a condition-position glob that is **unsatisfiable against the
+path universe**, scoped to path-shaped `import-target` globs so bare package specifiers
+stay exempt. Measured against this repository's 514 files and 95 directories:
 
-## What 0069 got wrong, and why it matters here
-
-0069's "R3b gained a fault" section states the mechanism as **a glob-exercise tally** — "a glob that
-can match but matched no edge in this run" — and records two prerequisites from that: `diagnose()`
-promises to report _"without running any of them"_ and a tally requires running; and `doctor` cannot
-load a rule file that imports vitest.
-
-**Both prerequisites are moot, because a tally cannot work.** Measured: for
-`notImportFrom('**/legcay/**')` every edge _is_ tested against the glob — the condition iterates all
-edges and matches each one. Tested-count is non-zero and match-count is zero, which is byte-for-byte
-what a respected ban produces. A tally distinguishes nothing.
-
-The real discriminator is **satisfiability**, and it is static:
-
-> An unsatisfiable glob cannot be an armed tripwire. A tripwire has to be armed against something
-> that exists. `**/legcay/**` matches no path in the project, so nothing can ever cross it.
-> `**/legacy/**` matches real paths, so it can.
-
-That preserves the reasoning 0069 warned must not be deleted — `src/core/diagnose.ts:165-168`'s
-_"a positive condition glob is indistinguishable from an armed tripwire that has not fired"_ — rather
-than replacing it. The skip is not wrong; it is **too broad**. It is applied to every
-`position === 'condition'` glob (`diagnose.ts:169`), while the tripwire argument only justifies
-skipping the _satisfiable_ ones.
-
-**Correct 0069's section to point here** rather than leaving a refuted mechanism and two phantom
-prerequisites in a plan that is otherwise finished.
-
-## Mechanism
-
-The obstacle is not the condition-position skip. It is that **`import-target` globs have no path
-universe to be dead against**, deliberately:
-
-- `src/core/glob-site.ts:23` — _"a resolved module path or a bare specifier. Never [checked]"_
-- `src/core/path-universe.ts:72` — _"`import-target`, `specifier` and `literal` are not path kinds
-  and have no [universe]"_
-- `src/predicates/module.ts:103` — _"an installed package resolves into node_modules, which is
-  outside the project by construction, so checking it would fail every correct dependency rule"_
-
-That exemption is right. `notImportFrom('fastify')` matches no project path and is a perfectly good
-rule — and bug 0014 was fixed precisely so a bare package name works. So the fix cannot be "check
-import-target against the path universe".
-
-**It has to be a shape discriminator.** `'**/legcay/**'` is unmistakably naming a path;
-`'fastify'` and `'@scope/pkg'` are unmistakably naming a package. Only the first kind can be
-meaningfully unsatisfiable.
-
-```ts
-/**
- * Whether an `import-target` glob is naming a PATH rather than a package.
- *
- * Only a path-shaped glob can be checked against the path universe. A bare
- * specifier legitimately matches no project path — that is what bug 0014 was
- * fixed to support — so misclassifying one as dead would fail every correct
- * `notImportFrom('fastify')`.
- */
-function namesAPath(glob: string): boolean
+```
+**/src/cli/**              matchesProject=true
+**/infra/**                matchesProject=true
+**/bannned/**              matchesProject=false   <- correctly flagged
+**/legacy/**               matchesProject=false   <- FALSE POSITIVE
+**/node_modules/**         matchesProject=false   <- FALSE POSITIVE
+fastify, @scope/pkg        package-shaped, correctly exempt
 ```
 
-Discriminator, to be settled by measuring the real corpus (see the inventory): a glob is
-path-shaped when it contains `/` **and** is not a bare or scoped package specifier. `'@scope/pkg'`
-contains `/` and is a package; `'**/legacy/**'`, `'src/legacy/*'` and `'../legacy/**'` are paths.
-A subpath import (`'#internal/*'`) and a package subpath (`'lodash/fp'`) are the two shapes that
-will decide whether "contains `/`" needs strengthening.
+Two false-positive classes, and the second is fatal:
 
-Then, for a site with `position === 'condition'` **and** `polarity === 'negative'` **and**
-`namesAPath(glob)` **and** the glob dead against the path universe: report it. Everything else keeps
-today's behaviour.
+1. **Targets outside the project.** `notImportFrom('**/node_modules/**')` is a good rule
+   and would be reported dead, because resolved import paths legitimately leave the
+   project. This one is avoidable with more exclusions, and doing so is a treadmill.
+2. **The pre-emptive ban.** `notImportFrom('**/legacy/**')` in a repository with no
+   `legacy/` folder is a **legitimate armed tripwire** — and `docs/modules.md:38` teaches
+   that exact glob as the canonical example. Nothing static distinguishes it from a
+   misspelling, because there is nothing to distinguish: the two are the same string in
+   the same position with the same match count.
 
-This is one narrow widening of an existing skip. No new surface, no runtime tally, `diagnose()`'s
-"without running" promise intact, and `doctor` needs nothing it does not already have.
+**0069 had already reached this conclusion**, in its own table:
 
-## Decisions
+| position    | polarity | Unsatisfiable ⇒                                         |
+| ----------- | -------- | ------------------------------------------------------- |
+| `condition` | negative | **no fault** — indistinguishable from an armed tripwire |
 
-**A configuration finding, not a violation.** It reports that a rule enforces nothing, which is
-0069's category: `bypassFilters: true`, forced to `error`, refused by `.excluding()`, skipped by
-diff and baseline. Same treatment as every other "this rule cannot fire" finding.
+and in `src/core/diagnose.ts:165-168`, which says the same thing in code. Draft 1 claimed
+satisfiability breaks that tie. It does not. Satisfiability only breaks the tie for globs
+that could never match anything _anywhere_ — syntactically impossible ones — and
+`syntacticFault` already handles those.
 
-**The remedy is specific, because the generic one is wrong here.** 0069's dead-glob remedy offers
-"the glob names a directory rather than the files inside it (append `/**`)" among its causes. For a
-denylist the likeliest cause is a misspelling, and the second-likeliest is that the banned code was
-already deleted — in which case the correct action is to **delete the rule**, not fix the glob. Say
-both, and say which is which.
+## Why the runtime mechanism cannot work either
 
-**It must not fire for a package-shaped glob, ever.** That is the failure mode that would make this
-plan a net negative: `notImportFrom('fastify')` on a project that has not installed fastify yet is a
-legitimate pre-emptive ban, and a red there would teach people to delete the guard. Guarded by
-identity in the inventory, in both directions.
+0069's first record of this fault stated it as a **glob-exercise tally**: "a glob that can
+match but matched no edge in this run". Measured: for `notImportFrom('**/legcay/**')` every
+edge _is_ tested against the glob, so tested > 0 and matched == 0 — byte-for-byte what a
+respected ban produces. A tally distinguishes nothing. That correction is recorded in 0069.
 
-## Test inventory
+So both mechanisms are refuted, by the same underlying fact from two directions: **the
+information needed is not in the code.** It is in the author's head.
 
-1. **The two rows in Problem, as one test.** `notImportFrom('**/bannned/**')` reports a
-   configuration finding; `notImportFrom('**/banned/**')` over a folder nobody imports reports
-   **nothing**. Both in one test, because the pair is the whole point and asserting either alone
-   passes on a build that fires for everything or for nothing.
-2. **Package-shaped globs never fire**, asserted as an explicit list: `'fastify'` (installed),
-   `'not-installed-anywhere'` (not installed), `'@scope/pkg'`, `'lodash/fp'`, `'#internal/x'`. The
-   not-installed row is the one that matters — it is the legitimate pre-emptive ban.
-3. **Polarity**: the same unsatisfiable glob in `onlyImportFrom` reports **no** configuration
-   finding, because 14 real violations already say it. Asserted with the violation count, so it
-   fails if the allowlist ever goes quiet.
-4. **Position**: an unsatisfiable path-shaped glob in `.that().notImportFrom(…)` **predicate**
-   position — decide and pin. Plan 0071 made that predicate anti-monotone, so a dead glob there
-   selects _everything_, which is loud in a different way. Measure before deciding.
-5. **`.excluding()` is still exempt** — `position === 'exclusion'` matching zero is remedy-optional
-   (proposal 006) and must stay silent. A sabotage that widens the skip removal to exclusions must
-   red.
-6. **The remedy remediates**, both branches: fixing the spelling clears it, and deleting the rule
-   clears it. The second is the branch a generic dead-glob remedy gets wrong.
-7. **`diagnose()` still reports without running.** Asserted by a rule whose evaluation would throw:
-   `diagnose()` must still return the finding. That is what stops a future implementer reaching for
-   a runtime tally.
-8. **Corpus non-regression**: `diagnose()` over this repo's own rule files reports the same findings
-   as before this change. The discriminator is new logic on a shipped surface; it must add exactly
-   one class of finding and no others.
-9. **Sabotage, from the diff**: drop the `namesAPath` guard (packages must red — this is the net-negative
-   direction); drop the polarity guard (the allowlist must red); drop the satisfiability check (armed
-   tripwires must red); invert `namesAPath` (everything flips).
+## Three structural blockers, measured, that matter for 0073 rather than here
+
+Recorded because draft 1 asserted the opposite of each, and whoever reads 0073 needs them:
+
+1. **`GlobSite.polarity` does not carry the denylist/allowlist distinction.**
+   `negateGlobs` (`src/core/glob-site.ts:236`) is its only writer, so it tracks `not()`
+   combinator negation. `notImportFrom`'s sites are polarity **positive**.
+2. **There is no condition-position glob site to un-skip.** A `notImportFrom` rule exposes
+   **0** glob trees through the `diagnose()` interface; add a `.that()` and it exposes
+   **1** — the selector. `Condition<T>` (`src/core/condition.ts:47`) declares `description`
+   and `evaluate` and nothing about globs; only _predicates_ declare them. So
+   `diagnose.ts:169`'s `position === 'condition'` skip is skipping **predicate-derived**
+   sites, and the conditions' own globs never reach `globSitesOf` at all.
+3. **`viewsFor` gives `import-target` no views**, deliberately (`path-universe.ts:72`),
+   because a bare specifier legitimately matches no project path — which is what
+   [bug 0014](../bugs/fixed/0014-import-globs-do-not-match-bare-package-names.md) was
+   fixed to support.
+
+## What is actually left: an author-declared expectation
+
+The only thing that separates a typo from a pre-emptive ban is **intent**, and this
+project already has the shape for that — `.expectNonEmpty()`
+(`src/core/rule-builder.ts:119`), shipped in 0.18.0 for exactly the analogous selector
+case. The author says "I expect this to match", and the finding exists because they said
+so, not because a heuristic guessed.
+
+```ts
+// Today: silent forever if the glob is wrong, and correct if the ban is pre-emptive.
+modules(p).that().resideInFolder('**/src/**').should().notImportFrom('**/legacy/**')
+
+// The successor: the author declares the ban is live, so a glob that matches nothing
+// is a fault BY DECLARATION rather than by inference.
+modules(p)
+  .that()
+  .resideInFolder('**/src/**')
+  .should()
+  .notImportFrom('**/legacy/**')
+  .expectGlobsMatch()
+```
+
+**An opt-IN, and that direction is not negotiable.** 0069's appendix already rejected the
+opt-out: _"`.allowEmpty()` — one word, silent forever, typo or not, and nothing revisits
+it"_, and _"no opt-out at all — purest, but fails 0.18.1's own criterion and tells users to
+delete legitimate tripwires"_. An opt-in inverts both objections: the default keeps working
+for pre-emptive bans, and the declaration is the thing a reviewer can see.
+
+Design constraints, all inherited rather than invented:
+
+- **It must fail, not warn** (ADR-008 rule 1). Once the author has declared the
+  expectation, the remedy is not optional — fix the glob or drop the declaration — so this
+  is a configuration finding: `bypassFilters: true`, forced to `error` by `severityFor`,
+  refused by `.excluding()`, skipped by diff and baseline. Identical treatment to every
+  other "this rule cannot fire" finding.
+- **The remedy must be per-cause** (ADR-008 rule 2). A denylist glob matching nothing has
+  two likely causes and they need opposite actions: a **misspelling**, where the fix is the
+  glob; and **the banned code was already deleted**, where the fix is to delete the rule.
+  0069's generic dead-glob remedy offers "append `/**`", which is right for a selector and
+  wrong here.
+- **It must say there is no escape hatch** (ADR-008 rule 3), the sentence 0.23.0 added to
+  every configuration finding.
+- **It must cover both silent conditions** — `notImportFrom` and
+  `onlyHaveTypeImportsFrom` — and must **not** fire for the five loud ones, which need no
+  declaration because a typo there is already maximally loud.
+
+Whether this earns API surface is a genuine product question and not settled here. The
+honest case against: a rule author who mistypes a glob is unlikely to have also remembered
+to add `.expectGlobsMatch()`, so the opt-in may protect exactly the people who did not need
+protecting. That is the same objection `.expectNonEmpty()` faces, and it shipped — but
+selector emptiness is a much commoner mistake than a denylist typo, so the analogy is not
+free. **Decide that before building it.**
 
 ## Out of scope
 
-- **The exercise tally.** Refuted above; a tally cannot distinguish a typo'd denylist from a
-  respected ban.
-- **0069's R3b static guard** for non-condition positions — designed, gated on an adopting
-  codebase's `doctor` pre-flight, independent of this.
-- **Bug 0015's edgeless-subject case** — a subject set with no edges at all, so the allowlist was
-  never exercised. Different fault, different owner, evidence in that bug file.
-- **Normalizing `import-target` globs** — 0067 part C's path-glob auto-fail plus normalization is
-  the broader version of the shape question here, and it is parked on a version decision. This plan
-  needs only to _classify_ a shape, not to rewrite it.
-- **Reporting a package-shaped glob for a package that is not in `package.json`.** Tempting and
-  wrong: a pre-emptive ban on something not yet installed is the main reason to write one.
+- **Condition-declared globs** — [plan 0073](./0073-conditions-declare-their-globs.md).
+  The prerequisite for any of this, and worth doing on its own merits.
+- **[Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)** —
+  the `only*` family passing on an edgeless subject. 0069 records it as a known exposure at
+  line 205; it is a different fault with a different owner.
+- **0069's R3b** — the _selector_ glob guard, designed and gated on an adopting codebase's
+  `doctor` pre-flight. Unaffected by any of this.
