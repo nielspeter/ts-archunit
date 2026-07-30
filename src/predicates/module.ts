@@ -3,24 +3,55 @@ import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
 import { globAnyOf } from '../core/glob-site.js'
 import type { ImportOptions } from '../core/import-options.js'
-import { isTypeOnlyImport } from '../core/import-options.js'
-import { importCandidates } from '../core/import-candidates.js'
+import { candidatesFor } from '../core/import-candidates.js'
+import { edgesOf, type ModuleEdgeKind } from '../core/module-edges.js'
 
 /**
- * Every string a glob may be matched against, across every import in the file.
+ * Which edge kinds these predicates see.
  *
- * Flattened rather than grouped per import: these predicates only ask "does
- * ANY import match", so which import a candidate came from is not needed. See
- * `importCandidates` for why one import can contribute two strings.
+ * The **same set as the conditions** (`DEPENDENCY_KINDS` in
+ * `conditions/dependency.ts`), and it has to be: `notImportFrom` is one
+ * identifier with two definitions chosen by chain position, so a predicate that
+ * disagreed with its own condition about what an import is would be this plan's
+ * Problem statement inside one method name.
+ */
+const PREDICATE_KINDS: Record<ModuleEdgeKind, boolean> = {
+  import: true,
+  reexport: true,
+  dynamic: true,
+  'type-expression': true,
+  require: false,
+}
+
+/**
+ * Every string a glob may be matched against, across every edge in the file.
+ *
+ * Flattened rather than grouped per edge: these predicates only ask "does ANY
+ * edge match", so which edge a candidate came from is not needed. See
+ * `candidatesFor` for why one edge can contribute two strings.
+ *
+ * **Two consumers, moving subjects in opposite directions** (plan 0071 §3), which
+ * is why widening this is in scope rather than an implementation detail:
+ *
+ * - `notImportFrom` is **anti-monotone** — a file with a matching re-export now
+ *   fails the predicate and drops out of the selection, so rules select FEWER
+ *   subjects and report FEWER findings. Losing findings is the one direction this
+ *   release claims cannot happen, so it is asserted by identity.
+ * - `importFrom` is **monotone-increasing** — more files match, more subjects,
+ *   more findings.
+ *
+ * The condition-layer measurement ("0 findings lost") cannot see either: this
+ * repo's own rules use `notImportFrom` in condition position 16 times and
+ * predicate position zero, so the corpus structurally cannot show the loss.
  */
 function importCandidatePaths(sourceFile: SourceFile, ignoreTypeImports = false): string[] {
-  return sourceFile
-    .getImportDeclarations()
-    .filter((decl) => {
+  return edgesOf(sourceFile)
+    .filter((edge) => {
+      if (!PREDICATE_KINDS[edge.kind]) return false
       if (!ignoreTypeImports) return true
-      return !isTypeOnlyImport(decl)
+      return !edge.typeOnly
     })
-    .flatMap((decl) => [...importCandidates(decl)])
+    .flatMap((edge) => [...candidatesFor(edge.specifier, edge.resolvedPath)])
 }
 
 /**

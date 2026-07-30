@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-07-30T06:32:01.666Z",
+  "hashVersion": 2,
+  "root": ".",
+  "count": 2,
+  "violations": [
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/consumer-import.ts",
+      "line": 1,
+      "hash": "9b425ad157bd267a",
+      "subject": "8ea4aa10d5f06191"
+    },
+    {
+      "rule": "should not import from \"**/banned/**\"",
+      "file": "src/mixed.ts",
+      "line": 4,
+      "hash": "cd61b80a852154fd",
+      "subject": "099d6675f8bfb8cd"
+    }
+  ]
+}

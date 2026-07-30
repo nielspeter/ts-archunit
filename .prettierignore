@@ -2,3 +2,16 @@ dist/
 node_modules/
 coverage/
 poc/fixtures/
+
+# Fixtures whose LINE NUMBERS are asserted.
+#
+# `tests/core/module-edges-forms.test.ts` pins each edge's statement line, and the
+# fixture carries a deliberately multi-line form of every kind — that is the only
+# thing that distinguishes `line` taken from the statement (correct) from `line`
+# taken from the string literal (wrong for 5% of real imports, and for every
+# multi-line re-export and dynamic import).
+#
+# Prettier collapses those forms back onto one line, which silently deletes the
+# property under test. A "DO NOT reflow" comment in the file cannot stop it; this
+# can.
+tests/fixtures/module-edge-forms/
