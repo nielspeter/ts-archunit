@@ -14,3 +14,14 @@ docs/.vitepress/cache/
 # Deleted in afterAll; ignored so a crashed run cannot leave them to be committed —
 # or, worse, collected as tests by the next run. See that file's header.
 tests/__generated__/
+
+# Credentials must never be stageable from the working tree of a public repo.
+# A review agent created an empty `context7-key.env` here while setting up the
+# Context7 API key, and nothing in this file would have stopped `git add -A` from
+# committing it once filled in. The key is an ACCOUNT credential (not repo-scoped),
+# so a leak is not limited to this project.
+.env
+.env.*
+*.env
+*-key.env
+*.pem

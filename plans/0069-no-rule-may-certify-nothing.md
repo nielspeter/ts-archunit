@@ -337,12 +337,24 @@ violations** — an allowlist typo is maximally loud and needs no diagnostic. A 
 the opposite: `notImportFrom('**/legcay/**')` reports zero forever, and that is indistinguishable
 from a ban being respected. So the polarity matters, and `GlobSite` already carries it.
 
-Two prerequisites, so whoever picks this up is not surprised: `diagnose()` currently promises to
-report _"without running any of them"_ and a glob-exercise tally requires running; and `doctor`
-cannot load a rule file that imports vitest, which is a co-equal documented authoring path. Note
-also `src/core/diagnose.ts`'s deliberate skip — _"a positive condition glob is indistinguishable
-from an armed tripwire that has not fired"_ — which is this fault's precedent and must not be
-"fixed" without replacing the reasoning.
+> **Superseded, 2026-07-30 — the mechanism above is refuted. See
+> [plan 0072](./0072-a-denylist-glob-that-cannot-match.md).**
+>
+> This section stated the fault as a **glob-exercise tally** ("matched no edge in this run") and
+> recorded two prerequisites from it: `diagnose()` promises to report _"without running any of
+> them"_ and a tally requires running; and `doctor` cannot load a rule file that imports vitest.
+>
+> **A tally cannot work.** Measured: for `notImportFrom('**/legcay/**')` every edge _is_ tested
+> against the glob — the condition iterates all edges and matches each. Tested-count is non-zero
+> and match-count is zero, which is byte-for-byte what a **respected ban** produces. So both
+> prerequisites are moot, and neither blocks anything.
+>
+> The real discriminator is **satisfiability**, and it is static: an unsatisfiable glob cannot be an
+> armed tripwire, because a tripwire has to be armed against something that exists. That preserves
+> `src/core/diagnose.ts:165-168`'s reasoning rather than replacing it — the skip there is not wrong,
+> it is applied to every `position === 'condition'` glob when the argument only justifies skipping
+> the _satisfiable_ ones. The obstacle turned out to be that `import-target` globs have no path
+> universe at all, deliberately, so the fix is a shape discriminator. 0072 carries it.
 
 ## Releases
 
