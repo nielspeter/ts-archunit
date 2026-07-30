@@ -3,7 +3,7 @@
 **Reported:** 2026-07-30
 **Found in:** all versions since v0.20.0 (R2a) for `definePredicate`; the asymmetry with
 built-ins dates from v0.29.0 and [plan 0073](../plans/completed/0073-conditions-declare-their-globs.md)
-**Fixed:** 2026-07-30 — **not yet released.** Additive and non-breaking; both parameters are
+**Fixed:** 2026-07-30, released in **v0.30.0**. Additive and non-breaking; both parameters are
 optional, so every existing two-argument call is unaffected.
 **Severity:** Medium for `definePredicate`, Low for `defineCondition`, and the split is the
 point — see below. Neither is a false green: a glob nobody declares is a glob `doctor` does not
