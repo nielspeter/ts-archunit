@@ -108,3 +108,56 @@ export function failureOrViolations(
     ? error.violations
     : [ruleFileFailure(file, error, ruleFiles)]
 }
+
+/**
+ * A rule file stopped evaluating partway, so the rules after that point never ran.
+ *
+ * [Bug 0029](../../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md),
+ * and the half [plan 0069](../../plans/0069-no-rule-may-certify-nothing.md)'s R3a
+ * specified and did not build: *"R3a states the semantics, and the CLI **reports the
+ * truncation rather than absorbing it**."* The semantics shipped in v0.23.0; this is
+ * the reporting.
+ *
+ * In a **self-executing** rule file — the shape `init` scaffolds and `docs/cli.md`
+ * documents — every rule calls its own terminal at module scope. A throw there aborts
+ * the module, so every rule declared after it is never evaluated. The CLI then folds
+ * the thrown finding into the run and the output looks entirely ordinary. Measured on
+ * v0.28.0, the same two rules in each style:
+ *
+ * | rule file shape                  | findings reported |
+ * | -------------------------------- | ----------------- |
+ * | `export default [rule1, rule2]`  | **5** — the configuration finding and all four violations |
+ * | self-executing                   | **1** — the four violations silently absent |
+ *
+ * Worse than a crash, because the run is **red for the other finding**: someone fixes
+ * that, moves on, and never learns the rest of the file was skipped — or takes the
+ * sanctioned remedy for a dead glob, which is to delete the rule, and still never
+ * learns it.
+ *
+ * **What this can and cannot say.** The module never finished, so the CLI cannot know
+ * *what* was lost — only that anything after the throw did not run. Naming a count or
+ * a rule would be invention. It says the file stopped and what to do, which is all it
+ * has.
+ *
+ * `bypassFilters` because it reports missing coverage: nothing to grade, exclude or
+ * accept into a baseline.
+ */
+export function ruleFileTruncated(file: string, ruleFiles: number): ArchViolation {
+  const others = ruleFiles > 1 ? ' The other rule files in this run were still checked.' : ''
+  return {
+    rule: 'ts-archunit: rule file',
+    element: basename(file),
+    file,
+    line: 1,
+    message:
+      `This rule file stopped evaluating at the finding above, so any rule declared after ` +
+      `that point never ran and its violations are not in this report. Rules that had already ` +
+      `run are reported normally.${others}`,
+    suggestion:
+      `Fix the finding above, then re-run to see the rest of this file. If you would rather the ` +
+      `file always evaluate in full, move its rules into \`export default [rule1, rule2]\` — an ` +
+      `array export builds every rule before any of them runs, so one finding cannot hide the ` +
+      `others.`,
+    bypassFilters: true,
+  }
+}

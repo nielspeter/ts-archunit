@@ -3,11 +3,16 @@ import { withBaseline } from '../../helpers/baseline.js'
 import { diffAware } from '../../helpers/diff-aware.js'
 import type { OutputFormat } from '../../core/check-options.js'
 import type { ArchViolation } from '../../core/violation.js'
-import { writeReport } from '../../core/execute-rule.js'
+import { ArchRuleError } from '../../core/errors.js'
+import { setCallerAggregatesReports, writeReport } from '../../core/execute-rule.js'
 import { suppressionNotice } from '../../core/diff-disclosure.js'
 import { writeStderr } from '../../core/stderr.js'
 import { loadRuleFiles } from '../load-rules.js'
-import { attributeToRuleFile, failureOrViolations } from '../rule-file-findings.js'
+import {
+  attributeToRuleFile,
+  failureOrViolations,
+  ruleFileTruncated,
+} from '../rule-file-findings.js'
 
 export interface CheckArgs {
   ruleFiles: string[]
@@ -33,6 +38,10 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   const baseline = args.baseline !== undefined ? withBaseline(args.baseline) : undefined
   const diff = args.changed ? diffAware(args.base) : undefined
 
+  // This command reports once, at the end, across every rule file. So a
+  // self-executing rule file's own terminals must not also write the findings that
+  // travel on their thrown error — see `setCallerAggregatesReports`.
+  setCallerAggregatesReports(true)
   const collected: ArchViolation[] = []
   const total = args.ruleFiles.length
   for (const file of args.ruleFiles) {
@@ -49,6 +58,25 @@ export async function runCheck(args: CheckArgs): Promise<number> {
       // surfaces its violations rather than crashing. (Presets no longer throw
       // at import — they return builders.)
       collected.push(...failureOrViolations(file, error, total))
+      // …and, for a thrown TERMINAL, say that the file stopped there — the part R3a
+      // specified and did not build (bug 0029). A throw during import aborts the
+      // module, so any rule declared after it never ran and its violations are not
+      // in this report, while the run is red for the thrown finding so nothing else
+      // reveals the gap.
+      //
+      // **Only for an `ArchRuleError`**, which is the signal that a terminal fired:
+      // rules before it DID run and report, rules after did not. For any other error
+      // — a syntax error, a missing dependency — nothing ran at all, and
+      // `ruleFileFailure` already says the file could not be evaluated. Adding
+      // "the rules after this never ran" there would imply some had, and point at a
+      // "finding above" that is an error rather than a finding. Three of bug 0025's
+      // own tests caught exactly that when this fired unconditionally.
+      //
+      // Only at THIS boundary either way. A throw from `builder.violations()` below
+      // happens after the module finished, so nothing was truncated, and the
+      // `export default [rule1, rule2]` shape never reaches here at all — an array
+      // export builds every rule before any of them runs.
+      if (error instanceof ArchRuleError) collected.push(ruleFileTruncated(file, total))
       continue
     }
     for (const builder of builders) {

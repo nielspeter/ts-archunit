@@ -161,7 +161,11 @@ describe('runCheck', () => {
   it('captures violations from a preset that throws ArchRuleError on import (fallback)', async () => {
     vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     mockLoadRuleFiles.mockRejectedValue(new ArchRuleError([v({ severity: 'error' })], 'preset'))
-    expect(await runCheck(baseArgs)).toBe(1)
+    // TWO, not one: the thrown violation plus the truncation notice. An
+    // `ArchRuleError` from loading means a terminal fired at module scope, so any rule
+    // after it never ran — and saying so is bug 0029's fix. Both are error-severity,
+    // and `runCheck` returns that count.
+    expect(await runCheck(baseArgs)).toBe(2)
   })
 
   it('sums error-severity violations across builders', async () => {
@@ -243,7 +247,13 @@ describe('runCheck', () => {
 
     const count = await runCheck({ ...baseArgs, ruleFiles: ['a.ts', 'b.ts'] })
 
-    expect(count).toBe(2) // FromA (fallback) + FromB (still loaded)
+    // FromA (fallback) + a.ts's truncation notice + FromB (still loaded).
+    //
+    // The notice is bug 0029's fix: `a.ts` threw a terminal at module scope, so any
+    // rule it declared after that point never ran. `b.ts` loaded cleanly and gets no
+    // notice, which is the property that matters here — one file stopping early must
+    // not make the others look truncated too.
+    expect(count).toBe(3)
   })
 
   it('applies the baseline to the unified list before computing the exit code', async () => {

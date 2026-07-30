@@ -214,6 +214,37 @@ export function writeReport(
 }
 
 /**
+ * Whether a caller aggregates and reports every finding itself.
+ *
+ * The CLI does: it collects across all rule files and calls `writeReport` once, so a
+ * per-rule terminal that also writes produces the finding twice — measured on the real
+ * CLI as two `Architecture Violation [1 of 1]` blocks with identical content while
+ * `--format json` said 1 (bug 0029).
+ *
+ * **Only the findings the aggregator can actually recover may be suppressed**, which
+ * means only the ones that travel on the thrown `ArchRuleError`. A `.warn()` whose
+ * violations are ordinary does not throw, and the CLI never calls `.violations()` on a
+ * self-executing rule file — so those exist nowhere else and must always be written or
+ * they are lost outright.
+ *
+ * Default false, because the in-test path has no aggregator: nothing catches the error
+ * and re-renders it, so `ArchRuleError.message` — a one-line summary by design — would
+ * be all a reader gets, losing the finding's message, its remedy and the sentence
+ * saying it cannot be suppressed.
+ */
+let callerAggregatesReports = false
+
+/**
+ * Declare that the caller will report every finding itself. **CLI only.**
+ *
+ * Not an option on `CheckOptions`: a self-executing rule file passes no options, and
+ * this is a property of who is driving the run rather than of any one rule.
+ */
+export function setCallerAggregatesReports(on: boolean): void {
+  callerAggregatesReports = on
+}
+
+/**
  * Execute the terminal "check" action: apply options, format, throw on violations.
  */
 export function executeCheck(
@@ -292,18 +323,35 @@ export function executeWarn(
 
   if (filtered.length > 0) {
     const stamped = stampSeverity(filtered, 'warn')
-    if (options?.format === 'json') {
-      writeStderr(formatViolationsJson(stamped, ctx.reason))
-    } else if (options?.format === 'github') {
-      process.stdout.write(formatViolationsGitHub(stamped, 'warning') + '\n')
-    } else {
-      writeStderr(formatViolations(stamped, ctx.reason))
+    const configFindings = stamped.filter((v) => v.bypassFilters === true)
+
+    // Write only what the throw will NOT carry.
+    //
+    // This used to write `stamped` in full and then throw the configuration
+    // findings, so those were reported twice: once here and once by whoever
+    // caught the error and reported `error.violations`. Measured on the CLI —
+    // two `Architecture Violation [1 of 1]` blocks with identical content, while
+    // `--format json` said 1 (bug 0029).
+    //
+    // Splitting rather than skipping the write entirely, because the ordinary
+    // warn-level violations are NOT on the error — it deliberately carries only
+    // the configuration findings, so that "these findings are true" stays true
+    // for every entry. Dropping the write would lose them.
+    // The configuration findings ride on the throw, so an aggregator re-reports them
+    // and writing here would duplicate. Everything else exists only here.
+    const advisory = callerAggregatesReports
+      ? stamped.filter((v) => v.bypassFilters !== true)
+      : stamped
+    if (advisory.length > 0) {
+      if (options?.format === 'json') {
+        writeStderr(formatViolationsJson(advisory, ctx.reason))
+      } else if (options?.format === 'github') {
+        process.stdout.write(formatViolationsGitHub(advisory, 'warning') + '\n')
+      } else {
+        writeStderr(formatViolations(advisory, ctx.reason))
+      }
     }
 
-    // Logged first, then thrown: the ordinary violations still reach the
-    // reader on the surface they chose, and only the configuration findings
-    // reach the error.
-    const configFindings = stamped.filter((v) => v.bypassFilters === true)
     if (configFindings.length > 0) throw new ArchRuleError(configFindings, ctx.reason)
   }
 }

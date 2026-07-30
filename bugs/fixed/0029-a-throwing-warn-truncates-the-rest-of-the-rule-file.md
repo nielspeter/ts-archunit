@@ -1,7 +1,9 @@
 # Bug 0029: a throwing `.warn()` truncates the rest of the rule file, silently
 
 **Reported:** 2026-07-30
+**Fixed:** 2026-07-30
 **Found in:** v0.20.0 (R3a's warn-throw) through v0.26.0
+**Status:** **FIXED** — the CLI now reports the truncation, and each finding is reported once. Guarded by `tests/cli/rule-file-truncation.test.ts` against **real** rule files on disk, with the `export default [...]` control as the discriminator. Six reverts, all caught.
 **Severity:** High — silent coverage loss, shipped by the release whose thesis is that silent
 coverage loss is the defect. Every rule after the throwing one is never registered, its violations
 never reported, and the run is **red for a different reason** — so nobody investigates. The
@@ -146,3 +148,33 @@ the throw path already carries the findings.
   remaining half.
 - **[Bug 0026](./fixed/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md)**
   supplies the file attribution this finding needs.
+
+## How it was fixed
+
+**The truncation notice**, `ruleFileTruncated` in `src/cli/rule-file-findings.ts`, emitted
+at the load boundary in `runCheck` — and **only for an `ArchRuleError`**. That is the
+signal a terminal fired at module scope, so rules before it ran and rules after did not.
+For any other error nothing ran at all, and `ruleFileFailure` already says the file could
+not be evaluated; adding "the rules after this never ran" there would imply some had, and
+point at a "finding above" that is an error rather than a finding. Three of bug 0025's own
+tests caught exactly that when the notice fired unconditionally.
+
+**The double print** was subtler than the report suggested, and the report's preferred
+option was wrong. It proposed that `executeWarn` should not write before throwing, since
+"the throw path already carries the findings". True for the CLI, which catches and
+re-renders — but on the **in-test** path nothing catches, so `ArchRuleError.message` (a
+one-line summary by design) would be all a reader gets, losing the finding's message, its
+remedy and the sentence saying it cannot be suppressed. Measured: that regression showed
+up as `config-findings-cannot-be-downgraded.test.ts` failing.
+
+So the write is suppressed only for findings an aggregator can recover, and only when one
+is present: `setCallerAggregatesReports(true)`, set by the CLI. The ordinary warn-level
+violations are always written, because they travel on no error and the CLI never calls
+`.violations()` on a self-executing rule file — suppressing those would lose them outright.
+That third failure mode is in the sabotage matrix too.
+
+## What is still true
+
+The lost violations stay lost in the run where the truncation happens. The module never
+finished, so the CLI cannot know what did not register — only that something did not. The
+notice says so and says what to do; naming a count would be invention.
