@@ -8,6 +8,21 @@ The plan claimed **8**. It was wrong by more than 4×, and worse, nobody could h
 
 **Corrected 2026-07-26, after review found the same defect one level down.** The first version counted 26 rows in a table that had 27, dropped one of the 35 tests entirely, and classified a **live shipped preset bug** as legitimate. Three reviewers found all three independently. A hand-typed count, wrong, in the document written because a hand-typed count was wrong — which is the argument for the mechanism and not for more care, again.
 
+## What this appendix does NOT enumerate, 2026-07-30
+
+The recipe above sets `_requireNonEmpty = true`, so the population is tests that assert on an
+**empty selector**. An **edgeless subject** — a selector that matched files, none of which have
+any import edges — is a _non-empty_ selector and is therefore absent from these 35 rows.
+
+That matters because it was nearly acted on. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)
+proposed failing on an edgeless subject, and [plan 0071](./0071-one-definition-of-a-module-edge.md)
+designed a rule-level version of it before both were refuted by measurement. Anyone deriving that
+population needs a second recipe — and the one test that would have been in it,
+`tests/conditions/dependency.test.ts:43` ("passes for a module with no imports (vacuously true)"),
+**stays green**, because for the `only*` family zero edges is maximal compliance rather than
+absent evidence. The evidence is in bug 0015; it is not a gap in this appendix's number, it is a
+different number that nobody needs.
+
 Rows are keyed by **test name**, not `file:line`. The first version's line numbers were stale the day they merged, because the fixes in the same commit moved them.
 
 **35 is the blast radius, not the defect count.** Most of these are correct: `notExist()` is _satisfied_ by an empty set, so a test asserting "nothing matches X" must keep passing after R3b. Shipping R3b without this classification would have meant either 35 spurious failures or a guard weakened until it stopped catching anything.

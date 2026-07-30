@@ -1,9 +1,9 @@
 # Plan 0069 — No rule may certify nothing
 
-**Status:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)** (its 0.22.0 instrument is built and awaiting tag; its 0.23.0 flip closes both bugs), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
+**Status:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)** (**both released** — v0.22.0 shipped the instrument, v0.23.0 the flip; the plan is in `plans/completed/` and bugs 0019/0020 are closed), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
 **Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
 **Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); ~~absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md)~~ — **019 moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)**; closes [bug 0011](../bugs/fixed/0011-dogfood-rules-select-nothing.md).
-**Prerequisites:** [bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) ships first, alone. The single-root refactor (`spike/0014-rule-census`, +456/−165) is **unmerged** and lands as its own commit with its own test pass.
+**Prerequisites: both satisfied.** [Bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) shipped. The single-root refactor **landed** as `85be8ce refactor(core): one root for every builder`, via `feat/0069-r2a-glob-model` rather than the `spike/0014-rule-census` branch this header used to name — that branch still exists and is **not** an ancestor of `main`, so do not read it as the source of truth. Everything since depends on the single root: plan 0070's assertion gate hangs off `TerminalBuilder`, which is what made one hook reach all fifteen builders.
 
 ## Corrections carried into draft 7
 
@@ -317,6 +317,32 @@ So the keyword grep is a starting point, not the checklist. Draft 6 said the che
 **`emptyIsPass`, specified** — it was previously named only as "`.some()` → `.every()`", which lives on `spike/0067c-empty-by-default` and not in this plan, making it unimplementable from here. The contract: a condition today reports a violation when **some** subject fails; over an empty subject set that is vacuously false, so the rule passes. `emptyIsPass` inverts the default — a condition is satisfied only when **every** subject satisfies it _and_ at least one subject exists — so an empty subject set fails instead. It is opt-out per condition for the genuine cases (`.notExist()` rules, where zero subjects is the passing state), it **never covers a path fault** (an unsatisfiable glob is caught earlier, by the tree, with a different message), and it lands in R3b. Its doc surface is `docs/core-concepts.md`'s condition semantics section.
 
 ---
+
+## R3b gained a fault, 2026-07-30
+
+From [plan 0071](./0071-one-definition-of-a-module-edge.md) and the refutation recorded in
+[bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md): **a glob
+that is satisfiable but matched no edge** belongs to R3b, and it is a different fault from the
+one 0069 already covers.
+
+| Fault                                                                    | Owner                 |
+| ------------------------------------------------------------------------ | --------------------- |
+| A glob that **cannot** match anything in the project (unsatisfiable)     | R3b, already designed |
+| A glob that **can** match but **matched no edge** in this run            | **R3b, new**          |
+| A subject set with no edges at all, so the allowlist was never exercised | bug 0015              |
+
+The new row is the silent one, and 0071's measurement is what shows which case is worth
+reporting: `onlyImportFrom('**/nowhere/**')` over 19 edge-bearing subjects produces **96
+violations** — an allowlist typo is maximally loud and needs no diagnostic. A **denylist** typo is
+the opposite: `notImportFrom('**/legcay/**')` reports zero forever, and that is indistinguishable
+from a ban being respected. So the polarity matters, and `GlobSite` already carries it.
+
+Two prerequisites, so whoever picks this up is not surprised: `diagnose()` currently promises to
+report _"without running any of them"_ and a glob-exercise tally requires running; and `doctor`
+cannot load a rule file that imports vitest, which is a co-equal documented authoring path. Note
+also `src/core/diagnose.ts`'s deliberate skip — _"a positive condition glob is indistinguishable
+from an armed tripwire that has not fired"_ — which is this fault's precedent and must not be
+"fixed" without replacing the reasoning.
 
 ## Releases
 
