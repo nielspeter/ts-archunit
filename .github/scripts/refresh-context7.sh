@@ -152,6 +152,17 @@ case "$content_type" in
   application/json*) ;;
   *) fail "HTTP $code but the response is '$content_type', not JSON. A non-JSON 200 means the request reached a page route rather than the API — that is what makes the upstream action report success while refreshing nothing." ;;
 esac
+# A 400 with `user-has-active-task` means a refresh for this account is ALREADY
+# running, so the work this job exists to trigger is in flight. Measured: the
+# v0.28.0 release run got 200 at 13:20:33 and a dispatch 17 minutes later got
+#   {"error":"user-has-active-task","message":"You already have a library being
+#    processed. Only one library can be processed at a time."}
+# with the crawl still going. Failing on that reported a working refresh as broken.
+if [ "$code" = "400" ] && grep -q 'user-has-active-task' /tmp/context7-response 2>/dev/null; then
+  echo "::notice title=Context7 refresh already running::A refresh for this account is already in flight, so the crawl this job would have started is already happening. Context7 processes one library at a time. Nothing to do."
+  exit 0
+fi
+
 [ "$code" = "200" ] || fail "HTTP $code from POST /api/v1/refresh. 400 = the request body no longer matches the schema (the field is \`libraryName\`, and a wrong name here is how this script shipped broken once already); 401 = the API key is missing, malformed or expired; 404 = \`$LIBRARY\` is not indexed at all, so add it at https://context7.com/add-library rather than refreshing it; 405 = the endpoint moved again."
 
 # Guard 2: the index has to actually move.
@@ -181,22 +192,34 @@ if [ "$unreadable" -eq "$POLL_ATTEMPTS" ]; then
   fail "The refresh was accepted (HTTP 200) but the index could not be read back even once in $((POLL_ATTEMPTS * POLL_SECONDS))s. That is a failure to VERIFY, not a failure to refresh — the docs may well be current, and the search API being unreachable for that long is itself worth a look. Re-run this job before assuming anything."
 fi
 
-if [ "$(current_state)" != 'finalized' ]; then
-  fail "The refresh was accepted and the library reports state='$(current_state)', i.e. still indexing after $((POLL_ATTEMPTS * POLL_SECONDS))s. The refresh is working and the poll budget is too short. Raise CONTEXT7_POLL_ATTEMPTS and re-run — do NOT re-run the publish job."
+# NOT a `state != finalized` check.
+#
+# `state` describes the last COMPLETED index, not whether a task is running —
+# measured: a crawl accepted at 13:20 was still in flight 18 minutes later with
+# `state=finalized` throughout, because that value refers to the previous crawl. So
+# treating it as an "is it indexing" flag, as an earlier version of this script did,
+# produced a branch that can never fire and advice ("raise the poll budget") aimed at
+# the wrong thing. The in-flight signal is the 400 above, from the refresh endpoint
+# itself.
+if [ "$(current_state)" != 'finalized' ] && [ "$(current_state)" != 'unknown' ]; then
+  fail "The library reports state='$(current_state)', which is neither 'finalized' nor readable. That is a state this script has never seen — read the search API response before assuming what it means."
 fi
 
 # Accepted, finalized, timestamp unchanged: a WARNING, not a failure.
 #
-# Measured on the v0.28.0 release run, which was the first time this path ever
-# executed: `{"message":"Refresh started successfully"}`, then `state=finalized` for
-# all 450s with `lastUpdateDate` frozen at a re-crawl four hours earlier — and still
-# frozen fifteen minutes after the job gave up. A larger budget would have failed
-# identically, so this is not a timing problem.
+# Measured on the v0.28.0 release run, the first time this path ever executed:
+# `{"message":"Refresh started successfully"}`, then `state=finalized` for all 450s
+# with `lastUpdateDate` frozen at the previous crawl.
 #
-# The likeliest cause is a server-side rate limit or debounce: the 200 acknowledges
-# the request, it does not promise a crawl. Whatever the cause, `lastUpdateDate`
-# moving is **not** a property this job can require on every release — a release that
-# changes no indexed content legitimately leaves it alone too.
+# The first reading of that was a rate limit — the 200 acknowledging a request it
+# would not act on. **That was wrong**, and the API said so: a dispatch 17 minutes
+# later answered `user-has-active-task`, i.e. the crawl accepted at 13:20 was still
+# running. So the 200 does queue work; the crawl is simply slower than any poll budget
+# worth spending CI time on (>18 minutes observed, on ~377k tokens).
+#
+# Either way `lastUpdateDate` moving is **not** a property this job can require on
+# every release — a slow crawl and a release that changed no indexed content look
+# identical from here, and neither is a fault.
 #
 # So it warns and exits 0. Hard-failing here would red a correct run, and by ADR-008
 # a guard nobody will act on is worse than no guard: it teaches people to skip the
