@@ -10,7 +10,7 @@ import { combineGlobs, negateGlobs } from './glob-site.js'
  *
  * @example
  * // Negate a predicate:
- * functions(p).that(not(areAsync())).should()...
+ * functions(p).that().satisfy(not(areAsync())).should()...
  *
  * // Negate a type matcher:
  * .should().haveReturnTypeMatching(not(matching(/void/)))
@@ -49,7 +49,7 @@ function assertHomogeneous<T>(inputs: (Predicate<T> | TypeMatcher)[]): void {
  *
  * @example
  * // Combine predicates:
- * functions(p).that(and(areAsync(), areExported())).should()...
+ * functions(p).that().satisfy(and(areAsync(), areExported())).should()...
  *
  * // Combine type matchers:
  * .should().haveReturnTypeMatching(and(matching(/Promise/), not(matching(/void/))))
@@ -83,7 +83,7 @@ export function and<T>(...inputs: (Predicate<T> | TypeMatcher)[]): Predicate<T> 
  *
  * @example
  * // Combine predicates:
- * functions(p).that(or(areAsync(), areExported())).should()...
+ * functions(p).that().satisfy(or(areAsync(), areExported())).should()...
  *
  * // Combine type matchers:
  * .should().haveReturnTypeMatching(or(matching(/Promise/), matching(/Collection/)))

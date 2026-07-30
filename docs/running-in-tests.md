@@ -113,7 +113,7 @@ import { diagnose } from '@nielspeter/ts-archunit'
 it('every architecture rule asserts something', () => {
   const rules = [
     classes(p).that().extend('BaseRepository').should().beExported(),
-    modules(p).that().resideInFolder('src/domain/**').should().notImportFrom('src/http/**'),
+    modules(p).that().resideInFolder('**/src/domain/**').should().notImportFrom('**/src/http/**'),
   ]
   expect(diagnose(rules)).toEqual([])
 })

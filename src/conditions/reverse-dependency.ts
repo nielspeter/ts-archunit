@@ -3,6 +3,7 @@ import { type SourceFile, type Project, Node } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { moduleEdges } from '../core/module-edges.js'
+import { globAnyOf } from '../core/glob-site.js'
 
 // ─── Reverse import graph (cached per ts-morph Project) ──────────
 
@@ -105,6 +106,13 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // `file-path`, NOT `import-target` — and this is the row to get right. The glob
+    // names the FILES ALLOWED TO IMPORT the subject, matched against an importer's own
+    // path, so unlike the four dependency conditions it is a genuine path glob with
+    // real path-universe views. Declaring it as `import-target` would hand a checkable
+    // glob to machinery that has no views for that kind, which fails silently in the
+    // direction that looks fine (plan 0073).
+    globs: globAnyOf(globs, 'file-path'),
     description: `only be imported via ${quotedGlobs}`,
     evaluate(elements: SourceFile[], context: ConditionContext): ArchViolation[] {
       // Build graph from ALL project files, not just the filtered elements

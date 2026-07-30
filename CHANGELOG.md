@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.29.0] - 2026-07-30
+
+Two fixes and one piece of plumbing. **This release invalidates dependency baselines** and no
+printed text moves, which is exactly why it says so loudly. Read
+[Upgrading](https://nielspeter.github.io/ts-archunit/upgrading) first.
+
+**Before upgrading:** refresh the baseline on your current version and commit it separately.
+If you are still on 0.27.x, come **straight here** — going by way of 0.28.0 costs you two
+refreshes for one outcome.
+
+```bash
+npx ts-archunit baseline --output arch-baseline.json   # prints the delta it accepted
+git commit -am 'chore: refresh arch baseline before upgrade'
+```
+
+### Fixed
+
+- **Two dependency findings in one file can no longer share a baseline identity**
+  ([bug 0028](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md)).
+  A finding's identity was `element::message`, and a dependency message carries the element
+  basename and the resolved target and nothing else — no line, no imported names, no edge kind.
+  So `export { a } from './banned.js'` and `export { b } from './banned.js'` in one barrel hashed
+  identically: one baseline entry accepted both, and fixing one left the other silently accepted.
+  Dependency findings now carry a distinct `identity` built from the edge's imported names and
+  line. **`HASH_VERSION` moves 2 → 3 and every dependency entry changes hash**, including ones
+  that never collided. A 0.28.x baseline matches nothing, and a non-empty baseline that matches
+  nothing at all now emits a diagnostic rather than reading as a clean run.
+  - **A residual, stated:** for a static `import`, the recorded name is the _inward_ one, so
+    `import { X } from 'm'` and `import { X as Y } from 'm'` in one file still share an identity.
+    The barrel case this fixes uses outward names, which differ.
+- **A rule file that stops evaluating partway now says so**
+  ([bug 0029](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md)).
+  Since 0.23.0 `.warn()` throws on a configuration finding. In a **self-executing** rule file —
+  the shape `init` scaffolds — a throw at module scope aborts the module, so every rule declared
+  after it was never evaluated while the output looked entirely ordinary. Measured on 0.28.0, the
+  same two rules: the array-export shape reported **5** findings, the self-executing shape
+  reported **1**, with four violations silently absent. The lost findings stay lost — nothing can
+  recover them in that run — but the report now names the truncation and the rule file, because
+  "fewer findings than yesterday" is the one outcome you must not read as progress.
+- **Three `@example` blocks in `src/core/combinators.ts` did not compile.** They showed
+  `.that(not(...))`; the working form is `.that().satisfy(not(...))`.
+- **A documented example failed its own assertion.** `docs/running-in-tests.md` — the page that
+  teaches you to check your rules enforce something — used `resideInFolder('src/domain/**')`
+  under `expect(diagnose(rules)).toEqual([])`. Unanchored, that selects **0** modules where the
+  anchored form selects 40, so `diagnose()` returned a finding and the example was red as
+  written.
+
+### Added
+
+- **Conditions declare the globs they match against**
+  ([plan 0073](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0073-conditions-declare-their-globs.md)).
+  Twelve conditions — the four dependency conditions, `onlyBeImportedVia`, both
+  `resideInFile` / `resideInFolder` pairs, and three delegating aliases in the standard rules —
+  now populate `Condition.globs`, so a rule's condition globs reach `globs()` stamped
+  `position: 'condition'`. A `notImportFrom` rule exposed **zero** glob trees before this and now
+  exposes its own. **No verdict changes**: `diagnose()` skips condition-position globs by
+  decision, because a denylist glob matching nothing is indistinguishable from a ban being
+  respected. This is the visibility half only.
+- **A docs guard for glob syntax.** Every TypeScript fence in `docs/` is parsed, and a glob
+  matched against an absolute path must be anchored. Parsing rather than line-matching is the
+  mechanism, not a refinement of it: a line regex found 467 glob-ish literals and called 224
+  unanchored, almost all falsely — import specifiers and rule ids. Parsing found the real
+  population of **132** path-glob arguments, of which 9 were unanchored, 8 of those legitimately
+  so, and 1 was the `running-in-tests.md` bug above.
+
+### Changed
+
+- `elementCondition` and `functionCondition` take an optional `globs` argument. Internal, but
+  named here because the **public** `definePredicate` / `defineCondition` did **not** get one —
+  see [bug 0030](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0030-user-defined-predicates-and-conditions-cannot-declare-globs.md).
+  A custom path-matching predicate's glob is still invisible to `doctor`, which is a
+  present-tense detection gap rather than a latent one.
+
 ## [0.28.0] - 2026-07-30
 
 The second of [plan 0071](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0071-one-definition-of-a-module-edge.md)'s two releases: **one definition of a module edge**, closing [bug 0022](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md). This release **changes enforcement**. Read [Upgrading](https://nielspeter.github.io/ts-archunit/upgrading) first.
@@ -39,7 +112,7 @@ git commit -am 'chore: refresh arch baseline before upgrade'
 
 ### ⚠️ Do not baseline a barrel
 
-Measured on this repo's `src/index.ts`: **114 findings, 87 distinct identities — 46.5% share an identity with a sibling.** A barrel re-exports many names from the same module, and a dependency message carries the basename and the resolved target only, so those findings are byte-identical and hash the same. Accept one entry and you accept its siblings, and a re-export added later is silently pre-accepted. Exclude the barrel by path — `.excluding()` matches `element` as a **basename**, so `.excluding('index.ts')` silences every `index.ts` in the project at once — or downgrade it with `.asSeverity('warn')`, which keeps printing. This is [bug 0028](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0028-two-findings-in-one-file-can-share-a-baseline-identity.md); the release does not create it, but it moves its incidence from "uncommon" to "every barrel".
+Measured on this repo's `src/index.ts`: **114 findings, 87 distinct identities — 46.5% share an identity with a sibling.** A barrel re-exports many names from the same module, and a dependency message carries the basename and the resolved target only, so those findings are byte-identical and hash the same. Accept one entry and you accept its siblings, and a re-export added later is silently pre-accepted. Exclude the barrel by path — `.excluding()` matches `element` as a **basename**, so `.excluding('index.ts')` silences every `index.ts` in the project at once — or downgrade it with `.asSeverity('warn')`, which keeps printing. This is [bug 0028](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md); the release does not create it, but it moves its incidence from "uncommon" to "every barrel".
 
 ### What this release does NOT widen
 

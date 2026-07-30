@@ -1,5 +1,6 @@
 import type { Node } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
+import type { DeclaredGlobs } from '../core/glob-site.js'
 import type { ArchViolation } from '../core/violation.js'
 import { createViolation } from '../core/violation.js'
 
@@ -17,8 +18,12 @@ export function elementCondition<T extends Node>(
   description: string,
   predicate: (element: T) => boolean,
   messageFn: (element: T) => string,
+  globs?: DeclaredGlobs,
 ): Condition<T> {
   return {
+    // Plan 0073. Optional because most callers assert about names, types or members
+    // and have no glob at all — only the path conditions in `structural.ts` pass it.
+    globs,
     description,
     evaluate(elements: T[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []

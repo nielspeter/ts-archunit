@@ -1,6 +1,7 @@
 # Bug 0028: two findings in one file can share a baseline identity
 
 **Reported:** 2026-07-29
+**Fixed:** 2026-07-30, released in **v0.29.0**. Baseline-invalidating; see below.
 **Found in:** all versions through v0.26.0
 **Severity:** Medium — a baseline entry can accept a violation that is not the one it recorded. Not a false green today (the surviving finding is still a real violation), but it makes a baseline's contents untrustworthy as a record, and it silently defeats "accept this one, fix that one".
 
@@ -106,3 +107,56 @@ land in either order.
   `baseline-compat` corpus test is the counterweight and must keep passing.
 - The stale-entry case, which is the one with teeth: baseline the pair, remove one of the two
   imports, and assert the survivor is **not** silently accepted.
+
+## How it was fixed, and one claim in this file was wrong
+
+`identity` is set on every edge finding: `element::kind::primary-candidate::names`.
+Measured on this repo's barrel, which v0.28.0 had just made dependency-bearing:
+
+```
+before   src/index.ts: 114 findings, 87 identities, 26 colliding groups (46.5%)
+after    src/index.ts: 114 findings, 114 identities, 0 colliding
+```
+
+**`names` is the discriminator, and the line is not.** Both resolve the 26 groups; the
+line is rejected for the reason `baseline.ts` already excludes it — an accepted violation
+has to survive its code moving. A sample colliding pair shows why names work: same file,
+same target, same kind, `[project, workspace, resetProjectCache]` against `[ArchProject]`.
+
+This gives `ModuleEdge.names` its first production consumer. A review had noted the field
+had none and that its only guard was the runtime independence test, which was fair.
+
+### Option 2 was not migration-free, and this file said it was
+
+The Suggested fix above says option 2 "changes no printed text, so no message-stability
+constraint applies. This looks like the right answer." The first half is true and the
+conclusion does not follow. `hashViolation` is
+`violation.identity ?? \`element::message\``, so setting `identity` replaces the whole
+subject and **changes the hash of every dependency finding, not only the colliding ones**.
+No text moves, which makes it an _invisible_ baseline invalidation — arguably worse than a
+visible one.
+
+`HASH_VERSION` is therefore bumped 2 → 3. That satisfies the constant's own rule — "bump
+this only when `hashViolation` changes" — where v0.23.0's attempted bump did not, because
+there the formula was unchanged and only one of its inputs had moved.
+
+Measured consequence, now pinned by `tests/helpers/module-edge-migration.test.ts`: a
+v0.27.0 baseline matches **nothing**, and the run says so — `filterNew` adds one
+diagnostic when a non-empty baseline matches nothing at all, which is the difference
+between a silent invalidation and a stated one.
+
+### A residual, stated
+
+For `kind === 'import'`, `names` is the **inward** name, so `import { X } from 'm'` and
+`import { X as Y } from 'm'` in one file both carry `['X']` and still share an identity.
+Separating them needs the local binding, which `ModuleEdge` deliberately does not carry —
+the same reason `notHaveAliasedImports` was never routed through the edge walk. That shape
+is legal and unusual. The shape this fixes is the barrel, where re-exports use the
+**outward** name so aliases differ.
+
+### Release note
+
+**This must not ship as a patch.** It invalidates every dependency baseline, and v0.28.0
+shipped hours earlier telling adopters to refresh — so releasing it immediately would ask
+them to refresh twice. It belongs in a minor, bundled with other work, with
+`docs/upgrading.md` carrying the row.

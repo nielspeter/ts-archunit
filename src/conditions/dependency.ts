@@ -3,6 +3,7 @@ import type { SourceFile, ImportDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { candidatesFor, matchedCandidate } from '../core/import-candidates.js'
+import { globAnyOf } from '../core/glob-site.js'
 import {
   edgeTypeOnlyRemedy,
   edgeValuePhrase,
@@ -81,6 +82,42 @@ function edgeViolation(
     line: edge.line,
     message,
     because: context.because,
+    // `identity` — the canonical form that supersedes `element::message` in the
+    // baseline hash. [Bug 0028](../../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).
+    //
+    // The message carries the basename and the resolved target and nothing else, so
+    // two edges from one file to one module are byte-identical and share a hash.
+    // Measured on this repo's own barrel after v0.28.0 made barrels
+    // dependency-bearing: `src/index.ts` produced **114 findings and 87 identities —
+    // 26 colliding groups, 46.5% of findings sharing**. You could not accept one and
+    // keep failing on its sibling, and a re-export added later was silently
+    // pre-accepted by an entry written before it existed.
+    //
+    // **`names` is the discriminator, and the line is not.** Measured, adding `names`
+    // takes those 114 edges to 114 distinct identities; adding the line does too, and
+    // is rejected for the reason `baseline.ts` already excludes it — an accepted
+    // violation has to survive its code moving. A sample colliding pair shows why
+    // names work: same file, same target, same kind, `[project, workspace,
+    // resetProjectCache]` against `[ArchProject]`.
+    //
+    // This is `ModuleEdge.names`' first production consumer. Until now its only
+    // reader was the runtime independence test, which is a fair criticism of a field
+    // that costs a per-kind rule to compute.
+    //
+    // **A residual, stated.** For `kind === 'import'` `names` is the INWARD name, so
+    // `import { X } from 'm'` and `import { X as Y } from 'm'` in one file both carry
+    // `['X']` and still share an identity. Separating them needs the local binding,
+    // which `ModuleEdge` deliberately does not carry — the same reason
+    // `notHaveAliasedImports` was never routed through the edge walk. That shape is
+    // legal and unusual; the shape this fixes is the barrel, where re-exports use the
+    // OUTWARD name and aliases therefore differ. Measured: 26 colliding groups on this
+    // repo's barrel go to 0, and the aliased-import pair is what remains.
+    identity: [
+      sourceFile.getBaseName(),
+      edge.kind,
+      edgeCandidates(edge)[0],
+      [...edge.names].sort((a, b) => a.localeCompare(b)).join(','),
+    ].join('::'),
   }
 }
 
@@ -126,6 +163,16 @@ export function onlyImportFrom(
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description: `only import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
@@ -175,6 +222,16 @@ export function notImportFrom(
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description: `not import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
@@ -252,6 +309,16 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description:
       globs.length === 1 ? `depend on ${quotedGlobs}` : `depend on at least one of ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
@@ -361,6 +428,16 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
   return {
+    // Declared so the glob is visible to `explain`, `doctor` and 0069's glob model
+    // (plan 0073). `globAnyOf` because the variadic family is `matchers.some`, so the
+    // set is dead only when every glob in it is — `all` here would read a set with one
+    // live glob as dead, which is the 0.18.1 withdrawal in the other direction
+    // (`glob-site.ts:185`).
+    //
+    // `import-target` has no path-universe views by design (`path-universe.ts:72`), so
+    // declaring changes no verdict — a bare specifier legitimately matches no project
+    // path, which is what bug 0014 was fixed to support.
+    globs: globAnyOf(globs, 'import-target'),
     description: `only have type imports from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []

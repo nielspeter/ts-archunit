@@ -339,9 +339,18 @@ describe('item 12 — each kind names itself, so no finding is absorbed', () => 
       const v = found.find((x) => x.line === line)
       return v === undefined ? undefined : hashViolation(v, fixtureRoot)
     }
+    // TWO identities, and this is the honest number.
+    //
+    // The re-export at line 5 is distinct from both imports — that is §4's verb, and
+    // it is the collision bug 0028 mattered most for. The two IMPORTS at lines 4 and
+    // 11 still share one, because `names` is the INWARD name for an import and
+    // `import { SECRET }` / `import { SECRET as Hidden }` both carry `['SECRET']`.
+    // Separating those needs the local binding, which `ModuleEdge` does not carry.
+    //
+    // Asserted rather than glossed, so the residual cannot be mistaken for a fix.
     expect(new Set(found.map((v) => hashViolation(v, fixtureRoot))).size).toBe(2)
-    expect(identityOf(4)).toBe(identityOf(11)) // two imports collide — bug 0028
-    expect(identityOf(5)).not.toBe(identityOf(4)) // the re-export does not — §4
+    expect(identityOf(4)).toBe(identityOf(11))
+    expect(identityOf(5)).not.toBe(identityOf(4))
   })
 
   it('keeps the `import` message byte-identical, so existing baselines survive', () => {
@@ -377,10 +386,11 @@ describe('item 12 — each kind names itself, so no finding is absorbed', () => 
     expect(byFile.get('consumer-dynamic.ts')).not.toMatch(/consumer-dynamic\.ts imports "/)
   })
 
-  it('reports both of two colliding findings, which identities alone cannot see', () => {
-    // `twice.ts` re-exports one banned module twice. The two findings share an
-    // identity (bug 0028, pre-existing and out of scope), so an identity-set
-    // assertion is blind to losing either one — the multiset is not.
+  it('gives two re-exports of one module distinct identities (bug 0028, now fixed)', () => {
+    // `twice.ts` re-exports one banned module twice — `{ SECRET }` and
+    // `{ SECRET as Again }`. Until bug 0028 was fixed these shared one identity,
+    // because the message carries only the basename and the resolved target, so you
+    // could not accept one and keep failing on the other.
     const found = modules(p)
       .that()
       .resideInFile(inFixture('twice.ts'))
@@ -389,9 +399,8 @@ describe('item 12 — each kind names itself, so no finding is absorbed', () => 
       .violations()
 
     expect(identify(found)).toEqual(['src/twice.ts:4', 'src/twice.ts:5'])
-    // Recorded rather than asserted as desirable: this IS the pre-existing
-    // collision, and it must not be mistaken for something this release fixed.
-    expect(new Set(found.map((v) => hashViolation(v, fixtureRoot))).size).toBe(1)
+    // Distinct now, via the imported names in `identity`.
+    expect(new Set(found.map((v) => hashViolation(v, fixtureRoot))).size).toBe(2)
   })
 })
 
@@ -653,9 +662,10 @@ describe('onlyHaveTypeImportsFrom names each kind too', () => {
       const v = found.find((x) => x.line === line)
       return v === undefined ? undefined : hashViolation(v, fixtureRoot)
     }
-    // Same shape as item 12: the two imports collide (bug 0028), the re-export does
-    // not. Reverting `edgeValuePhrase('reexport')` to the import phrase collapses
-    // the second assertion.
+    // The two imports still share an identity (`names` is the inward name, so an
+    // alias does not separate them); the re-export is distinct via its verb.
+    // Reverting `edgeValuePhrase('reexport')` to the import phrase collapses the
+    // second assertion.
     expect(identityOf(4)).toBe(identityOf(11))
     expect(identityOf(5)).not.toBe(identityOf(4))
   })
