@@ -1,6 +1,7 @@
 import { Node, SyntaxKind } from 'ts-morph'
 import type { SourceFile } from 'ts-morph'
 import { isTypeOnlyImport, isTypeOnlyReExport } from './import-options.js'
+import { registerCacheReset } from './cache-registry.js'
 
 /**
  * One definition of "a module edge", for every condition that needs one.
@@ -107,28 +108,16 @@ export interface ModuleEdge {
 /**
  * Every module edge leaving each file, in one call (ADR-007 rule 2).
  *
- * **No cache.** Measured: the full classifying pass is 9.6–17.1ms warm over 471
- * files (1914 edges), and `strictBoundaries`' 1665 file-visits put that at
- * 34–40ms — 25–29% against a 137ms preset baseline. The decision rests on a
- * different number: cold, the first `getSymbol()` on this project costs ~143ms
- * and the incumbent `getModuleSpecifierSourceFile()` costs the same order, so
- * the *incremental* cost of this mechanism over the old one is near-zero and the
- * absolute cost is checker warm-up today's code already pays. If a consumer
- * reports a multiple-slowdown, the fix is a cache of **resolution**, not of the
- * walk.
+ * **Cached since plan 0076**, per file, invalidated by `onModified`. The
+ * sentence this paragraph used to carry — *"No cache … if a consumer reports a
+ * multiple-slowdown, the fix is a cache of resolution, not of the walk"* — was
+ * half right: a consumer did report one, and the walk is indeed not the cost
+ * (1ms across five passes over 520 files). But resolution is not the cost
+ * either. Building the `ModuleEdge` is: 15ms resolution against ~32ms
+ * construction, of 48ms total. So the cache is of the built edges, and the
+ * forward commitment this docstring made — *"what it forecloses is batching a
+ * resolution cache later"* — is discharged rather than left standing.
  *
- * **Used by the reverse graph**, which is the one caller holding a whole file set
- * (`conditions/reverse-dependency.ts`). The four conditions and two predicates
- * call the per-file {@link edgesOf} instead, because `Predicate<T>` is
- * per-element by construction.
- *
- * Having both is not an ADR-007 rule-2 down-payment and this docstring used to
- * claim it was. Measured: the walk has no per-project setup, so N calls of one
- * file cost the same total as one call of N files — 509 single-file calls and one
- * bulk call both land in the same 10.8–16.7ms warm band, and the ~193ms cold cost
- * is checker warm-up that is shared either way. The genuine down-payment is the
- * **ts-morph-free return type**; this signature's value is that it is where a
- * resolution cache would go, and it now has a real caller to hang one on.
  */
 export function moduleEdges(
   files: readonly SourceFile[],
@@ -147,6 +136,63 @@ export function moduleEdges(
  * would otherwise build a one-entry `Map` per file just to read it back out.
  */
 export function edgesOf(sourceFile: SourceFile): readonly ModuleEdge[] {
+  const hit = cache.get(sourceFile)
+  if (hit !== undefined) return hit
+  const edges = buildEdges(sourceFile)
+  if (!watched.has(sourceFile)) {
+    // Once per file, not once per miss: a watch session that re-evaluates
+    // rules would otherwise accumulate one listener per rule execution.
+    watched.add(sourceFile)
+    sourceFile.onModified(() => cache.delete(sourceFile))
+  }
+  cache.set(sourceFile, edges)
+  return edges
+}
+
+/**
+ * One built edge list per file, invalidated when the file is modified.
+ *
+ * Plan 0076. Measured on this repository (520 files): five whole-project
+ * `notImportFrom` rules made **10,525 `getSymbol()` calls in 47ms** where 2,105
+ * would do — exactly 5x, because rules that share subjects re-resolve the same
+ * literals. Five *disjoint* folder rules cost 388, so the win tracks subject
+ * overlap rather than rule count.
+ *
+ * **Why not `resolve()` alone**, which this file's own docstring above
+ * recommends: measured across five passes, the walk is 1ms, resolution 15ms and
+ * building the `ModuleEdge` ~32ms. The advice predates anyone splitting the
+ * three, and resolution is the middle third rather than the cost.
+ *
+ * **Why a listener rather than object identity.** A `SourceFile`'s identity
+ * SURVIVES an edit — measured, `addImportDeclaration` and `replaceWithText`
+ * both keep the same object while the edges change — so the argument that makes
+ * `WeakMap<ArchProject, …>` safe in `element-cache.ts` does **not** transfer. A
+ * `SourceFile`-keyed cache without invalidation serves pre-edit edges after an
+ * edit, and a `notImportFrom` rule then passes on the import the edit just
+ * added: ADR-008's false green, manufactured by a cache. `onModified` is a
+ * ts-morph API (no raw compiler access, ADR-002 intact) and fires on every
+ * mutation path — `addImportDeclaration`, `replaceWithText`, `remove` and
+ * `insertText` — and never on a read.
+ */
+let cache = new WeakMap<SourceFile, readonly ModuleEdge[]>()
+const watched = new WeakSet<SourceFile>()
+
+/**
+ * Drop every cached edge list. Called by `resetProjectCache()`.
+ *
+ * `onModified` covers a change to the file that OWNS the edge. It does not cover
+ * a change to the edge's **target** — `resolvedPath` is a function of the whole
+ * program, so creating the file a specifier could not resolve to, or deleting
+ * the one it did, leaves the importer's cached edge stale. Measured, both
+ * directions. This is the escape hatch for that; `watched` is deliberately not
+ * cleared, since those listeners stay correct.
+ */
+function clearModuleEdgeCache(): void {
+  cache = new WeakMap<SourceFile, readonly ModuleEdge[]>()
+}
+registerCacheReset(clearModuleEdgeCache)
+
+function buildEdges(sourceFile: SourceFile): readonly ModuleEdge[] {
   const edges: (ModuleEdge & { pos: number })[] = []
   for (const literal of sourceFile.getImportStringLiterals()) {
     const parent = literal.getParent()
@@ -463,10 +509,37 @@ export const FORWARD_EDGE_KINDS: Record<ModuleEdgeKind, boolean> = {
  * question — on a 100-import file whose first import matches, 100 checker calls
  * where the pre-0.28.0 code made 1.
  *
- * Unsorted, because a `.some()` cannot observe order. Anything that reports a
- * finding must use {@link edgesOf}, whose source ordering is part of its contract.
+ * **Order is unspecified, and since plan 0076 it differs between a cold and a
+ * warm call.** Cold, edges arrive in walk order — the declaration forms first,
+ * because that is how ts-morph enumerates them. Warm, they arrive in the source
+ * order {@link edgesOf} sorted them into. Measured, on a file whose dynamic
+ * import precedes its declaration import:
+ *
+ *     cold  ./a.js, ./b.js
+ *     warm  ./b.js, ./a.js
+ *
+ * No verdict depends on it today: the only consumer is `dependOn`
+ * (`conditions/dependency.ts`), which is a `.some()` and stops at the first
+ * match. But "sometimes sorted" is a worse contract than "never sorted", so it
+ * is stated rather than left to be discovered. **Anything that reports a
+ * finding must use {@link edgesOf}**, whose source ordering is part of its
+ * contract — a reporting site fed from here would name a different edge
+ * depending on whether an unrelated rule warmed the file first, which is one
+ * finding with two identities.
  */
 export function* edgeStream(sourceFile: SourceFile): Generator<ModuleEdge> {
+  // Warm: yield the already-built edges. The caller still breaks early, and
+  // iterating a materialized array costs nothing — the resolution it was
+  // avoiding has already happened.
+  const hit = cache.get(sourceFile)
+  if (hit !== undefined) {
+    yield* hit
+    return
+  }
+  // Cold: stream, and deliberately do NOT populate the cache. Filling it here
+  // would resolve every literal in the file to answer a question the first one
+  // may settle, which is the cost this generator exists to avoid
+  // (`dependency.ts:327-334`).
   for (const literal of sourceFile.getImportStringLiterals()) {
     const parent = literal.getParent()
     if (parent === undefined) continue

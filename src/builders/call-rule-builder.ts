@@ -4,6 +4,10 @@ import type { ConditionContext } from '../core/condition.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchCall } from '../models/arch-call.js'
 import { collectCalls } from '../models/arch-call.js'
+import { createElementCache, SOLE_POPULATION } from '../core/element-cache.js'
+
+/** One collection per project, shared by every rule built from it (plan 0075). */
+const cache = createElementCache<ArchCall>()
 import {
   haveNameMatching as identityHaveNameMatching,
   haveNameStartingWith as identityHaveNameStartingWith,
@@ -73,7 +77,9 @@ export class CallRuleBuilder extends RuleBuilder<ArchCall> {
   protected _identifyByArgument?: number
 
   protected getElements(): ArchCall[] {
-    return this.project.getSourceFiles().flatMap(collectCalls)
+    return cache.get(this.project, SOLE_POPULATION, () =>
+      this.project.getSourceFiles().flatMap(collectCalls),
+    )
   }
 
   protected override buildConditionContext(): ConditionContext {

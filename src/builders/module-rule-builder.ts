@@ -25,6 +25,10 @@ import {
 } from '../conditions/structural.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ModuleBodyOptions } from '../helpers/body-traversal.js'
+import { createElementCache, SOLE_POPULATION } from '../core/element-cache.js'
+
+/** One collection per project, shared by every rule built from it (plan 0075). */
+const cache = createElementCache<SourceFile>()
 import {
   moduleContain,
   moduleNotContain,
@@ -56,7 +60,12 @@ import {
  */
 export class ModuleRuleBuilder extends RuleBuilder<SourceFile> {
   protected getElements(): SourceFile[] {
-    return this.project.getSourceFiles()
+    // Cached for uniformity rather than for speed: measured, 5 × `modules()`
+    // issues zero descendant queries and costs ~1ms, because this is a direct
+    // read of ts-morph's own accessor. Included so the population rule is
+    // "every RuleBuilder subclass that derives elements from the project",
+    // which a test can check, rather than a judgement call per builder.
+    return cache.get(this.project, SOLE_POPULATION, () => this.project.getSourceFiles())
   }
 
   // --- Identity predicates (from predicates/identity.ts) ---

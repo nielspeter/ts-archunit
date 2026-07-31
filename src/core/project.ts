@@ -1,5 +1,6 @@
 import { Project, type SourceFile, type CompilerOptions } from 'ts-morph'
 import path from 'node:path'
+import { clearRegisteredCaches } from './cache-registry.js'
 import fs from 'node:fs'
 
 /**
@@ -178,4 +179,9 @@ export function workspace(tsConfigPaths: string[]): ArchProject {
 export function resetProjectCache(): void {
   cache.clear()
   workspaceCache.clear()
+  // Plan 0075/0076: the memoized element collections and module edges are keyed
+  // on objects this function replaces, so `project()` callers are covered by
+  // identity alone. A consumer holding their OWN `ArchProject` is not, and this
+  // is their documented way to invalidate after mutating the ts-morph project.
+  clearRegisteredCaches()
 }
