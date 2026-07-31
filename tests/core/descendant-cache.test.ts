@@ -7,9 +7,13 @@
  * traversals — and `agentGuardrails` emits one `functions()` rule per banned
  * API, which is exactly that shape.
  *
- * Measured on this repository, eight banned APIs: **88 ms → 16 ms**, identical
- * findings. The element cache from plan 0075 does not help here; it removed the
- * redundant *collection* of the functions and left the body walks in place.
+ * Measured on this repository (530 files), eight banned APIs: **8,504 walk
+ * requests become 1,063 real traversals** — the ratio is the stable figure, and
+ * wall clock landed between 16 and 23 ms against 88 ms across three
+ * reproductions. Identical findings. The element cache from plan 0075 does not
+ * help here; it removed the redundant *collection* of the functions and left the
+ * body walks in place. `findMatchesBroad` remains uncached and its marginal rule
+ * costs ~57 ms — see the module docstring for why that is filed, not done.
  *
  * ## The invalidation is the dangerous part, and a node key alone is unsafe
  *
@@ -59,8 +63,17 @@ afterEach(() => {
  * nearer level counts only the calls made on source files. Plan 0075 recorded a
  * wrong-by-8,424 conclusion from exactly that mistake.
  */
-function countWalks(project: Project, run: () => void): number {
-  const sample = project.createSourceFile('/__probe.ts', 'const a = 1', { overwrite: true })
+function countWalks(_project: Project, run: () => void): number {
+  // A THROWAWAY project for the probe, not the one under measurement. Creating
+  // `/__probe.ts` in the caller's project with `overwrite: true` fires
+  // `onModified`, so the harness silently invalidated the file it was measuring
+  // — measured: pointing the probe at an existing path reds the very first test.
+  // `element-cache.test.ts` gets this right and this file had copied the sibling
+  // that does not.
+  const sample = new Project({ useInMemoryFileSystem: true }).createSourceFile(
+    '/__probe.ts',
+    'const a = 1',
+  )
   let proto: object | null = protoOf(sample)
   while (proto !== null && !Object.prototype.hasOwnProperty.call(proto, 'getDescendantsOfKind')) {
     proto = protoOf(proto)
@@ -170,6 +183,12 @@ describe('an edit to the file invalidates it', () => {
     // invalidation would miss this while a per-file one catches it. Measured:
     // editing `g` leaves `f`'s object identical and unforgotten.
     const { file } = twoBodies()
+    // BOTH warmed. The first version warmed only `g`, so the assertion on `f`
+    // below was a cold read and proved nothing — an invalidation scheme that
+    // dropped only the node it registered against passed every test here.
+    expect(descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)).toHaveLength(
+      1,
+    )
     expect(descendantsOfKind(file.getFunctionOrThrow('g'), SyntaxKind.CallExpression)).toHaveLength(
       1,
     )
@@ -194,10 +213,16 @@ describe('an edit to the file invalidates it', () => {
 
     file.getFunctionOrThrow('f').addStatements('eval("z")')
 
+    let after: readonly string[] = []
     const walks = countWalks(project, () => {
-      descendantsOfKind(other.getFunctionOrThrow('h'), SyntaxKind.CallExpression)
+      after = descendantsOfKind(other.getFunctionOrThrow('h'), SyntaxKind.CallExpression).map((n) =>
+        n.getText(),
+      )
     })
     expect(walks).toBe(0)
+    // Paired with identity: a cache that served `other` a wrong-but-cached array
+    // is also zero walks.
+    expect(after).toEqual(['console.log(1)'])
   })
 
   it('registers one listener per file, not one per miss', () => {
@@ -216,6 +241,129 @@ describe('an edit to the file invalidates it', () => {
     descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)
 
     expect(registrations).toBe(1)
+  })
+})
+
+describe('a forgotten descendant does not become a crash', () => {
+  it('re-walks when the cached nodes were forgotten under it', () => {
+    /**
+     * The regression review caught, measured against `main` through the rule
+     * path: 1 violation before this cache, `InvalidOperationError` after.
+     *
+     * `node.forget()` and `forgetNodesCreatedInBlock()` forget nodes without
+     * modifying the file, so `onModified` never fires. The KEY node stays live
+     * and unforgotten while the walked DESCENDANTS are gone — which is why an
+     * early `node.wasForgotten()` check (what shipped first) guarded the
+     * harmless case and missed this one.
+     */
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    const file = tsMorphProject.createSourceFile('/src/a.ts', 'export function f() { eval("x") }')
+    const project: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+    const run = (): number =>
+      functions(project).should().notContain(call('eval')).violations().length
+
+    expect(run()).toBe(1)
+    file.getDescendantsOfKind(SyntaxKind.CallExpression)[0]?.forget()
+
+    // Must not throw, and must still find it — this is `main`'s behaviour.
+    expect(run()).toBe(1)
+  })
+
+  it('does not fix forgetNodesCreatedInBlock, which was already broken', () => {
+    /**
+     * Honest attribution, because the first version of this test asserted a fix
+     * nobody made. Measured on BOTH sides: a rule re-run after
+     * `forgetNodesCreatedInBlock` throws on `main` too, so this cache neither
+     * causes nor cures it. The cause is one layer up — plan 0075's element cache
+     * retains the `ArchFunction` wrappers created inside the block, and those are
+     * what the next run reads.
+     *
+     * Pinned as a throw rather than left unstated, so that if someone fixes the
+     * element cache this test tells them the behaviour changed rather than
+     * leaving a silent difference between the two forget APIs.
+     */
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    tsMorphProject.createSourceFile('/src/a.ts', 'export function f() { eval("x") }')
+    const project: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+    const run = (): number =>
+      functions(project).should().notContain(call('eval')).violations().length
+
+    tsMorphProject.forgetNodesCreatedInBlock(() => {
+      expect(run()).toBe(1)
+    })
+
+    expect(() => run()).toThrow(/removed or forgotten/)
+    // And the escape hatch works, which is the part that IS this cache's business.
+    resetProjectCache()
+    expect(run()).toBe(1)
+  })
+
+  it('is cleared by resetProjectCache(), which is the documented escape hatch', () => {
+    // The remedy the module docstring names, and which nothing asserted —
+    // deleting the `registerCacheReset` call was green across the whole suite.
+    const { project, file } = twoBodies()
+    const fn = file.getFunctionOrThrow('f')
+    expect(descendantsOfKind(fn, SyntaxKind.CallExpression)).toHaveLength(1)
+
+    resetProjectCache()
+
+    const walks = countWalks(project, () => {
+      descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)
+    })
+    expect(walks).toBe(1)
+  })
+
+  it('still invalidates after a reset, because the listener reads the live map', () => {
+    /**
+     * The invariant review found undefended, and it is not a revert — it is the
+     * "clarifying" refactor someone reaches for:
+     *
+     *     const captured = byFile
+     *     sourceFile.onModified(() => captured.delete(sourceFile))
+     *
+     * `registerCacheReset` REPLACES `byFile`, so a captured reference deletes
+     * from the abandoned map and the live entry stays stale. Measured with that
+     * mutation: the rule sees 1 call where the truth is 2 — `notContain` passing
+     * on the call the edit just added. The whole suite stayed green.
+     *
+     * The sequence matters: warm, reset, re-warm (which is what re-registers
+     * nothing, since `watched` is deliberately not cleared), then edit.
+     */
+    const { file } = twoBodies()
+    expect(descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)).toHaveLength(
+      1,
+    )
+
+    resetProjectCache()
+    expect(descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)).toHaveLength(
+      1,
+    )
+
+    file.getFunctionOrThrow('f').addStatements('eval("z")')
+
+    const after = descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)
+    expect(after.map((n) => n.getText())).toContain('eval("z")')
+    expect(after).toHaveLength(2)
+  })
+
+  it('hands back the cached array itself, not a copy', () => {
+    // The no-copy property, which is where the whole saving lives: returning
+    // `.slice()` on every hit was green everywhere. `readonly` is the compile-time
+    // half; this is the runtime half.
+    const { file } = twoBodies()
+    const fn = file.getFunctionOrThrow('f')
+
+    expect(descendantsOfKind(fn, SyntaxKind.CallExpression)).toBe(
+      descendantsOfKind(fn, SyntaxKind.CallExpression),
+    )
   })
 })
 
@@ -245,10 +393,20 @@ describe('the rule that pays for it', () => {
     // about the second.
     functions(project).should().notContain(call('eval')).violations()
 
+    // The violations are captured INSIDE the measurement, because `0 walks` is
+    // also what a rule path that analysed nothing reports. Review verified two
+    // reverts — `searchFunctionBody` returning no body, and `findMatchesInNode`
+    // returning `[]` — that left this test green with the count alone.
+    let seen: string[] = []
     const walks = countWalks(tsMorphProject, () => {
-      functions(project).should().notContain(call('console.log')).violations()
+      seen = functions(project)
+        .should()
+        .notContain(call('console.log'))
+        .violations()
+        .map((v) => v.element)
     })
 
+    expect(seen).toEqual(['b'])
     // Zero: every body was walked by the warm-up. Uncached this is one per
     // function body, and the assertion reds.
     expect(walks).toBe(0)
