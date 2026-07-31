@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.31.1] - 2026-07-31
+
+Internal performance only — no API change, no baseline impact, no finding changes.
+
+### Fixed
+
+- **A body is walked once per kind, not once per matcher.** `notContain(call(x))` and its
+  siblings walked a function body, then filtered the result with the matcher; the walk is a
+  function of the node and the kind and only the filter differs, so N matchers over one body did
+  N identical traversals. `agentGuardrails` pays for it directly — it emits one rule per banned
+  API. Measured on a 530-file project: eight banned APIs **88 ms → 16 ms**, identical findings.
+- **The same for the broad walk**, which `expression()` and `comment()` take because they have no
+  syntax kinds to narrow by. The marginal broad rule goes from **~57 ms to ~17 ms**. Measured
+  before deciding: of that cost the walk is roughly three quarters and the per-matcher filter is
+  the rest, which is why only the walk is shared.
+- Both caches invalidate per source file on modification, and `resetProjectCache()` clears them —
+  a node's identity survives an edit to its own body, so keying on the node alone would have
+  served pre-edit descendants.
+
 ## [0.31.0] - 2026-07-31
 
 Two false greens closed, plus two internal caches. **Metric baselines are invalidated**;

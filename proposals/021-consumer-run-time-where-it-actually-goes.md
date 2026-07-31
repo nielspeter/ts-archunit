@@ -158,6 +158,13 @@ separately, 142 -> 83 ms for eight APIs) and leaves the eight body walks in plac
 walk — collect each body's call expressions once, match N patterns against it — is a different
 change with a different seam.
 
+> **Done in v0.31.1**, at that seam. `src/core/descendant-cache.ts` caches the walk per
+> `(node, kind)` and, separately, the kind-independent walk that `expression()` and `comment()`
+> need. Measured: eight banned APIs 88 → 16 ms, and the broad path's marginal rule ~57 → ~17 ms.
+> The split that decided the design is worth keeping: of a broad matcher's cost the **walk is
+> ~49ms of ~68ms** and the filter is the rest, so the walk was the shareable three quarters and
+> the filter is not shareable at all.
+
 So the population that provably re-walks the AST is not "someone who writes lots of `calls()`
 rules", it is **anyone using a preset we ship with more than one banned API**.
 
