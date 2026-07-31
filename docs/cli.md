@@ -250,6 +250,13 @@ count down into errors vs warnings:
 ```jsonc
 {
   "summary": { "total": 2, "errors": 1, "warnings": 1, "reason": null },
+  // Allowlist rules that had subjects but tested no edges, so they passed
+  // without exercising the allowlist. Not a failure: for the `only*` family
+  // zero edges is maximal compliance, and a dependency-free module is a
+  // legitimate shape. Only you can tell that from a rule certifying nothing.
+  "untestedAllowlists": [
+    { "rule": "…should only import from \"**/domain/**\"", "subjects": 3, "edges": 0 },
+  ],
   "violations": [
     {
       "rule": "…",

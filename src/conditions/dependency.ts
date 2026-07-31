@@ -3,6 +3,7 @@ import type { SourceFile, ImportDeclaration } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { candidatesFor, matchedCandidate } from '../core/import-candidates.js'
+import { recordEdgeCoverage } from '../core/edge-coverage.js'
 import { globAnyOf } from '../core/glob-site.js'
 import {
   edgeTypeOnlyRemedy,
@@ -176,10 +177,22 @@ export function onlyImportFrom(
     description: `only import from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
+      // Bug 0015: an allowlist constrains EDGES, so a subject with none passes
+      // however broken the allowlist. Counted after the same filters the check
+      // applies — including `ignoreType`, since an edge this rule skips is an
+      // edge it did not test.
+      let tested = 0
+      // Counted separately so the disclosure can name the right cause: a subject
+      // whose imports were all filtered by `ignoreTypeImports` is NOT a
+      // dependency-free module, and saying so sends the reader to a folder full
+      // of imports to look for the ones the tool says are missing.
+      let seen = 0
       for (const sf of sourceFiles) {
         for (const edge of edgesOf(sf)) {
           if (!DEPENDENCY_KINDS[edge.kind]) continue
+          seen++
           if (ignoreType && edge.typeOnly) continue
+          tested++
           const candidates = edgeCandidates(edge)
           const importPath = candidates[0]
           if (matchedCandidate(candidates, matchers) === undefined) {
@@ -194,6 +207,12 @@ export function onlyImportFrom(
           }
         }
       }
+      recordEdgeCoverage(
+        context.rule,
+        sourceFiles.length,
+        tested,
+        seen > 0 ? 'all-filtered' : 'no-edges',
+      )
       return violations
     },
   }
@@ -441,10 +460,21 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
     description: `only have type imports from ${quotedGlobs}`,
     evaluate(sourceFiles: SourceFile[], context: ConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
+      // Bug 0015: same shape — the allowlist scopes which imports must be
+      // type-only, so a subject with no matching import tests nothing.
+      let tested = 0
+      // Same distinction as `onlyImportFrom`, for the other reason: here an edge
+      // is out of scope because the GLOB did not name it, and that is the case
+      // worth surfacing — the glob may be a typo.
+      let seen = 0
       for (const sf of sourceFiles) {
         for (const edge of edgesOf(sf)) {
           if (!TYPE_IMPORT_KINDS[edge.kind]) continue
+          seen++
           const importPath = matchedCandidate(edgeCandidates(edge), matchers)
+          // In scope only when the allowlist matched it: an edge the glob does
+          // not name is one this rule never had an opinion about.
+          if (importPath !== undefined) tested++
           if (importPath !== undefined && !edge.typeOnly) {
             const violation = edgeViolation(
               sf,
@@ -472,6 +502,12 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
           }
         }
       }
+      recordEdgeCoverage(
+        context.rule,
+        sourceFiles.length,
+        tested,
+        seen > 0 ? 'none-matched' : 'no-edges',
+      )
       return violations
     },
   }

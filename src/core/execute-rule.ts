@@ -10,6 +10,7 @@ import { activeNotice } from './diff-disclosure.js'
 import { formatViolationsGitHub } from './format-github.js'
 import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
 import { writeStderr } from './stderr.js'
+import type { EdgeCoverage } from './edge-coverage.js'
 
 /**
  * Context for executing a rule's terminal methods.
@@ -195,9 +196,11 @@ export function writeReport(
   violations: ArchViolation[],
   format?: OutputFormat,
   reason?: string,
+  /** Allowlist rules that tested no edges, for the JSON document (bug 0015). */
+  untested: readonly EdgeCoverage[] = [],
 ): void {
   if (format === 'json') {
-    process.stdout.write(formatViolationsJson(violations, reason) + '\n')
+    process.stdout.write(formatViolationsJson(violations, reason, untested) + '\n')
     return
   }
   if (violations.length === 0) return

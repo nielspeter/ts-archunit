@@ -180,4 +180,4 @@ itself, since nothing else in the suite can see it.
 - **Giving `import-target` path-universe views.** Deliberate (`path-universe.ts:72`) and
   load-bearing for bug 0014.
 - **The `only*` edgeless-subject exposure** — 0069 line 205,
-  [bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md).
+  [bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md).
