@@ -36,6 +36,16 @@ The empirical basis (plan 0063, 2026-07-17). A hand-maintained artifact failed a
 
 The last three are the interesting ones: they were introduced **while fixing** the earlier ones. That is the signature of a missing principle, not carelessness.
 
+**It then happened three more times inside this ADR's own first application**, each found by mutation _after_ inspection had signed off, and each introduced by the fix for the row above it:
+
+| Layer                                                       | Outcome                                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| The failure **message**, rendered only on the red path      | Never executed by a green suite; 6 mutations of it left 13/13 passing     |
+| Four detectors asserting an empty list against clean `src/` | Vacuous by construction; green with the detection deleted                 |
+| A flag exempting items the oracle could not see             | Forced true, **every** item skipped the oracle and the suite stayed green |
+
+Twelve rows, eight of them introduced by a fix. That regress — check → message → detectors → oracle — is what rule 6 exists to bound.
+
 **The second body of evidence (plans 0069–0070, bugs 0011–0024, 2026-07-25 → 07-29).** Different code, different reviewers, same shapes — and this time the false greens were measured rather than argued:
 
 | Instance                                                           | Outcome                                                                                                                                                                 |
@@ -57,7 +67,7 @@ The last row is the one that changed this document — see rule 5's first coroll
 
 **Every check we ship — and every check that guards a check — must be reactable by an agent, and must be guarded by a derivation independent of the one it protects.**
 
-Five rules, all binding.
+Six rules, all binding. Rules 1–5 say what a check must do; rule 6 says how far to chase them.
 
 ### Rule 1 — Actionable findings fail; they never warn
 
@@ -121,9 +131,26 @@ Corollaries:
 - **Every guard needs its own vacuity guard.** `expect(a).toBe(b)` passes trivially when both are empty or zero. `0 === 0` is green. If the inputs can be empty, assert they are not.
 - **A test that restates the implementation is not a test of the implementation.** It catches typos and inverted conditions. It cannot catch the rule being wrong.
 
+### Rule 6 — Recursion depth is proportional to blast radius
+
+Rule 5 **has no fixed point.** Every guard is itself a derivation, so every guard needs a guard, and 0063 proved the regress is real rather than theoretical: the check → the check's message → the message's detectors → the detectors' oracle. Each layer was a genuine defect, each was found only by mutation, and each was introduced by the fix for the one above it. Nothing in rules 1–5 says when to stop, and that omission is what let a `tests/`-only guard over a clean corpus consume three adversarial review rounds and roughly ten times its own budget.
+
+So: **the depth you chase rule 5 to is a function of what breaks if you are wrong.**
+
+| Blast radius                                                          | Depth                                                                                          |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Published API — strangers depend on it, and we cannot fix it for them | Guard the guard. Adversarial review. Mutate.                                                   |
+| A gate on an irreversible effect (publish, deploy, delete)            | Guard the guard. The remedy path matters as much as the check.                                 |
+| An internal check over a corpus we control                            | Guard the check. Prove each detector fires **once**. Then stop.                                |
+| A check with a scheduled expiry                                       | Discount everything by the time remaining. A guard that dies at 1.0 does not earn round three. |
+
+This is not licence to ship the shapes rules 1–5 forbid — a vacuous guard is worthless at every depth, and "prove each detector fires" is the floor, not the ceiling. It is licence to **stop at the floor** when the blast radius is small, and to say so out loud rather than discovering it after the fact.
+
+The honest test: **"if this check simply did not exist, what would it cost us this quarter?"** If the answer is "very little" — as it was for 0063, whose corpus was clean, whose class had occurred once in the project's history, and which expires at 1.0 — then one round of proving the detectors fire is the correct amount of rigour, and a second round is the sunk-cost fallacy wearing the costume of diligence.
+
 ### Enforcement
 
-Rules 1–4 are **review-enforced**. They are properties of prose and structure that no static rule can check honestly, and a rule that could would itself need a rule 5 guard.
+Rules 1–4 and rule 6 are **review-enforced**. They are properties of prose and structure that no static rule can check honestly, and a rule that could would itself need a rule 5 guard.
 
 Rule 5 is enforced by the reviewer question, which is cheap and mechanical: **"what would this test do if the thing it guards were completely broken?"** If the answer is "pass," the derivations are not independent. That single question found three defects in 0063 that three prior review rounds missed, and 11 then 9 more across plans 0069–0070 that expert inspection did not.
 
