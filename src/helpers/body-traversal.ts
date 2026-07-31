@@ -1,6 +1,7 @@
 import { type Node, type ClassDeclaration, type SourceFile, Node as NodeUtils } from 'ts-morph'
 import type { ExpressionMatcher } from './matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
+import { descendantsOfKind } from '../core/descendant-cache.js'
 
 /**
  * Options for module body analysis.
@@ -30,7 +31,10 @@ export interface MatchResult {
 function findMatchesByKind(node: Node, matcher: ExpressionMatcher): Node[] {
   const matches: Node[] = []
   for (const kind of matcher.syntaxKinds ?? []) {
-    for (const descendant of node.getDescendantsOfKind(kind)) {
+    // Cached: the walk is a function of (node, kind) and only the matcher's
+    // filter differs, so N matchers over one body did N identical traversals.
+    // `agentGuardrails` emits one rule per banned API and paid exactly that.
+    for (const descendant of descendantsOfKind(node, kind)) {
       if (matcher.matches(descendant)) {
         matches.push(descendant)
       }
