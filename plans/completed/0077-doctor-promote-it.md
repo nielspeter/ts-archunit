@@ -1,6 +1,6 @@
 # Plan 0077 — `doctor`: promote it
 
-**Status:** PROPOSED, and **reversed during its own investigation**. Draft 1 recommended retiring
+**Status:** DONE, 2026-07-31 — and **reversed during its own investigation**. Draft 1 recommended retiring
 `doctor`. Four measurements refuted the premise it rested on; the reversal is left visible below
 because the refuted argument is the one a future reader will reach for again.
 **Priority:** High as a decision, Low as work. It settles the open question
@@ -127,6 +127,25 @@ ADR-008's question: **what would these tests do if `doctor` were quietly reduced
 wrapper that drops load failures?** The first two pass. So the third is load-bearing, and it must
 assert the finding — a rule file that fails to load must produce a non-zero exit **and** name the
 file, because the failure this command exists to prevent is `exit 0` on a file that never ran.
+
+## Result
+
+Implemented, 4 of 4 sabotages caught. `doctor` is in `--help` with its scope stated;
+`docs/cli.md` and `docs/api-reference.md` drop "experimental" for a scope note and a
+not-a-build-gate note; `#diagnostics-experimental` anchors repointed across six pages.
+
+Two guards changed hands rather than being added. `tests/cli/run.test.ts` asserted `doctor` is
+**absent** from `--help` "because it is experimental" — the guard for the decision this plan
+reverses — and it is now inverted, with the reasoning in the test so the next reader sees why it
+flipped. And `tests/cli/doctor.test.ts` gained the load-failure **contrast**: the same unloadable
+file yields a named finding from `doctor` and is unreachable for `diagnose()`, which is handed
+rules rather than files. That is the assertion that justifies keeping the command, and without it
+the promotion rests on prose.
+
+Phase 3 corrected a false claim in 0074 as well as restating its gate: the old text said "neither
+`doctor` nor `diagnose()` can reach them" of this repository's 43 rules. `diagnose()` can — the
+rules are simply never returned from their `it()` callbacks, which is a test-authoring problem,
+not a tool limitation. The gate no longer waits on finding a differently-shaped project.
 
 ## Out of scope
 

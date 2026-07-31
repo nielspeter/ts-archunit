@@ -26,6 +26,7 @@ Usage:
   ts-archunit check [files...]          Run architecture rules
   ts-archunit baseline [files...]       Generate baseline file
   ts-archunit explain [files...]        Dump all active rules as JSON
+  ts-archunit doctor [files...]         Report rules that cannot enforce anything
 
 Options:
   --preset <name>       init: starter preset — recommended (default) | agent-guardrails
@@ -236,9 +237,17 @@ export async function run(args: string[]): Promise<void> {
   } else if (command === 'explain') {
     await handleExplain(ruleFiles, values.markdown, values.format)
   } else if (command === 'doctor') {
-    // Experimental and deliberately absent from HELP_TEXT: removing a
-    // documented command later is its own breaking change, and `doctor`'s life
-    // after R3 has not been decided. Hidden is what defers that decision.
+    // Supported since plan 0077, which settled the keep-or-retire question 0069
+    // left open. It is scoped, not experimental: it diagnoses rule files the CLI
+    // can LOAD — the `arch.rules.ts` shape `init` scaffolds, which
+    // `getting-started.md` calls the default path. Rules hosted in a vitest or
+    // jest file cannot be imported outside their runner; `diagnose()` is the
+    // answer there and reports the same findings.
+    //
+    // Still not a build gate (0069): it is invoked deliberately, and `check` is
+    // the gate. What it uniquely catches is a rule file that fails to LOAD,
+    // which `diagnose()` cannot see because it never loads — and which would
+    // otherwise be zero coverage reported as success.
     const code = await runDoctor({
       ruleFiles,
       format: values.format === 'json' ? 'json' : 'terminal',

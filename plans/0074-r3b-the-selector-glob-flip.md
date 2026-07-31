@@ -63,19 +63,27 @@ Note the exclusion's _stated_ reason was also wrong and is corrected in 0069:
 `arch-rules.test.ts` predates the plan by four months, so the sites are not uniformly
 curated. The binding constraint turned out to be **size**, not curation.
 
-**What the gate still needs:** a real project with ts-archunit rules in a **loadable**
-`arch.rules.ts` — not a vitest test file, because `doctor` cannot load one that imports a
-test runner, and this repository's 43 rules live inside `it()` callbacks with zero exported
-builders, so neither `doctor` nor `diagnose()` can reach them. Run `doctor`, classify each
-finding against the decision rule, record the population. That is an afternoon once such a
-project exists.
+**What the gate still needs — restated by [plan 0077](./completed/0077-doctor-promote-it.md).** The
+original wording demanded "a loadable `arch.rules.ts`, not a vitest test file". That constraint
+belongs to `doctor`'s **loader**, not to the diagnosis: `diagnose()` is handed rules, so it runs
+wherever they are built, including inside a test file. So the gate is:
+
+> Run the pre-flight over a real adopting codebase — `doctor` for a CLI-shaped project,
+> `diagnose(rules)` for a test-hosted one — and classify each finding against the decision rule
+> above, recording the population.
+
+The original claim that "neither `doctor` nor `diagnose()` can reach them" is wrong about
+`diagnose()` and was what kept this plan parked. What this repository actually needs is to
+**collect** its 43 rules — they are built inside `it()` callbacks and never returned — which is a
+test-authoring change, not a tool limitation. That is the afternoon's work, and it no longer waits
+on finding a differently-shaped project.
 
 ## The other two decisions, both 0069's, both still open
 
 1. **`doctor`: keep as a supported command, or retire it?** 0069 requires this be decided
    **before** R3, and says why it cannot drift: _"shipping it experimental/hidden is precisely
    the mechanism that defers the decision."_ It currently ships experimental/hidden.
-   **Written up as [plan 0077](./0077-doctor-promote-it.md)**, which — after an investigation
+   **Written up as [plan 0077](./completed/0077-doctor-promote-it.md)**, which — after an investigation
    that reversed its own first recommendation — proposes **promoting** it: `doctor` works on the
    CLI shape `init` scaffolds, which `getting-started.md` calls the default path, and it reports
    load failures that `diagnose()` structurally cannot. Note what that does to the gate below:
