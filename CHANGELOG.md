@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.31.0] - 2026-07-31
+
+> Scoped to this branch's change. 0.31.0 is cut from four branches — the two caches, the two bug
+> fixes, and the proposals/docs pass — and the combined release notes are written at merge time,
+> because an entry describing all four cannot link to files that live on the other three.
+
+### Fixed
+
+- **Improving a metric no longer turns the build red**
+  ([bug 0012](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0012-metric-findings-have-no-usable-ratchet.md)).
+  Metric messages embed the measured value and a finding was identified by its message, so a
+  class going from 10 methods to 8 was reported as **new** — paying down debt failed CI on every
+  incremental step, which is why the size and concentration family sat at zero uses. Metric
+  findings now carry a stable identity and the baseline records the accepted measurement:
+  improving stays green, and only a regression past the accepted value fails. Ten conditions,
+  including the two complexity ones whose message shape hid them from the original enumeration.
+  - **The accepted value tightens only when you regenerate.** A class baselined at 10 that
+    improves to 8 may regrow to 10 without failing. A `check` run is read-only and must not
+    rewrite its own baseline.
+  - **The identity carries the file path**, so two same-named classes in different files — or two
+    `index.ts` barrels, or a `save` method on two repositories — do not share one entry.
+  - The measurement is on the wire as `measured` in `--format json`.
+
+### Changed
+
+- **`HASH_VERSION` 3 → 4.** Metric findings only; every other baseline entry is byte-identical
+  and keeps matching. See [Upgrading](https://nielspeter.github.io/ts-archunit/upgrading).
+
 ## [0.30.0] - 2026-07-30
 
 A custom predicate can finally tell `doctor` what glob it matches against. Additive and
@@ -604,7 +632,7 @@ v2 hashing is byte-identical to v1 for any finding whose fields contain no path,
 
 If a baseline stops matching entirely you will get a finding saying so, with the counts and the likely cause, instead of a wall of "new" violations.
 
-**Not fixed: the size and complexity metrics.** `maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding — improving the code turns the build red. Regenerating does not help, and this release does not change it ([bug 0012](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0012-metric-findings-have-no-usable-ratchet.md)). Those rules remain effectively unbaselineable.
+**Not fixed: the size and complexity metrics.** `maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding — improving the code turns the build red. Regenerating does not help, and this release does not change it ([bug 0012](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0012-metric-findings-have-no-usable-ratchet.md)). Those rules remain effectively unbaselineable.
 
 **Green → red, on unchanged code.** Three collectors now see functions they previously could not, so rules that were quietly passing may start reporting:
 

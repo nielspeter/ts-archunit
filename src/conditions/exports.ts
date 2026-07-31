@@ -96,6 +96,11 @@ export function haveMaxExports(max: number): Condition<SourceFile> {
             line: 1,
             message: `${sf.getBaseName()} has ${String(count)} named export(s), exceeding the limit of ${String(max)}`,
             because: context.because,
+            // Hand-built rather than through `metricViolation`, because this
+            // site has no `Node` to derive an element name from — it reports
+            // against the file. Same two fields, same contract (bug 0012).
+            identity: `${sf.getFilePath()}::${sf.getBaseName()}::named-exports`,
+            measured: count,
           })
         }
       }

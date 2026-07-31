@@ -58,7 +58,11 @@ A baselined violation is identified by its content, not by where it sits: the ru
 Two things still change identity, by design and by omission:
 
 - **By design** — renaming the element, rewording `.because()`, or changing the rule's own configuration. The finding should be re-reviewed.
-- **By omission** — the size and complexity metrics (`maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings) put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding. Improving the code turns the build red. That is [bug 0012](https://github.com/NielsPeter/ts-archunit/blob/main/bugs/0012-metric-findings-have-no-usable-ratchet.md); those rules are not yet baselineable in a useful way.
+- **By design, and now ratcheted** — the size and complexity metrics (`maxMethods`,
+  `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings) put the measured value in
+  the message, but since 0.31.0 they are identified by element and metric and the baseline records
+  the accepted measurement. Improving a class from 10 methods to 8 stays green; growing past 10
+  fails. The accepted value only tightens on regeneration.
 
 ## Suppressing individual violations
 
