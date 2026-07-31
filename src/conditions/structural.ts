@@ -128,6 +128,9 @@ export function beExported<T extends Node>(): Condition<T> {
 export function notExist<T extends Node>(): Condition<T> {
   return {
     description: 'not exist',
+    // Zero subjects is this condition's PASSING state, so an empty selection
+    // and an unsatisfiable selector glob are both correct here (plan 0074).
+    assertsCardinality: true,
     evaluate(elements: T[], context: ConditionContext): ArchViolation[] {
       return elements.map((element) =>
         createViolation(element, `${getElementName(element)} should not exist`, context),

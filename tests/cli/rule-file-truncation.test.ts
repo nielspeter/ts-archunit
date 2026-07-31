@@ -141,7 +141,8 @@ describe('a self-executing rule file that throws partway', () => {
     // them a second time — two `Architecture Violation [1 of 1]` blocks with
     // identical content, while `--format json` said 1.
     const report = stderr.join('')
-    expect(report.match(/Selector matched 0 subjects/g)).toHaveLength(1)
+    // R3b (plan 0074) supersedes this: the selector is STATICALLY dead, so the glob gate reports it before the runtime empty-selection check ever runs. Strictly stronger — "can never match" implies "matched nothing" — and reporting both would be one fact twice, which is bug 0031's shape.
+    expect(report.match(/can never match anything in this project/g)).toHaveLength(1)
     expect(report.match(/stopped evaluating at the finding above/g)).toHaveLength(1)
   })
 
@@ -210,7 +211,7 @@ describe('the array-export shape is not truncated, and must not be told it was',
     // two fixtures really are the same rules in two shapes. If they drifted, the
     // comparison above would be measuring two different things.
     const selectorFinding = (found: ArchViolation[]): string | undefined =>
-      found.find((v) => v.message.includes('Selector matched 0 subjects'))?.message
+      found.find((v) => v.message.includes('can never match anything in this project'))?.message
     expect(selectorFinding(control)).toBeDefined()
     expect(selectorFinding(truncated)).toBe(selectorFinding(control))
 

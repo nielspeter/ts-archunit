@@ -124,7 +124,8 @@ describe('.warn()', () => {
     } catch {
       // expected
     }
-    expect(logged.join('')).toContain('0 subjects')
+    // R3b (plan 0074) supersedes this: the selector is STATICALLY dead, so the glob gate reports it before the runtime empty-selection check ever runs. Strictly stronger — "can never match" implies "matched nothing" — and reporting both would be one fact twice, which is bug 0031's shape.
+    expect(logged.join('')).toContain('can never match anything in this project')
   })
 })
 

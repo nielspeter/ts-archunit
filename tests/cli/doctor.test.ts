@@ -308,9 +308,21 @@ describe('files that cannot be loaded (plan 0070, 0.22.0)', () => {
       .should()
       .notImportFrom('**/banned/**')
 
-    // The rule reports no violations — it has no subjects — so a `check` run is
-    // silent. `diagnose()` sees the fault.
-    expect(deadGlobRule.violations()).toEqual([])
+    // **This assertion inverted in plan 0074 (R3b), and the inversion is the
+    // point.** It used to read `expect(deadGlobRule.violations()).toEqual([])`
+    // — `check` was silent on a dead selector, which is precisely the false
+    // green that justified keeping `doctor` as a separate command. R3b turns
+    // that silence into a configuration finding, so the gate now catches it
+    // too.
+    //
+    // `doctor` still earns its slot: it reports this WITHOUT running any rule,
+    // which is the pre-flight an adopter runs before the flip reds their build.
+    // But the "check cannot see this at all" half of plan 0077's justification
+    // is now historical, and this test is where a reader finds that out.
+    const atCheckTime = deadGlobRule.violations()
+    expect(atCheckTime).toHaveLength(1)
+    expect(atCheckTime[0]?.message).toContain('can never match anything in this project')
+    expect(atCheckTime[0]?.bypassFilters).toBe(true)
     expect(diagnose([deadGlobRule]).map((f) => f.kind)).toEqual(['dead-glob'])
   })
 

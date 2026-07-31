@@ -199,6 +199,11 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * project to compare globs against — which must be the one the rules
    * actually ran on, not one the CLI guessed at.
    */
+  /** Plan 0074: any declared cardinality condition exempts the rule's selector. */
+  protected override assertsCardinality(): boolean {
+    return this._conditions.some((condition) => condition.assertsCardinality === true)
+  }
+
   getProject(): ArchProject {
     return this.project
   }

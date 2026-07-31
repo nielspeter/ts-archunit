@@ -55,6 +55,9 @@ function functionCondition(
 export function notExist(): Condition<ArchFunction> {
   return {
     description: 'not exist',
+    // Zero subjects is this condition's PASSING state, so an empty selection
+    // and an unsatisfiable selector glob are both correct here (plan 0074).
+    assertsCardinality: true,
     evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {
       return elements.map((fn) => ({
         rule: context.rule,

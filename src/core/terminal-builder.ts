@@ -1,6 +1,13 @@
 import type { ArchViolation } from './violation.js'
 import { severityFor } from './violation.js'
 import type { GlobNode } from './glob-site.js'
+import type { GlobSite } from './glob-site.js'
+import type { ArchProject } from './project.js'
+import type { PathUniverse } from './path-universe.js'
+import { pathUniverse } from './path-universe.js'
+import { isDeadGlobTree, isDeadSite, globSitesOf } from './glob-evaluator.js'
+import { diagnoseGlob, FAULT_ADVICE, ON_DISK_ADVICE } from './glob-diagnosis.js'
+import { diskSet } from './disk-set.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import type { RuleDescription } from './rule-description.js'
@@ -155,7 +162,19 @@ export abstract class TerminalBuilder {
    * by diff and baseline. See `severityFor` and ADR-008 rule 1.
    */
   private collectWithAssertionGuard(): ArchViolation[] {
-    if (this.assertsSomething()) return this.collectViolations()
+    if (this.assertsSomething()) {
+      // Plan 0074 (R3b). AFTER the assertion gate, deliberately: a rule with a
+      // dead glob AND no condition reports the missing assertion only, which is
+      // the right root cause — no selector makes an assertion-less rule capable
+      // of failing. The comment above already committed to that ordering; this
+      // is the branch that honours it.
+      //
+      // Gate-first within this branch, before `collectViolations()`: a rule
+      // whose selector cannot match will walk the whole AST to select nothing.
+      const deadGlobs = this.deadSelectorFindings()
+      if (deadGlobs.length > 0) return deadGlobs
+      return this.collectViolations()
+    }
 
     const described = this.describeRule()
     const name = described.id || described.rule || this.constructor.name
@@ -341,6 +360,125 @@ export abstract class TerminalBuilder {
    */
   globs(): readonly GlobNode[] {
     return []
+  }
+
+  /**
+   * The project this rule was built against, when it has one.
+   *
+   * Concrete returning `undefined` rather than abstract, for the reason
+   * `globs()` above records: both roots are public exports, so an abstract
+   * member is a compile break for an external subclass. `RuleBuilder`
+   * overrides it with the non-optional form.
+   *
+   * The glob gate needs it, and a builder that cannot name its project simply
+   * has its globs left unchecked — the same fallback `diagnose()` takes, and
+   * the honest one: satisfiability is meaningless without a path universe to
+   * take it against.
+   */
+  getProject(): ArchProject | undefined {
+    return undefined
+  }
+
+  /**
+   * Selector globs that can never match — plan 0074 (R3b), the flip.
+   *
+   * 0069's decision table, not reopened here: a **selector** glob that is
+   * unsatisfiable means the rule can never have subjects, so it certifies
+   * nothing and passing is a lie. `discovery` already fails (0067-D, and the
+   * slice builders own their own message). `condition` and `exclusion` are
+   * **never** faults — a condition glob matching nothing is indistinguishable
+   * from an armed tripwire that has not fired, and plan 0072 got that wrong
+   * twice before it stayed written down.
+   *
+   * Negative polarity is excluded by `isDeadGlobTree` itself: `not(dead)`
+   * over-selects rather than under-selecting, so it cannot be dead.
+   *
+   * This is the same computation `diagnose()` performs — deliberately, and
+   * from the same functions, so the pre-flight and the gate can never disagree
+   * about what is dead. `doctor` told adopters what R3b would fail on; if the
+   * two used separate logic that promise would be worth nothing.
+   */
+  /**
+   * Whether any condition on this rule declares emptiness as its passing state.
+   *
+   * Concrete `false` default for the reason `globs()` records — an abstract
+   * member breaks external subclasses. `RuleBuilder` overrides it by reading
+   * its own conditions; the builders that take their condition as a
+   * constructor argument have no cardinality condition to declare.
+   */
+  protected assertsCardinality(): boolean {
+    return false
+  }
+
+  protected deadSelectorFindings(): ArchViolation[] {
+    const project = this.getProject()
+    if (project === undefined) return []
+    // A condition that asserts CARDINALITY is satisfied by having no subjects,
+    // so an unsatisfiable selector is this rule working rather than failing —
+    // the pre-emptive guard `.should().notExist()` expresses. Declared by the
+    // condition, never probed: evaluating any condition against `[]` returns no
+    // violations, so probing answers "satisfied" for all of them.
+    if (this.assertsCardinality()) return []
+    const trees = this.globs()
+    if (trees.length === 0) return []
+
+    const universe = pathUniverse(project)
+    const findings: ArchViolation[] = []
+    for (const tree of trees) {
+      // Only inside a tree that is dead as a whole: `or(dead, live)` is a
+      // working rule, and reporting its dead branch is the false red the tree
+      // model exists to prevent.
+      if (!isDeadGlobTree(tree, universe)) continue
+      for (const site of globSitesOf(tree)) {
+        if (site.position !== 'selector') continue
+        if (!isDeadSite(site, universe)) continue
+        findings.push(this.deadSelectorViolation(site, universe, project))
+      }
+    }
+    return findings
+  }
+
+  /**
+   * The finding for one dead selector glob.
+   *
+   * Carries the SAME cause and advice `doctor` prints, from the same two
+   * tables — a reader who ran the pre-flight must not be told something
+   * different by the build that fails. Bugs 0031 and 0032 are why the tables
+   * are worth reusing rather than paraphrasing: both were cases where the
+   * cause stated was wrong for the input, and both were fixed in one place.
+   *
+   * `bypassFilters` makes it a configuration finding: `error` severity
+   * regardless of `.asSeverity('warn')`, refused by `.excluding()`, and
+   * skipped by diff and baseline (ADR-008 rule 1). A rule that can never have
+   * subjects is not a violation you triage; it is a rule that does not work.
+   */
+  private deadSelectorViolation(
+    site: GlobSite,
+    universe: PathUniverse,
+    project: ArchProject,
+  ): ArchViolation {
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    const diagnosis = diagnoseGlob(site, universe, diskSet(project))
+    const onDisk = diagnosis.onDisk === undefined ? '' : ON_DISK_ADVICE[diagnosis.onDisk]
+    const cause = onDisk === '' ? FAULT_ADVICE[diagnosis.fault] : onDisk
+    const advice =
+      `This rule's selector ${site.origin} can never match anything in this project, ` +
+      `so it has no subjects and cannot fail — ${cause}. ` +
+      `Correct the glob, or remove the rule. This finding cannot be suppressed: not by ` +
+      `.warn(), .asSeverity('warn'), .excluding(), a baseline, or diff-aware mode.`
+    return {
+      rule: name,
+      ruleId: described.id,
+      element: site.glob,
+      file: '',
+      line: 0,
+      message: advice,
+      // Its own remedy, never the author's (bug 0021): their `suggestion` is
+      // for a violation of the rule, and this says the rule cannot produce one.
+      suggestion: advice,
+      bypassFilters: true,
+    }
   }
 
   /**
