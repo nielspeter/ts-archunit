@@ -4,6 +4,7 @@ import { ArchRuleError } from './errors.js'
 import { writeReport } from './execute-rule.js'
 import { suppressionNotice } from './diff-disclosure.js'
 import { writeStderr } from './stderr.js'
+import { edgeCoverageNotice, resetEdgeCoverage, untestedRules } from './edge-coverage.js'
 
 /**
  * Run an array of rules (e.g. a spread preset) and throw one aggregated
@@ -21,6 +22,9 @@ import { writeStderr } from './stderr.js'
  * whole array — one readable error listing every error-severity violation.
  */
 export function checkAll(rules: RuleBuilderLike[], options?: CheckOptions): void {
+  // Per run, like `runCheck` — a second `checkAll` in one vitest file must
+  // not inherit the first's rules.
+  resetEdgeCoverage()
   let violations = rules.flatMap((rule) => rule.violations())
 
   if (options?.baseline) {
@@ -48,7 +52,23 @@ export function checkAll(rules: RuleBuilderLike[], options?: CheckOptions): void
   // stderr carries it for every other format. Found by sabotage: removing the
   // `writeStderr` call left the tests green because the notice was reaching
   // stderr through the "Why:" line instead.
-  writeReport(violations, options?.format, options?.format === 'json' ? notice : undefined)
+  writeReport(
+    violations,
+    options?.format,
+    options?.format === 'json' ? notice : undefined,
+    untestedRules(),
+  )
+
+  // Bug 0015 reaches the in-test path too. `checkAll` is the vitest-side
+  // equivalent of `runCheck`, and a disclosure the recommended runner never
+  // shows is a disclosure that does not exist — the same argument that got
+  // `diagnose()` exported for the vitest half of the audience. The residual,
+  // stated: a bare `.check()` per rule has no run boundary to reset or report
+  // at, so it still shows nothing.
+  if (options?.format !== 'json') {
+    const coverage = edgeCoverageNotice()
+    if (coverage !== undefined) writeStderr(`${coverage}\n`)
+  }
 
   const errors = violations.filter((v) => (v.severity ?? 'error') === 'error')
   if (errors.length > 0) {

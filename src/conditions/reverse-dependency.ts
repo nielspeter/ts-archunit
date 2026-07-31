@@ -3,6 +3,7 @@ import { type SourceFile, type Project, Node } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { moduleEdges } from '../core/module-edges.js'
+import { recordEdgeCoverage } from '../core/edge-coverage.js'
 import { globAnyOf } from '../core/glob-site.js'
 
 // ─── Reverse import graph (cached per ts-morph Project) ──────────
@@ -121,9 +122,15 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
       const graph = getReverseImportGraph(allFiles)
       const violations: ArchViolation[] = []
 
+      // Bug 0015: the mirror case — a module with no importers passes however
+      // broken the allowlist. This condition already documented the behaviour
+      // ("Modules with zero importers pass vacuously") without treating it as a
+      // gap; the tally is what turns that note into something a reader sees.
+      let tested = 0
       for (const sf of elements) {
         const importers = graph.get(sf.getFilePath()) ?? []
         for (const importer of importers) {
+          tested++
           const importerPath = importer.getFilePath()
           if (!matchers.some((m) => m(importerPath))) {
             violations.push({
@@ -138,6 +145,7 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
         }
       }
 
+      recordEdgeCoverage(context.rule, elements.length, tested)
       return violations
     },
   }

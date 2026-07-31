@@ -159,7 +159,7 @@ free. **Decide that before building it.**
 
 - **Condition-declared globs** — [plan 0073](./completed/0073-conditions-declare-their-globs.md).
   The prerequisite for any of this, and worth doing on its own merits.
-- **[Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)** —
+- **[Bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)** —
   the `only*` family passing on an edgeless subject. 0069 records it as a known exposure at
   line 205; it is a different fault with a different owner.
 - **0069's R3b** — the _selector_ glob guard, designed and gated on an adopting codebase's

@@ -20,6 +20,7 @@ describe('formatViolationsJson', () => {
     const parsed: unknown = JSON.parse(output)
     expect(parsed).toEqual({
       summary: { total: 1, errors: 1, warnings: 0, reason: null },
+      untestedAllowlists: [],
       violations: [
         {
           rule: 'test rule',

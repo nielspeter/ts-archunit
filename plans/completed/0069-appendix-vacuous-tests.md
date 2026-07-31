@@ -14,7 +14,7 @@ The recipe above sets `_requireNonEmpty = true`, so the population is tests that
 **empty selector**. An **edgeless subject** — a selector that matched files, none of which have
 any import edges — is a _non-empty_ selector and is therefore absent from these 35 rows.
 
-That matters because it was nearly acted on. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)
+That matters because it was nearly acted on. [Bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)
 proposed failing on an edgeless subject, and [plan 0071](./0071-one-definition-of-a-module-edge.md)
 designed a rule-level version of it before both were refuted by measurement. Anyone deriving that
 population needs a second recipe — and the one test that would have been in it,

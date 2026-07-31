@@ -2,7 +2,7 @@
 
 **Status:** **DONE — both releases shipped** (v0.27.0 instruments, v0.28.0 the widening, 2026-07-30) — the three instruments are released; §Test inventory items 1-3 are done, with 29 tests and a 15-revert sabotage matrix. Both releases shipped. Five reviewers audited the widening before it went out; 60 diff-derived reverts, and the four survivors that mattered were all missing tests — including `onlyImportFrom`, whose widening no test invoked at all. **Draft 4 exists because two independent reviewers, working from opposite ends, found the same thing: item 7 — the release's headline guard — was green with bug 0022 fully reinstated.**
 **Priority:** High. [Bug 0022](../bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
-**Closes:** bug 0022. [Bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **out of scope** — its option 1 is refuted and the evidence lives in that file.
+**Closes:** bug 0022. [Bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **out of scope** — its option 1 is refuted and the evidence lives in that file.
 
 **Two releases, deliberately:**
 

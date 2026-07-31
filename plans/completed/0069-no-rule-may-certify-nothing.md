@@ -206,7 +206,7 @@ notImportFrom('**/src/gone/**')   (negative)  ->  0 violations   silent green
 onlyImportFrom('**/src/gone/**')  (positive)  ->  1 violation    loud red
 ```
 
-**Known exposure:** the `only*` family is not reliably loud — `onlyImportFrom` iterates import declarations, so a subject with zero imports passes vacuously (`src/conditions/reverse-dependency.ts:146` documents this for `onlyBeImportedVia`). Filed as [bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md), and R3's changelog claim is scoped to **path globs** accordingly.
+**Known exposure:** the `only*` family is not reliably loud — `onlyImportFrom` iterates import declarations, so a subject with zero imports passes vacuously (`src/conditions/reverse-dependency.ts:146` documents this for `onlyBeImportedVia`). Filed as [bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md), and R3's changelog claim is scoped to **path globs** accordingly.
 
 `import-target` globs are exempt entirely. Measured 2026-07-26: `getSourceFiles()` returns 430 files here, **0 under `node_modules/`**, so `**/node_modules/typescript/**` — which `arch-rules.test.ts:98` uses correctly — is unsatisfiable against any path universe by construction, and checking it would fail every correct dependency rule in existence.
 
@@ -327,7 +327,7 @@ So the keyword grep is a starting point, not the checklist. Draft 6 said the che
 ## R3b gained a fault, 2026-07-30
 
 From [plan 0071](./0071-one-definition-of-a-module-edge.md) and the refutation recorded in
-[bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md): **a glob
+[bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md): **a glob
 that is satisfiable but matched no edge** belongs to R3b, and it is a different fault from the
 one 0069 already covers.
 
@@ -489,7 +489,7 @@ Each verified by sabotage: revert the fix, watch it go red.
 
 ## Known exposures, stated not hidden
 
-- The `only*` family passes vacuously on subjects with no edges — [bug 0015](../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md); R3's changelog claim is scoped to path globs.
+- The `only*` family passes vacuously on subjects with no edges — [bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md); R3's changelog claim is scoped to path globs.
 - A hand-written `{ description, test }` predicate declares no globs. It disables the check for any `or()` containing it (by the propagation rule) and `doctor` reports its description. `GlobSite`/`GlobNode` are exported so this is fixable by the author.
 - `base` is not verified against a second derivation; the cost of a mis-declaration is a worse message, by design.
 - `workspace()` sets `tsConfigPath` to the alphabetically-first member tsconfig (`src/core/project.ts:143`), so the disk walk's root derives from one member. `discoverIdentityRoot` walks up to `.git` and usually recovers; an unusual layout scopes the walk below some members and mislabels their globs. Fail-open.

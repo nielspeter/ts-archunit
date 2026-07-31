@@ -1,6 +1,7 @@
 # Bug 0015: `onlyImportFrom` passes on a file with no imports, however broken the allowlist
 
 **Reported:** 2026-07-25
+**Fixed:** 2026-07-31 — **not yet released.** Option 2, as this file decided.
 **Found in:** all versions through v0.19.0
 **Severity:** Medium — the allowlist family is silent exactly where an allowlist matters most, and one of the two affected conditions documents the behaviour without treating it as a defect.
 
@@ -138,3 +139,54 @@ is about.
 edge-bearing subjects produces **96 violations** — maximally loud. The allowlist typo this bug
 cites as motivation is already caught by the rule firing on every edge. The silent case is the
 **denylist**.
+
+## Fixed 2026-07-31, by reporting rather than failing
+
+Option 2, exactly as this file's own analysis concluded, and no third mechanism.
+`src/core/edge-coverage.ts` tallies what each `only*` condition actually had to work with,
+and a rule that had **subjects but tested zero edges** is named on the reporting surface:
+
+- `--format json` gains a top-level `untestedAllowlists` array — always present, empty when
+  every allowlist was exercised, so a consumer can tell "none" from "this version does not
+  report it". An agent parses stdout, so a stderr-only notice would have been invisible to the
+  reader this project is built for.
+- Every other format gets one stderr footnote after the report, **naming the rules** rather than
+  counting them (ADR-008 rule 4) and stating why it might be fine.
+
+The canonical case from this file's Description now reads:
+
+```
+[ts-archunit] 1 allowlist rule passed without testing a single edge:
+  - that reside in folder matching "**/src/domain/**" should only import from "**/nowhere/**" (1 subject, 0 edges)
+  An allowlist constrains edges, so a subject with none cannot violate it. This is correct for a
+  genuinely dependency-free module and means the rule certified nothing otherwise — only you can
+  tell which.
+```
+
+### What the implementation had to get right
+
+- **It discriminates.** A tally that reported every rule would be noise, and noise is how a real
+  signal gets ignored. The edge-bearing rule in the same run is not named.
+- **Not `ConditionContext`.** That type is public and backs `defineCondition()`; this file already
+  records that extending `Condition<T>` was one reason the failing design could not ship. The
+  tally follows `diff-disclosure.ts`'s run-scoped module-state precedent instead, with the same
+  test reset, and `runCheck` resets per run so a watch loop does not inherit the previous one.
+- **Counted after the same filters the check applies**, including `ignoreTypeImports` — an edge
+  the rule skips is an edge it did not test.
+- **`onlyHaveTypeImportsFrom` counts an edge as tested only when the allowlist matched it**, since
+  an edge the glob does not name is one the rule never had an opinion about.
+
+### Guards
+
+`tests/core/edge-coverage.test.ts`, 11 tests, **8 of 8 sabotages caught** — but only after three
+gaps that the first matrix found and that are worth recording, because two of them are the shape
+this bug is about:
+
+1. **The two other conditions' tests could not fail.** They asserted only that a vacuous rule
+   _is_ reported — which a counter that never increments also produces. Both now have a
+   discriminator: a subject that genuinely has importers, and an import the allowlist genuinely
+   scopes in.
+2. **The empty-selector test was vacuous.** Measured: the builder short-circuits and never calls
+   `evaluate` on an empty subject set, so nothing was recorded either way and removing the
+   `subjects > 0` filter left it green. It now pins that mechanism, and the filter is tested
+   where it is reachable.

@@ -6,6 +6,7 @@ import type { ArchViolation } from '../../core/violation.js'
 import { ArchRuleError } from '../../core/errors.js'
 import { setCallerAggregatesReports, writeReport } from '../../core/execute-rule.js'
 import { suppressionNotice } from '../../core/diff-disclosure.js'
+import { edgeCoverageNotice, resetEdgeCoverage, untestedRules } from '../../core/edge-coverage.js'
 import { writeStderr } from '../../core/stderr.js'
 import { loadRuleFiles } from '../load-rules.js'
 import {
@@ -34,6 +35,10 @@ export interface CheckArgs {
  * preset call) is handled by a best-effort catch — error-severity only.
  */
 export async function runCheck(args: CheckArgs): Promise<number> {
+  // Per run: the tally is module state (the `diff-disclosure` pattern), and a
+  // second `runCheck` in one process — the CLI's watch loop, or a test — must
+  // not inherit the first run's rules.
+  resetEdgeCoverage()
   const format: OutputFormat = args.format === 'auto' ? detectFormat() : args.format
   const baseline = args.baseline !== undefined ? withBaseline(args.baseline) : undefined
   const diff = args.changed ? diffAware(args.base) : undefined
@@ -119,7 +124,16 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   // stderr carries it for every other format. Found by sabotage: removing the
   // `writeStderr` call left the tests green because the notice was reaching
   // stderr through the "Why:" line instead.
-  writeReport(filtered, format, format === 'json' ? notice : undefined)
+  writeReport(filtered, format, format === 'json' ? notice : undefined, untestedRules())
+
+  // Bug 0015, and it goes AFTER the report so it reads as a footnote rather than
+  // as part of the findings. JSON carries the same information structurally in
+  // `summary.untestedAllowlists`, so emitting the prose there too would duplicate
+  // it into a document a consumer parses.
+  if (format !== 'json') {
+    const coverage = edgeCoverageNotice()
+    if (coverage !== undefined) writeStderr(`${coverage}\n`)
+  }
 
   // Exit code = error-severity count; warns are reported but never fail.
   return filtered.filter((v) => (v.severity ?? 'error') === 'error').length
