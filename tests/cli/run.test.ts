@@ -130,7 +130,7 @@ describe('baseline propagates its exit code', () => {
   })
 })
 
-describe('doctor (experimental, hidden)', () => {
+describe('doctor (supported since plan 0077)', () => {
   it('reaches runDoctor rather than the unknown-command arm', async () => {
     // `exitCode` is 1 either way — the unknown-command arm also sets it — so
     // asserting the code is another false green. The MESSAGE is what
@@ -153,6 +153,23 @@ describe('doctor (experimental, hidden)', () => {
     const output = written.join('')
     expect(output).not.toContain('Unknown command')
     expect(output).toContain('no rule files')
+  })
+
+  it('rejects a --format it does not support', async () => {
+    // Unvalidated while the command was hidden: `--format github` ran silently
+    // as terminal. Tolerable for something absent from `--help`, not for a
+    // listed command whose flag surface a reader now expects to be real.
+    const errors: string[] = []
+    const errSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
+      errors.push(args.map(String).join(' '))
+    })
+    try {
+      await run(['doctor', '--format', 'github', 'x.ts'])
+    } finally {
+      errSpy.mockRestore()
+    }
+    expect(errors.join('')).toContain("--format 'github' is not valid for 'doctor'")
+    expect(errors.join('')).toContain('terminal, json')
   })
 
   it('is listed in --help, because it is supported', async () => {

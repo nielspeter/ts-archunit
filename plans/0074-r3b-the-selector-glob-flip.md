@@ -75,8 +75,13 @@ wherever they are built, including inside a test file. So the gate is:
 The original claim that "neither `doctor` nor `diagnose()` can reach them" is wrong about
 `diagnose()` and was what kept this plan parked. What this repository actually needs is to
 **collect** its 43 rules — they are built inside `it()` callbacks and never returned — which is a
-test-authoring change, not a tool limitation. That is the afternoon's work, and it no longer waits
-on finding a differently-shaped project.
+test-authoring change, not a tool limitation.
+
+That removes the **host** constraint. It does not remove the gate: this repository's own rules have
+to produce a **non-empty** finding population before there is anything to classify, and a suite
+that is already green under its own rules may well produce none. So the gate now reads "an adopting
+codebase with real findings", which this repository may or may not be — an afternoon of collecting
+the rules answers that, and answering it is itself the next step.
 
 ## The other two decisions, both 0069's, both still open
 

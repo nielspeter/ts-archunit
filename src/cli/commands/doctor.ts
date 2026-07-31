@@ -12,19 +12,19 @@ export interface DoctorArgs {
 /**
  * Report what each rule cannot enforce, without running any of them.
  *
- * **Experimental and hidden.** Not listed in `--help`, because removing a
- * documented command later is its own breaking change and its life after R3
- * is not yet decided. Shipping it hidden is precisely what defers that
- * decision.
+ * **Supported and scoped** since plan 0077, which settled the keep-or-retire
+ * question 0069 left open. It diagnoses rule files the CLI can **load** — the
+ * `arch.rules.ts` shape `init` scaffolds, which `getting-started.md` calls the
+ * default path. Rules hosted in a vitest or jest file cannot be imported outside
+ * their runner; `diagnose()` is the answer there and reports the same findings.
  *
- * It is a diagnostic you invoke, not a build gate — do not wire it into a
- * pipeline. It nevertheless **exits non-zero when it reports anything**,
- * because an agent reads `exit 0` as "nothing to do" (ADR-008 rule 1), and a
- * diagnostic that reports problems while exiting 0 is a diagnostic nobody
- * acts on.
+ * **Why the command earns its slot:** a **dead glob**. A rule whose selector can
+ * never match certifies nothing, and `check` never calls `diagnose()` — measured,
+ * `check` exits 0 with no output on such a rule while this reports it and exits
+ * 1. Until 0069's R3b turns that into a check-time failure, this and `diagnose()`
+ * are the only surfaces that see it.
  *
- * Reports identities, never totals: which glob, in which rule, at which
- * position, and what is verifiably true about it.
+ * Not a build gate (0069): `check` is the gate.
  */
 export async function runDoctor(args: DoctorArgs): Promise<number> {
   if (args.ruleFiles.length === 0) {

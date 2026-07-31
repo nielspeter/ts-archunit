@@ -41,6 +41,7 @@ Options:
   --base <branch>       Base branch for diff (default: main)
   --format <format>     check: terminal, json, github, auto (default: auto)
                         explain: json (default), markdown, agent
+                        doctor: terminal (default), json
   --markdown            Output explain results as markdown table
   -w, --watch           Watch for changes and re-run (check command only)
   --config <path>       Path to config file
@@ -151,10 +152,21 @@ async function handleBaseline(ruleFiles: string[], output: string): Promise<void
 }
 
 /** Reject a `--format` value that isn't valid for the given subcommand. */
-function isValidFormat(command: 'check' | 'explain', format: string | undefined): boolean {
+const FORMATS: Record<'check' | 'explain' | 'doctor', readonly string[]> = {
+  check: ['terminal', 'json', 'github', 'auto'],
+  explain: ['json', 'markdown', 'agent'],
+  // `doctor` has only these two. It was unvalidated while the command was
+  // hidden, so `--format github` ran silently as terminal — tolerable for an
+  // undocumented command, not for one listed in `--help` (plan 0077 review).
+  doctor: ['terminal', 'json'],
+}
+
+function isValidFormat(
+  command: 'check' | 'explain' | 'doctor',
+  format: string | undefined,
+): boolean {
   if (format === undefined) return true
-  const allowed =
-    command === 'check' ? ['terminal', 'json', 'github', 'auto'] : ['json', 'markdown', 'agent']
+  const allowed = FORMATS[command]
   if (!allowed.includes(format)) {
     console.error(
       `Error: --format '${format}' is not valid for '${command}'. Valid values: ${allowed.join(', ')}.`,
@@ -225,7 +237,8 @@ export async function run(args: string[]): Promise<void> {
 
   if (
     (command === 'check' && !isValidFormat('check', values.format)) ||
-    (command === 'explain' && !isValidFormat('explain', values.format))
+    (command === 'explain' && !isValidFormat('explain', values.format)) ||
+    (command === 'doctor' && !isValidFormat('doctor', values.format))
   ) {
     return
   }
@@ -245,9 +258,19 @@ export async function run(args: string[]): Promise<void> {
     // answer there and reports the same findings.
     //
     // Still not a build gate (0069): it is invoked deliberately, and `check` is
-    // the gate. What it uniquely catches is a rule file that fails to LOAD,
-    // which `diagnose()` cannot see because it never loads — and which would
-    // otherwise be zero coverage reported as success.
+    // the gate.
+    //
+    // What it uniquely catches is a **dead glob** — a rule whose selector can
+    // never match, so it certifies nothing. `check` does not call `diagnose()`
+    // at all, and measured, it exits **0 with no output** on such a rule while
+    // `doctor` names the site and exits 1. That is the ADR-008 false green this
+    // whole area exists for, and until 0069's R3b flips it into a check-time
+    // failure, `doctor` and `diagnose()` are the only surfaces that see it.
+    //
+    // NOT load failures, which an earlier version of this comment claimed:
+    // `check` already reports an unloadable rule file as an error-severity
+    // configuration finding with a remedy (`cli/rule-file-findings.ts`), and
+    // does it better than this command's bare stderr line.
     const code = await runDoctor({
       ruleFiles,
       format: values.format === 'json' ? 'json' : 'terminal',

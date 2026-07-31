@@ -11,6 +11,20 @@ import path from 'node:path'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { runDoctor } from '../../src/cli/commands/doctor.js'
 import { diagnose } from '../../src/core/diagnose.js'
+import { Project } from 'ts-morph'
+import { modules } from '../../src/index.js'
+import type { ArchProject } from '../../src/core/project.js'
+
+/** The fixture project the dead-glob contrast needs. */
+function loadFixtureProject(): ArchProject {
+  const tsconfigPath = path.resolve(import.meta.dirname, '../fixtures/modules/tsconfig.json')
+  const tsMorphProject = new Project({ tsConfigFilePath: tsconfigPath })
+  return {
+    tsConfigPath: tsconfigPath,
+    _project: tsMorphProject,
+    getSourceFiles: () => tsMorphProject.getSourceFiles(),
+  }
+}
 
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 const FIXTURE_TSCONFIG = path.join(repoRoot, 'tests/fixtures/modules/tsconfig.json')
@@ -282,10 +296,22 @@ describe('files that cannot be loaded (plan 0070, 0.22.0)', () => {
     expect(stderr.join('')).toContain('unloadable.mjs')
     expect(stderr.join('')).toContain('could not be loaded')
 
-    // diagnose: the file never becomes rules, so the only thing it can be handed
-    // is the empty set — and an empty set is legitimately no findings. That is
-    // not a defect in `diagnose()`; it is the boundary between the two surfaces.
-    expect(diagnose([])).toEqual([])
+    // `expect(diagnose([])).toEqual([])` stood here and was vacuous — true for
+    // any implementation, ∀ over ∅. Replaced with the contrast that is actually
+    // load-bearing and that review identified as the real justification for this
+    // command: a DEAD GLOB. `check` never calls `diagnose()`, so a rule whose
+    // selector can never match is reported by this surface and by nothing else.
+    const project = loadFixtureProject()
+    const deadGlobRule = modules(project)
+      .that()
+      .resideInFolder('**/nonexistent-folder/**')
+      .should()
+      .notImportFrom('**/banned/**')
+
+    // The rule reports no violations — it has no subjects — so a `check` run is
+    // silent. `diagnose()` sees the fault.
+    expect(deadGlobRule.violations()).toEqual([])
+    expect(diagnose([deadGlobRule]).map((f) => f.kind)).toEqual(['dead-glob'])
   })
 
   it('MIXED case: a load failure plus a clean file still exits non-zero', async () => {

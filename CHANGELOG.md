@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.32.0] - 2026-07-31
+
+### Changed
+
+- **`ts-archunit doctor` is a supported command, not a hidden experiment.** It is listed in
+  `--help`, and the docs drop "experimental" for a stated scope. What it earns its slot for is a
+  **dead glob**: a rule whose selector can never match certifies nothing, and `check` never calls
+  `diagnose()` — measured, `check` exits 0 with no output on such a rule while `doctor` exits 1 and
+  names the site. It remains a diagnostic you invoke, **not a build gate**; `check` is the gate.
+  Rules hosted in a vitest or jest file cannot be loaded by the CLI — `diagnose()` reports the same
+  findings there.
+- **`doctor --format` is validated.** It accepted anything while the command was hidden, so
+  `--format github` ran silently as terminal. It now takes `terminal` (default) or `json`, and
+  rejects anything else the way `check` and `explain` do.
+
 ## [0.31.1] - 2026-07-31
 
 Internal performance only — no API change, no baseline impact, no finding changes.

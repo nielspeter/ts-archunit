@@ -146,7 +146,7 @@ It reports **identities, never totals** — which rule file, which rule, and for
 `doctor` is a diagnostic you invoke, not a gate — `check` is the gate. It exits non-zero when it reports anything so an agent does not read `exit 0` as "nothing to do", but that is for your terminal, not your pipeline.
 :::
 
-What it catches that `diagnose()` cannot: **a rule file that fails to load at all.** `diagnose()` never loads anything, so it cannot know one is missing — and a rule file that does not load is zero coverage reported as success.
+**What nothing else catches: a dead glob.** A rule whose selector can never match certifies nothing, and `check` does not look — measured, `check` exits **0 with no output** on such a rule, while `doctor` names the site and exits 1. That is the failure this command exists for. (An unloadable rule file is _not_ the distinguishing case: `check` already reports that as an error-severity finding with a remedy.)
 
 ## Options
 

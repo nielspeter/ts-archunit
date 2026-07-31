@@ -45,12 +45,22 @@ the CLI.
 
 **Two further facts draft 1 missed, both pointing the same way:**
 
-1. **`doctor` reports something `diagnose()` structurally cannot: load failures.** `diagnose()`
-   never loads anything, so it cannot tell you a rule file failed to load. `doctor` has explicit
-   machinery for it, and the comment at `doctor.ts:55-60` says why — swallowing a load failure
-   _"turned a visible crash into `exit 0` plus a clean bill of health — the ADR-008 rule 1 failure
-   this command exists to surface."_ A rule file that does not load is zero coverage reported as
-   success, and `doctor` is the only surface that catches it.
+1. **`check` never calls `diagnose()`, so a dead glob is invisible to the gate.** Measured on a
+   scratch rule whose selector glob matches nothing: `check` exits **0 with no output**, while
+   `doctor` exits **1** and names `reside in folder matching "**/nonexistent-folder/**"
+[selector]`. `grep diagnose src/cli/commands/check.ts src/core/execute-rule.ts
+src/core/check-all.ts` finds only a comment. A rule that can never match certifies nothing and
+   the gate calls it green — ADR-008 rule 1 — and until 0074's R3b turns that into a check-time
+   failure, `doctor` and `diagnose()` are the only surfaces that see it.
+
+   **A draft of this plan claimed the justification was load failures instead. That was false and
+   review caught it**: `check tmp/unloadable.mjs` exits **1** with _"This rule file could not be
+   evaluated, so its rules enforced nothing in this run"_ and a `Fix:` remedy. `doctor`'s
+   load-failure machinery is real and its comment at `doctor.ts:55-60` is accurate about why it
+   must not swallow one, but it is **not** unique to `doctor`, so it cannot be what earns the
+   slot. The claim was written from reading the code and never run — which is the same failure
+   mode as draft 1's.
+
 2. **The present state is a documented holding pattern, not an accident.** `docs/cli.md:141-143`
    already says it is _"deliberately absent from `--help`: retiring a documented command later
    would be its own breaking change, and its future is undecided,"_ and points vitest users at
@@ -92,11 +102,14 @@ Add `doctor` to `HELP_TEXT` in `src/cli/index.ts`, beside `check`, `baseline`, `
 
 `docs/cli.md:112` drops "(experimental)" from the heading; the warning block at `:141` becomes the
 scope statement above, keeping the do-not-wire-into-a-pipeline guidance and the `diagnose()`
-pointer. The other six pages that mention `doctor` lose the word "experimental" where it appears.
+pointer.
 
-**Files:** `docs/cli.md` (3 mentions), `docs/api-reference.md` (7), `docs/custom-rules.md` (4),
-`docs/upgrading.md` (5), `docs/troubleshooting.md` (2), `docs/violation-reporting.md` (1),
-`docs/running-in-tests.md` (1); `CHANGELOG.md`.
+**Files, counted rather than estimated.** Seven pages mention `doctor`, but only **two** carry the
+word "experimental": `docs/cli.md` and `docs/api-reference.md`. The other five
+(`custom-rules`, `upgrading`, `troubleshooting`, `violation-reporting`, `running-in-tests`) just
+reference the command and need nothing. The `#diagnostics-experimental` anchor lived in exactly
+**one** page — `docs/cli.md`, verified with `git grep -l diagnostics-experimental cb8b69f^`. Also
+`README.md`'s CLI line, which omitted `doctor` entirely, and `CHANGELOG.md`.
 
 ### Phase 3 — unblock 0074's gate
 
@@ -114,33 +127,74 @@ That is why this repository could never run its own gate: 43 rules inside `it()`
 
 ## Test inventory
 
-| test                                                 | asserts                                                                       |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `doctor is listed in --help`                         | phase 1, the whole point of promotion                                         |
-| `doctor still reports a dead glob and exits 1`       | promotion changed discoverability, not behaviour — the 14 existing tests stay |
-| `doctor reports a load failure that diagnose cannot` | the capability that justifies keeping the command at all                      |
-| `the docs no longer call it experimental`            | phase 2, derived by scanning the pages rather than restated                   |
+| test                                                  | asserts                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `doctor is listed in --help`                          | phase 1, the whole point of promotion                                         |
+| `doctor still reports a dead glob and exits 1`        | promotion changed discoverability, not behaviour — the 14 existing tests stay |
+| `a dead glob is reported here and silent under check` | the capability that justifies keeping the command at all                      |
+| `doctor rejects a --format it does not support`       | a listed command's flag surface must be real; unvalidated while hidden        |
+| `the docs no longer call it experimental`             | phase 2, `tests/docs/doctor-is-not-experimental.test.ts` — scans every page   |
 
 ## Guards
 
-ADR-008's question: **what would these tests do if `doctor` were quietly reduced to a `diagnose()`
-wrapper that drops load failures?** The first two pass. So the third is load-bearing, and it must
-assert the finding — a rule file that fails to load must produce a non-zero exit **and** name the
-file, because the failure this command exists to prevent is `exit 0` on a file that never ran.
+ADR-008's question: **what would these tests do if `doctor` were quietly reduced to a pass-through
+that reports nothing?** Rows 1 and 4 still pass — `--help` listing and flag validation are not
+findings. So row 3 is load-bearing, and it must assert both halves of the contrast: the rule
+produces **no violations** (so a `check` run is silent) and `diagnose()` reports **`dead-glob`**.
+Asserting only the second half would pass against a `check` that had learned to call `diagnose()`
+itself, which is exactly the world where this command stops earning its slot.
+
+The half that was shipped first here was `expect(diagnose([])).toEqual([])` — true for every
+implementation, ∀ over ∅, and caught by review. A contrast test whose contrast side is vacuous is
+one assertion, not two.
+
+## Sabotage matrix
+
+Six reverts, enumerated from `git diff` rather than from memory, baseline asserted green first,
+exit codes only, tree git-verified after each. **6 of 6 caught.**
+
+| revert                                                  | caught by                                         |
+| ------------------------------------------------------- | ------------------------------------------------- |
+| the `doctor` line removed from `HELP_TEXT`              | `run.test.ts` — is listed in `--help`             |
+| the `doctor` branch removed from the dispatch guard     | `run.test.ts` — rejects an unsupported `--format` |
+| `FORMATS.doctor` widened to accept `github`             | same                                              |
+| `diagnose()` stops emitting `dead-glob`                 | `doctor.test.ts` — the dead-glob contrast         |
+| "experimental" re-added beside `doctor` in `cli.md`     | `doctor-is-not-experimental.test.ts`              |
+| the retired `#diagnostics-experimental` anchor relinked | same                                              |
+
+**The last two reported MISSED on the first run and were not.** Their sabotage strings were
+`'### doctor'`, but the heading is ``### `doctor` — Report Rules That Enforce Nothing``, so
+`str.replace` found nothing and wrote the file back unchanged — a sabotage that did not sabotage,
+scoring the guard as absent. Rows 1-4 asserted their anchor matched and rows 5-6 did not. A no-op
+revert reads exactly like an unguarded one, and the reading it produces is the flattering
+direction: it sends you to write a guard that already exists. **Assert the anchor, or the row is
+not evidence.**
+
+Not covered by any guard, stated rather than implied: the `docs/api-reference.md` prose that told
+the reader to run `doctor` in CI while `cli.md` said not to. It is corrected, and nothing would
+catch its return.
 
 ## Result
 
-Implemented, 4 of 4 sabotages caught. `doctor` is in `--help` with its scope stated;
-`docs/cli.md` and `docs/api-reference.md` drop "experimental" for a scope note and a
-not-a-build-gate note; `#diagnostics-experimental` anchors repointed across six pages.
+Implemented. `doctor` is in `--help` with its scope stated; `docs/cli.md` and
+`docs/api-reference.md` drop "experimental" for a scope note and a not-a-build-gate note; the
+`#diagnostics-experimental` anchor was repointed in the one page that carried it. `README.md`'s
+CLI line now lists the command, and `doctor --format` is validated — it accepted anything while
+hidden, so `--format github` ran silently as terminal.
 
-Two guards changed hands rather than being added. `tests/cli/run.test.ts` asserted `doctor` is
+One guard changed hands rather than being added. `tests/cli/run.test.ts` asserted `doctor` is
 **absent** from `--help` "because it is experimental" — the guard for the decision this plan
 reverses — and it is now inverted, with the reasoning in the test so the next reader sees why it
-flipped. And `tests/cli/doctor.test.ts` gained the load-failure **contrast**: the same unloadable
-file yields a named finding from `doctor` and is unreachable for `diagnose()`, which is handed
-rules rather than files. That is the assertion that justifies keeping the command, and without it
-the promotion rests on prose.
+flipped. `tests/cli/doctor.test.ts` gained the dead-glob **contrast** that justifies keeping the
+command: a rule whose selector can never match reports zero violations, so `check` is silent,
+while `diagnose()` returns `dead-glob`. Without that pair the promotion rests on prose.
+
+**Review then reversed a second claim inside this plan.** Its own justification section had
+asserted that load failures are what only `doctor` catches. Running the case showed `check` catches
+them too, with a remedy. The correction is above, and it cost a rewrite of the plan, the dispatch
+comment, `docs/cli.md`, `docs/api-reference.md` (which told the reader to run `doctor` in CI while
+`cli.md` said not to) and the test. Two drafts of one plan, both wrong from reading rather than
+running — that is the pattern worth carrying forward, not the conclusion.
 
 Phase 3 corrected a false claim in 0074 as well as restating its gate: the old text said "neither
 `doctor` nor `diagnose()` can reach them" of this repository's 43 rules. `diagnose()` can — the

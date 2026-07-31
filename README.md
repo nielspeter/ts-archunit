@@ -316,7 +316,7 @@ tsconfig(p).requires({ strict: true, noUncheckedIndexedAccess: true }).check()
 - **[Cross-layer validation](https://nielspeter.github.io/ts-archunit/cross-layer)** — route/schema/SDK consistency
 - **[Custom predicates and conditions](https://nielspeter.github.io/ts-archunit/custom-rules)** — `definePredicate()`, `defineCondition()`, `and`/`or`/`not` combinators
 - **[Metrics](https://nielspeter.github.io/ts-archunit/metrics)** — cyclomatic complexity, lines of code, method count limits
-- **[CLI](https://nielspeter.github.io/ts-archunit/cli)** — `check`, `baseline`, `explain`, `--watch` mode
+- **[CLI](https://nielspeter.github.io/ts-archunit/cli)** — `check`, `baseline`, `explain`, `doctor`, `--watch` mode
 
 ## Entry Points
 
