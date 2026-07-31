@@ -34,9 +34,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { Project, SyntaxKind } from 'ts-morph'
 import type { SourceFile } from 'ts-morph'
-import { descendantsOfKind } from '../../src/core/descendant-cache.js'
+import { allDescendants, descendantsOfKind } from '../../src/core/descendant-cache.js'
 import { functions } from '../../src/index.js'
-import { call } from '../../src/helpers/matchers.js'
+import { call, expression } from '../../src/helpers/matchers.js'
 import { resetProjectCache } from '../../src/core/project.js'
 import type { ArchProject } from '../../src/core/project.js'
 
@@ -63,24 +63,26 @@ afterEach(() => {
  * nearer level counts only the calls made on source files. Plan 0075 recorded a
  * wrong-by-8,424 conclusion from exactly that mistake.
  */
-function countWalks(_project: Project, run: () => void): number {
-  // A THROWAWAY project for the probe, not the one under measurement. Creating
-  // `/__probe.ts` in the caller's project with `overwrite: true` fires
-  // `onModified`, so the harness silently invalidated the file it was measuring
-  // — measured: pointing the probe at an existing path reds the very first test.
-  // `element-cache.test.ts` gets this right and this file had copied the sibling
-  // that does not.
+function countMethod(name: 'getDescendantsOfKind' | 'getDescendants', run: () => void): number {
+  // A THROWAWAY project for the probe, not the one under measurement. Creating a
+  // file in the caller's project with `overwrite: true` fires `onModified`, so the
+  // harness silently invalidated the file it was measuring — measured: pointing
+  // the probe at an existing path reds the very first test.
   const sample = new Project({ useInMemoryFileSystem: true }).createSourceFile(
     '/__probe.ts',
     'const a = 1',
   )
+  // The owner prototype is found by WALKING the chain, not by assuming a depth:
+  // `Node.prototype` is five levels above a `SourceFile` instance and patching a
+  // nearer level counts only the calls made on source files. Plan 0075 recorded a
+  // wrong-by-8,424 conclusion from exactly that mistake.
   let proto: object | null = protoOf(sample)
-  while (proto !== null && !Object.prototype.hasOwnProperty.call(proto, 'getDescendantsOfKind')) {
+  while (proto !== null && !Object.prototype.hasOwnProperty.call(proto, name)) {
     proto = protoOf(proto)
   }
-  if (proto === null) throw new Error('no prototype owns getDescendantsOfKind')
+  if (proto === null) throw new Error(`no prototype owns ${name}`)
   const owner: object = proto
-  const descriptor = Object.getOwnPropertyDescriptor(owner, 'getDescendantsOfKind')
+  const descriptor = Object.getOwnPropertyDescriptor(owner, name)
   if (descriptor === undefined) throw new Error('no descriptor')
   const original: unknown = descriptor.value
   if (typeof original !== 'function') throw new Error('not a function')
@@ -90,14 +92,24 @@ function countWalks(_project: Project, run: () => void): number {
     count += 1
     return Reflect.apply(original, this, args)
   }
-  Object.defineProperty(owner, 'getDescendantsOfKind', { ...descriptor, value: spy })
+  Object.defineProperty(owner, name, { ...descriptor, value: spy })
   restore = () => {
-    Object.defineProperty(owner, 'getDescendantsOfKind', descriptor)
+    Object.defineProperty(owner, name, descriptor)
   }
   run()
   restore()
   restore = undefined
   return count
+}
+
+/** Counts the by-kind walk. */
+function countWalks(_project: Project, run: () => void): number {
+  return countMethod('getDescendantsOfKind', run)
+}
+
+/** The same harness, for the kind-independent `getDescendants`. */
+function countBroadWalks(_project: Project, run: () => void): number {
+  return countMethod('getDescendants', run)
 }
 
 /** Two functions, each with one call, in one file. */
@@ -241,6 +253,143 @@ describe('an edit to the file invalidates it', () => {
     descendantsOfKind(file.getFunctionOrThrow('f'), SyntaxKind.CallExpression)
 
     expect(registrations).toBe(1)
+  })
+})
+
+describe('the broad walk is shared too', () => {
+  /**
+   * `findMatchesBroad` is the other strategy — `expression()` and `comment()`
+   * declare no `syntaxKinds`, so they must look at every descendant. Measured on
+   * this repository, 1,698 bodies / 117,949 descendants with ts-morph's wrapper
+   * cache warm:
+   *
+   *     getDescendants()          49 ms   <- shared by this
+   *     + getText() on each       71 ms
+   *     + regex on each           68 ms
+   *
+   * The walk is ~three quarters of the cost and the filter is per-matcher, so the
+   * walk is the shareable part. End to end, six successive broad rules:
+   * **~57 ms each becomes ~17 ms each.**
+   */
+  it('walks a body once however many broad matchers ask', () => {
+    const { project, file } = twoBodies()
+    const fn = file.getFunctionOrThrow('f')
+
+    const walks = countWalks(project, () => {
+      allDescendants(fn)
+      allDescendants(fn)
+      allDescendants(fn)
+    })
+
+    // `getDescendants` is a different method from `getDescendantsOfKind`, so the
+    // by-kind counter reads zero either way — this counts the broad one.
+    expect(walks).toBe(0)
+    expect(allDescendants(fn).length).toBeGreaterThan(1)
+  })
+
+  it('is actually wired into findMatchesBroad, not merely available', () => {
+    // The wiring, through the RULE path, with the violations captured inside the
+    // measurement — `0` is also what a rule that analysed nothing reports. This
+    // is the shape the last review showed was missing for the by-kind half.
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    tsMorphProject.createSourceFile(
+      '/src/parse.ts',
+      'export function a() { JSON.parse("{}") }\nexport function b() { const x = 1; return x }',
+    )
+    const project: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+
+    // Warm with one broad matcher, then measure a second over the same bodies.
+    functions(project)
+      .should()
+      .notContain(expression(/JSON\.parse\(/))
+      .violations()
+
+    let seen: string[] = []
+    const walks = countBroadWalks(tsMorphProject, () => {
+      seen = functions(project)
+        .should()
+        .notContain(expression(/JSON\.stringify\(/))
+        .violations()
+        .map((v) => v.element)
+    })
+
+    expect(seen).toEqual([])
+    expect(walks).toBe(0)
+  })
+
+  it('sees an edit, and only in the edited file', () => {
+    const { project, file } = twoBodies()
+    const other = project.createSourceFile('/src/b.ts', 'export function h() { console.log(1) }')
+    const before = allDescendants(file.getFunctionOrThrow('f')).length
+    allDescendants(other.getFunctionOrThrow('h'))
+
+    file.getFunctionOrThrow('f').addStatements('eval("z")')
+
+    expect(allDescendants(file.getFunctionOrThrow('f')).length).toBeGreaterThan(before)
+    // The untouched file keeps its entry, or the cache is pointless.
+    let text: readonly string[] = []
+    const walks = countBroadWalks(project, () => {
+      text = allDescendants(other.getFunctionOrThrow('h')).map((n: { getKindName: () => string }) =>
+        n.getKindName(),
+      )
+    })
+    expect(walks).toBe(0)
+    expect(text.length).toBeGreaterThan(1)
+  })
+
+  it('re-walks when the cached nodes were forgotten under it', () => {
+    const { file } = twoBodies()
+    const fn = file.getFunctionOrThrow('f')
+    const first = allDescendants(fn)
+    expect(first.length).toBeGreaterThan(1)
+
+    first[0]?.forget()
+
+    // Must not throw and must not return the forgotten list.
+    expect(() =>
+      allDescendants(fn).map((n: { getKindName: () => string }) => n.getKindName()),
+    ).not.toThrow()
+  })
+
+  it('hands back the cached array itself, not a copy', () => {
+    const { file } = twoBodies()
+    const fn = file.getFunctionOrThrow('f')
+    expect(allDescendants(fn)).toBe(allDescendants(fn))
+  })
+
+  it('is cleared by resetProjectCache(), and still invalidates afterwards', () => {
+    // Both halves in one: the escape hatch works, and the listener reads the live
+    // binding so a post-reset edit is still seen.
+    const { project, file } = twoBodies()
+    const before = allDescendants(file.getFunctionOrThrow('f')).length
+
+    resetProjectCache()
+    const walks = countBroadWalks(project, () => {
+      allDescendants(file.getFunctionOrThrow('f'))
+    })
+    expect(walks).toBe(1)
+
+    file.getFunctionOrThrow('f').addStatements('eval("z")')
+    expect(allDescendants(file.getFunctionOrThrow('f')).length).toBeGreaterThan(before)
+  })
+
+  it('does not serve a broad query from the by-kind map, or the reverse', () => {
+    // Two maps, one lifetime. Conflating them would answer "every descendant"
+    // with "every call expression", which is a wrong population rather than a
+    // stale one.
+    const { file } = twoBodies()
+    const fn = file.getFunctionOrThrow('f')
+
+    const byKind = descendantsOfKind(fn, SyntaxKind.CallExpression)
+    const broad = allDescendants(fn)
+
+    expect(byKind).toHaveLength(1)
+    expect(broad.length).toBeGreaterThan(byKind.length)
+    expect(broad).not.toBe(byKind)
   })
 })
 
