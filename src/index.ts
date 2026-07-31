@@ -282,6 +282,9 @@ export { detectFormat, isCI } from './core/environment.js'
 
 // Baseline mode
 export { withBaseline, generateBaseline, Baseline } from './helpers/baseline.js'
+// The shape `generateBaseline` returns. Exported because `docs/setup-best-practices.md`
+// teaches a ratchet gate that reads it, and a documented return type needs a name.
+export type { BaselineDelta } from './helpers/baseline.js'
 export type { BaselineEntry, BaselineFile, BaselineOptions } from './helpers/baseline.js'
 
 // Diff-aware mode
