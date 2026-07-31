@@ -1,7 +1,7 @@
 import { type Node, type ClassDeclaration, type SourceFile, Node as NodeUtils } from 'ts-morph'
 import type { ExpressionMatcher } from './matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
-import { descendantsOfKind } from '../core/descendant-cache.js'
+import { allDescendants, descendantsOfKind } from '../core/descendant-cache.js'
 
 /**
  * Options for module body analysis.
@@ -52,7 +52,10 @@ function findMatchesByKind(node: Node, matcher: ExpressionMatcher): Node[] {
  */
 function findMatchesBroad(node: Node, matcher: ExpressionMatcher): Node[] {
   const matches: Node[] = []
-  for (const descendant of node.getDescendants()) {
+  // Cached: the walk is kind-independent and identical across matchers, and
+  // measured it is ~three quarters of a broad matcher's cost. Only the filter
+  // below is per-matcher.
+  for (const descendant of allDescendants(node)) {
     if (matcher.matches(descendant)) {
       matches.push(descendant)
     }
