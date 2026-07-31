@@ -287,6 +287,23 @@ describe('the broad walk is shared too', () => {
     expect(allDescendants(fn).length).toBeGreaterThan(1)
   })
 
+  it('does not conflate two nodes', () => {
+    // Sabotage found this missing: serving the first cached entry for the file
+    // regardless of which node was asked is a WRONG-population bug, not a stale
+    // one, and every other broad test passed under it. The by-kind map has the
+    // equivalent test; this one did not.
+    const { file } = twoBodies()
+
+    const f = allDescendants(file.getFunctionOrThrow('f')).map((n) => n.getText())
+    const g = allDescendants(file.getFunctionOrThrow('g')).map((n) => n.getText())
+
+    expect(f.some((t) => t.includes('console.log'))).toBe(true)
+    expect(g.some((t) => t.includes('eval'))).toBe(true)
+    // Each body sees its own call and not the sibling's.
+    expect(f.some((t) => t.includes('eval'))).toBe(false)
+    expect(g.some((t) => t.includes('console.log'))).toBe(false)
+  })
+
   it('is actually wired into findMatchesBroad, not merely available', () => {
     // The wiring, through the RULE path, with the violations captured inside the
     // measurement — `0` is also what a rule that analysed nothing reports. This
