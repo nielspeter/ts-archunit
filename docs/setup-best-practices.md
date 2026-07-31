@@ -53,12 +53,108 @@ git add arch-baseline.json && git commit
 
 As you fix legacy violations, regenerate the baseline to ratchet down — it can only shrink.
 
+### Enforcing the ratchet
+
+"It can only shrink" is a convention until something checks it. Nothing stops a red PR being
+turned green by regenerating the baseline, and a violation accepted a year ago and one accepted
+ten minutes ago look identical in the file.
+
+Compare the baseline against **the base branch**, not against the working tree — and give the
+job enough history to do it:
+
+```yaml
+# .github/workflows/arch.yml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0 # required: the default shallow checkout has no base to diff against
+```
+
+```bash
+git diff --exit-code "origin/$GITHUB_BASE_REF...HEAD" -- arch-baseline.json
+```
+
+Three ways to get this wrong, all of which have shipped in this document at some point and all
+of which were caught by running them:
+
+- **`git diff --exit-code arch-baseline.json`** with no ref compares the **working tree to the
+  index**. A CI checkout is clean, so it exits 0 no matter what the PR did — a gate that cannot
+  fail.
+- **`git fetch --depth=1 origin "$GITHUB_BASE_REF"`** does not create `origin/<branch>`; a plain
+  `git fetch <remote> <branch>` only updates `FETCH_HEAD`. The diff line then dies with
+  `fatal: bad revision` and **exit 128**, which a shell treats as failure — so it fails every PR
+  instead of none. Verified.
+- **`...` on a shallow clone** has no merge base. Either use `fetch-depth: 0` as above, or fetch
+  with an explicit refspec and use the two-dot form:
+  `git fetch --depth=1 origin "$GITHUB_BASE_REF:refs/remotes/origin/$GITHUB_BASE_REF"` then
+  `git diff --exit-code "origin/$GITHUB_BASE_REF" HEAD -- arch-baseline.json`.
+
+That rejects **any** change to the baseline, including a legitimate ratchet-down and a
+same-content refresh — `generateBaseline` stamps `generatedAt`, so re-running it always rewrites
+the file. Treat a failure as "explain this in review", not as "never touch it", and see the
+exceptions below.
+
+For a gate that allows shrinking, use the delta `generateBaseline` returns. It **overwrites the
+file before it returns**, so run it against a copy — pointing it at a scratch path directly
+would find no prior baseline and report every entry as new:
+
+```ts
+import fs from 'node:fs'
+import { generateBaseline } from '@nielspeter/ts-archunit'
+
+// Copy first: generateBaseline OVERWRITES its output before returning the delta,
+// so running it against the real file accepts the growth and then complains.
+fs.copyFileSync('arch-baseline.json', '.arch-baseline.check.json')
+const delta = generateBaseline(violations, '.arch-baseline.check.json')
+
+// `added` counts identities, and two findings can share one — so a PR that adds a
+// duplicate of an accepted violation has `added === 0`. Compare the count as well.
+const grew = delta.added > 0 || (delta.before !== undefined && delta.after > delta.before)
+if (grew) {
+  console.error(`Baseline grew: ${String(delta.before)} -> ${String(delta.after)}`)
+  process.exit(1)
+}
+```
+
+**The delta gate cannot see a metric regression.** Metric identities are deliberately
+value-free since 0.31.0, so a class growing from 8 methods to 12 changes no hash and the delta
+is `(+0, −0)`. `check` still catches it — `isKnown` compares the measurement — so run this
+**in addition to** `check`, never instead. Measured.
+
+`violations` is the array your rules produce — `rules.flatMap((rule) => rule.violations())` over
+the builders you would otherwise pass to `checkAll`. This is a script you run with `tsx`, not a
+built-in flag.
+
+**Two cases where the gate is wrong and you must let the change through** (a third, the metric rules, was fixed in 0.31.0):
+
+- **An upgrade.** [Upgrading](/upgrading) tells you to refresh the baseline before several
+  releases, and 0.29.0's identity change rewrites every entry. The gate will fire on exactly the
+  commit the upgrade instructions asked for.
+- **A rule whose description changed.** The tool's own remedy for that finding is "regenerate the
+  baseline", which the gate forbids.
+- ~~**The metric rules.**~~ **Fixed in 0.31.0.** `maxMethods` and friends used to put the measured
+  value in the message, so a class going from 10 methods to 8 counted as a _new_ finding and
+  improving the code failed the gate —
+  [bug 0012](https://github.com/NielsPeter/ts-archunit/blob/main/bugs/fixed/0012-metric-findings-have-no-usable-ratchet.md).
+  They now ratchet per element: the baseline records the accepted measurement, improving stays
+  green, and only a regression past that value fails. Note the accepted value tightens when you
+  regenerate and not before, so a class baselined at 10 that improves to 8 may regrow to 10
+  without failing.
+
+Agree a convention for these — a commit-message marker, a label, a skip path — before you turn
+the gate on. And run it **in addition to** `check`, never instead: the baseline deliberately
+excludes configuration findings, so a job that only diffs the baseline never sees a dead glob or
+an empty selector.
+
 A baselined violation is identified by its content, not by where it sits: the rule, the element and the message, with the repository root normalised out of all three. Some rules supply their own canonical identity where the message would otherwise be unstable — a duplicate pair is identified by its two endpoints regardless of which is reported first, and a per-occurrence finding by its enclosing declaration rather than its line number. The baseline records where the repository root sat relative to itself, so the file matches on any machine and in any CI checkout, whatever the directory is called.
 
 Two things still change identity, by design and by omission:
 
 - **By design** — renaming the element, rewording `.because()`, or changing the rule's own configuration. The finding should be re-reviewed.
-- **By omission** — the size and complexity metrics (`maxMethods`, `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings) put the measured value in the message, so a class going from 10 methods to 8 is reported as a new finding. Improving the code turns the build red. That is [bug 0012](https://github.com/NielsPeter/ts-archunit/blob/main/bugs/0012-metric-findings-have-no-usable-ratchet.md); those rules are not yet baselineable in a useful way.
+- **By design, and now ratcheted** — the size and complexity metrics (`maxMethods`,
+  `maxClassLines`, `maxParameters`, `haveMaxExports` and their siblings) put the measured value in
+  the message, but since 0.31.0 they are identified by element and metric and the baseline records
+  the accepted measurement. Improving a class from 10 methods to 8 stays green; growing past 10
+  fails. The accepted value only tightens on regeneration.
 
 ## Suppressing individual violations
 
