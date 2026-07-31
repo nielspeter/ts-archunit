@@ -1,6 +1,6 @@
 # Plan 0076 — Build module edges once per file
 
-**Status:** READY.
+**Status:** DONE, shipped in v0.31.0. Implemented on `perf/element-and-edge-caches`.
 **Priority:** Medium. Smaller than [0075](./0075-collect-elements-once-per-project.md) in absolute
 milliseconds and, like it, one of the two items in
 [proposal 021](../proposals/021-consumer-run-time-where-it-actually-goes.md) whose value survives

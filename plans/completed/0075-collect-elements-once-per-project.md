@@ -1,6 +1,6 @@
 # Plan 0075 — Collect elements once per project
 
-**Status:** READY.
+**Status:** DONE, shipped in v0.31.0. Implemented on `perf/element-and-edge-caches`.
 **Priority:** High. It is the largest measured win available that changes no behaviour, and it
 is one of only two items in [proposal 021](../proposals/021-consumer-run-time-where-it-actually-goes.md)
 whose value does not depend on how TypeScript 7 turns out.

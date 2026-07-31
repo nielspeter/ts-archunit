@@ -47,8 +47,8 @@ everything else keeps matching. Read
 ### Added
 
 - **Element collections and module edges are cached per project**
-  ([plan 0075](https://github.com/nielspeter/ts-archunit/blob/main/plans/0075-collect-elements-once-per-project.md),
-  [plan 0076](https://github.com/nielspeter/ts-archunit/blob/main/plans/0076-resolve-module-edges-once-per-file.md)).
+  ([plan 0075](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0075-collect-elements-once-per-project.md),
+  [plan 0076](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0076-resolve-module-edges-once-per-file.md)).
   Measured on a 520-file project: five `calls()` rules went from 2,600 AST descendant queries in
   692 ms to 0 in 3 ms, and five whole-project `notImportFrom` rules from 10,545 symbol lookups in
   46 ms to 0 in 2 ms. The win tracks how much your rules overlap — many rules over the same
