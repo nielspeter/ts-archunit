@@ -20,6 +20,15 @@ import { writeStderr } from '../core/stderr.js'
  * no path, so most v1 baselines keep matching. The version alone is therefore
  * NOT grounds to fail — see `unmatchedBaselineFinding`, which fires on the
  * measurement instead.
+ * 4 — bug 0012. Metric findings gained a producer-set `identity`
+ *     (`file::element::metric`) and an accepted `measured` value, so every entry
+ *     for the ten size and complexity conditions hashes differently. The v3
+ *     precedent applies exactly: `hashViolation`'s FORMULA is untouched and one
+ *     of its inputs moved, which is the case the 0.23.0 withdrawal established
+ *     is worth a bump only when the identity of existing entries actually
+ *     changes. It does here, for that family and no other — a baseline with no
+ *     metric entries is byte-identical and keeps matching.
+ *
  */
 // Stays 2 through 0.23.0, deliberately. Accumulate (bug 0020) lengthens
 // `buildRuleDescription()` for a rule derived off a held rule and for a
@@ -56,7 +65,7 @@ import { writeStderr } from '../core/stderr.js'
 //     no migration treatment — that conflated text-stability with baseline-stability
 //     and was wrong. The bump is what lets `unmatchedBaselineFinding` name the real
 //     cause instead of guessing at a re-resolved root.
-const HASH_VERSION = 3
+const HASH_VERSION = 4
 
 /**
  * A single entry in the baseline file.
@@ -75,6 +84,16 @@ export interface BaselineEntry {
   line: number
   /** Stable identity hash: sha256(rule + element + message) */
   hash: string
+  /**
+   * The measurement this entry accepted, for a metric finding (bug 0012).
+   *
+   * Present only on metric findings. `filterNew` suppresses such a finding
+   * while the current measurement is **no greater** than this, so improving a
+   * metric stays green and regressing past the accepted value fails. Without
+   * it the message's embedded count made every change — in either direction —
+   * a new finding, and paying down debt turned the build red.
+   */
+  measured?: number
   /**
    * Subject hash: sha256(element + message), i.e. identity WITHOUT the rule
    * description. Written since 0.24.0 and optional, so a baseline from an
@@ -259,6 +278,8 @@ export function withBaseline(baselinePath: string, options: BaselineOptions = {}
   // second copy of every entry. Entries written before 0.24.0 have no subject
   // and simply do not appear here.
   const subjects = new Map<string, string>()
+  /** hash -> accepted measurement, for metric findings (bug 0012). */
+  const accepted = new Map<string, number>()
   // Annotated as `readonly unknown[]`, not iterated directly: `parsed.violations`
   // is `any[]` after the `Array.isArray` check, and ADR-005 bars both `any` and
   // the `as` that would otherwise be needed to re-narrow it. Assigning to this
@@ -275,9 +296,20 @@ export function withBaseline(baselinePath: string, options: BaselineOptions = {}
     ) {
       subjects.set(entry.subject, entry.rule)
     }
+    // Bug 0012: the measurement this entry accepted. Absent on every non-metric
+    // entry and on anything written before this shipped, which `isKnown` reads
+    // as "no ratchet recorded" rather than as zero.
+    if (
+      'hash' in entry &&
+      typeof entry.hash === 'string' &&
+      'measured' in entry &&
+      typeof entry.measured === 'number'
+    ) {
+      accepted.set(entry.hash, entry.measured)
+    }
   }
 
-  return new Baseline(hashes, effectiveRoot, hashVersion, resolved, subjects)
+  return new Baseline(hashes, effectiveRoot, hashVersion, resolved, subjects, accepted)
 }
 
 /**
@@ -313,6 +345,9 @@ export function generateBaseline(
       line: v.line,
       hash: hashViolation(v, root),
       subject: hashSubject(v, root),
+      // Bug 0012. Written only for metric findings, so a baseline of ordinary
+      // findings is byte-identical to one from before this shipped.
+      ...(v.measured === undefined ? {} : { measured: v.measured }),
     }))
 
   // Read before writing — this is the only moment both sets exist (plan 0071).
@@ -488,14 +523,47 @@ export class Baseline {
      * diagnosis rather than guessing at it (bug 0027).
      */
     private readonly knownSubjects: ReadonlyMap<string, string> = new Map(),
+    /**
+     * Hash -> the measurement accepted for it, for metric findings (bug 0012).
+     * Absent for every non-metric entry and for baselines written before this
+     * shipped, where equality of identity remains the right test.
+     */
+    private readonly acceptedMeasurements: ReadonlyMap<string, number> = new Map(),
   ) {}
 
   /**
    * Check if a violation is known (exists in the baseline).
    * Known violations are filtered out — they don't cause failures.
    */
-  isKnown(violation: ArchViolation): boolean {
+  /**
+   * Whether the baseline holds an entry with this violation's identity.
+   *
+   * Distinct from {@link isKnown}, which also asks whether a metric finding is
+   * still within the measurement that entry accepted. A regressed metric has an
+   * entry and is not known.
+   */
+  hasEntry(violation: ArchViolation): boolean {
     return this.knownHashes.has(hashViolation(violation, this.root))
+  }
+
+  isKnown(violation: ArchViolation): boolean {
+    const hash = hashViolation(violation, this.root)
+    if (!this.knownHashes.has(hash)) return false
+
+    // Bug 0012: a metric finding is known only while it is **no worse** than
+    // what was accepted. Identity answers "is this the same finding?"; a metric
+    // needs "is it worse than what we accepted?", which is a comparison.
+    //
+    // Both sides must be present. A metric violation matched against an entry
+    // written before this shipped has no accepted value to compare with, and
+    // the honest reading of that is the pre-0012 one — the entry was accepted,
+    // so it stays accepted until the baseline is regenerated. Treating a
+    // missing value as 0 would fail every metric finding in an older baseline
+    // and call it a regression.
+    const accepted = this.acceptedMeasurements.get(hash)
+    if (violation.measured === undefined || accepted === undefined) return true
+
+    return violation.measured <= accepted
   }
 
   /**
@@ -518,10 +586,14 @@ export class Baseline {
         continue
       }
       matchable += 1
-      if (this.isKnown(violation)) {
-        matched += 1
-        continue
-      }
+      // `matched` counts entries the baseline RECOGNISED, not violations it
+      // suppressed, and the two differ for a metric finding that regressed past
+      // its accepted value (bug 0012). Counting suppression instead made a
+      // single-entry baseline whose one metric got worse report "no entry
+      // survived: every prior identity is gone" — a false cause, since the
+      // identity matched perfectly and only the number moved.
+      if (this.hasEntry(violation)) matched += 1
+      if (this.isKnown(violation)) continue
       kept.push(violation)
     }
     // The specific diagnosis SUPERSEDES the generic one, and not merely for
@@ -567,6 +639,12 @@ export class Baseline {
     for (const violation of violations) {
       if (violation.bypassFilters === true) continue
       if (this.isKnown(violation)) continue
+      // A regressed metric is not a renamed rule (bug 0012). Its hash is in the
+      // baseline — the description is demonstrably unchanged — and only the
+      // measurement moved, so `isKnown` is false while `hasEntry` is true.
+      // Without this the ratchet's own working case reported "1 rule whose
+      // description changed", which is a false cause under ADR-008 rule 2.
+      if (this.hasEntry(violation)) continue
       const recordedRule = this.knownSubjects.get(hashSubject(violation, this.root))
       if (recordedRule === undefined) continue
       changed.set(recordedRule, violation.rule)

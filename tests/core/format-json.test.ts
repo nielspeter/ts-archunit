@@ -34,6 +34,7 @@ describe('formatViolationsJson', () => {
           suggestion: null,
           docs: null,
           codeFrame: null,
+          measured: null,
         },
       ],
     })

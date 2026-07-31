@@ -1,8 +1,8 @@
 import type { ArchFunction } from '../models/arch-function.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
-import { createViolation } from '../core/violation.js'
 import { cyclomaticComplexity, linesOfCode } from '../helpers/complexity.js'
+import { metricViolation } from '../core/metric-violation.js'
 
 /**
  * Function must not exceed the given cyclomatic complexity.
@@ -28,9 +28,13 @@ export function maxFunctionComplexity(threshold: number): Condition<ArchFunction
         const cc = cyclomaticComplexity(fn.getBody())
         if (cc > threshold) {
           violations.push(
-            createViolation(
+            metricViolation(
               fn.getNode(),
-              `${fn.getName() ?? '<anonymous>'} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)})`,
+              {
+                metric: 'complexity',
+                measured: cc,
+                message: `${fn.getName() ?? '<anonymous>'} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)})`,
+              },
               context,
             ),
           )
@@ -60,9 +64,13 @@ export function maxFunctionLines(threshold: number): Condition<ArchFunction> {
         const loc = linesOfCode(fn.getNode())
         if (loc > threshold) {
           violations.push(
-            createViolation(
+            metricViolation(
               fn.getNode(),
-              `${fn.getName() ?? '<anonymous>'} has ${String(loc)} lines (max: ${String(threshold)})`,
+              {
+                metric: 'lines',
+                measured: loc,
+                message: `${fn.getName() ?? '<anonymous>'} has ${String(loc)} lines (max: ${String(threshold)})`,
+              },
               context,
             ),
           )
@@ -96,9 +104,13 @@ export function maxFunctionParameters(threshold: number): Condition<ArchFunction
         const params = fn.getParameters().length
         if (params > threshold) {
           violations.push(
-            createViolation(
+            metricViolation(
               fn.getNode(),
-              `${fn.getName() ?? '<anonymous>'} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
+              {
+                metric: 'parameters',
+                measured: params,
+                message: `${fn.getName() ?? '<anonymous>'} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
+              },
               context,
             ),
           )

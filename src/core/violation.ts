@@ -45,6 +45,15 @@ export interface ArchViolation {
    * The rendered output is unaffected; this is identity only.
    */
   identity?: string
+
+  /**
+   * The measurement this finding reports, for a metric condition — bug 0012.
+   *
+   * The baseline stores it and compares rather than equates, so improving a
+   * metric stays green while regressing past the accepted value fails. Absent
+   * on every non-metric finding, where equality of identity is the right test.
+   */
+  measured?: number
   /** Optional rationale provided via .because() */
   because?: string
   /** Source code snippet around the violation line */

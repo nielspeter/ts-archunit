@@ -9,6 +9,7 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { createViolation, getElementName } from '../core/violation.js'
 import { elementCondition } from './helpers.js'
+import { metricViolation } from '../core/metric-violation.js'
 
 // Inline the union to avoid conditions → predicates import cycle
 // (same pattern as type-level.ts)
@@ -263,9 +264,13 @@ export function maxProperties(max: number): Condition<PropertyBearingNode> {
         const count = getPropertySymbols(element).length
         if (count > max) {
           violations.push(
-            createViolation(
+            metricViolation(
               element,
-              `${getElementName(element)} has ${String(count)} properties, max allowed is ${String(max)}`,
+              {
+                metric: 'properties',
+                measured: count,
+                message: `${getElementName(element)} has ${String(count)} properties, max allowed is ${String(max)}`,
+              },
               context,
             ),
           )

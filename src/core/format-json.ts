@@ -55,6 +55,11 @@ export function formatViolationsJson(
       suggestion: v.suggestion ?? null,
       docs: v.docs ?? null,
       codeFrame: v.codeFrame ?? null,
+      // Bug 0012's measurement, on the wire. Without it the ratchet is
+      // machine-readable only inside the baseline file, and a dashboard wanting
+      // the number has to regex it back out of the message — which is the
+      // fragility bug 0012 was filed about.
+      measured: v.measured ?? null,
     })),
   }
   return JSON.stringify(output, null, 2)

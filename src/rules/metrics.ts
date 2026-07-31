@@ -7,8 +7,8 @@ import type {
 } from 'ts-morph'
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
-import { createViolation } from '../core/violation.js'
 import { cyclomaticComplexity, linesOfCode } from '../helpers/complexity.js'
+import { metricViolation } from '../core/metric-violation.js'
 
 /** All callable members of a class: methods, constructors, getters, setters */
 type ClassMember =
@@ -56,9 +56,14 @@ export function maxCyclomaticComplexity(threshold: number): Condition<ClassDecla
           const cc = cyclomaticComplexity(member.getBody())
           if (cc > threshold) {
             violations.push(
-              createViolation(
+              metricViolation(
                 member,
-                `${getMemberName(cls, member)} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)}) — split into smaller methods`,
+                {
+                  metric: 'complexity',
+                  measured: cc,
+                  qualifiedName: getMemberName(cls, member),
+                  message: `${getMemberName(cls, member)} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)}) — split into smaller methods`,
+                },
                 context,
               ),
             )
@@ -89,9 +94,13 @@ export function maxClassLines(threshold: number): Condition<ClassDeclaration> {
         const loc = linesOfCode(cls)
         if (loc > threshold) {
           violations.push(
-            createViolation(
+            metricViolation(
               cls,
-              `${cls.getName() ?? '<anonymous>'} has ${String(loc)} lines (max: ${String(threshold)}) — consider splitting into focused classes`,
+              {
+                metric: 'lines',
+                measured: loc,
+                message: `${cls.getName() ?? '<anonymous>'} has ${String(loc)} lines (max: ${String(threshold)}) — consider splitting into focused classes`,
+              },
               context,
             ),
           )
@@ -122,9 +131,14 @@ export function maxMethodLines(threshold: number): Condition<ClassDeclaration> {
           const loc = linesOfCode(member)
           if (loc > threshold) {
             violations.push(
-              createViolation(
+              metricViolation(
                 member,
-                `${getMemberName(cls, member)} has ${String(loc)} lines (max: ${String(threshold)})`,
+                {
+                  metric: 'lines',
+                  measured: loc,
+                  qualifiedName: getMemberName(cls, member),
+                  message: `${getMemberName(cls, member)} has ${String(loc)} lines (max: ${String(threshold)})`,
+                },
                 context,
               ),
             )
@@ -157,9 +171,13 @@ export function maxMethods(threshold: number): Condition<ClassDeclaration> {
         const count = cls.getMethods().length
         if (count > threshold) {
           violations.push(
-            createViolation(
+            metricViolation(
               cls,
-              `${cls.getName() ?? '<anonymous>'} has ${String(count)} methods (max: ${String(threshold)}) — consider splitting into focused classes`,
+              {
+                metric: 'methods',
+                measured: count,
+                message: `${cls.getName() ?? '<anonymous>'} has ${String(count)} methods (max: ${String(threshold)}) — consider splitting into focused classes`,
+              },
               context,
             ),
           )
@@ -192,9 +210,14 @@ export function maxParameters(threshold: number): Condition<ClassDeclaration> {
           const params = member.getParameters().length
           if (params > threshold) {
             violations.push(
-              createViolation(
+              metricViolation(
                 member,
-                `${getMemberName(cls, member)} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
+                {
+                  metric: 'parameters',
+                  measured: params,
+                  qualifiedName: getMemberName(cls, member),
+                  message: `${getMemberName(cls, member)} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
+                },
                 context,
               ),
             )
