@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.31.0] - 2026-07-31
 
-> Scoped to this branch's change. 0.31.0 is cut from four branches — the two caches, the two bug
-> fixes, and the proposals/docs pass — and the combined release notes are written at merge time,
-> because an entry describing all four cannot link to files that live on the other three.
+Two false greens closed, plus two internal caches. **Metric baselines are invalidated**;
+everything else keeps matching. Read
+[Upgrading](https://nielspeter.github.io/ts-archunit/upgrading) first.
 
 ### Fixed
 
@@ -27,9 +27,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **The identity carries the file path**, so two same-named classes in different files — or two
     `index.ts` barrels, or a `save` method on two repositories — do not share one entry.
   - The measurement is on the wire as `measured` in `--format json`.
+- **An allowlist that tested no edges now says so**
+  ([bug 0015](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)).
+  The `only*` family constrains edges, so a subject with none passes however broken the
+  allowlist — and in a layered architecture the innermost layer is both the one an allowlist
+  protects and the one most likely to have no outbound imports. Reported, never failed: for that
+  family zero edges is maximal compliance, and every remedy failing could offer makes something
+  worse. `--format json` gains a top-level `untestedAllowlists`; other formats get a stderr
+  footnote naming the rules **and the cause** — "no imports at all", "excluded by
+  `ignoreTypeImports`" and "none matched the allowlist glob" are three different situations, and
+  only the first means the module is dependency-free.
+- **Two published builder docstrings** were corrupted by a bad edit and shipped as fragments in
+  `dist/*.d.ts` — the IDE hover for `modules()` and `calls()`. Restored, and guarded by a test
+  that parses the JSDoc this package publishes.
+- **The baseline-ratchet CI recipe in the docs could not work.** The published form compared the
+  working tree to the index, so it exited 0 on every CI checkout regardless of what the PR did.
+  Corrected, with the `fetch-depth` prerequisite it needs, and verified by running it.
+
+### Added
+
+- **Element collections and module edges are cached per project**
+  ([plan 0075](https://github.com/nielspeter/ts-archunit/blob/main/plans/0075-collect-elements-once-per-project.md),
+  [plan 0076](https://github.com/nielspeter/ts-archunit/blob/main/plans/0076-resolve-module-edges-once-per-file.md)).
+  Measured on a 520-file project: five `calls()` rules went from 2,600 AST descendant queries in
+  692 ms to 0 in 3 ms, and five whole-project `notImportFrom` rules from 10,545 symbol lookups in
+  46 ms to 0 in 2 ms. The win tracks how much your rules overlap — many rules over the same
+  subjects benefit, disjoint per-folder rules barely do. No verdict changes.
+- `resetProjectCache()` clears those caches, which is the escape hatch if you build an
+  `ArchProject` yourself and mutate the underlying ts-morph project between rules.
+- `BaselineDelta` is exported, so `generateBaseline`'s return type has a name.
 
 ### Changed
 
+- `formatViolationsJson` takes an optional third argument (the untested allowlists). Existing
+  two-argument calls are unaffected.
 - **`HASH_VERSION` 3 → 4.** Metric findings only; every other baseline entry is byte-identical
   and keeps matching. See [Upgrading](https://nielspeter.github.io/ts-archunit/upgrading).
 
