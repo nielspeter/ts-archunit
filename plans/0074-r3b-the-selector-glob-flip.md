@@ -75,10 +75,13 @@ project exists.
 1. **`doctor`: keep as a supported command, or retire it?** 0069 requires this be decided
    **before** R3, and says why it cannot drift: _"shipping it experimental/hidden is precisely
    the mechanism that defers the decision."_ It currently ships experimental/hidden.
-   **Written up as [plan 0077](./0077-retire-doctor-keep-the-diagnosis.md)**, which recommends
-   retiring the command and keeping `diagnose()`. Note what that does to the gate below: the
-   "loadable `arch.rules.ts`" constraint exists _only_ because the gate was written around
-   `doctor`, and against `diagnose()` it disappears.
+   **Written up as [plan 0077](./0077-doctor-promote-it.md)**, which — after an investigation
+   that reversed its own first recommendation — proposes **promoting** it: `doctor` works on the
+   CLI shape `init` scaffolds, which `getting-started.md` calls the default path, and it reports
+   load failures that `diagnose()` structurally cannot. Note what that does to the gate below:
+   the "loadable `arch.rules.ts`" constraint is real for `doctor` and **not** for the diagnosis,
+   so the gate can be run either way — which is why this repository, whose 43 rules live inside
+   `it()` callbacks, could never run its own.
 2. **Version sequencing.** R3b is breaking. 0069's open question 1: _"1.0 is at minimum
    R3 → path-norm → two quiet releases."_
 
