@@ -2,7 +2,7 @@
 
 **Reported:** 2026-07-31
 **Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../plans/0074-r3b-the-selector-glob-flip.md)'s gate run 4
-**Status:** **FIXED** 2026-07-31, unreleased. Verified against the same real codebase that
+**Status:** **FIXED** 2026-07-31, released in **v0.33.0**. Verified against the same real codebase that
 found it, remedy included — see below.
 **Severity:** High **once R3b ships**, Medium today. Today this is a diagnostic's advice. R3b turns
 these exact strings into the text of a **failing build**, so the wrong cause becomes the thing CI

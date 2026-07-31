@@ -1,11 +1,11 @@
 # Plan 0074 — R3b: the selector glob flip
 
-**Status:** GATE OPEN as of gate run 4 (2026-07-31), behind bugs 0031 and 0032. Previously DESIGNED, GATED. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
+**Status:** GATE OPEN and UNBLOCKED as of v0.33.0 — bugs 0031 and 0032 are fixed. Previously DESIGNED, GATED. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
 on 2026-07-30 so that a 90%-shipped plan stops being held open by one slice waiting on a
 precondition that does not exist yet. Nothing here is undecided — the design and both open
 decisions are settled in 0069 and [its appendix](./completed/0069-appendix-vacuous-tests.md).
-**Priority:** High. Startable once bugs 0031 and 0032 are fixed — they are corrections to the
-messages R3b converts into build failures, so they come first.
+**Priority:** High, and startable. Bugs 0031 and 0032 shipped in v0.33.0; what remains is
+version sequencing, since R3b is breaking.
 **Breaking.** A dead selector glob becomes a hard failure, so it reds on globs the adopting
 team wrote.
 
@@ -120,7 +120,7 @@ is wrong for that input?_ **Yes, twice, and both are now filed.**
    refuted by what `absent` means. `ON_DISK_ADVICE`'s own docstring states that principle and
    applies it to the other two known-fact cases.
 
-**So the gate opens and R3b is startable — after those two.** Not as a nicety: R3b's whole content
+**So the gate opens and R3b is startable — after those two, which shipped in v0.33.0.** Not as a nicety: R3b's whole content
 is turning this diagnostic into a **failure**, so these strings stop being advice a human skims
 and become the text CI prints and an agent acts on. Shipping the flip first would take a message
 that is wrong on a real adopting codebase's first run and make it a red build. That is ADR-008
