@@ -492,13 +492,13 @@ correspondence(p)
 | `defineConfig`      | `defineConfig(config: CliConfig): CliConfig` | Define CLI configuration file.                                   |
 | `resetProjectCache` | `resetProjectCache(): void`                  | Clear the project singleton cache. Used by watch mode and tests. |
 
-## Diagnostics (experimental)
+## Diagnostics
 
 Report which rules **cannot enforce anything**, without running them.
 
 `diagnose()` itself returns findings rather than throwing — it is the surface for inspecting a rule set. Since 0.23.0 the underlying faults do fail a build when the rules actually run: a rule that [asserts nothing](/violation-reporting#a-rule-must-assert-something) is a configuration finding on every terminal. Use this to survey rules ahead of time, or in CI via `ts-archunit doctor`, which exits non-zero.
 
-**Experimental.** The shape may change, and `ts-archunit doctor` is deliberately absent from `--help` because retiring a documented command is its own breaking change.
+**Two hosts, one diagnosis.** `diagnose()` runs wherever you build your rules, including inside vitest or jest. `ts-archunit doctor` is the CLI equivalent for rule files the CLI can **load** — the `arch.rules.ts` shape — and additionally reports a rule file that fails to load, which `diagnose()` cannot see because it never loads one.
 
 | Export              | Signature                                                           | Description                                                                                                                                                                                                                           |
 | ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

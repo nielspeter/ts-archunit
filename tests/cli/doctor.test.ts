@@ -10,6 +10,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { runDoctor } from '../../src/cli/commands/doctor.js'
+import { diagnose } from '../../src/core/diagnose.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 const FIXTURE_TSCONFIG = path.join(repoRoot, 'tests/fixtures/modules/tsconfig.json')
@@ -241,6 +242,50 @@ describe('files that cannot be loaded (plan 0070, 0.22.0)', () => {
     // The remedy is conditional: this file does NOT import a test runner, so
     // the message may offer that case but must not assert it as the cause.
     expect(stderr.join('')).not.toContain('A file that imports a test runner (vitest/jest) cannot')
+  })
+
+  it('reports a load failure, which diagnose() structurally cannot — plan 0077', async () => {
+    /**
+     * The capability that justifies keeping this command rather than retiring it
+     * in favour of `diagnose()`, and the reason plan 0077 reversed its own first
+     * recommendation.
+     *
+     * `diagnose()` is handed **rules**. `doctor` is handed **files** and loads
+     * them. So only `doctor` can observe that a file produced no rules because it
+     * failed to load — and `doctor.ts` says why that matters: swallowing it
+     * "turned a visible crash into `exit 0` plus a clean bill of health". A rule
+     * file that does not load is zero coverage reported as success, which is the
+     * ADR-008 rule 1 failure this whole command exists to surface.
+     *
+     * Asserted as a CONTRAST, not as a claim about `doctor` alone: the same
+     * broken file yields a finding from `doctor` and is unreachable for
+     * `diagnose()`, which has no file to be given.
+     */
+    const file = path.join(workDir, 'unloadable.mjs')
+    fs.writeFileSync(file, `throw new Error('boom')\n`)
+
+    const stderr: string[] = []
+    const original = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      stderr.push(String(chunk))
+      return true
+    }
+    let code: number
+    try {
+      code = await runDoctor({ ruleFiles: [file], format: 'terminal' })
+    } finally {
+      process.stderr.write = original
+    }
+
+    // doctor: names the file and fails.
+    expect(code).toBe(1)
+    expect(stderr.join('')).toContain('unloadable.mjs')
+    expect(stderr.join('')).toContain('could not be loaded')
+
+    // diagnose: the file never becomes rules, so the only thing it can be handed
+    // is the empty set — and an empty set is legitimately no findings. That is
+    // not a defect in `diagnose()`; it is the boundary between the two surfaces.
+    expect(diagnose([])).toEqual([])
   })
 
   it('MIXED case: a load failure plus a clean file still exits non-zero', async () => {

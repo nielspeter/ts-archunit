@@ -155,9 +155,20 @@ describe('doctor (experimental, hidden)', () => {
     expect(output).toContain('no rule files')
   })
 
-  it('is absent from --help, because it is experimental', async () => {
-    // Removing a documented command later is its own breaking change, so
-    // `doctor` stays out of the help text until its life after R3 is decided.
+  it('is listed in --help, because it is supported', async () => {
+    /**
+     * Inverted by plan 0077, which settled the keep-or-retire question 0069 left
+     * open. It was hidden while the decision was pending — and 0069 named that
+     * exact state as the mechanism that defers a decision, which it then did for
+     * five sessions.
+     *
+     * The investigation reversed its own first recommendation. Retiring it looked
+     * right until two things were measured: `getting-started.md` calls the CLI
+     * "the default path" and `init` scaffolds a rule file with zero vitest
+     * imports, so `doctor` serves the documented default; and it reports a rule
+     * file that FAILS TO LOAD, which `diagnose()` cannot, because it never loads
+     * one. A rule file that does not load is zero coverage reported as success.
+     */
     const written: string[] = []
     const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       written.push(String(chunk))
@@ -168,6 +179,10 @@ describe('doctor (experimental, hidden)', () => {
     } finally {
       writeSpy.mockRestore()
     }
-    expect(written.join('')).not.toContain('doctor')
+    const help = written.join('')
+    expect(help).toContain('ts-archunit doctor')
+    // Named alongside its siblings, not tucked in an options line — the point of
+    // promotion is that a reader scanning the command list finds it.
+    expect(help).toContain('Report rules that cannot enforce anything')
   })
 })

@@ -109,7 +109,7 @@ npx ts-archunit explain arch.rules.ts --format agent >> CLAUDE.md
 
 Outputs a structured description of every rule — id, description, because, suggestion — without executing them. `--format agent` emits an imperative "Do NOT … / MUST …" block (with a check-in-loop preamble and sentinel markers) for AI coding agents — see [AI Agents](/ai-agents). See [Explain Command](/explain) for use cases.
 
-### `doctor` — Report Rules That Enforce Nothing (experimental)
+### `doctor` — Report Rules That Enforce Nothing
 
 ```bash
 ts-archunit doctor arch.rules.ts
@@ -138,9 +138,15 @@ demo/no-condition
 
 It reports **identities, never totals** — which rule file, which rule, and for a dead glob the glob and its position. (Before 0.24.0 this promised a position for every finding, which only a dead glob has: a rule that asserts nothing has no glob and no position, and its only identity was a prose sentence you had to grep for.) It **exits non-zero when it reports anything**, because an agent reads `exit 0` as "nothing to do".
 
-::: warning Experimental — do not wire it into a pipeline
-`doctor` is a diagnostic you invoke, not a build gate, and it is deliberately absent from `--help`: retiring a documented command later would be its own breaking change, and its future is undecided. Use [`diagnose()`](/api-reference#diagnostics-experimental) for the same thing inside a test.
+::: tip Scope — which rule files it can read
+`doctor` diagnoses rule files **the CLI can load**: the `arch.rules.ts` shape `init` scaffolds, which is [the default path](/getting-started). If your rules live in a vitest or jest test file, the CLI cannot import it — that file needs its runner — so call [`diagnose(rules)`](/api-reference#diagnostics) in that suite instead. It reports the same findings.
 :::
+
+::: warning Not a build gate
+`doctor` is a diagnostic you invoke, not a gate — `check` is the gate. It exits non-zero when it reports anything so an agent does not read `exit 0` as "nothing to do", but that is for your terminal, not your pipeline.
+:::
+
+What it catches that `diagnose()` cannot: **a rule file that fails to load at all.** `diagnose()` never loads anything, so it cannot know one is missing — and a rule file that does not load is zero coverage reported as success.
 
 ## Options
 
