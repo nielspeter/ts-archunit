@@ -1,10 +1,11 @@
 # Plan 0074 — R3b: the selector glob flip
 
-**Status:** DESIGNED, GATED. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
+**Status:** GATE OPEN as of gate run 4 (2026-07-31), behind bugs 0031 and 0032. Previously DESIGNED, GATED. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
 on 2026-07-30 so that a 90%-shipped plan stops being held open by one slice waiting on a
 precondition that does not exist yet. Nothing here is undecided — the design and both open
 decisions are settled in 0069 and [its appendix](./completed/0069-appendix-vacuous-tests.md).
-**Priority:** High when the gate opens; **not startable** before then.
+**Priority:** High. Startable once bugs 0031 and 0032 are fixed — they are corrections to the
+messages R3b converts into build failures, so they come first.
 **Breaking.** A dead selector glob becomes a hard failure, so it reds on globs the adopting
 team wrote.
 
@@ -77,24 +78,74 @@ The original claim that "neither `doctor` nor `diagnose()` can reach them" is wr
 **collect** its 43 rules — they are built inside `it()` callbacks and never returned — which is a
 test-authoring change, not a tool limitation.
 
-That removes the **host** constraint. It does not remove the gate: this repository's own rules have
-to produce a **non-empty** finding population before there is anything to classify, and a suite
-that is already green under its own rules may well produce none. So the gate now reads "an adopting
-codebase with real findings", which this repository may or may not be — an afternoon of collecting
-the rules answers that, and answering it is itself the next step.
+That removes the **host** constraint. It does not remove the gate: there has to be a **non-empty**
+finding population before there is anything to classify.
+
+## Gate run 4, 2026-07-31 — the gate opens, with two amendments
+
+Two halves: this repository's own rules, and a real codebase adopting the shipped package.
+
+**Half A — this repository. Refuted, for the fourth time, now at the rule-site level.** The 36
+rules in `tests/archunit/arch-rules.test.ts` are collected as values (`gate()`) and handed to
+`diagnose()`. **Zero findings.** The population here is 36, not the 43 this plan and the roadmap
+both said — 41 `it()` blocks, five of them the file's own meta-guards. A green suite under its own
+rules produces nothing to classify, which is what the three earlier runs kept discovering by other
+routes. The collection is worth keeping regardless: it closes the residual the file's source-text
+glob scan names in its own comment, and the guard now carries a control, because zero findings is
+also what a broken `diagnose()` returns.
+
+**Half B — `honojs/hono` @ `51db313` (v4.12.33), 186 non-test `.ts` under `src/`.** Chosen
+sight-unseen; not this repository, not gate run 2's, not the fixture corpus. Installed the
+**published** `@nielspeter/ts-archunit@0.32.0` from npm, ran `ts-archunit init --preset layered`,
+and diagnosed the scaffold **unedited** — the documented default path in its ordinary first-run
+state, which is exactly the population R3b exists to act on.
+
+| population                                 | findings | shape                                    |
+| ------------------------------------------ | -------- | ---------------------------------------- |
+| A: root `tsconfig.json` (solution-style)   | **10**   | 4 selector, 6 discovery; all `dead-glob` |
+| B: `tsconfig.build.json` (loads 186 files) | **6**    | 6 discovery, all `onDisk: absent`        |
+
+**Verdict against the registered decision rule** — _does any finding's message assert a cause that
+is wrong for that input?_ **Yes, twice, and both are now filed.**
+
+1. **[Bug 0031](../bugs/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md)** —
+   hono's root tsconfig is `"files": []` plus project references, so it loads nothing (confirmed
+   independently: `tsc --listFilesOnly` also lists 0). `check` says so correctly; `doctor`, in the
+   same run, blames each glob in turn. `slice-rule-builder.ts:345` already states the rule —
+   _"blaming the glob would send the caller to the wrong file entirely"_ — and `diagnose()` does
+   not apply it. The 4 selector findings in that same run got the **right** cause, which is what
+   makes it a defect rather than a limit.
+2. **[Bug 0032](../bugs/0032-an-absent-path-defers-to-a-cause-list-it-refutes.md)** — `onDisk:
+'absent'` maps to `''`, so it falls through to `no-match`'s three causes, two of which are
+   refuted by what `absent` means. `ON_DISK_ADVICE`'s own docstring states that principle and
+   applies it to the other two known-fact cases.
+
+**So the gate opens and R3b is startable — after those two.** Not as a nicety: R3b's whole content
+is turning this diagnostic into a **failure**, so these strings stop being advice a human skims
+and become the text CI prints and an agent acts on. Shipping the flip first would take a message
+that is wrong on a real adopting codebase's first run and make it a red build. That is ADR-008
+rule 2 — a remedy must be verified to remediate — asked of R3b's own output.
+
+**Two side observations, not blocking, recorded because they came out of the same run:**
+
+- `ts-archunit --shape layered` (a plausible wrong guess; the flag is `--preset`) exits with a raw
+  Node `ERR_PARSE_ARGS_UNKNOWN_OPTION` stack trace rather than a message naming the valid flags.
+- The `layered` scaffold emits `shared: ['**/src/shared/**']`, but `shared` is read only under
+  `strict: true`, which the scaffold does not set. The option is inert as scaffolded, and nothing
+  says so — the glob is not diagnosed either, correctly, since it is never used.
 
 ## The other two decisions, both 0069's, both still open
 
 1. **`doctor`: keep as a supported command, or retire it?** 0069 requires this be decided
    **before** R3, and says why it cannot drift: _"shipping it experimental/hidden is precisely
    the mechanism that defers the decision."_ It currently ships experimental/hidden.
-   **Written up as [plan 0077](./completed/0077-doctor-promote-it.md)**, which — after an investigation
-   that reversed its own first recommendation — proposes **promoting** it: `doctor` works on the
-   CLI shape `init` scaffolds, which `getting-started.md` calls the default path, and it reports
-   load failures that `diagnose()` structurally cannot. Note what that does to the gate below:
-   the "loadable `arch.rules.ts`" constraint is real for `doctor` and **not** for the diagnosis,
-   so the gate can be run either way — which is why this repository, whose 43 rules live inside
-   `it()` callbacks, could never run its own.
+   **SETTLED by [plan 0077](./completed/0077-doctor-promote-it.md), shipped in v0.32.0**: promoted,
+   listed in `--help`, scope stated. What earns it the slot is a **dead selector glob** — `check`
+   never calls `diagnose()`, so it exits 0 with no output where `doctor` exits 1 and names the
+   site. 0077 also asserted that only `doctor` catches load failures; that was false and review
+   caught it — `check` catches those too, exits 1, and prints a remedy. The "loadable
+   `arch.rules.ts`" constraint is real for `doctor` and **not** for the diagnosis, so the gate can
+   be run either way, which is what gate run 4 above did on both sides.
 2. **Version sequencing.** R3b is breaking. 0069's open question 1: _"1.0 is at minimum
    R3 → path-norm → two quiet releases."_
 
