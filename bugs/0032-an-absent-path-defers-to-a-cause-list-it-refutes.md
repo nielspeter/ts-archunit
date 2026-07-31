@@ -2,7 +2,8 @@
 
 **Reported:** 2026-07-31
 **Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../plans/0074-r3b-the-selector-glob-flip.md)'s gate run 4
-**Status:** OPEN
+**Status:** **FIXED** 2026-07-31, unreleased. Verified against the same real codebase that
+found it, remedy included — see below.
 **Severity:** Medium today, High once R3b ships — same escalation as
 [bug 0031](./0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md): R3b turns this
 advice into the text of a failing build.
@@ -90,3 +91,28 @@ empty string with prose passes.
   of the same gate run.
 - [Plan 0072](../plans/0072-a-denylist-glob-that-cannot-match.md) — why "misspelled" must not be
   the only cause offered.
+
+## Fix as shipped
+
+`ON_DISK_ADVICE['absent']` now carries the fact and the causes the fact leaves standing:
+
+> nothing matching this exists on disk — a path segment is misspelled, or it names a folder you
+> have not created yet (banning one pre-emptively is legitimate: the rule arms when the folder
+> appears)
+
+`not-determined` keeps its empty string, with a comment saying it is **not** the same case despite
+looking identical: there the walk was pruned, so no fact is known and deferring is honest.
+
+**Verified on the input that found it.** Hono's six findings now read with the fact stated, and
+applying the remedy — pointing the three example globs at folders hono actually has — cleared all
+six and `doctor` exited **0**.
+
+## Sabotage matrix
+
+Three reverts, enumerated from the diff, all caught:
+
+| revert                                                          | caught |
+| --------------------------------------------------------------- | ------ |
+| `absent` back to `''`                                           | yes    |
+| overreach — `not-determined` filled in as well                  | yes    |
+| states the fact but keeps "the directory holds no source files" | yes    |

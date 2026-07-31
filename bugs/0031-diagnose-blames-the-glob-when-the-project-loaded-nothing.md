@@ -2,7 +2,8 @@
 
 **Reported:** 2026-07-31
 **Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../plans/0074-r3b-the-selector-glob-flip.md)'s gate run 4
-**Status:** OPEN
+**Status:** **FIXED** 2026-07-31, unreleased. Verified against the same real codebase that
+found it, remedy included — see below.
 **Severity:** High **once R3b ships**, Medium today. Today this is a diagnostic's advice. R3b turns
 these exact strings into the text of a **failing build**, so the wrong cause becomes the thing CI
 prints and an agent acts on.
@@ -93,3 +94,43 @@ cause unconditionally passes.
   same gate run.
 - [Plan 0074](../plans/0074-r3b-the-selector-glob-flip.md) — R3b, which makes this text a build
   failure.
+
+## Fix as shipped
+
+`diagnose()` checks the project's source-file count before consulting any glob and emits one
+`project-empty` finding, then skips the glob walk for that rule. Deduped by tsconfig **path**, so a
+rule file with two `project()` calls still reports each empty one once. The message names the
+mechanism, because "check that this tsconfig includes your sources" is not actionable for a config
+that has no `include` at all:
+
+> the project loaded 0 source files (…), so no glob in any rule built against it can match —
+> including this one. Check that this tsconfig includes your sources; a solution-style tsconfig
+> (`"files": []` with `"references"`) loads none of them, so point the rules at the tsconfig that
+> does. Reported once for this project: the globs are not the fault and are left undiagnosed until
+> it loads
+
+A condition-less rule is **still** reported alongside it. The empty project must not become a
+blanket excuse — that would trade one silent pass for another.
+
+**Verified on the input that found it**, not on a fixture: hono's scaffold went from **10 findings
+to 1**, and applying the stated remedy — repointing `project()` at `tsconfig.build.json` — cleared
+it and surfaced the real glob findings. ADR-008 rule 2 asks that a remedy be verified to
+remediate; this one was run.
+
+## Sabotage matrix
+
+Reverts enumerated from the diff. **7 of 7 caught** across both bugs; the four for this one:
+
+| revert                                                 | caught |
+| ------------------------------------------------------ | ------ |
+| the empty-project check removed entirely               | yes    |
+| right `kind`, `no-match`'s cause list as the advice    | yes    |
+| the check fires for every project, not only empty ones | yes    |
+| reported per rule instead of once per project          | yes    |
+
+Row 2 first scored **MISSED**, and was not. `s.index('          advice:')` matched the
+`project-unknown` block, which appears earlier in the file — so the sabotage rewrote a different
+finding's advice and left this one intact. Anchoring on `kind: 'project-empty'` and asserting the
+targeted text contains `loaded 0 source files` caught it. Second time in one session that a
+sabotage hit the wrong target and reported the guard as absent; both times the flattering
+direction. An unasserted anchor is not a revert.

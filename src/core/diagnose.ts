@@ -47,11 +47,13 @@ export interface DiagnosableRule extends RuleBuilderLike {
 /** One thing wrong with one rule, named specifically enough to fix. */
 export interface DiagnosticFinding {
   /**
-   * `'dead-glob'` — a glob that can never match; `'no-condition'` — a rule
+   * `'project-empty'` — the project loaded no files, so nothing can match and
+   * the globs are not the fault (bug 0031); `'dead-glob'` — a glob that can
+   * never match; `'no-condition'` — a rule
    * that asserts nothing; `'project-unknown'` — a rule whose globs could not
    * be checked because it cannot name the project it was built against.
    */
-  readonly kind: 'dead-glob' | 'no-condition' | 'project-unknown'
+  readonly kind: 'dead-glob' | 'no-condition' | 'project-unknown' | 'project-empty'
   /** The rule's id if it has one, else its assembled description. */
   readonly rule: string
   /** Where the glob was written: `resideInFolder("**\/src/x/**")`. */
@@ -92,6 +94,8 @@ export function diagnose(
   project?: ArchProject,
 ): DiagnosticFinding[] {
   const findings: DiagnosticFinding[] = []
+  /** tsconfig paths already reported empty — see the `project-empty` block below. */
+  const emptyProjects = new Set<string>()
 
   for (const rule of rules) {
     const name = ruleName(rule)
@@ -152,6 +156,42 @@ export function diagnose(
       }
       continue
     }
+
+    // Bug 0031. When the project loaded nothing, EVERY glob is dead and none
+    // of them is the reason. Diagnosing them one by one produced six findings
+    // whose advice said "a path segment is misspelled" about correctly spelled
+    // globs, measured against a real adopting codebase whose root tsconfig is
+    // `"files": []` plus project references.
+    //
+    // The rule is not new here: `slice-rule-builder.ts` already states it —
+    // "blaming the glob would send the caller to the wrong file entirely" —
+    // and `check` printed the right cause in the same run this printed the
+    // wrong one.
+    //
+    // Once per PROJECT, not per rule and not per glob: the identity of this
+    // fault is the tsconfig, so that is what ADR-008 rule 4 asks be named.
+    // Deduped by path rather than by object because the path is what the
+    // message prints, and printing one sentence twice is the thing being
+    // fixed.
+    if (target.getSourceFiles().length === 0) {
+      if (!emptyProjects.has(target.tsConfigPath)) {
+        emptyProjects.add(target.tsConfigPath)
+        findings.push({
+          kind: 'project-empty',
+          rule: name,
+          advice:
+            `the project loaded 0 source files (${target.tsConfigPath}), so no glob in any rule ` +
+            `built against it can match — including this one. Check that this tsconfig includes ` +
+            `your sources; a solution-style tsconfig ("files": [] with "references") loads none ` +
+            `of them, so point the rules at the tsconfig that does. Reported once for this ` +
+            `project: the globs are not the fault and are left undiagnosed until it loads`,
+        })
+      }
+      // Skip the glob walk. Not an optimisation — reporting those globs is the
+      // bug, because every one of them would carry a cause that is false.
+      continue
+    }
+
     const universe = pathUniverse(target)
 
     for (const tree of trees) {

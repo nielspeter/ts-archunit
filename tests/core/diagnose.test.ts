@@ -396,3 +396,87 @@ describe('this repository, diagnosed by its own mechanism', () => {
     expect(diagnose(rules)).toEqual([])
   })
 })
+
+/**
+ * Bug 0031 — when the project loaded nothing, the globs are not the fault.
+ *
+ * Found by plan 0074's gate run 4 against a real adopting codebase whose root
+ * `tsconfig.json` is `"files": []` plus project references. Every glob is dead,
+ * and diagnosing them one by one produced six findings whose advice said "a
+ * path segment is misspelled" about correctly spelled globs — while `check`,
+ * in the same run, named the real cause. `slice-rule-builder.ts` already states
+ * the rule: "blaming the glob would send the caller to the wrong file
+ * entirely."
+ */
+describe('an empty project (bug 0031)', () => {
+  /** A project that loads no files, named by a path a reader can act on. */
+  const emptyProject: ArchProject = (() => {
+    const emptyTsconfig = path.resolve(
+      import.meta.dirname,
+      '../fixtures/does-not-load/tsconfig.json',
+    )
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    return {
+      tsConfigPath: emptyTsconfig,
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+  })()
+
+  it('names the project, not the globs', () => {
+    const rule = modules(emptyProject)
+      .that()
+      .resideInFolder('**/src/routes/**')
+      .should()
+      .notImportFrom('**/src/repositories/**')
+
+    const findings = diagnose([rule])
+
+    expect(findings.map((f) => f.kind)).toEqual(['project-empty'])
+    // The TEXT, not the kind. A fix that reports the right kind with
+    // `no-match`'s cause list still sends the reader to edit a correct glob,
+    // which is the whole defect.
+    const [finding] = findings
+    expect(finding?.advice).toContain('loaded 0 source files')
+    expect(finding?.advice).toContain(emptyProject.tsConfigPath)
+    expect(finding?.advice).not.toContain('misspelled')
+  })
+
+  it('reports once per project, however many rules and globs there are', () => {
+    const rules = [
+      modules(emptyProject).that().resideInFolder('**/a/**').should().notImportFrom('**/b/**'),
+      modules(emptyProject).that().resideInFolder('**/c/**').should().notImportFrom('**/d/**'),
+      modules(emptyProject).that().resideInFolder('**/e/**').should().notImportFrom('**/f/**'),
+    ]
+    // Six globs across three rules. The identity of this fault is the tsconfig,
+    // so one finding names it — ADR-008 rule 4 asks for the identity, and here
+    // the identity is not the glob.
+    expect(diagnose(rules).map((f) => f.kind)).toEqual(['project-empty'])
+  })
+
+  it('still reports a rule that asserts nothing, which is a separate fault', () => {
+    // The empty project must not become a blanket excuse. A condition-less rule
+    // is condition-less whether or not anything loaded, and suppressing that
+    // would trade one silent pass for another.
+    const rule = modules(emptyProject).that().resideInFolder('**/src/**')
+    expect(
+      diagnose([rule])
+        .map((f) => f.kind)
+        .sort(),
+    ).toEqual(['no-condition', 'project-empty'])
+  })
+
+  it('CONTROL: a loaded project with a genuinely wrong glob still gets the glob', () => {
+    // Without this, returning `project-empty` unconditionally passes every
+    // assertion above.
+    const rule = modules(p)
+      .that()
+      .resideInFolder('**/definitely-not-a-folder-here/**')
+      .should()
+      .notImportFrom('**/x/**')
+
+    const findings = diagnose([rule])
+    expect(findings.map((f) => f.kind)).toEqual(['dead-glob'])
+    expect(findings[0]?.glob).toBe('**/definitely-not-a-folder-here/**')
+  })
+})

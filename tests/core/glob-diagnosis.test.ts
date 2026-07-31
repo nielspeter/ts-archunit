@@ -12,7 +12,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { Project } from 'ts-morph'
-import { diagnoseGlob, syntacticFault, FAULT_ADVICE } from '../../src/core/glob-diagnosis.js'
+import {
+  diagnoseGlob,
+  syntacticFault,
+  FAULT_ADVICE,
+  ON_DISK_ADVICE,
+} from '../../src/core/glob-diagnosis.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
 import { buildDiskSet, diskSet } from '../../src/core/disk-set.js'
 import type { GlobSite } from '../../src/core/glob-site.js'
@@ -213,5 +218,77 @@ describe('the disk set', () => {
     expect(diskSet(emptyProject(path.join(root, 'tsconfig.json'))).classify('**/pkg/*')).toBe(
       'holds-typescript',
     )
+  })
+})
+
+/**
+ * Bug 0032 — a verified absence must not defer to a cause list it refutes.
+ *
+ * `ON_DISK_ADVICE['absent']` was `''`, so the caller fell through to
+ * `FAULT_ADVICE['no-match']`, two of whose three causes are false when nothing
+ * matching exists on disk: there is no directory, so neither "append `/**`" nor
+ * "the directory holds no source files" can apply. `ON_DISK_ADVICE`'s own
+ * docstring already states that principle — it is applied to the two other
+ * known-fact entries and was not applied here.
+ *
+ * Found by plan 0074's gate run 4 on the ordinary first-run state of the
+ * documented default path: `init` scaffolds example globs, and the advice for
+ * them was two-thirds refuted by a fact the tool had already computed.
+ */
+describe('advice for a path that is absent (bug 0032)', () => {
+  /** The three causes `no-match` offers, as the reader sees them. */
+  const NO_MATCH = FAULT_ADVICE['no-match']
+
+  function adviceFor(glob: string, root: string): string {
+    const project = emptyProject(path.join(root, 'tsconfig.json'))
+    const diagnosis = diagnoseGlob(site(glob), pathUniverse(project), diskSet(project))
+    const onDisk = diagnosis.onDisk
+    expect(onDisk).toBeDefined()
+    return onDisk !== undefined && ON_DISK_ADVICE[onDisk] !== ''
+      ? ON_DISK_ADVICE[onDisk]
+      : FAULT_ADVICE[diagnosis.fault]
+  }
+
+  it('states the fact, and neither of the causes the fact refutes', () => {
+    const root = tempRoot('archunit-absent-')
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'src', 'a.ts'), 'export const x = 1\n')
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+
+    const advice = adviceFor('**/src/nowhere/**', root)
+
+    expect(advice).toContain('nothing matching this exists on disk')
+    // The two refuted causes, asserted by their own words rather than by
+    // "advice !== NO_MATCH" — which would pass for any replacement string,
+    // including one that reintroduced them in a rewording.
+    expect(advice).not.toContain('append')
+    expect(advice).not.toContain('holds no source files')
+    // Plan 0072: banning a folder that does not exist yet is legitimate and is
+    // taught by `docs/modules.md`, so "misspelled" must not stand alone.
+    expect(advice).toContain('have not created yet')
+  })
+
+  it('CONTROL: not-determined still defers, because there no fact is known', () => {
+    // The two empty strings looked alike and are not. Here the walk was pruned,
+    // so deferring to the cause list is the honest move — a fix that filled in
+    // every blank would break this.
+    const root = tempRoot('archunit-undetermined-')
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    for (let i = 0; i < 40; i++) {
+      fs.writeFileSync(path.join(root, 'src', `f${String(i)}.ts`), 'export const x = 1\n')
+    }
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    const project = emptyProject(path.join(root, 'tsconfig.json'))
+
+    expect(buildDiskSet(project, 5).classify('**/src/nowhere/**')).toBe('not-determined')
+    expect(ON_DISK_ADVICE['not-determined']).toBe('')
+  })
+
+  it('CONTROL: the two facts that already had text still have their own', () => {
+    // Bounds the change. Without these, replacing the whole map with one string
+    // passes the assertion above.
+    expect(ON_DISK_ADVICE['holds-typescript']).toContain('tsconfig include/exclude')
+    expect(ON_DISK_ADVICE['no-typescript']).toContain('contains no TypeScript')
+    expect(NO_MATCH).toContain('misspelled')
   })
 })

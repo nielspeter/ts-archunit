@@ -135,7 +135,21 @@ export const ON_DISK_ADVICE: Readonly<Record<OnDisk, string>> = {
   'holds-typescript':
     'this path exists and contains TypeScript, but your tsconfig include/exclude keeps it out of the project',
   'no-typescript': 'this path exists but contains no TypeScript',
-  absent: '',
+  // Bug 0032. This was `''`, so a verified absence deferred to `no-match`'s
+  // list — the exact deferral the paragraph above rules out, and two of that
+  // list's three causes are refuted by the fact: there is no directory, so
+  // "append /**" and "holds no source files" are both false.
+  //
+  // The second cause is not filler. Plan 0072 established that banning a
+  // folder you have not created is LEGITIMATE and is taught by
+  // `docs/modules.md:38` (`notImportFrom('**/legacy/**')`), so this must not
+  // tell the reader their glob is wrong — only what is true, and what the
+  // truth leaves open.
+  absent:
+    'nothing matching this exists on disk — a path segment is misspelled, or it names a folder you have not created yet (banning one pre-emptively is legitimate: the rule arms when the folder appears)',
+  // Stays empty, and is NOT the same case as `absent` above despite looking
+  // identical. Here the walk was pruned, so no fact is known — deferring to
+  // `no-match`'s cause list is the honest move rather than a gap.
   'not-determined': '',
 }
 
