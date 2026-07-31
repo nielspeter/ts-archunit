@@ -134,3 +134,42 @@ finding's advice and left this one intact. Anchoring on `kind: 'project-empty'` 
 targeted text contains `loaded 0 source files` caught it. Second time in one session that a
 sabotage hit the wrong target and reported the guard as absent; both times the flattering
 direction. An unasserted anchor is not a revert.
+
+## Corrections after review
+
+Three, all measured:
+
+1. **"Reported once for this project" was false on the primary surface.** `runDoctor` calls
+   `diagnose()` **per rule file**, so two rule files against one empty tsconfig printed the
+   sentence claiming it was printed once, twice. The clause is gone; it was tool bookkeeping in the
+   position where the reader's next action belongs.
+2. **"Point the rules at the tsconfig that does" was an impossible remedy on reachable inputs** —
+   an `include` matching nothing, a repository with no `.ts` files, `"files": []` with no
+   `references`. Stating it only when true meant reading the tsconfig, which put `JSON.parse` in
+   `src/core/` and was **rejected by this project's own architecture rules** (`hygiene/no-json-parse`,
+   "ts-archunit analyzes AST, not JSON"; `references` is not in `getCompilerOptions()`, and ADR-002
+   rules out the raw TypeScript API). Exempting the rule for this file would have been the wrong
+   direction. The clause is now phrased as a **condition the reader settles by glancing at their own
+   file**, true either way.
+3. **Dedup keyed on the tsconfig path, which is not an identity.** `workspace([...])` sets
+   `tsConfigPath` to the alphabetically first of N, so a `workspace()` and a `project()` naming that
+   config collided — and the loser hit the early exit and contributed **no finding at all**. A false
+   green inside the fix for a false green. Now a `WeakSet` on the project object, which is what
+   `pathUniverse` and `diskSet` already key on.
+
+Two further gaps review found, both fixed: a **syntactic** fault (`'./src/**'`) was suppressed by
+the early exit though no project could fix it — it is dead in every possible project, so
+withholding it bought a second failing round trip; and the empty-project text was a **second copy**
+of one the slice builder already owned, created while quoting this bug's own instruction not to.
+They had already diverged in the wrong direction: the builder's copy — the one a **failing build**
+prints — kept the wording this bug records as not actionable. Both now call
+`emptyProjectAdvice()`, pinned by a parity test in `assertion-gate.test.ts` beside the
+`assertionAdvice` precedent.
+
+The fixture also changed. The first guard used an in-memory double whose emptiness came from
+`useInMemoryFileSystem`; it is now `tests/fixtures/does-not-load/`, a real solution-style config
+that ts-morph loads 0 files from, with a referenced project that loads 1. That buys the remedy
+test: apply the fix the message states and assert the finding clears — rather than asserting it in
+a commit message.
+
+**Final matrix: 11 of 11.**

@@ -3,11 +3,12 @@ import type { ArchProject } from './project.js'
 import type { GlobPosition, GlobSite } from './glob-site.js'
 import type { GlobFault } from './glob-diagnosis.js'
 import type { OnDisk } from './disk-set.js'
-import { diagnoseGlob, FAULT_ADVICE, ON_DISK_ADVICE } from './glob-diagnosis.js'
+import { diagnoseGlob, syntacticFault, FAULT_ADVICE, ON_DISK_ADVICE } from './glob-diagnosis.js'
 import { globSitesOf, isDeadSite } from './glob-evaluator.js'
 import { pathUniverse } from './path-universe.js'
 import { diskSet } from './disk-set.js'
 import { isDeadGlobTree } from './glob-evaluator.js'
+import { emptyProjectAdvice } from './empty-project-advice.js'
 import type { RuleBuilderLike } from './rule-builder-like.js'
 import type { GlobNode } from './glob-site.js'
 
@@ -94,8 +95,18 @@ export function diagnose(
   project?: ArchProject,
 ): DiagnosticFinding[] {
   const findings: DiagnosticFinding[] = []
-  /** tsconfig paths already reported empty — see the `project-empty` block below. */
-  const emptyProjects = new Set<string>()
+  /**
+   * Projects already reported empty, by OBJECT not by path.
+   *
+   * The path is not an identity: `workspace([...])` sets `tsConfigPath` to the
+   * alphabetically first of N configs (`project.ts`), so a `workspace()` and a
+   * `project()` naming that same config collided — and the loser was dropped
+   * silently, contributing no finding at all. A false green inside the fix for
+   * a false green. `project()` and `workspace()` are both memoized, so object
+   * identity IS project identity, and it is what `pathUniverse` and `diskSet`
+   * already key on.
+   */
+  const emptyProjects = new WeakSet<ArchProject>()
 
   for (const rule of rules) {
     const name = ruleName(rule)
@@ -153,6 +164,9 @@ export function diagnose(
           advice:
             'this rule declares globs but cannot say which project it was built against, so they were not checked. A builder constructed directly rather than through its entry point has no project to report',
         })
+        // ...but the syntactic faults do not need a project, so they are still
+        // reported here rather than held back for a run that may never happen.
+        findings.push(...syntacticFindings(name, trees))
       }
       continue
     }
@@ -174,21 +188,25 @@ export function diagnose(
     // message prints, and printing one sentence twice is the thing being
     // fixed.
     if (target.getSourceFiles().length === 0) {
-      if (!emptyProjects.has(target.tsConfigPath)) {
-        emptyProjects.add(target.tsConfigPath)
+      if (!emptyProjects.has(target)) {
+        emptyProjects.add(target)
         findings.push({
           kind: 'project-empty',
           rule: name,
-          advice:
-            `the project loaded 0 source files (${target.tsConfigPath}), so no glob in any rule ` +
-            `built against it can match — including this one. Check that this tsconfig includes ` +
-            `your sources; a solution-style tsconfig ("files": [] with "references") loads none ` +
-            `of them, so point the rules at the tsconfig that does. Reported once for this ` +
-            `project: the globs are not the fault and are left undiagnosed until it loads`,
+          // One owner, shared with the builder's failing-check message. The
+          // clause "Reported once for this project" used to be here and was
+          // FALSE on the primary surface: `doctor` calls `diagnose()` once per
+          // rule file, so two files against one empty tsconfig printed the
+          // sentence claiming it was printed once, twice. Measured by review.
+          advice: emptyProjectAdvice(target),
         })
       }
-      // Skip the glob walk. Not an optimisation — reporting those globs is the
-      // bug, because every one of them would carry a cause that is false.
+      // The syntactic faults survive an empty project: they are properties of
+      // the glob text, not of what loaded, so withholding them buys the reader
+      // a second failing round trip.
+      findings.push(...syntacticFindings(name, trees))
+      // Skip the rest of the glob walk. Not an optimisation — reporting those
+      // globs is the bug, because every one would carry a cause that is false.
       continue
     }
 
@@ -210,6 +228,43 @@ export function diagnose(
         if (!isDeadSite(site, universe)) continue
         findings.push(describe(site, name, universe, target))
       }
+    }
+  }
+  return findings
+}
+
+/**
+ * The faults that need no project at all, reported on the branches that have none.
+ *
+ * `syntacticFault` takes `(glob, kind, base)` — no universe, no project — and
+ * is split out for exactly that reason. `'./src/**'` is dead in every possible
+ * project; loading the tsconfig will not fix it. Both early exits below (the
+ * project is unknown, the project is empty) used to swallow these, so the
+ * reader corrected their config, re-ran, and only then learned the glob was
+ * also malformed — a second round trip for a fault already decided.
+ *
+ * Reported by review. Applies to the pre-existing `project-unknown` branch too,
+ * which had the same hole.
+ */
+function syntacticFindings(rule: string, trees: readonly GlobNode[]): DiagnosticFinding[] {
+  const findings: DiagnosticFinding[] = []
+  for (const tree of trees) {
+    for (const site of globSitesOf(tree)) {
+      // Same position filter as the main path: an exclusion or condition glob
+      // matching nothing is not a fault, and that does not change because the
+      // fault is syntactic.
+      if (site.position === 'exclusion' || site.position === 'condition') continue
+      const fault = syntacticFault(site.glob, site.kind, site.base)
+      if (fault === undefined) continue
+      findings.push({
+        kind: 'dead-glob',
+        rule,
+        origin: site.origin,
+        glob: site.glob,
+        position: site.position,
+        fault,
+        advice: FAULT_ADVICE[fault],
+      })
     }
   }
   return findings

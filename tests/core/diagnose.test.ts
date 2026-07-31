@@ -10,6 +10,7 @@ import picomatch from 'picomatch'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { diagnose } from '../../src/core/diagnose.js'
+import { FAULT_ADVICE } from '../../src/core/glob-diagnosis.js'
 import {
   modules,
   classes,
@@ -398,85 +399,171 @@ describe('this repository, diagnosed by its own mechanism', () => {
 })
 
 /**
- * Bug 0031 — when the project loaded nothing, the globs are not the fault.
+ * Bugs 0031 and 0032 — the cause the tool already knows, asserted where the
+ * reader receives it.
  *
- * Found by plan 0074's gate run 4 against a real adopting codebase whose root
- * `tsconfig.json` is `"files": []` plus project references. Every glob is dead,
- * and diagnosing them one by one produced six findings whose advice said "a
- * path segment is misspelled" about correctly spelled globs — while `check`,
- * in the same run, named the real cause. `slice-rule-builder.ts` already states
- * the rule: "blaming the glob would send the caller to the wrong file
- * entirely."
+ * Both were found by plan 0074's gate run 4 against a real adopting codebase
+ * whose root `tsconfig.json` is `"files": []` plus project references. The
+ * fixture below is that shape for real, not an in-memory double: emptiness is a
+ * property of the config being loaded, so if `project()` ever learns to follow
+ * `references` this stops passing instead of silently guarding a branch nobody
+ * reaches.
+ *
+ * These assert through `diagnose()` rather than against the advice constants.
+ * A first version checked the constants and reimplemented the selection —
+ * review measured two mutations of the real selection that left all 2719 tests
+ * green, one of which appended the refuted causes straight back onto the
+ * shipped string. A constant is not the message.
  */
-describe('an empty project (bug 0031)', () => {
-  /** A project that loads no files, named by a path a reader can act on. */
-  const emptyProject: ArchProject = (() => {
-    const emptyTsconfig = path.resolve(
-      import.meta.dirname,
-      '../fixtures/does-not-load/tsconfig.json',
-    )
-    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+describe('what cannot be blamed on the glob (bugs 0031, 0032)', () => {
+  const solutionStyle = path.resolve(import.meta.dirname, '../fixtures/does-not-load/tsconfig.json')
+  const referenced = path.resolve(
+    import.meta.dirname,
+    '../fixtures/does-not-load/pkg/tsconfig.json',
+  )
+
+  function load(tsConfigPath: string): ArchProject {
+    const tsMorphProject = new Project({ tsConfigFilePath: tsConfigPath })
     return {
-      tsConfigPath: emptyTsconfig,
+      tsConfigPath,
       _project: tsMorphProject,
       getSourceFiles: () => tsMorphProject.getSourceFiles(),
     }
-  })()
+  }
 
-  it('names the project, not the globs', () => {
-    const rule = modules(emptyProject)
+  const empty = load(solutionStyle)
+
+  // A glob that matches the REFERENCED project for real, so applying the
+  // remedy reaches silence rather than a different finding. With a glob the
+  // fixture lacks, the remedy test would assert the wrong thing: repointing the
+  // tsconfig clears `project-empty` and correctly reveals the dead glob, which
+  // is not a failure of the remedy.
+  const ruleFor = (target: ArchProject) =>
+    modules(target)
       .that()
-      .resideInFolder('**/src/routes/**')
+      .resideInFolder('**/does-not-load/pkg/src/**')
       .should()
-      .notImportFrom('**/src/repositories/**')
+      .notImportFrom('**/node_modules/**')
 
-    const findings = diagnose([rule])
-
-    expect(findings.map((f) => f.kind)).toEqual(['project-empty'])
-    // The TEXT, not the kind. A fix that reports the right kind with
-    // `no-match`'s cause list still sends the reader to edit a correct glob,
-    // which is the whole defect.
-    const [finding] = findings
-    expect(finding?.advice).toContain('loaded 0 source files')
-    expect(finding?.advice).toContain(emptyProject.tsConfigPath)
-    expect(finding?.advice).not.toContain('misspelled')
+  it('the fixture is empty because the CONFIG is, not because the test says so', () => {
+    // Without this the whole block could be guarding a project that is empty
+    // for a reason the product never produces.
+    expect(empty.getSourceFiles()).toEqual([])
+    expect(load(referenced).getSourceFiles().length).toBeGreaterThan(0)
   })
 
-  it('reports once per project, however many rules and globs there are', () => {
-    const rules = [
-      modules(emptyProject).that().resideInFolder('**/a/**').should().notImportFrom('**/b/**'),
-      modules(emptyProject).that().resideInFolder('**/c/**').should().notImportFrom('**/d/**'),
-      modules(emptyProject).that().resideInFolder('**/e/**').should().notImportFrom('**/f/**'),
-    ]
-    // Six globs across three rules. The identity of this fault is the tsconfig,
-    // so one finding names it — ADR-008 rule 4 asks for the identity, and here
-    // the identity is not the glob.
-    expect(diagnose(rules).map((f) => f.kind)).toEqual(['project-empty'])
+  it('names the project and the mechanism, not the globs', () => {
+    const findings = diagnose([ruleFor(empty)])
+    expect(findings.map((f) => f.kind)).toEqual(['project-empty'])
+
+    const [finding] = findings
+    expect(finding?.advice).toContain('loaded 0 source files')
+    expect(finding?.advice).toContain(solutionStyle)
+    // The mechanism named, as a condition rather than a claim — see the test
+    // below for why it is not asserted.
+    expect(finding?.advice).toContain('project references')
+    expect(finding?.advice).not.toContain('misspelled')
+    // The rule field has shipped as `''` before (see `ruleName`), and `doctor`
+    // prints it.
+    expect(finding?.rule).toBeTruthy()
+    expect(finding?.rule).not.toBe('unnamed')
+  })
+
+  it('the stated remedy clears the finding — applied, not asserted', () => {
+    // ADR-008 rule 2: a remedy is verified by remediating. The message says to
+    // point the rules at the tsconfig that holds the sources; this is that
+    // edit, and the result must be silence. Identities, not a count — a
+    // failure here should name what survived.
+    const after = diagnose([ruleFor(load(referenced))])
+    expect(after.map((f) => `${f.kind}: ${f.glob ?? f.advice}`)).toEqual([])
+  })
+
+  it('offers the solution-style cause as a CONDITION, never as a claim', () => {
+    // A draft asserted it outright and told every reader to point elsewhere —
+    // impossible where no such sibling exists (an `include` matching nothing, a
+    // repo with no `.ts` at all). The repair that read the tsconfig to check
+    // was removed by this project's OWN `hygiene/no-json-parse` rule, so the
+    // clause is conditional instead: true either way, and the reader settles it
+    // by looking at their own file.
+    const advice = diagnose([ruleFor(empty)])[0]?.advice ?? ''
+    expect(advice).toContain('if it delegates to project references')
+    // Not a claim about THIS config.
+    expect(advice).not.toContain('this one is solution-style')
+  })
+
+  it('reports each empty project, and each one once', () => {
+    // Identity, not cardinality. A boolean instead of the set keeps a single
+    // "once" assertion green while the SECOND project goes entirely silent —
+    // it hits the early exit and contributes nothing at all. Review measured
+    // exactly that mutation staying green.
+    const other = load(solutionStyle) // same path, a DIFFERENT project object
+    const findings = diagnose([ruleFor(empty), ruleFor(other), ruleFor(empty)])
+    expect(findings.map((f) => f.kind)).toEqual(['project-empty', 'project-empty'])
+    // `empty` twice collapses to one; `other` is its own project despite
+    // sharing a tsconfig path — `workspace()` makes that reachable, and keying
+    // on the path dropped the loser silently.
+  })
+
+  it('still reports a syntactic fault, which no project could fix', () => {
+    // `./src/**` is dead in every possible project. Withholding it until the
+    // config is corrected buys the reader a second failing round trip for a
+    // fault already decided.
+    const dotted = modules(empty)
+      .that()
+      .resideInFolder('./src/**')
+      .should()
+      .notImportFrom('**/x/**')
+    const findings = diagnose([dotted])
+    expect(findings.map((f) => `${f.kind}/${f.fault ?? '-'}`)).toEqual([
+      'project-empty/-',
+      'dead-glob/dot-segment',
+    ])
   })
 
   it('still reports a rule that asserts nothing, which is a separate fault', () => {
-    // The empty project must not become a blanket excuse. A condition-less rule
-    // is condition-less whether or not anything loaded, and suppressing that
-    // would trade one silent pass for another.
-    const rule = modules(emptyProject).that().resideInFolder('**/src/**')
-    expect(
-      diagnose([rule])
-        .map((f) => f.kind)
-        .sort(),
-    ).toEqual(['no-condition', 'project-empty'])
+    // The empty project must not become a blanket excuse: a condition-less rule
+    // is condition-less whether or not anything loaded. Order is pinned, not
+    // sorted — the two happen to be alphabetical, so a `.sort()` would hide a
+    // reordering.
+    const rule = modules(empty).that().resideInFolder('**/src/**')
+    expect(diagnose([rule]).map((f) => f.kind)).toEqual(['no-condition', 'project-empty'])
   })
 
-  it('CONTROL: a loaded project with a genuinely wrong glob still gets the glob', () => {
-    // Without this, returning `project-empty` unconditionally passes every
-    // assertion above.
+  it('a dead glob in a LOADED project gets the absent text, not the refuted causes', () => {
+    // Bug 0032, through the shipped path. This is the assertion the constant
+    // test could not make: it is the string `doctor` prints.
     const rule = modules(p)
       .that()
       .resideInFolder('**/definitely-not-a-folder-here/**')
       .should()
       .notImportFrom('**/x/**')
 
-    const findings = diagnose([rule])
-    expect(findings.map((f) => f.kind)).toEqual(['dead-glob'])
-    expect(findings[0]?.glob).toBe('**/definitely-not-a-folder-here/**')
+    const [finding] = diagnose([rule])
+    expect(finding?.kind).toBe('dead-glob')
+    expect(finding?.onDisk).toBe('absent')
+    expect(finding?.glob).toBe('**/definitely-not-a-folder-here/**')
+    expect(finding?.advice).toContain('under the project root')
+    expect(finding?.advice).not.toContain('append')
+    expect(finding?.advice).not.toContain('holds no source files')
+    // And no excuse for a selector that selects nothing.
+    expect(finding?.advice).not.toContain('legitimate')
+  })
+
+  it('CONTROL: not-determined still DEFERS to the cause list, end to end', () => {
+    // The sibling test asserts `ON_DISK_ADVICE['not-determined'] === ''`, which
+    // does not prove the caller falls back — review measured a mutation where
+    // the empty string won and every such finding shipped with EMPTY advice,
+    // suite green. `node_modules` is pruned by the walk, so this reaches
+    // `not-determined` through the real code.
+    const rule = modules(p)
+      .that()
+      .resideInFolder('**/node_modules/nothing-here/**')
+      .should()
+      .notImportFrom('**/x/**')
+
+    const [finding] = diagnose([rule])
+    expect(finding?.onDisk).toBe('not-determined')
+    expect(finding?.advice).not.toBe('')
+    expect(finding?.advice).toBe(FAULT_ADVICE['no-match'])
   })
 })

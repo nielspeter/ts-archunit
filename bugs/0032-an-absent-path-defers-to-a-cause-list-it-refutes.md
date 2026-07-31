@@ -116,3 +116,45 @@ Three reverts, enumerated from the diff, all caught:
 | `absent` back to `''`                                           | yes    |
 | overreach — `not-determined` filled in as well                  | yes    |
 | states the fact but keeps "the directory holds no source files" | yes    |
+
+## The first fix was itself confidently wrong, twice — corrected after review
+
+Shipping "the fact, then the causes it leaves standing" is easy to say and was got wrong on the
+first attempt in two independent ways. Both were found by review and both were then **measured**.
+
+**1. It asserted a universal the walk cannot support.** The text said _"nothing matching this
+exists on disk"_. `absent` is not a fact about the disk; it is the result of a **bounded** walk
+from `discoverIdentityRoot`, which prunes 14 directory names and swallows unreadable directories.
+Measured false on two reachable inputs:
+
+```
+parens dir EXISTS on disk, classify = absent      # app/(marketing)/ — picomatch reads () as a group
+sibling package EXISTS = true, classify = absent  # monorepo checkout with no .git, identity root = packages/api
+```
+
+The text is now scoped to what was searched: _"no file or directory matching this was found under
+the project root (build and vendor directories are not searched…)"_. The metacharacter case gets
+the cause `slice-rule-builder.ts` already states for `check`.
+
+**2. It handed a selector an excuse for the exact false green this project exists to kill.** The
+draft carried plan 0072's _"banning one pre-emptively is legitimate"_. But 0072's case is a
+`notImportFrom` — a **condition** glob — and `diagnose()` drops `condition` and `exclusion`
+positions before this string is reached (`diagnose.ts`), so it printed **only** for `selector` and
+`discovery`. There, a glob matching nothing means the rule has no subjects: the false green 0069 is
+named after and R3b will fail the build on. The message told the agent it was fine. Removed, and
+guarded by a test named for it.
+
+The lesson is not "check the wording". It is that a message asserting a **fact** must be checked
+against how that fact is derived — `absent` came from a bounded walk — and against **which callers
+can reach it** — the position filter. Neither is visible from the constant alone, which is also why
+the guard had to move (below).
+
+## The guard moved, because the first one could not fail
+
+The original test asserted the advice constants and **reimplemented** the selection that assembles
+the shipped string. Review measured two mutations of the real selection leaving all 2719 tests
+green — one of which appended the refuted causes straight back onto what the user reads. A constant
+is not the message. The assertions now go through `diagnose()`, and a `not-determined` case
+exercises the deferral end to end rather than asserting `=== ''`.
+
+**Final matrix: 11 of 11**, including both mutations review found green.

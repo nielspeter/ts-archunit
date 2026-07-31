@@ -28,6 +28,8 @@ import * as graphqlExports from '../../src/graphql/index.js'
 import { TerminalBuilder, ASSERTION_DOCS } from '../../src/core/terminal-builder.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
+import { modules } from '../../src/builders/module-rule-builder.js'
+import { emptyProjectAdvice } from '../../src/core/empty-project-advice.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
 import { tsconfig } from '../../src/tsconfig/index.js'
 import { smells } from '../../src/smells/index.js'
@@ -570,6 +572,59 @@ describe('every remedy remediates (ADR-008 rule 2, behavioural corollary)', () =
     }
     expect(thrown).toBeInstanceOf(ArchRuleError)
     expect(thrown instanceof ArchRuleError ? thrown.violations[0]?.suggestion : '').toBe(advice)
+  })
+})
+
+describe('empty-project parity — one string, one place', () => {
+  // The second state to get a single owner, after `assertionAdvice`. Bug 0031's
+  // fix wrote a SECOND text for it while quoting the bug's own instruction not
+  // to, and the two diverged at birth in the wrong direction: the builder's
+  // copy — the one a FAILING BUILD prints — kept the wording bug 0031 itself
+  // records as not actionable, while the diagnostic got the better text.
+  //
+  // Nothing failed when they disagreed, which is the same hole plan 0070 closed
+  // for `assertionAdvice` and a later review found reopened by a third copy.
+  const solutionStyle = path.resolve(import.meta.dirname, '../fixtures/does-not-load/tsconfig.json')
+
+  function emptyProject(): ArchProject {
+    const tsMorphProject = new Project({ tsConfigFilePath: solutionStyle })
+    return {
+      tsConfigPath: solutionStyle,
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+  }
+
+  it("the doctor's empty-project advice IS the builder's, character for character", () => {
+    const target = emptyProject()
+    expect(target.getSourceFiles()).toEqual([])
+
+    const [finding] = diagnose([
+      modules(target).that().resideInFolder('**/x/**').should().notImportFrom('**/y/**'),
+    ])
+    const fromDoctor = finding?.advice
+    expect(fromDoctor).toBeTruthy()
+
+    // The builder's failing-check message embeds the same text plus its own
+    // trailing sentence, and capitalises the opening. `toBe` on the shared
+    // fragment, not `toContain` on a paraphrase.
+    const fromBuilder = slices(target)
+      .matching('src/')
+      .should()
+      .beFreeOfCycles()
+      .describeRule().rule
+    const builderMessage = slices(target)
+      .matching('src/')
+      .should()
+      .beFreeOfCycles()
+      .violations()
+      .map((v) => v.message)
+      .join('\n')
+    expect(fromBuilder).toBeTruthy()
+
+    const shared = emptyProjectAdvice(target)
+    expect(fromDoctor).toBe(shared)
+    expect(builderMessage).toContain(shared.charAt(0).toUpperCase() + shared.slice(1))
   })
 })
 

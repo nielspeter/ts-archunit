@@ -89,6 +89,26 @@ const p = project('./config/tsconfig.build.json')
 
 In a monorepo, load the specific package's tsconfig, or use [`workspace()`](/core-concepts#monorepo-workspace) to unify several.
 
+## Every rule passes, and `doctor` says the project loaded 0 source files
+
+Your tsconfig is **solution-style** — `"files": []` plus `"references"` — which is what a monorepo root usually looks like. TypeScript loads no sources from it; it only points at the projects that do. So every glob in every rule matches nothing, every rule passes over an empty set, and the run is green while enforcing nothing.
+
+Confirm it independently of ts-archunit:
+
+```bash
+tsc -p tsconfig.json --listFilesOnly    # prints nothing
+```
+
+Point `project()` at the tsconfig that actually holds your sources:
+
+```typescript
+const p = project('tsconfig.build.json')
+```
+
+Or cover several at once with [`workspace()`](/core-concepts#monorepo-workspace).
+
+`doctor` reports this **once per project** rather than once per glob, because the globs are not the fault — they are left undiagnosed until something loads. `check` reports it too, on any slice rule. This was [bug 0031](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md): before it was fixed, each glob was blamed individually and the advice suggested checking spelling.
+
 ## Violations point at `tsconfig.json:1` for a compiler-option rule
 
 Expected. [`tsconfig()`](/config-rules) checks the resolved options object, which has no source position, so every violation references the config file at line 1 rather than the offending JSON line. The message names the exact option to fix.
