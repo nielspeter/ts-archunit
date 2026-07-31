@@ -115,7 +115,18 @@ Outputs a structured description of every rule — id, description, because, sug
 ts-archunit doctor arch.rules.ts
 ```
 
-Reports which rules **cannot enforce anything**, without running them: a glob that can never match, and a rule that selects elements but asserts nothing about them.
+Reports which rules **cannot enforce anything**, without running them: a glob that can never match, a rule that selects elements but asserts nothing about them, a rule whose project cannot be identified, and a project that loaded no source files at all.
+
+That last one is the commonest surprise in a monorepo. A **solution-style** `tsconfig.json` — `"files": []` plus `"references"` — loads nothing itself, so every glob in every rule is dead and none of them is the reason. `doctor` says so once and names the config, rather than blaming each glob in turn:
+
+```
+  arch.rules.ts
+    preset/recommended/no-eval
+    project-empty: the project loaded 0 source files (/repo/tsconfig.json), so no glob
+    can match. Check that this tsconfig includes your sources — and if it delegates to
+    project references ("files": [] with "references"), it loads none of them itself, so
+    the rules need the tsconfig that holds your sources rather than this one
+```
 
 ```
 demo/typo-in-glob

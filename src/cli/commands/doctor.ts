@@ -136,6 +136,21 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   return 1
 }
 
+/**
+ * Which kinds carry a glob, and therefore render with origin/position/fault.
+ *
+ * A `Record` over the union rather than a boolean expression, so that adding a
+ * kind fails `tsc` until someone decides how it renders. `project-empty` was
+ * added to `DiagnosticFinding['kind']` and this file kept compiling — the gap
+ * that made the choice implicit.
+ */
+const HAS_GLOB: Readonly<Record<DiagnosticFinding['kind'], boolean>> = {
+  'dead-glob': true,
+  'no-condition': false,
+  'project-unknown': false,
+  'project-empty': false,
+}
+
 function format(findings: readonly DiagnosticFinding[]): string {
   const lines: string[] = ['']
   for (const finding of findings) {
@@ -144,16 +159,22 @@ function format(findings: readonly DiagnosticFinding[]): string {
     // which to open.
     lines.push(finding.ruleFile === undefined ? `  ${finding.rule}` : `  ${finding.ruleFile}`)
     if (finding.ruleFile !== undefined) lines.push(`    ${finding.rule}`)
-    if (finding.kind === 'dead-glob') {
+    if (HAS_GLOB[finding.kind]) {
       lines.push(
         `    ${finding.origin ?? finding.glob ?? '(unknown)'}  [${finding.position ?? 'unknown'}]`,
         `    ${finding.fault ?? 'unknown'}: ${finding.advice}`,
       )
     } else {
-      // `no-condition` and `project-unknown` have no glob, no position and no
-      // fault. Rendering them through the dead-glob shape printed
-      // `(unknown) [unknown]` / `unknown: …`, which reads like a bug in the
-      // tool rather than a finding about the rule.
+      // `no-condition`, `project-unknown` and `project-empty` have no glob, no
+      // position and no fault. Rendering them through the dead-glob shape
+      // printed `(unknown) [unknown]` / `unknown: …`, which reads like a bug in
+      // the tool rather than a finding about the rule.
+      //
+      // `HAS_GLOB` below is what makes adding a fifth kind a COMPILE error
+      // rather than a silent fall into this branch. `project-empty` was added
+      // to the union and compiled without anyone choosing a rendering for it —
+      // an if/else cannot ask the question, and `Record<K, …>` can. Same device
+      // as `FAULT_ADVICE` and `ON_DISK_ADVICE` in `glob-diagnosis.ts`.
       lines.push(`    ${finding.kind}: ${finding.advice}`)
     }
     lines.push('')

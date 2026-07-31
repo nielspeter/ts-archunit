@@ -12,7 +12,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { Project } from 'ts-morph'
-import { diagnoseGlob, syntacticFault, FAULT_ADVICE } from '../../src/core/glob-diagnosis.js'
+import {
+  diagnoseGlob,
+  syntacticFault,
+  FAULT_ADVICE,
+  ON_DISK_ADVICE,
+} from '../../src/core/glob-diagnosis.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
 import { buildDiskSet, diskSet } from '../../src/core/disk-set.js'
 import type { GlobSite } from '../../src/core/glob-site.js'
@@ -213,5 +218,68 @@ describe('the disk set', () => {
     expect(diskSet(emptyProject(path.join(root, 'tsconfig.json'))).classify('**/pkg/*')).toBe(
       'holds-typescript',
     )
+  })
+})
+
+/**
+ * Bug 0032 — a verified absence must not defer to a cause list it refutes.
+ *
+ * `ON_DISK_ADVICE['absent']` was `''`, so the caller fell through to
+ * `FAULT_ADVICE['no-match']`, two of whose three causes are false when the walk
+ * found nothing: there is no directory, so neither "append `/**`" nor "the
+ * directory holds no source files" can apply.
+ *
+ * **These are constant-level facts only.** The string a reader actually
+ * receives is assembled in `diagnose()`, and the first version of this block
+ * reimplemented that assembly here — review measured two mutations of the real
+ * selection that left the whole suite green, including one that appended the
+ * refuted causes straight back on. The shipped-string assertions therefore live
+ * in `diagnose.test.ts`, where they go through `diagnose()`. What stays here is
+ * what belongs to the constant: that the two known-fact entries have their own
+ * text and that `not-determined` deliberately does not.
+ */
+describe('the on-disk advice table (bug 0032)', () => {
+  it('gives a verified absence its own text, refuting neither cause it cannot support', () => {
+    const advice = ON_DISK_ADVICE.absent
+    expect(advice).not.toBe('')
+    // Scoped to the search, not to "disk". `absent` is the result of a BOUNDED
+    // walk — measured false as a universal on two reachable inputs: a sibling
+    // package outside the identity root, and a directory whose name contains
+    // glob metacharacters.
+    expect(advice).toContain('under the project root')
+    expect(advice).not.toContain('nothing matching this exists on disk')
+    // The two causes the fact refutes stay out, asserted by their own words —
+    // `advice !== FAULT_ADVICE['no-match']` would pass for any rewording that
+    // put them back.
+    expect(advice).not.toContain('append')
+    expect(advice).not.toContain('holds no source files')
+  })
+
+  it('does not tell a selector that a folder which does not exist yet is fine', () => {
+    // Regression guard. A draft carried plan 0072's "banning one pre-emptively
+    // is legitimate" here. 0072's case is a `notImportFrom` — a CONDITION glob
+    // — and `diagnose()` drops condition and exclusion positions before this
+    // string is reached, so it printed only for `selector` and `discovery`,
+    // where a glob matching nothing means the rule has no subjects. That is
+    // the false green 0069 is named after and R3b will fail the build on.
+    expect(ON_DISK_ADVICE.absent).not.toContain('legitimate')
+    expect(ON_DISK_ADVICE.absent).not.toContain('pre-emptive')
+  })
+
+  it('CONTROL: not-determined stays empty, because there no fact is known', () => {
+    // The two empty strings looked alike and are not: here the walk was pruned,
+    // so deferring to the cause list is honest. A fix that filled in every
+    // blank would break this. The DEFERRAL itself is exercised end to end in
+    // `diagnose.test.ts` — asserting `=== ''` here does not prove the caller
+    // still falls back, which review measured as a real hole.
+    expect(ON_DISK_ADVICE['not-determined']).toBe('')
+  })
+
+  it('CONTROL: the two facts that already had text still have their own', () => {
+    // Bounds the change: replacing the whole map with one string passes the
+    // assertions above and fails here.
+    expect(ON_DISK_ADVICE['holds-typescript']).toContain('tsconfig include/exclude')
+    expect(ON_DISK_ADVICE['no-typescript']).toContain('contains no TypeScript')
+    expect(FAULT_ADVICE['no-match']).toContain('misspelled')
   })
 })

@@ -135,7 +135,37 @@ export const ON_DISK_ADVICE: Readonly<Record<OnDisk, string>> = {
   'holds-typescript':
     'this path exists and contains TypeScript, but your tsconfig include/exclude keeps it out of the project',
   'no-typescript': 'this path exists but contains no TypeScript',
-  absent: '',
+  // Bug 0032. This was `''`, so a verified absence deferred to `no-match`'s
+  // list — the exact deferral the paragraph above rules out, and two of that
+  // list's three causes are refuted by the fact: there is no directory, so
+  // "append /**" and "holds no source files" are both false.
+  //
+  // TWO CORRECTIONS FROM REVIEW OF THE FIRST FIX, both of which made this
+  // string a new confidently-wrong message while removing an old one:
+  //
+  // 1. It said "nothing matching this exists on disk" — a universal claim the
+  //    walk cannot support. `absent` means "not found in a BOUNDED walk" from
+  //    `discoverIdentityRoot`, with pruned directory names and unreadable
+  //    directories dropped. Measured false on two reachable inputs: a sibling
+  //    package outside the identity root (a monorepo checkout with no `.git`,
+  //    which `identity-root.ts` itself documents), and a real directory whose
+  //    name holds glob metacharacters. So the claim is scoped to the search.
+  // 2. It offered "a folder you have not created yet — banning one
+  //    pre-emptively is legitimate", borrowed from plan 0072. But 0072's case
+  //    is a `notImportFrom`, a CONDITION glob, and `diagnose()` drops
+  //    condition and exclusion positions before reaching here. This string is
+  //    printed only for `selector` and `discovery`, where a glob matching
+  //    nothing means the rule has no subjects — the false green 0069 is named
+  //    after and R3b will fail the build on. It told the agent that was fine.
+  //
+  // The metacharacter cause is `slice-rule-builder.ts`'s, verbatim in
+  // substance, because it already states it for `check` — the same
+  // one-fact-two-texts trap this fix fell into elsewhere.
+  absent:
+    'no file or directory matching this was found under the project root (build and vendor directories are not searched, so a path inside one is not seen) — a path segment does not match what is on disk, or a literal "(", ")", "{", "}" or "!" in a folder name is being read as pattern syntax rather than a literal character, in which case match that level with "*" instead',
+  // Stays empty, and is NOT the same case as `absent` above despite looking
+  // identical. Here the walk was pruned, so no fact is known — deferring to
+  // `no-match`'s cause list is the honest move rather than a gap.
   'not-determined': '',
 }
 

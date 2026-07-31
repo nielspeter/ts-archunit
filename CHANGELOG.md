@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.33.0] - 2026-07-31
+
+Both fixes came out of [plan 0074](plans/0074-r3b-the-selector-glob-flip.md)'s gate run against a
+real adopting codebase, and both were verified against that same input rather than against a
+fixture.
+
+### Fixed
+
+- **`doctor` no longer blames the glob when the project loaded nothing** (bug 0031). A
+  solution-style `tsconfig.json` — `"files": []` plus `"references"`, the usual monorepo root —
+  loads no sources, so every glob is dead and none of them is the reason. Each one used to be
+  reported with advice suggesting a misspelling, about correctly spelled globs, while `check`
+  named the real cause in the same run. `doctor` now reports it **once per project**, names the
+  config, and leaves the globs undiagnosed until something loads. A rule that asserts nothing is
+  still reported alongside it, and a **syntactic** fault (`'./src/**'`) is still reported too,
+  because no project could fix it.
+- **A path that is absent gets its own advice** (bug 0032), instead of falling through to a
+  three-cause list of which two are refuted by the absence. The text is scoped to what was
+  actually searched — a bounded walk that skips build and vendor directories — rather than
+  asserting a universal about the disk, and it names the glob-metacharacter cause (`(`, `)`, `{`,
+  `}`, `!` in a folder name) that `check` already stated.
+- **One text for "this project loaded nothing"**, shared by `diagnose()` and the slice builder's
+  failing-`check` message. They were written separately and had already diverged, with the weaker
+  wording on the surface that fails builds.
+
+### Changed
+
+- **`DiagnosticFinding['kind']` gains `'project-empty'`.** Source-breaking for TypeScript
+  consumers with an exhaustive `switch` over the union, and it is part of `doctor --format json`'s
+  contract. No enforcement change: `check` reports the same violations it did before.
+
 ## [0.32.0] - 2026-07-31
 
 ### Changed
