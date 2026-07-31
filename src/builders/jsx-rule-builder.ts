@@ -1,6 +1,7 @@
 import type { ArchProject } from '../core/project.js'
 import { RuleBuilder } from '../core/rule-builder.js'
 import type { ArchJsxElement } from '../models/arch-jsx-element.js'
+import { createElementCache, SOLE_POPULATION } from '../core/element-cache.js'
 import { collectJsxElements } from '../models/arch-jsx-element.js'
 import {
   haveNameMatching as identityHaveNameMatching,
@@ -22,6 +23,9 @@ import {
   haveAttributeMatching as conditionHaveAttributeMatching,
   notHaveAttributeMatching as conditionNotHaveAttributeMatching,
 } from '../conditions/jsx.js'
+
+/** One collection per project, shared by every rule built from it (plan 0075). */
+const cache = createElementCache<ArchJsxElement>()
 
 /**
  * Rule builder for JSX element architecture rules.
@@ -59,7 +63,9 @@ import {
  */
 export class JsxRuleBuilder extends RuleBuilder<ArchJsxElement> {
   protected getElements(): ArchJsxElement[] {
-    return this.project.getSourceFiles().flatMap(collectJsxElements)
+    return cache.get(this.project, SOLE_POPULATION, () =>
+      this.project.getSourceFiles().flatMap(collectJsxElements),
+    )
   }
 
   // --- Identity predicates (predicate-only, following CallRuleBuilder pattern) ---

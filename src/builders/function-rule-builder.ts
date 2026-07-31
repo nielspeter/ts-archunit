@@ -9,6 +9,7 @@ import {
   functionNotHaveEmptyBody,
 } from '../conditions/body-analysis-function.js'
 import type { ArchFunction } from '../models/arch-function.js'
+import { createElementCache, SOLE_POPULATION } from '../core/element-cache.js'
 import { collectFunctions, type FunctionCollectionOptions } from '../models/arch-function.js'
 import { followPattern as followPatternCondition } from '../conditions/pattern.js'
 import type { ArchPattern } from '../helpers/pattern.js'
@@ -49,6 +50,25 @@ import {
   haveParameterOfType as fnHaveParameterOfType,
   haveParameterNameMatching as fnHaveParameterNameMatching,
 } from '../predicates/function.js'
+
+/** One collection per (project, collection options), shared by every rule (plan 0075). */
+const cache = createElementCache<ArchFunction>()
+
+/**
+ * A canonical key for a collection-options object.
+ *
+ * Derived from the object's own entries, sorted — **not** `JSON.stringify`,
+ * which is key-order dependent, and not a hand-written list of the two fields,
+ * which would silently drop a third field added later and serve the wrong
+ * population under a colliding key.
+ */
+function optionsKey(options?: FunctionCollectionOptions): string {
+  if (options === undefined) return SOLE_POPULATION
+  return Object.entries(options)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, value]) => `${name}=${String(value)}`)
+    .join('|')
+}
 
 /**
  * Rule builder for function-level architecture rules.
@@ -91,9 +111,14 @@ export class FunctionRuleBuilder extends RuleBuilder<ArchFunction> {
   protected getElements(): ArchFunction[] {
     // _collectionOptions survives `.should()` forks via RuleBuilder.fork()'s
     // shallowClone in TerminalBuilder.copy — verified by the named-selection test.
-    return this.project
-      .getSourceFiles()
-      .flatMap((sf) => collectFunctions(sf, this._collectionOptions))
+    //
+    // The options are part of the cache key, not just the collection call:
+    // `functions(p)` and `functions(p, COLLECT_ALL)` are DIFFERENT populations
+    // of the same project, so a project-only key would serve one the other's
+    // elements (plan 0075).
+    return cache.get(this.project, optionsKey(this._collectionOptions), () =>
+      this.project.getSourceFiles().flatMap((sf) => collectFunctions(sf, this._collectionOptions)),
+    )
   }
 
   // --- Identity predicates (delegated to plan 0003 generics) ---

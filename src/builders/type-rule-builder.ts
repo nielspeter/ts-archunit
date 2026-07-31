@@ -25,6 +25,7 @@ import {
   resideInFile as conditionResideInFile,
   resideInFolder as conditionResideInFolder,
 } from '../conditions/structural.js'
+import { createElementCache, SOLE_POPULATION } from '../core/element-cache.js'
 import {
   haveNameMatching as identityHaveNameMatching,
   resideInFile as identityResideInFile,
@@ -32,6 +33,9 @@ import {
   areExported as identityAreExported,
   areNotExported as identityAreNotExported,
 } from '../predicates/identity.js'
+
+/** One collection per project, shared by every rule built from it (plan 0075). */
+const cache = createElementCache<TypeDeclaration>()
 
 /**
  * Rule builder for interface and type alias declarations.
@@ -56,12 +60,14 @@ export class TypeRuleBuilder extends RuleBuilder<TypeDeclaration> {
    * from all source files in the project.
    */
   protected getElements(): TypeDeclaration[] {
-    const elements: TypeDeclaration[] = []
-    for (const sf of this.project.getSourceFiles()) {
-      elements.push(...sf.getInterfaces())
-      elements.push(...sf.getTypeAliases())
-    }
-    return elements
+    return cache.get(this.project, SOLE_POPULATION, () => {
+      const elements: TypeDeclaration[] = []
+      for (const sf of this.project.getSourceFiles()) {
+        elements.push(...sf.getInterfaces())
+        elements.push(...sf.getTypeAliases())
+      }
+      return elements
+    })
   }
 
   // --- Type-specific predicates ---

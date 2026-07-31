@@ -40,6 +40,7 @@ import {
   beExported as conditionBeExported,
   notExist as conditionNotExist,
 } from '../conditions/structural.js'
+import { createElementCache, SOLE_POPULATION } from '../core/element-cache.js'
 
 // Class-specific conditions (this plan)
 import {
@@ -63,6 +64,9 @@ import {
   maxProperties as memberMaxProperties,
 } from '../conditions/members.js'
 
+/** One collection per project, shared by every rule built from it (plan 0075). */
+const cache = createElementCache<ClassDeclaration>()
+
 /**
  * Rule builder for ClassDeclaration elements.
  *
@@ -76,11 +80,13 @@ export class ClassRuleBuilder extends RuleBuilder<ClassDeclaration> {
   }
 
   protected getElements(): ClassDeclaration[] {
-    const classes: ClassDeclaration[] = []
-    for (const sourceFile of this.project.getSourceFiles()) {
-      classes.push(...sourceFile.getClasses())
-    }
-    return classes
+    return cache.get(this.project, SOLE_POPULATION, () => {
+      const classes: ClassDeclaration[] = []
+      for (const sourceFile of this.project.getSourceFiles()) {
+        classes.push(...sourceFile.getClasses())
+      }
+      return classes
+    })
   }
 
   // --- Identity predicate methods (plan 0003) ---
