@@ -8,15 +8,22 @@ import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import { shallowClone } from '../core/shallow-clone.js'
+import { isProjectRelative, relativeToRoot } from '../core/project-relative.js'
 
 /**
  * Resolve a layer by matching its glob against the project's source files.
  */
 function resolveLayer(project: ArchProject, name: string, pattern: string): Layer {
   const isMatch = picomatch(pattern)
+  const relative = isProjectRelative(pattern)
   const files: SourceFile[] = []
   for (const sf of project.getSourceFiles()) {
-    if (isMatch(sf.getFilePath())) {
+    const filePath = sf.getFilePath()
+    // Bug 0036: the glob is matched against an ABSOLUTE path, so a
+    // project-relative one could never resolve a layer. Same rule as every
+    // other path glob — relative means from the project root.
+    const fromRoot = relative ? relativeToRoot(sf, filePath, project.tsConfigPath) : undefined
+    if (isMatch(filePath) || (fromRoot !== undefined && isMatch(fromRoot))) {
       files.push(sf)
     }
   }
@@ -192,7 +199,11 @@ export class PairFinalBuilder extends TerminalBuilder {
   override globs(): readonly GlobNode[] {
     return this.layers.map((layer) =>
       stampGlobs(
-        globAnyOf([layer.pattern], 'file-path'),
+        globAnyOf(
+          [layer.pattern],
+          'file-path',
+          isProjectRelative(layer.pattern) ? 'normalized' : 'absolute',
+        ),
         'discovery',
         (g) => `layer("${layer.name}", "${g.glob}")`,
       ),

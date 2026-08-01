@@ -5,6 +5,7 @@ import { globAnyOf } from '../core/glob-site.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { candidatesFor } from '../core/import-candidates.js'
 import { edgesOf, FORWARD_EDGE_KINDS } from '../core/module-edges.js'
+import { rootOf } from '../core/project-relative.js'
 
 /**
  * Which edge kinds these predicates see.
@@ -39,13 +40,19 @@ const PREDICATE_KINDS = FORWARD_EDGE_KINDS
  * predicate position zero, so the corpus structurally cannot show the loss.
  */
 function importCandidatePaths(sourceFile: SourceFile, ignoreTypeImports = false): string[] {
-  return edgesOf(sourceFile)
-    .filter((edge) => {
-      if (!PREDICATE_KINDS[edge.kind]) return false
-      if (!ignoreTypeImports) return true
-      return !edge.typeOnly
-    })
-    .flatMap((edge) => [...candidatesFor(edge.specifier, edge.resolvedPath)])
+  return (
+    edgesOf(sourceFile)
+      .filter((edge) => {
+        if (!PREDICATE_KINDS[edge.kind]) return false
+        if (!ignoreTypeImports) return true
+        return !edge.typeOnly
+      })
+      // The importing file's root, so a project-relative import glob works here
+      // exactly as it does in the condition family (bugs 0037, 0036). Measured
+      // before this: `importFrom('src/domain/**')` selected 0 modules where the
+      // anchored spelling selected 5.
+      .flatMap((edge) => [...candidatesFor(edge.specifier, edge.resolvedPath, rootOf(sourceFile))])
+  )
 }
 
 /**

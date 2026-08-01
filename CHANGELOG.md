@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.36.3] - 2026-08-01
+
+### Fixed
+
+- **The relative-glob audit is complete, and the census that proves it is derived from source** ([bug 0036](bugs/fixed/0036-the-relative-glob-audit-is-incomplete.md)). v0.36.2 shipped with three path-glob surfaces unaudited and a uniformity guard whose surface list was written by hand — so it could not fail when a new surface was added, which is the one thing it existed for. The census now reads `src/` and fails until every file declaring a `file-path` or `parent-dir` glob is classified. It found **four** unclassified surfaces, three of them broken: `importFrom`/`notImportFrom` selected **0 subjects where the anchored spelling selected 5**, `onlyBeImportedVia` reported **5 violations against 0 anchored** — a false red on correct code — and `crossLayer().layer()` resolved nothing. All four normalize now, so a relative glob means the project root at every entry point.
+
+### Known gap
+
+- `crossLayer()`'s runtime half is not observable through the public API: a pair rule reports nothing whether its layer resolves three files or none. Its declaration half — what `doctor` and `diagnose()` say about the glob — **is** guarded. This is [plan 0067-D](plans/completed/0067-project-relative-globs.md)'s shape at an entry point [0069](plans/completed/0069-no-rule-may-certify-nothing.md) R3b never reached, and it is recorded as a follow-up on the bug rather than left to be rediscovered.
+
 ## [0.36.2] - 2026-08-01
 
 ### Fixed
@@ -17,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Known gap
 
-- Three path-glob surfaces — `crossLayer().layer()`, `smells.*.inFolder()`, `onlyBeImportedVia()` — are **not** audited for relative globs; anchor them with `'**/'`. [Bug 0036](bugs/0036-the-relative-glob-audit-is-incomplete.md), which also records that the uniformity guard's surface list is hand-maintained and so cannot fail when a new surface is added.
+- ~~Three path-glob surfaces are not audited for relative globs.~~ **Closed in 0.36.3** — all four (there were four) normalize.
 
 ## [0.36.1] - 2026-08-01
 

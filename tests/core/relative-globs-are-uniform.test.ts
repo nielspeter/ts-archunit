@@ -1,12 +1,14 @@
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
-import { modules, slices } from '../../src/index.js'
+import { modules, slices, crossLayer, haveMatchingCounterpart } from '../../src/index.js'
 import { resideInFile, resideInFolder, havePathMatching } from '../../src/predicates/identity.js'
 import { atPath } from '../../src/presets/shared.js'
 import { resolveByDefinition } from '../../src/models/slice.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { onlyImportFrom } from '../../src/conditions/dependency.js'
+import { onlyBeImportedVia } from '../../src/conditions/reverse-dependency.js'
+import { importFrom } from '../../src/predicates/module.js'
 import { candidatesFor } from '../../src/core/import-candidates.js'
 import type { ArchProject } from '../../src/core/project.js'
 
@@ -149,6 +151,55 @@ describe('a project-relative path glob means the same thing everywhere (bug 0033
       expect(diagnose([rule])).toEqual([])
       expect(rule.violations()).toEqual([])
     }
+  })
+
+  it('importFrom accepts the relative spelling (module predicate)', () => {
+    // Measured before the fix: 0 modules selected where the anchored spelling
+    // selected 5 — `predicates/module.ts` called `candidatesFor` without a root.
+    const rel = modules(p).that().satisfy(importFrom('src/**')).subjects().length
+    const anchored = modules(p).that().satisfy(importFrom('**/src/**')).subjects().length
+    expect(rel).toBeGreaterThan(0)
+    expect(rel).toBe(anchored)
+  })
+
+  it('crossLayer().layer stops reporting a relative glob as dead', () => {
+    // Only the DIAGNOSIS is assertable here, and the gap is worth stating.
+    // Measured: a `crossLayer` pair rule produces zero violations whether its
+    // layer resolves three files or none, so the runtime half of this fix is
+    // unobservable through the public API on any fixture — sabotaging it
+    // survives, and no test I can write here would catch that.
+    //
+    // That is itself a finding, recorded in bug 0036: an empty `crossLayer`
+    // layer is silent at check time and visible only to `doctor`, which is the
+    // 0067-D/R3b discovery-fault shape one entry point over.
+    const rule = (g: string) =>
+      crossLayer(p)
+        .layer('a', g)
+        .layer('b', '**/services/**')
+        .mapping(() => false)
+        .forEachPair()
+        .should(haveMatchingCounterpart([]))
+    expect(diagnose([rule('src/domain/**')]).map((f) => f.glob)).not.toContain('src/domain/**')
+    // The control that keeps the assertion above meaningful: a genuinely dead
+    // layer glob IS still reported.
+    expect(diagnose([rule('src/no-such-folder/**')]).map((f) => f.glob)).toContain(
+      'src/no-such-folder/**',
+    )
+  })
+
+  it('onlyBeImportedVia accepts the relative spelling — it was a false red', () => {
+    // Measured before the fix: `'src/**'` produced 5 violations where
+    // `'**/src/**'` produced none. The glob is matched against the IMPORTER's
+    // absolute path, so a relative one rejected every importer — a false red,
+    // the same shape as bug 0037 one layer over.
+    const count = (g: string) =>
+      modules(p)
+        .that()
+        .resideInFolder('**/domain/**')
+        .should()
+        .satisfy(onlyBeImportedVia(g))
+        .violations().length
+    expect(count('src/**')).toBe(count('**/src/**'))
   })
 
   it('CONTROL: an anchored glob keeps meaning "anywhere" on every surface', () => {
