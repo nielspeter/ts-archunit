@@ -115,7 +115,33 @@ Three things to settle:
 3. Per rule 3 the finding must state that it cannot be suppressed — see
    [plan 0078](../plans/0078-derive-the-configuration-finding-census.md).
 
-**This is a breaking change to published API, and the plan must budget for it.**
+### Option zero, and it should be tried first
+
+`overrides` is `Record<string, RuleSeverity>` (`presets/shared.ts:75`). In a TypeScript-first
+library the cheapest fix is a **type**: make the key a union of that preset's rule IDs. The typo
+becomes a red squiggle in the editor, before any run, at zero CI cost — and it deletes the
+case-variant sabotage row outright, because a case variant stops compiling too.
+
+Additive to the runtime finding, not a substitute: a JS consumer, a dynamically-built overrides
+object, and `--format json` pipelines all bypass the type. But it catches the overwhelming
+majority at the point of authorship, which is where ADR-008 would rather catch things.
+
+### The runtime fix must not break the published signature
+
+The first draft specified changing `validateOverrides` from `void` to returning rules. It is
+re-exported at `src/presets/index.ts:2` and documented at `docs/api-reference.md:672`, so that
+is a break — for a fault this bug concedes is low-frequency. All five callers are internal
+preset factories. **Add a sibling that returns findings** and leave `validateOverrides` alone;
+the user-visible outcome is identical at zero break, and rule 6 says guard the guard, not break
+the API.
+
+### Budget the upgrade shock
+
+The runtime fix turns currently-green builds **red** for anyone carrying a typo today. Coming
+in the same release as 0041 — which turns red builds green — that is two opposite surprises at
+once. Ship them apart, or write one combined note.
+
+**The original breaking framing, kept for the record:**
 `validateOverrides` is re-exported at `src/presets/index.ts:2` and documented at
 `docs/api-reference.md:672` with the `void` signature; `docs/presets.md:231` documents the
 current behaviour as _"Unrecognized override keys emit a warning — catches typos."_ Under

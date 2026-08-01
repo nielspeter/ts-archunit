@@ -1,5 +1,6 @@
 import type { ArchViolation } from './violation.js'
 import type { EdgeCoverage } from './edge-coverage.js'
+import { commentSuppressions } from './comment-suppression.js'
 
 /**
  * Format violations as a JSON string.
@@ -42,6 +43,19 @@ export function formatViolationsJson(
       rule: c.rule,
       subjects: c.subjects,
       edges: c.edges,
+    })),
+    // What inline `// ts-archunit-exclude` comments removed from this report.
+    // Structural rather than prose, for the same reason `untestedAllowlists` is:
+    // the agent reading this document needs identities it can act on, not a
+    // sentence to grep. Always present — an empty array, not omitted — so a
+    // consumer can tell "nothing was suppressed" from "this version does not
+    // report it".
+    //
+    // Every other filter in the pipeline discloses itself; this one did not,
+    // which after bug 0041 made it the widest silent filter we ship.
+    commentSuppressed: commentSuppressions().map((c) => ({
+      ruleId: c.ruleId,
+      file: c.file,
     })),
     violations: violations.map((v) => ({
       rule: v.rule,

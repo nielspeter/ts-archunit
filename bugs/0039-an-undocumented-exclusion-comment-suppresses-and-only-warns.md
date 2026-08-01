@@ -2,7 +2,7 @@
 
 **Reported:** 2026-08-01 · **Verified:** 2026-08-01, all four parse paths run behaviourally
 **Found in:** v0.36.3, by the ADR-008 compliance audit
-**Severity:** Medium, and genuinely arguable — the ceiling on any fix is one round of friction,
+**Severity:** **High** as of v0.37.0 — see "Re-rated" below. Filed as Medium, and genuinely arguable — the ceiling on any fix is one round of friction,
 and the scope is narrowed by three gates (see "How narrow this actually is"). Against Low: it
 is a silent green on a constraint the docs call required.
 
@@ -125,6 +125,44 @@ Four options, on different axes:
    resolves, rather than prose. Not breaking, and it reaches the rule-3-corollary goal that
    option 3 pays a break for.
 
+## Re-rated High, and the reason is on this branch
+
+Two paragraphs of this document became false the moment
+[bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) landed, which
+was **the same branch**:
+
+- _"the fail-open above reaches only `createViolation`-based conditions"_ — false. It reaches
+  every family.
+- _"Gate 3 shrinks this bug and enlarges the problem. Fix 0041 first."_ — that has happened.
+
+Measured against a `main` worktree, `modules().notImportFrom()`, control at 1 on both sides:
+a reason-free directive suppressed 0 findings before and suppresses all of them now. One
+un-reasoned line is a build-green kill switch for any rule id, on the families an adopting team
+reaches for first. That is High.
+
+The guard advice below is stale for the same reason: a guard written against
+`modules().notImportFrom()` no longer shows "not suppressed" for both cases.
+
+## This document is two bugs, and the wrong one is in the title
+
+**Split before working it.**
+
+- **The nested `-start` half** (below) is a correctness defect with a bounded fix and no policy
+  question beyond "error or nest properly". Medium-High. Worth doing.
+- **The undocumented-reason half** — the title — is a four-option policy question whose own best
+  argument is against fixing it: `: needed` reaches green **and silent** in one step, measured.
+  Either close it won't-fix-as-specified with that measurement as the reason, or reduce it to a
+  one-line decision. Do not carry four options indefinitely.
+
+## Correction: the docs do not contradict the source
+
+The first draft called this its strongest argument. It is wrong.
+`docs/violation-reporting.md:255` read _"Requires a reason -- undocumented exclusions are
+flagged as warnings"_ — the same sentence states the enforcement level, so the docs described
+shipped behaviour accurately. "Requires" was loose, and v0.37.0 rewrote it to _"a reason is
+expected; an undocumented exclusion still applies and emits a warning."_ No contradiction
+remains to argue from.
+
 ## Why "undocumented" is the interesting row
 
 Not because agents are careless — that is an unevidenced behavioural claim, and it fails on
@@ -133,9 +171,8 @@ row 2 anyway, where a nested `-start` is exactly what an agent produces. The che
 **The other three are malformed syntax no author intends. Omitting a reason is well-formed, is
 the shortest form that works, and the parser's own grammar comment sanctions it** —
 `src/core/exclusion-comments.ts:44` documents `// ts-archunit-exclude <rule-id>` without a
-reason as supported, while `docs/violation-reporting.md:255` says "Requires a reason". The
-source and the docs disagree. That is a fact about the repository, and it carries the argument
-better than a claim about behaviour.
+reason as supported. That is the argument; the docs-contradiction version of it was wrong and is
+retracted above.
 
 ## Guard
 

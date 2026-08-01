@@ -21,6 +21,10 @@ describe('formatViolationsJson', () => {
     expect(parsed).toEqual({
       summary: { total: 1, errors: 1, warnings: 0, reason: null },
       untestedAllowlists: [],
+      // Always present, never omitted, so a consumer can tell "nothing was
+      // suppressed" from "this version does not report it" — same contract as
+      // `untestedAllowlists`. Added in v0.37.0 with the disclosure work.
+      commentSuppressed: [],
       violations: [
         {
           rule: 'test rule',

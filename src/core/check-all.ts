@@ -6,6 +6,7 @@ import { dedupeConfigFindings } from './dedupe-config-findings.js'
 import { suppressionNotice } from './diff-disclosure.js'
 import { writeStderr } from './stderr.js'
 import { edgeCoverageNotice, resetEdgeCoverage, untestedRules } from './edge-coverage.js'
+import { commentSuppressionNotice, resetCommentSuppression } from './comment-suppression.js'
 
 /**
  * Run an array of rules (e.g. a spread preset) and throw one aggregated
@@ -26,6 +27,7 @@ export function checkAll(rules: RuleBuilderLike[], options?: CheckOptions): void
   // Per run, like `runCheck` — a second `checkAll` in one vitest file must
   // not inherit the first's rules.
   resetEdgeCoverage()
+  resetCommentSuppression()
   // One option, one finding (plan 0074). A preset fans a single bad option out
   // across every generated rule, and only an aggregation point can see that.
   let violations = dedupeConfigFindings(rules.flatMap((rule) => rule.violations()))
@@ -71,6 +73,14 @@ export function checkAll(rules: RuleBuilderLike[], options?: CheckOptions): void
   if (options?.format !== 'json') {
     const coverage = edgeCoverageNotice()
     if (coverage !== undefined) writeStderr(`${coverage}\n`)
+  }
+
+  // Inline exclusion comments, same footnote position and the same reason. Kept
+  // out of the JSON prose for the same reason coverage is: a consumer parsing
+  // that document gets the identities structurally, not as a sentence to grep.
+  if (options?.format !== 'json') {
+    const suppressed = commentSuppressionNotice()
+    if (suppressed !== undefined) writeStderr(`${suppressed}\n`)
   }
 
   const errors = violations.filter((v) => (v.severity ?? 'error') === 'error')

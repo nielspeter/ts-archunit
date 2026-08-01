@@ -9,6 +9,7 @@ import { formatViolationsJson } from './format-json.js'
 import { activeNotice } from './diff-disclosure.js'
 import { formatViolationsGitHub } from './format-github.js'
 import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
+import { recordCommentSuppression } from './comment-suppression.js'
 import { writeStderr } from './stderr.js'
 import type { EdgeCoverage } from './edge-coverage.js'
 
@@ -198,9 +199,14 @@ export function applyFilters(
       // `// ts-archunit-exclude` comments ARE parsed. Without the first clause
       // a comment in a rule file would silence the finding that says the rule
       // enforces nothing. Pinned by tests/helpers/exclusion-comments.ts.
-      result = result.filter(
-        (v) => v.bypassFilters === true || !isExcludedByComment(v, allComments),
-      )
+      result = result.filter((v) => {
+        if (v.bypassFilters === true) return true
+        if (!isExcludedByComment(v, allComments)) return true
+        // Disclose it. Silently dropping is what made this the only filter in
+        // the pipeline a reader could not see — see `comment-suppression.ts`.
+        recordCommentSuppression(v.ruleId ?? ctx.metadata?.id ?? '(unnamed rule)', v.file)
+        return false
+      })
     }
   }
 

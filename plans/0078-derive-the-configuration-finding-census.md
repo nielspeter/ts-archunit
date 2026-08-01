@@ -230,3 +230,22 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
 - [Bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) —
   why a configuration finding carries its own remedy, and the source of Phase 2's test shape.
 - No overlap with open plans 0047, 0048 or 0072, or with completed 0067/0069/0070 — checked.
+
+## Review notes (2026-08-01)
+
+- **Priority is inverted against this plan's own text** and that is now explicit rather than
+  implied. It sequences two user-facing bugs ahead of itself (0038 in Out of scope; 0040's fix
+  must reuse the existing producer) and still claimed High. **Phases 1–2 are Medium**, behind 0038. Phase 3 was the user-facing part — and it **shipped in v0.37.0** ahead of the rest,
+  because the sentence it fixes was reachable-but-wrong the moment 0041 landed.
+- **Effort Medium was optimistic.** Phase 2 wants a behavioural apply-the-fix test per mechanical
+  remedy across up to 12 sites: twelve fixtures alongside a census and ten message edits.
+- **Put a numeric cap on the "it's a judgement" classification.** The plan warns against it
+  becoming the default and gives that warning no teeth. A cap makes the escape hatch itself able
+  to fail.
+- **Census population is now 13, not 12** — v0.37.0's disclosure work did not add a producer, but
+  bug 0038's fix will, and 0040's fix should _remove_ one (the cross-layer producer becomes
+  redundant once `deadSelectorViolation` covers discovery sites). Re-derive rather than trusting
+  the list above.
+- **Confirmed by review:** no producer emits the flag without the literal `bypassFilters: true`
+  — 43 occurrences, all literal / type declaration / read. The text census is sound at the scan
+  level.

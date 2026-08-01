@@ -34,6 +34,13 @@ import { modules } from '../../src/builders/module-rule-builder.js'
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { isExcludedByComment } from '../../src/core/exclusion-comments.js'
+import { notHaveDefaultExport } from '../../src/conditions/exports.js'
+import { moduleNotContain } from '../../src/conditions/body-analysis-module.js'
+import {
+  commentSuppressionNotice,
+  commentSuppressions,
+  resetCommentSuppression,
+} from '../../src/core/comment-suppression.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const RULE_ID = 'probe/no-forbidden'
@@ -89,6 +96,33 @@ beforeAll(() => {
     '  }',
     '}',
   ])
+
+  // One file per remaining non-stamping family, each with the exemption in
+  // place. Bug 0041 named five families and the first guard measured one; the
+  // other four rested on the ordering argument, which is not measurement.
+  // BLOCK form, and it has to be. `conditions/exports.ts` hardcodes `line: 1`
+  // (`:24`, `:54`, `:96`), and a single-line directive covers `comment.line + 1`
+  // — so covering line 1 would need a comment on line 0. **No single-line
+  // exclusion comment can ever exempt a file-level finding.** Measured here;
+  // documented nowhere, which is part of bug 0044.
+  write('src/default-export-excluded.ts', [
+    '// ts-archunit-exclude-start probe/no-default: deliberate, guarded by 0041',
+    'export default function thing(): number {',
+    '  return 1',
+    '}',
+    '// ts-archunit-exclude-end probe/no-default',
+  ])
+  write('src/default-export-plain.ts', [
+    'export default function other(): number {',
+    '  return 2',
+    '}',
+  ])
+
+  write('src/module-body-excluded.ts', [
+    '// ts-archunit-exclude probe/no-eval-module: deliberate, guarded by 0041',
+    'export const run = (): unknown => eval("1")',
+  ])
+  write('src/module-body-plain.ts', ['export const go = (): unknown => eval("2")'])
 
   write('src/logger-plain.ts', [
     'export class LoggerPlain {',
@@ -188,6 +222,71 @@ describe('an exclusion comment reaches every condition family (bug 0041)', () =>
 
     expect(moduleFiles).toEqual(['consumer-plain.ts'])
     expect(classFiles).toEqual(['logger-plain.ts'])
+  })
+
+  it('the exports family honours it — block form, because it must', () => {
+    // `notHaveDefaultExport` builds violations in `conditions/exports.ts`, which
+    // never mentions `ruleId` — one of the four families the first guard argued
+    // about rather than measured. It reports at a hardcoded `line: 1`, so only
+    // the block form can cover it; see the fixture.
+    const files = offendingFiles(
+      modules(project)
+        .that()
+        .resideInFile('**/default-export-*.ts')
+        .should()
+        .satisfy(notHaveDefaultExport())
+        .rule({ id: 'probe/no-default' })
+        .violations(),
+    )
+    expect(files).toEqual(['default-export-plain.ts'])
+  })
+
+  it('the module-body family honours it', () => {
+    const files = offendingFiles(
+      modules(project)
+        .that()
+        .resideInFile('**/module-body-*.ts')
+        .should()
+        .satisfy(moduleNotContain(call(/^eval$/)))
+        .rule({ id: 'probe/no-eval-module' })
+        .violations(),
+    )
+    expect(files).toEqual(['module-body-plain.ts'])
+  })
+
+  it('WIRING: the suppression is disclosed, not silently dropped', () => {
+    // The unit tests in `comment-suppression-is-disclosed.test.ts` pass even if
+    // nothing ever calls `recordCommentSuppression`. This is the row that proves
+    // `applyFilters` is wired to it — the difference between a module that works
+    // and a module that is reachable.
+    resetCommentSuppression()
+    modules(project)
+      .that()
+      .resideInFile('**/consumer-excluded.ts')
+      .should()
+      .notImportFrom('**/forbidden*')
+      .rule({ id: RULE_ID })
+      .violations()
+
+    const disclosed = commentSuppressions()
+    expect(disclosed.length).toBeGreaterThan(0)
+    expect(disclosed.every((d) => d.ruleId === RULE_ID)).toBe(true)
+    expect(disclosed.some((d) => d.file.endsWith('consumer-excluded.ts'))).toBe(true)
+    expect(commentSuppressionNotice()).toContain(RULE_ID)
+    resetCommentSuppression()
+  })
+
+  it('WIRING CONTROL: a run that suppresses nothing discloses nothing', () => {
+    resetCommentSuppression()
+    modules(project)
+      .that()
+      .resideInFile('**/consumer-plain.ts')
+      .should()
+      .notImportFrom('**/forbidden*')
+      .rule({ id: RULE_ID })
+      .violations()
+    expect(commentSuppressions()).toHaveLength(0)
+    expect(commentSuppressionNotice()).toBeUndefined()
   })
 
   it('a comment naming a DIFFERENT rule id does not suppress', () => {

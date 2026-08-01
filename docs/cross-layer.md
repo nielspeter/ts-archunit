@@ -33,7 +33,7 @@ const resolved = layers.mapping(
 
 resolved
   .forEachPair()
-  .should(haveMatchingCounterpart(/* pass resolved layers */))
+  .should(haveMatchingCounterpart(layers))
   .because('every route must have a matching schema')
   .check()
 ```

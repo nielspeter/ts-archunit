@@ -2,8 +2,31 @@
 
 **Reported:** 2026-08-01 · **Verified:** 2026-08-01, reproduced with a non-vacuous control
 **Found in:** v0.36.3, while fixing [bug 0036](./fixed/0036-the-relative-glob-audit-is-incomplete.md)
-**Severity:** Medium. Public and documented, but no preset uses it, which caps it below
-bugs 0011/0018.
+**Severity:** **High** for the API defect below; Medium for the silence this bug is named after.
+Two reviewers independently said the headline is the wrong defect, and they are right — see
+"The defect an adopter hits first".
+
+## The defect an adopter hits first
+
+`haveMatchingCounterpart(layers: Layer[])` requires a `Layer[]` that **no public API can
+produce**: `PairFinalBuilder.layers` is `private readonly` at every stage
+(`cross-layer-builder.ts:136`, `:154`, `:178`) and `resolveLayer` is not exported. Every caller
+must hand-build the array, duplicating the builder's own resolution.
+
+Three published examples did not compile — two of them JSDoc on the public `crossLayer()` and
+the builder class, so every user saw them on IDE hover — and one showed a chain form
+(`.should().haveMatchingCounterpart()`) that does not exist. **Fixed in v0.37.0**, independent
+of the runtime work.
+
+What remains is the access problem, and it is what makes the rest of this bug hard: the
+condition judges the caller's copy, so "Layer X matched 0 files" describes an array the library
+never resolved. Measured — builder glob dead, hand-built layers populated → 2 counterpart
+violations and no configuration finding at all.
+
+**Fix: have `.should()` pass its own resolved layers to the condition.** That closes this, makes
+[bug 0042](./fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)'s
+remedy true (it currently has to caveat that it names the caller's pattern), and is a
+prerequisite for the silence fix below being meaningful.
 
 ## Description
 
