@@ -1,12 +1,14 @@
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
-import { modules, slices } from '../../src/index.js'
+import { modules, slices, crossLayer, haveMatchingCounterpart } from '../../src/index.js'
 import { resideInFile, resideInFolder, havePathMatching } from '../../src/predicates/identity.js'
 import { atPath } from '../../src/presets/shared.js'
 import { resolveByDefinition } from '../../src/models/slice.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { onlyImportFrom } from '../../src/conditions/dependency.js'
+import { onlyBeImportedVia } from '../../src/conditions/reverse-dependency.js'
+import { importFrom } from '../../src/predicates/module.js'
 import { candidatesFor } from '../../src/core/import-candidates.js'
 import type { ArchProject } from '../../src/core/project.js'
 
@@ -149,6 +151,44 @@ describe('a project-relative path glob means the same thing everywhere (bug 0033
       expect(diagnose([rule])).toEqual([])
       expect(rule.violations()).toEqual([])
     }
+  })
+
+  it('importFrom accepts the relative spelling (module predicate)', () => {
+    // Measured before the fix: 0 modules selected where the anchored spelling
+    // selected 5 — `predicates/module.ts` called `candidatesFor` without a root.
+    const rel = modules(p).that().satisfy(importFrom('src/**')).subjects().length
+    const anchored = modules(p).that().satisfy(importFrom('**/src/**')).subjects().length
+    expect(rel).toBeGreaterThan(0)
+    expect(rel).toBe(anchored)
+  })
+
+  it('crossLayer().layer resolves a relative glob', () => {
+    // Measured before the fix: the layer resolved nothing and `diagnose()`
+    // reported its glob dead. A layer that resolves nothing makes every
+    // cross-layer rule over it unfalsifiable.
+    const rule = (g: string) =>
+      crossLayer(p)
+        .layer('a', g)
+        .layer('b', '**/services/**')
+        .mapping(() => false)
+        .forEachPair()
+        .should(haveMatchingCounterpart([]))
+    expect(diagnose([rule('src/domain/**')]).map((f) => f.glob)).not.toContain('src/domain/**')
+  })
+
+  it('onlyBeImportedVia accepts the relative spelling — it was a false red', () => {
+    // Measured before the fix: `'src/**'` produced 5 violations where
+    // `'**/src/**'` produced none. The glob is matched against the IMPORTER's
+    // absolute path, so a relative one rejected every importer — a false red,
+    // the same shape as bug 0037 one layer over.
+    const count = (g: string) =>
+      modules(p)
+        .that()
+        .resideInFolder('**/domain/**')
+        .should()
+        .satisfy(onlyBeImportedVia(g))
+        .violations().length
+    expect(count('src/**')).toBe(count('**/src/**'))
   })
 
   it('CONTROL: an anchored glob keeps meaning "anywhere" on every surface', () => {
