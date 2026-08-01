@@ -2,10 +2,10 @@
 
 **Status:** DONE, shipped in v0.31.0. Implemented on `perf/element-and-edge-caches`.
 **Priority:** High. It is the largest measured win available that changes no behaviour, and it
-is one of only two items in [proposal 021](../proposals/021-consumer-run-time-where-it-actually-goes.md)
+is one of only two items in [proposal 021](../../proposals/021-consumer-run-time-where-it-actually-goes.md)
 whose value does not depend on how TypeScript 7 turns out.
 **Effort:** ~1 day, including the benchmark fixture.
-**Origin:** [Proposal 021](../proposals/021-consumer-run-time-where-it-actually-goes.md) Part 1,
+**Origin:** [Proposal 021](../../proposals/021-consumer-run-time-where-it-actually-goes.md) Part 1,
 from a consumer-reported slowdown. Everything below was re-measured against **this repository
 (518 files)** rather than inherited from the proposal's 147-file consumer, so the numbers are
 reproducible by anyone with the repo.
@@ -148,7 +148,7 @@ extending `TerminalBuilder` rather than `RuleBuilder`, both with hand-copied `fi
 bodies. Neither is memoizable by this key: one reads a loaded GraphQL schema, the other
 `this.sourceFiles`. **The population is nine and this plan caches six** — the test below
 derives that split from source rather than restating it, because
-[plan 0073](./completed/0073-conditions-declare-their-globs.md) restated a population from prose
+[plan 0073](./0073-conditions-declare-their-globs.md) restated a population from prose
 and parsing found nearly twice as many.
 
 Also out: `CallRuleBuilder.getMatchedCalls()` (`call-rule-builder.ts:247`) re-implements

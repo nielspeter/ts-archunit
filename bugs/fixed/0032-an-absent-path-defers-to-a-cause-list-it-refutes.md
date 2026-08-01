@@ -1,7 +1,7 @@
 # Bug 0032: an `absent` path defers to a cause list it refutes
 
 **Reported:** 2026-07-31
-**Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../plans/0074-r3b-the-selector-glob-flip.md)'s gate run 4
+**Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md)'s gate run 4
 **Status:** **FIXED** 2026-07-31, released in **v0.33.0**. Verified against the same real codebase that
 found it, remedy included — see below.
 **Severity:** Medium today, High once R3b ships — same escalation as
@@ -73,7 +73,7 @@ the fact, then the causes the fact leaves standing.
 > no file or directory matching this glob exists on disk — a path segment is misspelled, or this
 > names a folder you have not created yet
 
-The second cause is not filler. [Plan 0072](../plans/0072-a-denylist-glob-that-cannot-match.md)
+The second cause is not filler. [Plan 0072](../../plans/0072-a-denylist-glob-that-cannot-match.md)
 established that a pre-emptive ban on a folder that does not exist is **legitimate** and is taught
 by `docs/modules.md:38`, so the advice must not tell the reader their glob is wrong.
 
@@ -89,7 +89,7 @@ empty string with prose passes.
 
 - [Bug 0031](./0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md) — the other half
   of the same gate run.
-- [Plan 0072](../plans/0072-a-denylist-glob-that-cannot-match.md) — why "misspelled" must not be
+- [Plan 0072](../../plans/0072-a-denylist-glob-that-cannot-match.md) — why "misspelled" must not be
   the only cause offered.
 
 ## Fix as shipped

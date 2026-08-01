@@ -4,12 +4,12 @@
 
 What shipped here: R-any, R1, R2a and R3a (v0.20.0), and R2b (below). R3b is designed, its decisions are settled, and its gate needs a real external codebase — so it moves to its own plan rather than holding this one open indefinitely. That is the fallback this plan wrote for itself, taken deliberately.
 
-**Original status line, for the record:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./completed/0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)** (**both released** — v0.22.0 shipped the instrument, v0.23.0 the flip; the plan is in `plans/completed/` and bugs 0019/0020 are closed), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
+**Original status line, for the record:** **PARTIALLY SHIPPED in v0.20.0** — R-any, R1, R2a and R3a are released. **R2b** (the fence-aware docs scanner) is unblocked and off the critical path. **R3b** (the glob flip, proposal 019, `emptyIsPass`) is designed — its two open decisions are settled in [the appendix](./0069-appendix-vacuous-tests.md) — and gated on an adopting codebase running R2a's `doctor` pre-flight, which is possible from v0.20.0 onward. [Bug 0016](../../bugs/fixed/0016-narrowing-a-named-selection-mutates-it.md) **shipped in v0.21.0**, and its effect on R3b is now measured rather than assumed: re-running the appendix's recipe gives 28 failures at v0.20.0 and 29 at v0.21.0, with zero entries leaving the population and exactly one entering (a guard the fix itself added, now classified in category B). **No classification changed.** Bugs 0019/0020 and proposal 019 have **moved to [plan 0070](./0070-a-rule-must-assert-something.md)** (**both released** — v0.22.0 shipped the instrument, v0.23.0 the flip; the plan is in `plans/completed/` and bugs 0019/0020 are closed), so R3b shrinks to the glob guard and `emptyIsPass` — still gated on the adopting codebase's pre-flight.
 
-**Two changes on 2026-07-30.** The "new fault" recorded below — a satisfiable glob that matched no edge — is **refuted and has moved to [plan 0072](./0072-a-denylist-glob-that-cannot-match.md)**: a glob-exercise tally cannot distinguish a typo'd denylist from a respected ban, because both produce tested>0 and matched==0. R3b's own scope is unchanged by that. And R3a shipped **without its second half**: it states the warn-throw semantics and the CLI never got the truncation reporting the same section requires, which is now [bug 0029](../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md) — reachable, measured, and this plan's outstanding debt rather than a new feature.
+**Two changes on 2026-07-30.** The "new fault" recorded below — a satisfiable glob that matched no edge — is **refuted and has moved to [plan 0072](../0072-a-denylist-glob-that-cannot-match.md)**: a glob-exercise tally cannot distinguish a typo'd denylist from a respected ban, because both produce tested>0 and matched==0. R3b's own scope is unchanged by that. And R3a shipped **without its second half**: it states the warn-throw semantics and the CLI never got the truncation reporting the same section requires, which is now [bug 0029](../../bugs/fixed/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md) — reachable, measured, and this plan's outstanding debt rather than a new feature.
 **Priority:** Highest open item. The defect the tool exists to prevent, committed by the tool.
-**Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); ~~absorbs [proposal 019](../proposals/019-rules-that-enforce-nothing-must-fail.md)~~ — **019 moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md)**; closes [bug 0011](../bugs/fixed/0011-dogfood-rules-select-nothing.md).
-**Prerequisites: both satisfied.** [Bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) shipped. The single-root refactor **landed** as `85be8ce refactor(core): one root for every builder`, via `feat/0069-r2a-glob-model` rather than the `spike/0014-rule-census` branch this header used to name — that branch still exists and is **not** an ancestor of `main`, so do not read it as the source of truth. Everything since depends on the single root: plan 0070's assertion gate hangs off `TerminalBuilder`, which is what made one hook reach all fifteen builders.
+**Supersedes:** part C of [plan 0067](./0067-empty-selector-safety.md); ~~absorbs [proposal 019](../../proposals/019-rules-that-enforce-nothing-must-fail.md)~~ — **019 moved to [plan 0070](./0070-a-rule-must-assert-something.md)**; closes [bug 0011](../../bugs/fixed/0011-dogfood-rules-select-nothing.md).
+**Prerequisites: both satisfied.** [Bug 0014](../../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) shipped. The single-root refactor **landed** as `85be8ce refactor(core): one root for every builder`, via `feat/0069-r2a-glob-model` rather than the `spike/0014-rule-census` branch this header used to name — that branch still exists and is **not** an ancestor of `main`, so do not read it as the source of truth. Everything since depends on the single root: plan 0070's assertion gate hangs off `TerminalBuilder`, which is what made one hook reach all fifteen builders.
 
 ## Corrections carried into draft 7
 
@@ -76,7 +76,7 @@ Derivation status of each row, because two of the three are not yet reproducible
 
   That is the **blast radius, not the defect count**, and the distinction is the work R3b actually has to do. Most of the 35 are legitimate — `.notExist()` rules where zero subjects is the passing state, and tests whose entire point is an empty selection (`resideInFolder with nonexistent folder matches nothing`). But some are genuine, and one is a clean specimen: `tests/integration/coverage-gaps.test.ts:480` is named `finds interfaces extending Entity` and its body asserts that `extendType('NonExistentBase')` produces no violations. The name and the body disagree, the body asserts on an empty set, and its own comment records the author losing track mid-test.
 
-  **Classified 2026-07-26** in [the appendix](./completed/0069-appendix-vacuous-tests.md), then corrected after review: **22** legitimate, **5** asserting the current default R3b inverts by design, **8** genuine. The first cut said 26/1/6 — it miscounted its own table by one, dropped one of the 35 tests entirely, and filed a **live shipped preset bug** ([0018](../bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)) under legitimate.
+  **Classified 2026-07-26** in [the appendix](./0069-appendix-vacuous-tests.md), then corrected after review: **22** legitimate, **5** asserting the current default R3b inverts by design, **8** genuine. The first cut said 26/1/6 — it miscounted its own table by one, dropped one of the 35 tests entirely, and filed a **live shipped preset bug** ([0018](../../bugs/fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md)) under legitimate.
 
   The classification changed R3b's design, which the number alone could not have — and then review changed it again. "An empty selector fails **unless the condition is satisfied by emptiness**" turned out to be true of _every_ condition (∀ over ∅ is vacuous) and derivable from none of them. The workable rule is narrower: exempt only a condition that asserts **cardinality**, where zero subjects is the answer rather than the absence of one. `notExist()` is the only shipped condition of that kind, and the flag has to be declared rather than probed.
 
@@ -206,7 +206,7 @@ notImportFrom('**/src/gone/**')   (negative)  ->  0 violations   silent green
 onlyImportFrom('**/src/gone/**')  (positive)  ->  1 violation    loud red
 ```
 
-**Known exposure:** the `only*` family is not reliably loud — `onlyImportFrom` iterates import declarations, so a subject with zero imports passes vacuously (`src/conditions/reverse-dependency.ts:146` documents this for `onlyBeImportedVia`). Filed as [bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md), and R3's changelog claim is scoped to **path globs** accordingly.
+**Known exposure:** the `only*` family is not reliably loud — `onlyImportFrom` iterates import declarations, so a subject with zero imports passes vacuously (`src/conditions/reverse-dependency.ts:146` documents this for `onlyBeImportedVia`). Filed as [bug 0015](../../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md), and R3's changelog claim is scoped to **path globs** accordingly.
 
 `import-target` globs are exempt entirely. Measured 2026-07-26: `getSourceFiles()` returns 430 files here, **0 under `node_modules/`**, so `**/node_modules/typescript/**` — which `arch-rules.test.ts:98` uses correctly — is unsatisfiable against any path universe by construction, and checking it would fail every correct dependency rule in existence.
 
@@ -327,7 +327,7 @@ So the keyword grep is a starting point, not the checklist. Draft 6 said the che
 ## R3b gained a fault, 2026-07-30
 
 From [plan 0071](./0071-one-definition-of-a-module-edge.md) and the refutation recorded in
-[bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md): **a glob
+[bug 0015](../../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md): **a glob
 that is satisfiable but matched no edge** belongs to R3b, and it is a different fault from the
 one 0069 already covers.
 
@@ -344,7 +344,7 @@ the opposite: `notImportFrom('**/legcay/**')` reports zero forever, and that is 
 from a ban being respected. So the polarity matters, and `GlobSite` already carries it.
 
 > **Superseded, 2026-07-30 — the mechanism above is refuted. See
-> [plan 0072](./0072-a-denylist-glob-that-cannot-match.md).**
+> [plan 0072](../0072-a-denylist-glob-that-cannot-match.md).**
 >
 > This section stated the fault as a **glob-exercise tally** ("matched no edge in this run") and
 > recorded two prerequisites from it: `diagnose()` promises to report _"without running any of
@@ -398,7 +398,7 @@ from a ban being respected. So the polarity matters, and `GlobSite` already carr
 >
 > So the binding constraint is not curation, it is **size**. Record the reason that is true.
 
-**The gate must be able to see everything it gates.** Proposal 019 fires on condition-less rules, not on globs, so a `doctor` that reports only glob faults would pass while 019's blast radius was completely wrong — this plan's own question, asked of its own gate, answered "pass". Hence R2a's `doctor` reports condition-less rules too. **Resolved differently in the end:** 019 moved to [plan 0070](./completed/0070-a-rule-must-assert-something.md), whose 0.22.0 completes that reporting for every builder family — so this sentence is spent, and R3b keeps only the glob guard and `emptyIsPass`.
+**The gate must be able to see everything it gates.** Proposal 019 fires on condition-less rules, not on globs, so a `doctor` that reports only glob faults would pass while 019's blast radius was completely wrong — this plan's own question, asked of its own gate, answered "pass". Hence R2a's `doctor` reports condition-less rules too. **Resolved differently in the end:** 019 moved to [plan 0070](./0070-a-rule-must-assert-something.md), whose 0.22.0 completes that reporting for every builder family — so this sentence is spent, and R3b keeps only the glob guard and `emptyIsPass`.
 
 ### R3a's Upgrading section, which is not R3b's
 
@@ -410,7 +410,7 @@ R3a ships first and may ship alone, so it cannot borrow R3b's notes. Three sente
 
 Plus one hazard that is genuinely new and easy to miss: **in a self-executing rule file, a throwing `.warn()` truncates the rest of the module.** Today `rule1.warn(); rule2.check()` evaluates both, because `.warn()` cannot throw. After R3a a meta-finding in `rule1` aborts module evaluation, the CLI's catch (`src/cli/commands/check.ts:41-50`) folds `rule1`'s finding into the run and the output looks entirely normal — while `rule2` was never registered. Silent coverage loss, shipped by the release whose thesis is that silent coverage loss is the defect. `.check()` already has this hazard; R3a extends it to the surface documented as "logs, does not throw". The `export default [rule1, rule2]` shape is unaffected. R3a states the semantics, and the CLI **reports the truncation rather than absorbing it**.
 
-> **Shipped without the second half — filed as [bug 0029](../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md), 2026-07-30.** R3a's semantics shipped in v0.23.0; the CLI reporting never got built, and the hazard above is now reachable with shipped features. Measured at v0.26.0 against a real self-executing rule file: rule 1 warns on a dead `.expectNonEmpty()` selector, rule 2 has four real violations, and **all four are absent** from the terminal and from `--format json`. A `.violations()` control reports all four, isolating the cause to the throw. The reporting is bug 0029's remedy, not R3b's — it belongs to the release that acknowledges it rather than to the next feature.
+> **Shipped without the second half — filed as [bug 0029](../../bugs/fixed/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md), 2026-07-30.** R3a's semantics shipped in v0.23.0; the CLI reporting never got built, and the hazard above is now reachable with shipped features. Measured at v0.26.0 against a real self-executing rule file: rule 1 warns on a dead `.expectNonEmpty()` selector, rule 2 has four real violations, and **all four are absent** from the terminal and from `--format json`. A `.violations()` control reports all four, isolating the cause to the throw. The reporting is bug 0029's remedy, not R3b's — it belongs to the release that acknowledges it rather than to the next feature.
 
 ### R3b's Upgrading section, ordered — and the order is the point
 
@@ -489,7 +489,7 @@ Each verified by sabotage: revert the fix, watch it go red.
 
 ## Known exposures, stated not hidden
 
-- The `only*` family passes vacuously on subjects with no edges — [bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md); R3's changelog claim is scoped to path globs.
+- The `only*` family passes vacuously on subjects with no edges — [bug 0015](../../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md); R3's changelog claim is scoped to path globs.
 - A hand-written `{ description, test }` predicate declares no globs. It disables the check for any `or()` containing it (by the propagation rule) and `doctor` reports its description. `GlobSite`/`GlobNode` are exported so this is fixable by the author.
 - `base` is not verified against a second derivation; the cost of a mis-declaration is a worse message, by design.
 - `workspace()` sets `tsConfigPath` to the alphabetically-first member tsconfig (`src/core/project.ts:143`), so the disk walk's root derives from one member. `discoverIdentityRoot` walks up to `.git` and usually recovers; an unusual layout scopes the walk below some members and mislabels their globs. Fail-open.

@@ -26,7 +26,7 @@ for (const sf of sourceFiles) {
 ```
 
 So `onlyBeImportedVia('…')` sees a re-export as an import; `notImportFrom('…')` does not. Found
-during the five-persona review of [bug 0017](./fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md),
+during the five-persona review of [bug 0017](./0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md),
 independently, by measuring the boundary preset rather than reading it.
 
 ## Reproduction

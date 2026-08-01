@@ -1,8 +1,8 @@
 # Plan 0071 — Forward dependency conditions see every module edge
 
 **Status:** **DONE — both releases shipped** (v0.27.0 instruments, v0.28.0 the widening, 2026-07-30) — the three instruments are released; §Test inventory items 1-3 are done, with 29 tests and a 15-revert sabotage matrix. Both releases shipped. Five reviewers audited the widening before it went out; 60 diff-derived reverts, and the four survivors that mattered were all missing tests — including `onlyImportFrom`, whose widening no test invoked at all. **Draft 4 exists because two independent reviewers, working from opposite ends, found the same thing: item 7 — the release's headline guard — was green with bug 0022 fully reinstated.**
-**Priority:** High. [Bug 0022](../bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
-**Closes:** bug 0022. [Bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **out of scope** — its option 1 is refuted and the evidence lives in that file.
+**Priority:** High. [Bug 0022](../../bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md) is a false green in the enforcement itself: `export { x } from '…'` and `import('…')` cross every banned edge unflagged.
+**Closes:** bug 0022. [Bug 0015](../../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md) is **out of scope** — its option 1 is refuted and the evidence lives in that file.
 
 **Two releases, deliberately:**
 
@@ -249,7 +249,7 @@ Each kind a condition can report gets its own verb: `re-exports`, `dynamically i
 
 **Free only in 0.28.0.** Doing it later invalidates every baseline written at 0.28.
 
-**Not to be confused with [bug 0028](../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).** Measured on the _current_ build, 8 of 47 findings already collide — every pair `import`/`import`. On a full `strictBoundaries` run the rate is **362 findings / 329 distinct identities / 33 collided groups / 66 findings in collisions — 18%**. Per-kind verbs do **not** fix those. Pre-existing, filed separately, and its preferred fix (producer-set `identity`) changes no printed text, so it needs no sequencing against this plan.
+**Not to be confused with [bug 0028](../../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md).** Measured on the _current_ build, 8 of 47 findings already collide — every pair `import`/`import`. On a full `strictBoundaries` run the rate is **362 findings / 329 distinct identities / 33 collided groups / 66 findings in collisions — 18%**. Per-kind verbs do **not** fix those. Pre-existing, filed separately, and its preferred fix (producer-set `identity`) changes no printed text, so it needs no sequencing against this plan.
 
 **§4 makes bug 0028's incidence much worse, and the first number here was wrong by two orders of magnitude.** Draft 4 said "exactly one new within-kind collision", from a proxy that grouped `(importer, kind, target)` over runtime re-exports and found one pair. That proxy **filtered out `typeOnly` edges, which is exactly where the collisions are**: `export { X } from './core/project.js'` and `export type { Y } from './core/project.js'` both render `index.ts re-exports "…/project.ts" …`, byte-identical, so they share a hash.
 

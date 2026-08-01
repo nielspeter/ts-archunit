@@ -1,7 +1,7 @@
 # Bug 0036: the project-relative glob audit covers five surfaces, and there are more
 
 **Reported:** 2026-08-01
-**Found in:** v0.36.1, by the architect review of [bug 0033](./fixed/0033-assignedFrom-does-not-accept-a-project-relative-glob.md)
+**Found in:** v0.36.1, by the architect review of [bug 0033](./0033-assignedFrom-does-not-accept-a-project-relative-glob.md)
 **Status:** **FIXED** 2026-08-01, unreleased.
 **Severity:** Low-to-medium, and mostly a **documentation** defect today. Nothing is silently wrong at runtime — an unsupported relative glob matches nothing, which since v0.34.0 is a loud failure, not a false green. The cost is that `docs/slices.md` said "every surface" when the audit covered five.
 
@@ -61,5 +61,5 @@ Two things the census found about **itself** while being written, both fixed: a 
 
 ## Related
 
-- [Bug 0033](./fixed/0033-assignedFrom-does-not-accept-a-project-relative-glob.md), [bug 0035](./fixed/0035-a-workspace-has-no-single-root.md) — the two surfaces already done.
+- [Bug 0033](./0033-assignedFrom-does-not-accept-a-project-relative-glob.md), [bug 0035](./0035-a-workspace-has-no-single-root.md) — the two surfaces already done.
 - `plans/completed/0067-empty-selector-safety.md` part C — where root-relative resolution started.

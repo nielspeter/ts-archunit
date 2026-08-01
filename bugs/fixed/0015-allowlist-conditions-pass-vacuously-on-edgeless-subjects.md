@@ -43,7 +43,7 @@ as a gap.
 
 ## Why plan 0069 does not close it
 
-[Plan 0069](../plans/completed/0069-no-rule-may-certify-nothing.md) guards globs that cannot
+[Plan 0069](../../plans/completed/0069-no-rule-may-certify-nothing.md) guards globs that cannot
 match the project. This is a different failure: the glob may be perfectly
 satisfiable and the rule still certifies nothing, because the **subject has no
 edges to test**. A typo'd allowlist glob is the loud case — every import falls
@@ -79,7 +79,7 @@ sits in the canonical layered-architecture rule.
 This bug filed two options and said the choice should wait for plan 0069's reporting surface.
 That deciding is done: **option 1 (fail on an edgeless subject) is refuted, and so is a
 rule-level version of it.** The evidence lives here rather than in
-[plan 0071](../plans/0071-one-definition-of-a-module-edge.md), which designed and then withdrew
+[plan 0071](../../plans/completed/0071-one-definition-of-a-module-edge.md), which designed and then withdrew
 it — plans move to `completed/`, and this bug was filed separately precisely so its reasoning
 would not live only inside one.
 
@@ -121,7 +121,7 @@ population is legitimate.
 
 **Do not confuse this with a never-exercised glob.** Plan 0071 draft 2 briefly re-aimed this bug
 at "a denylist glob that matched no edge", which is a glob-declaration fault and belongs to
-[plan 0069](../plans/completed/0069-no-rule-may-certify-nothing.md) R3b — this bug's own "Why plan 0069
+[plan 0069](../../plans/completed/0069-no-rule-may-certify-nothing.md) R3b — this bug's own "Why plan 0069
 does not close it" section says exactly that the two mechanisms differ. Two diagnostics, two
 owners:
 

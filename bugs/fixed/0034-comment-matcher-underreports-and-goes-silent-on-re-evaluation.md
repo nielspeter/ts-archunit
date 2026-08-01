@@ -1,7 +1,7 @@
 # Bug 0034: the `comment()` matcher under-reports, and returns nothing at all on re-evaluation
 
 **Reported:** 2026-08-01
-**Found in:** v0.35.0 and every earlier version — by the architect review of [plan 0047](../plans/0047-typescript-escape-hatch-matchers.md), which was going to build on this machinery
+**Found in:** v0.35.0 and every earlier version — by the architect review of [plan 0047](../../plans/0047-typescript-escape-hatch-matchers.md), which was going to build on this machinery
 **Status:** **FIXED** 2026-08-01, released in **v0.36.0**.
 **Severity:** High. Two independent under-reports in a shipped rule, and one of them is a **rule that passes the second time it runs**. `noStubComments()` (`src/rules/hygiene.ts`) is affected today, and it is in this repository's own architecture suite.
 
@@ -47,7 +47,7 @@ The failure mode is a test that asserts _that_ something was found. Guards must 
 
 ## Related
 
-- [Plan 0047](../plans/0047-typescript-escape-hatch-matchers.md) — proposed `tsDirective()` on top of this, and to extract a shared `matchCommentRanges()` helper from it. The extraction must keep the dedup set **per matcher instance**; hoisting it to module scope turns defect C from per-rule into global and permanent.
+- [Plan 0047](../../plans/0047-typescript-escape-hatch-matchers.md) — proposed `tsDirective()` on top of this, and to extract a shared `matchCommentRanges()` helper from it. The extraction must keep the dedup set **per matcher instance**; hoisting it to module scope turns defect C from per-rule into global and permanent.
 - `noStubComments()` (`src/rules/hygiene.ts`) — under-reports today for reason A.
 
 ## Fix as shipped

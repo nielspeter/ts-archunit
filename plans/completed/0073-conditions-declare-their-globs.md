@@ -27,10 +27,10 @@ A derivation detail worth keeping: `onlyImportFrom`, `notImportFrom` and `depend
 signatures only misses three of the four dependency conditions — measured, on the first
 version of the guard's own walk.
 **Priority:** Medium. Not a false green on its own — nothing reports a condition glob today,
-so nothing reports one wrongly. It is the missing half of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)'s
+so nothing reports one wrongly. It is the missing half of [plan 0069](./0069-no-rule-may-certify-nothing.md)'s
 glob model, and the prerequisite for anything that wants to reason about condition globs at
 all.
-**Blocks:** [plan 0072](./0072-a-denylist-glob-that-cannot-match.md)'s successor, if that is
+**Blocks:** [plan 0072](../0072-a-denylist-glob-that-cannot-match.md)'s successor, if that is
 ever built. 0072's own mechanism is refuted; this plan is worth doing regardless of it.
 
 ## Problem
@@ -171,7 +171,7 @@ itself, since nothing else in the suite can see it.
 ## Out of scope
 
 - **Reporting anything about a condition glob.** That is 0069's R3b for selectors and
-  [0072](./0072-a-denylist-glob-that-cannot-match.md) for the denylist case, whose static and
+  [0072](../0072-a-denylist-glob-that-cannot-match.md) for the denylist case, whose static and
   runtime mechanisms are both refuted. This plan deliberately changes no verdict.
 - **`polarity` on condition sites.** `negateGlobs` is polarity's only writer and it means
   `not()`-combinator negation, not denylist-versus-allowlist. Overloading it to mean the
@@ -180,4 +180,4 @@ itself, since nothing else in the suite can see it.
 - **Giving `import-target` path-universe views.** Deliberate (`path-universe.ts:72`) and
   load-bearing for bug 0014.
 - **The `only*` edgeless-subject exposure** — 0069 line 205,
-  [bug 0015](../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md).
+  [bug 0015](../../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md).

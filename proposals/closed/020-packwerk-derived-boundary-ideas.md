@@ -40,7 +40,7 @@ specific, verified mismatch between what `strictBoundaries()`'s own code claims 
 what it actually enforces. Draft 1 then demoted it, correctly: the mismatch proves the
 `because`/`suggestion`/`imperative` **text** is wrong, not that anyone needs the stronger
 feature (entry-point-only privacy) that text describes. Draft 1 split those and filed the text
-half as [bug 0017](../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).
+half as [bug 0017](../../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md).
 
 **That bug shipped fixed in v0.25.0, the day after draft 1 was written**, and draft 1 asserted
 four times that it was "filed and actionable on its own". With the proven half closed, what
@@ -73,7 +73,7 @@ disposition because it is the one where "pending an adopter" is genuinely the st
 
 Draft 1's only evidence was that `no-cross-boundary`'s remedy described entry-point enforcement
 while the condition implemented folder-level isolation. Filed as
-[bug 0017](../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md),
+[bug 0017](../../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md),
 **fixed in v0.25.0**. `src/presets/boundaries.ts:240-241` now reads:
 
 > boundaries may only depend on themselves and the shared modules — an import from another
@@ -108,7 +108,7 @@ and wrong derivation. Three things were wrong with it:
 2. **It scaled the wrong quantity.** `strictBoundaries` generates O(boundaries) rules; the sketch
    generated O(private files) — roughly 120 extra rules on a 147-file consumer, all sharing one
    id. Draft 1 called this "same complexity class … not a new performance concern", which is
-   wrong: [proposal 021](./021-consumer-run-time-where-it-actually-goes.md) measures rule
+   wrong: [proposal 021](../021-consumer-run-time-where-it-actually-goes.md) measures rule
    execution overtaking project load somewhere around 140 rules. `explain --markdown` and
    `--format json` do not dedupe, so all ~120 would print; `explain --format agent` dedupes on
    `imperative`, so it survived only because the sketch's imperative happened to be constant.
@@ -165,7 +165,7 @@ already exists and nobody has asked for the stronger primitive.
 1. **`added` alone is not a sufficient gate.** It counts _identities_, and two findings can share
    one, so a PR adding a duplicate of an already-accepted violation has `added === 0`. The recipe
    compares the count as well. (Dependency findings stopped colliding in v0.29.0 —
-   [bug 0028](../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md) — but
+   [bug 0028](../../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md) — but
    the general case remains, so the gate does not assume otherwise.)
 2. **`generateBaseline` writes before it returns the delta**, so the programmatic gate accepts
    the growth and then complains about it. Harmless in CI, wrong locally. If this ever does earn

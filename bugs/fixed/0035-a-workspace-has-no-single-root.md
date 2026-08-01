@@ -55,4 +55,4 @@ Separately, `tests/core/relative-globs-are-uniform.test.ts` gained the discrimin
 ## Related
 
 - [Bug 0033](./0033-assignedFrom-does-not-accept-a-project-relative-glob.md) — extended the flaw to a third surface.
-- [Bug 0036](../0036-the-relative-glob-audit-is-incomplete.md) — three more surfaces are unaudited, and the uniformity guard's surface list is hand-maintained.
+- [Bug 0036](./0036-the-relative-glob-audit-is-incomplete.md) — three more surfaces are unaudited, and the uniformity guard's surface list is hand-maintained.

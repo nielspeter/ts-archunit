@@ -109,7 +109,7 @@ the entry-point/internal distinction.
   `src/helpers/baseline.ts:82` claims identity does not survive "rewording `.because()`" —
   false at HEAD, and itself a 0017-shaped overclaim sitting where a compat auditor would look.
 - **Two enforcement defects found during this bug's review are filed separately**, because they
-  are behaviour, not text: [bug 0022](../0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md)
+  are behaviour, not text: [bug 0022](./0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md)
   (`onlyImportFrom` is blind to `export … from` and `import()` — both cross this boundary
   unflagged, measured) and [bug 0023](./0023-strictboundaries-shared-globs-are-raw-and-unguarded.md)
   (`shared` globs matched raw and guarded by nothing). The corrected message below is honest

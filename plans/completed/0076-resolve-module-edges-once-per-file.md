@@ -3,7 +3,7 @@
 **Status:** DONE, shipped in v0.31.0. Implemented on `perf/element-and-edge-caches`.
 **Priority:** Medium. Smaller than [0075](./0075-collect-elements-once-per-project.md) in absolute
 milliseconds and, like it, one of the two items in
-[proposal 021](../proposals/021-consumer-run-time-where-it-actually-goes.md) whose value survives
+[proposal 021](../../proposals/021-consumer-run-time-where-it-actually-goes.md) whose value survives
 any TypeScript 7 outcome.
 **Effort:** ~half a day.
 **Origin:** Proposal 021 Part 2. Every number below is measured on **this repository (520 files,

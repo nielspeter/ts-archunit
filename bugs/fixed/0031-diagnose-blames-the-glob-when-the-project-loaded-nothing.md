@@ -1,7 +1,7 @@
 # Bug 0031: `diagnose()` blames the glob when the project loaded nothing
 
 **Reported:** 2026-07-31
-**Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../plans/0074-r3b-the-selector-glob-flip.md)'s gate run 4
+**Found in:** v0.32.0 (the shipped npm package), by [plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md)'s gate run 4
 **Status:** **FIXED** 2026-07-31, released in **v0.33.0**. Verified against the same real codebase that
 found it, remedy included — see below.
 **Severity:** High **once R3b ships**, Medium today. Today this is a diagnostic's advice. R3b turns
@@ -92,7 +92,7 @@ cause unconditionally passes.
 
 - [Bug 0032](./0032-an-absent-path-defers-to-a-cause-list-it-refutes.md) — the other half of the
   same gate run.
-- [Plan 0074](../plans/0074-r3b-the-selector-glob-flip.md) — R3b, which makes this text a build
+- [Plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md) — R3b, which makes this text a build
   failure.
 
 ## Fix as shipped

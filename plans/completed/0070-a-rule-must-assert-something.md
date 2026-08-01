@@ -10,7 +10,7 @@ diagnosis and the state table survived every round unchanged.
 `RuleBuilder` fields, five deletions, `describeRule()` on six builders, and the guards.
 Two releases. **See Implementation notes for what 0.22.0 actually shipped.**
 **Closes:** [bug 0019](../../bugs/fixed/0019-a-rule-with-no-condition-passes-in-total-silence.md), [bug 0020](../../bugs/fixed/0020-should-twice-silently-drops-the-first-assertion.md).
-**Splits from:** [plan 0069](../0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
+**Splits from:** [plan 0069](./0069-no-rule-may-certify-nothing.md) R3b — see "Why this is not R3b".
 **Absorbs:** [proposal 019](../../proposals/019-rules-that-enforce-nothing-must-fail.md) in full —
 including its central ask, the **deletion** of the four `console.warn + return []` sites, which
 draft 2 forgot — except the override-key ask (see Out of scope).

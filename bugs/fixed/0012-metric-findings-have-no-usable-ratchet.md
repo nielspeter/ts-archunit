@@ -83,7 +83,7 @@ Sketch:
 
 Note this is a **per-element** comparison, which is a different thing from the
 global violation budget rejected in
-[proposal 018](../proposals/018-adoptable-discovery-surface.md). That rejection
+[proposal 018](../../proposals/018-adoptable-discovery-surface.md). That rejection
 stands and is unrelated: a global count cannot say which finding got worse,
 whereas this comparison is anchored to one element and one metric. ADR-008 rule
 5 objects to cardinality standing in for identity; here identity selects the

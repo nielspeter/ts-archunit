@@ -40,4 +40,4 @@ Four tests in `tests/core/relative-globs-are-uniform.test.ts`: the relative and 
 
 - [Bug 0014](./0014-bare-package-import-globs-match-nothing.md) — why bare specifiers must survive this.
 - [Bug 0035](./0035-a-workspace-has-no-single-root.md) — the root derivation this uses.
-- [Bug 0036](../0036-the-relative-glob-audit-is-incomplete.md) — the remaining unaudited surfaces, and why the uniformity guard cannot yet catch a new one.
+- [Bug 0036](./0036-the-relative-glob-audit-is-incomplete.md) — the remaining unaudited surfaces, and why the uniformity guard cannot yet catch a new one.

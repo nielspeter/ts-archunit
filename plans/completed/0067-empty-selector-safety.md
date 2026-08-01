@@ -77,7 +77,7 @@ The root is derived **from the element**, not threaded through the builder, beca
 
 ### Scope boundary, measured rather than assumed
 
-Four surfaces take a path glob. After this, three accept a relative one; `slices().assignedFrom()` does not, and the layer options discover through it. Filed as [bug 0033](../../bugs/0033-assignedFrom-does-not-accept-a-project-relative-glob.md) rather than extended into, because `matching()` normalizes by a **third** mechanism again (rewriting to an anchored form) and three mechanisms for one concept should be unified deliberately. `docs/slices.md` carries the table.
+Four surfaces take a path glob. After this, three accept a relative one; `slices().assignedFrom()` does not, and the layer options discover through it. Filed as [bug 0033](../../bugs/fixed/0033-assignedFrom-does-not-accept-a-project-relative-glob.md) rather than extended into, because `matching()` normalizes by a **third** mechanism again (rewriting to an anchored form) and three mechanisms for one concept should be unified deliberately. `docs/slices.md` carries the table.
 
 ### Sabotage
 

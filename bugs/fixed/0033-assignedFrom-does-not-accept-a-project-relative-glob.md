@@ -1,7 +1,7 @@
 # Bug 0033: `assignedFrom()` does not accept a project-relative glob, while everything beside it does
 
 **Reported:** 2026-08-01
-**Found in:** v0.35.0, by [plan 0067](../plans/completed/0067-empty-selector-safety.md) part C — measured while writing its docs
+**Found in:** v0.35.0, by [plan 0067](../../plans/completed/0067-empty-selector-safety.md) part C — measured while writing its docs
 **Status:** **FIXED** 2026-08-01, released in **v0.36.1**.
 **Severity:** Medium. Nothing is silently wrong: the miss is loud (`assignedFrom` reports "discovers nothing" and fails). The cost is that the glob language is no longer uniform, so a spelling learned in one place stops working in another.
 
@@ -34,7 +34,7 @@ The property is uniformity, so the guard should be a **table test over the surfa
 
 ## Related
 
-- [Plan 0067](../plans/completed/0067-empty-selector-safety.md) part C — introduced the split.
+- [Plan 0067](../../plans/completed/0067-empty-selector-safety.md) part C — introduced the split.
 - `docs/slices.md` documents the split as a table, so the docs are correct today and will be wrong the moment this is fixed.
 
 ## A second instance, found by the same measurement
