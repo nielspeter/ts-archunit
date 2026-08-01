@@ -1,4 +1,9 @@
 import picomatch from 'picomatch'
+import {
+  isProjectRelative,
+  rootFromTsConfigPath,
+  relativeToGivenRoot,
+} from '../core/project-relative.js'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
 
@@ -214,25 +219,46 @@ export function resolveByMatching(project: ArchProject, glob: string): Slice[] {
  *
  * @example
  * resolveByDefinition(project, {
- *   presentation: 'src/controllers/**',
- *   domain: 'src/domain/**',
+ *   presentation: 'src/controllers/**',  // relative: those folders AT THE ROOT
+ *   domain: '**\/domain/**',             // anchored: a domain/ anywhere
  * })
  */
 export function resolveByDefinition(project: ArchProject, definition: SliceDefinition): Slice[] {
   const sourceFiles = project.getSourceFiles()
   const entries = Object.entries(definition)
   const matchers = entries.map(
-    ([name, glob]): { name: string; isMatch: picomatch.Matcher; files: SourceFile[] } => ({
+    ([name, glob]): {
+      name: string
+      isMatch: picomatch.Matcher
+      relative: boolean
+      files: SourceFile[]
+    } => ({
       name,
       isMatch: picomatch(glob),
+      // Bug 0033. A project-relative glob matched nothing here while the path
+      // predicates and `matching()` both accepted one — so `layers: { api:
+      // 'src/api/**' }` failed beside a `shared: ['src/shared/**']` that worked,
+      // in the same preset call. Same rule as the predicates (plan 0067 C):
+      // relative means **from the project root**, which is narrower and more
+      // accurate than the `'**/src/api/**'` the old advice prescribed.
+      relative: isProjectRelative(glob),
       files: [],
     }),
   )
 
+  // From the ArchProject's own tsconfig path, not from ts-morph's recorded
+  // `configFilePath` — the latter is undefined for an in-memory project, so
+  // normalization silently did not happen there and the failure message then
+  // described a relative glob as "anchored but matched no file".
+  const root = rootFromTsConfigPath(project.tsConfigPath)
   for (const sf of sourceFiles) {
     const filePath = sf.getFilePath()
+    const fromRoot = root === undefined ? undefined : relativeToGivenRoot(root, filePath)
     for (const matcher of matchers) {
-      if (matcher.isMatch(filePath)) {
+      const hit =
+        matcher.isMatch(filePath) ||
+        (matcher.relative && fromRoot !== undefined && matcher.isMatch(fromRoot))
+      if (hit) {
         matcher.files.push(sf)
         break // first match wins
       }

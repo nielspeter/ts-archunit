@@ -74,6 +74,30 @@ export function isProjectRelative(glob: string): boolean {
  * `path-universe.ts` applies, so the two cannot disagree about what the root
  * is. `undefined` when the project has no tsconfig.
  */
+/**
+ * The project root implied by a tsconfig path.
+ *
+ * Preferred wherever the caller holds the `ArchProject`, because it is the path
+ * the user named rather than what ts-morph recorded — `getCompilerOptions()
+ * .configFilePath` is `undefined` for an in-memory project even when the
+ * `ArchProject` carries a perfectly good path, and normalization then silently
+ * did not happen. The predicates cannot use this (they see only an element, by
+ * design, so the builder and `.satisfy()` spellings cannot diverge); the slice
+ * resolver can.
+ */
+export function rootFromTsConfigPath(tsConfigPath: string): string | undefined {
+  if (tsConfigPath === '') return undefined
+  const normalized = tsConfigPath.replaceAll('\\', '/')
+  const lastSlash = normalized.lastIndexOf('/')
+  return lastSlash === -1 ? undefined : normalized.slice(0, lastSlash)
+}
+
+/** `absolutePath` relative to `root`, or `undefined` when it sits outside. */
+export function relativeToGivenRoot(root: string, absolutePath: string): string | undefined {
+  const prefix = `${root}/`
+  return absolutePath.startsWith(prefix) ? absolutePath.slice(prefix.length) : undefined
+}
+
 export function rootOf(sourceFile: SourceFile): string | undefined {
   const configFilePath = sourceFile.getProject().getCompilerOptions().configFilePath
   if (typeof configFilePath !== 'string' || configFilePath === '') return undefined

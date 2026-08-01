@@ -247,9 +247,13 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
   })
 
   it('assignedFrom(): anchor advice only when a glob actually lacks the anchor', () => {
-    const message = discoveryMessage((b) => b.assignedFrom({ ghost: 'src/nope/**' }))
+    // `'*/nope/**'`, not `'src/nope/**'`. Since bug 0033 a project-relative glob
+    // RESOLVES against the project root here, so it is no longer unanchored and
+    // telling the author to prefix `"**/"` would send them to change a spelling
+    // that works. A leading `*/` is still genuinely unanchored.
+    const message = discoveryMessage((b) => b.assignedFrom({ ghost: '*/nope/**' }))
     expect(message).toContain(ANCHOR_ADVICE)
-    expect(message).toContain('ghost: "src/nope/**"') // names the slice, not just the glob
+    expect(message).toContain('ghost: "*/nope/**"') // names the slice, not just the glob
     expect(message).not.toContain(PREFIX_ADVICE)
   })
 
@@ -299,17 +303,33 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
   it('the anchor remedy is TRUE: adding "**/" turns an empty glob into a matching one', () => {
     // Independent derivation (ADR-008 R5): don't take the prose's word for it —
     // check that the transformation the message recommends actually works.
-    expect(resolveByDefinition(p, { x: 'src/domain/**' })[0]!.files).toHaveLength(0)
-    expect(resolveByDefinition(p, { x: '**/src/domain/**' })[0]!.files.length).toBeGreaterThan(0)
+    // `'*/domain/**'` is the still-unanchored shape; `'src/domain/**'` stopped
+    // being one in bug 0033 and is asserted below instead.
+    expect(resolveByDefinition(p, { x: '*/domain/**' })[0]!.files).toHaveLength(0)
+    expect(resolveByDefinition(p, { x: '**/domain/**' })[0]!.files.length).toBeGreaterThan(0)
+  })
+
+  it('a project-relative glob resolves against the project root (bug 0033)', () => {
+    // The gap this closed: `assignedFrom` was the one surface that rejected the
+    // spelling the path predicates and `matching()` both accepted, so
+    // `layers: { api: 'src/api/**' }` failed beside a `shared: ['src/shared/**']`
+    // that worked, in the same preset call.
+    expect(resolveByDefinition(p, { x: 'src/domain/**' })[0]!.files.length).toBeGreaterThan(0)
+    // And it means the ROOT one specifically — the same set as the absolute form.
+    const rel = resolveByDefinition(p, { x: 'src/domain/**' })[0]!.files.map((f) => f.getFilePath())
+    const abs = resolveByDefinition(p, { x: '**/src/domain/**' })[0]!.files.map((f) =>
+      f.getFilePath(),
+    )
+    expect(rel.sort()).toEqual(abs.sort())
   })
 
   it('a mixed definition names BOTH the unanchored and the anchored-but-missing', () => {
     // Naming only the unanchored subset sends the caller through a second failing
     // run to discover the rest — every slice is empty, so all of them are at fault.
     const message = discoveryMessage((b) =>
-      b.assignedFrom({ bad: 'src/nope/**', alsoBad: '**/does-not-exist/**' }),
+      b.assignedFrom({ bad: '*/nope/**', alsoBad: '**/does-not-exist/**' }),
     )
-    expect(message).toContain('bad: "src/nope/**"')
+    expect(message).toContain('bad: "*/nope/**"')
     expect(message).toContain('alsoBad: "**/does-not-exist/**"')
     expect(message).toContain(ANCHOR_ADVICE)
   })
@@ -344,7 +364,7 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
     // were also broken.
     const message = discoveryMessage((b) =>
       b.assignedFrom({
-        unanchored: 'src/nope/**',
+        unanchored: '*/nope/**',
         missing: '**/does-not-exist/**',
         dotted: './src/x/**',
         dirOnly: '**/src/domain',
@@ -360,8 +380,12 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
   })
 
   it('truncates within a fault group but never hides a whole group', () => {
-    const many: Record<string, string> = { shared: 'src/shared/**' }
-    for (let i = 0; i < 8; i++) many[`layer${String(i)}`] = `src/nope-${String(i)}/**`
+    // `*/`-prefixed, so these stay in the UNANCHORED group. A project-relative
+    // spelling resolves against the root since bug 0033, which would collapse
+    // everything into one `no-match` group and quietly retire the second half
+    // of this test — that a second group survives truncation.
+    const many: Record<string, string> = { shared: '*/shared/**' }
+    for (let i = 0; i < 8; i++) many[`layer${String(i)}`] = `*/nope-${String(i)}/**`
     many.missing = '**/does-not-exist/**' // a second fault group
     const message = discoveryMessage((b) => b.assignedFrom(many))
     expect(message).toContain('shared:') // error-prone key is always kept
@@ -422,7 +446,10 @@ describe('SliceRuleBuilder empty-discovery remedies (bug 0009)', () => {
       {
         branch: 'assignedFrom: unanchored',
         marker: 'prefix these with "**/"',
-        broken: (b) => b.assignedFrom({ a: 'src/features/auth/**', b: 'src/features/billing/**' }),
+        // `*/`, not a project-relative spelling: since bug 0033 the latter
+        // resolves against the project root, so it is no longer broken and this
+        // case would stop exercising the branch it names.
+        broken: (b) => b.assignedFrom({ a: '*/features/auth/**', b: '*/features/billing/**' }),
         remedy: (b) =>
           b.assignedFrom({ a: '**/src/features/auth/**', b: '**/src/features/billing/**' }),
       },
