@@ -234,6 +234,41 @@ describe('the other library warnings, on the same channel', () => {
   })
 })
 
+describe('the generated directory is this process’s alone (bug 0045)', () => {
+  // A STRUCTURAL pin, and labelled as one rather than dressed up as a guard.
+  //
+  // The defect needs two processes sharing a checkout, and a suite run is one
+  // process — measured: reverting to the shared directory leaves the rest of the
+  // suite green. So it cannot be guarded behaviourally from inside the suite.
+  // What this CAN do is stop the property being removed casually.
+  //
+  // The behavioural proof was taken by hand and is recorded on the bug: with the
+  // old code, deleting the shared root mid-run — exactly what a sibling's
+  // `beforeAll` did — killed the run with the same `ENOENT` the flake reported;
+  // with the new code, deleting a sibling's directory changes nothing.
+  it('the path is unique per process, so two runs cannot collide', () => {
+    expect(generatedDir).toContain(String(process.pid))
+    expect(generatedDir.startsWith(generatedRoot)).toBe(true)
+    expect(generatedDir).not.toBe(generatedRoot)
+  })
+
+  it('cleanup never removes a sibling’s directory', () => {
+    // The other half: owning a subdirectory is worthless if teardown still
+    // deletes the parent recursively. `rmdirSync` on the root is deliberate —
+    // it fails while a sibling still has one, which is the check we want.
+    const sibling = path.join(generatedRoot, 'run-000000')
+    fs.mkdirSync(sibling, { recursive: true })
+    try {
+      expect(() => {
+        fs.rmdirSync(generatedRoot)
+      }).toThrow()
+      expect(fs.existsSync(sibling)).toBe(true)
+    } finally {
+      fs.rmSync(sibling, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('the channel itself', () => {
   // Two properties of `writeStderr` that the child-process tests above cannot
   // see, both measured in their own child because they are about process
