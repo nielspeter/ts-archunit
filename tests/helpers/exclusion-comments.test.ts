@@ -74,19 +74,48 @@ describe('parseExclusionComments', () => {
     expect(result.warnings[0]?.message).toContain('Add a reason')
   })
 
-  it('reports nested block start as warning', () => {
+  // Bug 0039. This test used to assert a `Nested` warning and never looked at
+  // `result.exclusions` — which is exactly how the real behaviour stayed
+  // invisible: the inner directive was dropped, the inner `-end` closed the
+  // OUTER block, and the fixture silently produced a `rule-a` exclusion ending
+  // at line 5 that nothing asserted. Nesting two different rules is legitimate
+  // and now works.
+  it('nests two different rules, innermost closed first', () => {
     const source = [
       '// ts-archunit-exclude-start rule-a: outer block',
       'const x = 1',
       '// ts-archunit-exclude-start rule-b: inner block',
       'const y = 2',
       '// ts-archunit-exclude-end',
+      'const z = 3',
+      '// ts-archunit-exclude-end',
     ].join('\n')
 
     const result = parseExclusionComments(source, 'src/nested.ts')
-    expect(result.warnings.length).toBeGreaterThanOrEqual(1)
-    const nestedWarning = result.warnings.find((w) => w.message.includes('Nested'))
-    expect(nestedWarning).toBeDefined()
+    expect(result.warnings).toHaveLength(0)
+
+    const byRule = new Map(result.exclusions.map((e) => [e.ruleId, e]))
+    // Innermost closes at the FIRST end, outermost at the second — the whole
+    // fix, as one assertion. Before it, `rule-a` ended at line 5 and `rule-b`
+    // did not exist.
+    expect(byRule.get('rule-b')).toMatchObject({ line: 3, endLine: 5 })
+    expect(byRule.get('rule-a')).toMatchObject({ line: 1, endLine: 7 })
+  })
+
+  it('re-opening a rule that is already open is warned, and still applies', () => {
+    const source = [
+      '// ts-archunit-exclude-start rule-a: outer',
+      '// ts-archunit-exclude-start rule-a: redundant',
+      '// ts-archunit-exclude-end',
+      '// ts-archunit-exclude-end',
+    ].join('\n')
+
+    const result = parseExclusionComments(source, 'src/dup.ts')
+    // Warned because the likeliest cause is a missing `-end` — but still
+    // applied, because refusing it is what produced the early-close bug.
+    expect(result.warnings.map((w) => w.kind)).toEqual(['malformed'])
+    expect(result.warnings[0]?.message).toContain('already open')
+    expect(result.exclusions).toHaveLength(2)
   })
 })
 

@@ -9,6 +9,8 @@ import { formatViolationsJson } from './format-json.js'
 import { activeNotice } from './diff-disclosure.js'
 import { formatViolationsGitHub } from './format-github.js'
 import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
+import type { ExclusionWarning } from './exclusion-comments.js'
+import { UNSUPPRESSABLE } from './unsuppressable.js'
 import { recordCommentSuppression } from './comment-suppression.js'
 import { writeStderr } from './stderr.js'
 import type { EdgeCoverage } from './edge-coverage.js'
@@ -175,12 +177,23 @@ export function applyFilters(
 
   // Scan source files for inline exclusion comments (when rule has an ID)
   if (ctx.metadata?.id && result.length > 0) {
+    const undocumented: ExclusionWarning[] = []
     const filePaths = new Set(result.map((v) => v.file))
     const allComments = [...filePaths].flatMap((filePath) => {
       try {
         const sourceText = fs.readFileSync(filePath, 'utf-8')
         const parseResult = parseExclusionComments(sourceText, filePath)
         for (const warning of parseResult.warnings) {
+          // An undocumented exclusion is well-formed and APPLIES, so a stderr
+          // line is the wrong weight: it silences a real finding and the build
+          // goes green (bug 0039). It becomes a configuration finding below.
+          // The malformed shapes are different — two of the three decline to
+          // create the exclusion at all, so the original violation still fires
+          // and the build is already red. A line on stderr is right for those.
+          if (warning.kind === 'undocumented') {
+            undocumented.push(warning)
+            continue
+          }
           writeStderr(`[ts-archunit] ${warning.message}`)
         }
         return parseResult.exclusions
@@ -206,6 +219,36 @@ export function applyFilters(
         // the pipeline a reader could not see — see `comment-suppression.ts`.
         recordCommentSuppression(v.ruleId ?? ctx.metadata?.id ?? '(unnamed rule)', v.file)
         return false
+      })
+    }
+
+    // The exemption stands; what fails is the missing justification. That is
+    // deliberate and it is what makes the remedy remediable: add a reason and
+    // this finding clears while the exclusion keeps working. Refusing to apply
+    // the exclusion instead would make the remedy "add a reason" produce a
+    // DIFFERENT failure — the violation itself — which is a remedy that does
+    // not remediate (ADR-008 rule 2).
+    //
+    // Unsuppressable, because a suppression mechanism that can suppress the
+    // complaint about itself is not a mechanism.
+    for (const warning of undocumented) {
+      result.push({
+        rule: ctx.metadata.id,
+        ruleId: ctx.metadata.id,
+        element: `${ctx.metadata.id}@${warning.file}:${String(warning.line)}`,
+        file: warning.file,
+        line: warning.line,
+        message:
+          `This exclusion states no reason, so nothing records why the rule is ` +
+          `waived here — and it is silently suppressing a real finding.`,
+        suggestion:
+          `Add a reason: // ts-archunit-exclude ${ctx.metadata.id}: <why>. ` +
+          `A reason is prose and nothing verifies it, so this raises the cost of a ` +
+          `suppression rather than preventing one — the audience is the reviewer ` +
+          `reading the diff. If the exemption is not justifiable, delete it and fix ` +
+          `the finding instead. ${UNSUPPRESSABLE}`,
+        severity: 'error',
+        bypassFilters: true,
       })
     }
   }

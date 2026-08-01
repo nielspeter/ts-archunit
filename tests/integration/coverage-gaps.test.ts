@@ -1195,16 +1195,19 @@ describe('exclusion comments — parseExclusionComments and isExcludedByComment'
       expect(result.warnings[0]!.message).toContain('without matching end')
     })
 
-    it('warns on nested block start', () => {
+    it('an unterminated outer block fails closed, while the inner one applies', () => {
+      // Bug 0039: one `-end` closes the INNERMOST frame. `rule-a` is left open
+      // and therefore produces no exclusion at all — fail-closed, so whatever it
+      // meant to cover still fires.
       const source = [
         '// ts-archunit-exclude-start rule-a: first block',
         '// ts-archunit-exclude-start rule-b: nested block',
         '// ts-archunit-exclude-end',
       ].join('\n')
       const result = parseExclusionComments(source, '/test/file.ts')
-      expect(result.warnings.length).toBeGreaterThanOrEqual(1)
-      const nestedWarning = result.warnings.find((w) => w.message.includes('Nested'))
-      expect(nestedWarning).toBeDefined()
+      expect(result.exclusions.map((e) => e.ruleId)).toEqual(['rule-b'])
+      const unclosed = result.warnings.find((w) => w.message.includes('without matching end'))
+      expect(unclosed?.message).toContain('rule-a')
     })
 
     it('block start without reason produces undocumented warning', () => {
