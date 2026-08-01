@@ -22,10 +22,11 @@ rule enforces nothing, and it is unsuppressable by construction. There are **12*
 across **8** files:
 
 ```
-src/core/terminal-builder.ts:203, :480      src/presets/shared.ts:71
-src/core/rule-builder.ts:522, :556          src/conditions/cross-layer.ts:52
-src/helpers/baseline.ts:674, :730           src/builders/slice-rule-builder.ts:340
-src/cli/rule-file-findings.ts:85, :161      src/builders/correspondence-builder.ts:383
+src/core/terminal-builder.ts   ×2      src/presets/shared.ts               ×1
+src/core/rule-builder.ts       ×2      src/conditions/cross-layer.ts       ×1
+src/helpers/baseline.ts        ×2      src/builders/slice-rule-builder.ts  ×1
+src/cli/rule-file-findings.ts  ×2      src/builders/correspondence-builder.ts ×1
+src/core/execute-rule.ts       ×1  (added v0.38.0, bug 0039)
 ```
 
 Two invariants are supposed to hold across all twelve. Neither is enforced, and both are already
@@ -252,7 +253,7 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
 - **Put a numeric cap on the "it's a judgement" classification.** The plan warns against it
   becoming the default and gives that warning no teeth. A cap makes the escape hatch itself able
   to fail.
-- **Census population is now 13, not 12** — v0.37.0's disclosure work did not add a producer, but
+- **Census population is 13 as of v0.38.0, and was 12 when filed** — it has already moved once while this plan sat open, which is the argument for the plan — v0.37.0's disclosure work did not add a producer, but
   bug 0038's fix will, and 0040's fix should _remove_ one (the cross-layer producer becomes
   redundant once `deadSelectorViolation` covers discovery sites). Re-derive rather than trusting
   the list above.
