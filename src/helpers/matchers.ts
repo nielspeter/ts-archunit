@@ -25,6 +25,30 @@ export interface ExpressionMatcher {
    * The condition layer enforces this — matchers can assume the kind is correct.
    */
   matches(node: Node): boolean
+
+  /**
+   * Every position at which this matcher's pattern matches a comment attached
+   * to `node`. Absent for an ordinary matcher, where the node *is* the match.
+   *
+   * **Presence of this method is what makes a matcher a trivia matcher.** It
+   * was two members — a `matchesTrivia: true` flag beside a single-position
+   * accessor — and that admitted four states of which two were silently wrong:
+   * the flag without the accessor reported every node at its own line, and the
+   * accessor without the flag reproduced the original bug. Both were measured.
+   * One member cannot disagree with itself.
+   *
+   * **Every** position, not the first. A node routinely carries several
+   * matching comments — four stacked `// TODO` lines lead one statement — and
+   * the unit of a comment finding is the **comment**. Returning one collapsed
+   * them, which left `noStubComments()` reporting a single finding for four
+   * stubs: a ratchet hole exactly where agent-written stubs accumulate, in the
+   * rule `agentGuardrails` ships to catch them.
+   *
+   * Must be **pure and stable for a node**: the traversal calls it to
+   * enumerate and deduplicate matches, and the conditions layer calls it again
+   * to name the line, across a layer boundary, and the two must agree.
+   */
+  matchedTriviaPositions?(node: Node): readonly number[]
 }
 
 /**
@@ -287,8 +311,9 @@ export const STUB_PATTERNS =
  * `syntaxKinds: undefined` so the broad traversal path visits every node,
  * and `matches(node)` checks that node's comment ranges.
  *
- * A Set tracks matched comment positions to avoid duplicates (the same
- * comment may be visited as leading trivia of multiple nested nodes).
+ * The same comment is visible as trivia of several nested nodes, so the
+ * traversal deduplicates by the comment's own position — this matcher holds no
+ * state of its own (bug 0034).
  *
  * @param pattern - String substring or RegExp to test against comment text.
  *
@@ -298,11 +323,16 @@ export const STUB_PATTERNS =
  * comment('HACK')                     // matches hack comments
  */
 export function comment(pattern: string | RegExp): ExpressionMatcher {
-  // Dedup by (filePath, pos) — prevents the same comment from matching
-  // multiple times when visited as leading trivia of nested nodes.
-  // Using a composite string key avoids cross-file collisions.
-  const matchedComments = new Set<string>()
-
+  // NO dedup state here, deliberately — bug 0034. This used to hold a
+  // `Set<string>` of matched `filePath:pos` keys that was never reset, so the
+  // SAME rule object returned 2 violations and then 0 on its second
+  // evaluation: measured, and the purest form of the green that means nothing
+  // this project exists to remove. It bit watch mode, a preset array checked
+  // twice, and any test reusing a rule constant.
+  //
+  // Dedup now happens in the traversal, keyed by attachment point, via
+  // `matchedTriviaPositions` below. A matcher that holds no state cannot go
+  // stale.
   function testComment(range: CommentRange): boolean {
     const text = range.getText()
     if (typeof pattern === 'string') {
@@ -320,17 +350,15 @@ export function comment(pattern: string | RegExp): ExpressionMatcher {
         : `comment matching ${String(pattern)}`,
     // No syntaxKinds — broad traversal to visit all nodes and their comments
     matches(node: Node): boolean {
-      const filePath = node.getSourceFile().getFilePath()
       const ranges = [...node.getLeadingCommentRanges(), ...node.getTrailingCommentRanges()]
-      for (const range of ranges) {
-        const key = `${filePath}:${String(range.getPos())}`
-        if (matchedComments.has(key)) continue
-        if (testComment(range)) {
-          matchedComments.add(key)
-          return true
-        }
-      }
-      return false
+      return ranges.some((range) => testComment(range))
+    },
+    matchedTriviaPositions(node: Node): readonly number[] {
+      // `getPos()`, never `getEnd()`: a multi-line block comment or JSDoc would
+      // otherwise be reported at its CLOSING line. Invisible to an all-`//`
+      // fixture, where the two share a line — found by sabotage.
+      const ranges = [...node.getLeadingCommentRanges(), ...node.getTrailingCommentRanges()]
+      return ranges.filter((range) => testComment(range)).map((range) => range.getPos())
     },
   }
 }

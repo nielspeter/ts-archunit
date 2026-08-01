@@ -3,7 +3,11 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { identifyMatches } from './match-identity.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
-import { searchModuleBody, type ModuleBodyOptions } from '../helpers/body-traversal.js'
+import {
+  searchModuleBody,
+  type ModuleBodyOptions,
+  reportedLine,
+} from '../helpers/body-traversal.js'
 
 // ─── Module body conditions ────────────────────────────────────────
 
@@ -67,8 +71,8 @@ export function moduleNotContain(
             rule: context.rule,
             element: sf.getBaseName(),
             file: sf.getFilePath(),
-            line: node.getStartLineNumber(),
-            message: `${sf.getBaseName()} contains ${matcher.description} at line ${String(node.getStartLineNumber())}`,
+            line: reportedLine(node, result.triviaPositions[index]),
+            message: `${sf.getBaseName()} contains ${matcher.description} at line ${String(reportedLine(node, result.triviaPositions[index]))}`,
             identity: identities[index],
             because: context.because,
           })
@@ -109,8 +113,8 @@ export function moduleUseInsteadOf(
             rule: context.rule,
             element: sf.getBaseName(),
             file: sf.getFilePath(),
-            line: node.getStartLineNumber(),
-            message: `${sf.getBaseName()} contains ${bad.description} at line ${String(node.getStartLineNumber())} — use ${good.description} instead`,
+            line: reportedLine(node, badResult.triviaPositions[index]),
+            message: `${sf.getBaseName()} contains ${bad.description} at line ${String(reportedLine(node, badResult.triviaPositions[index]))} — use ${good.description} instead`,
             identity: identities[index],
             because: context.because,
           })

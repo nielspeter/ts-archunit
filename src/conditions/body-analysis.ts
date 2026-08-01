@@ -4,7 +4,7 @@ import type { ArchViolation } from '../core/violation.js'
 import { createViolation, getElementName } from '../core/violation.js'
 import { identifyMatches } from './match-identity.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
-import { searchClassBody } from '../helpers/body-traversal.js'
+import { searchClassBody, reportedLine } from '../helpers/body-traversal.js'
 
 // ─── Class body conditions ──────────────────────────────────────────
 
@@ -58,7 +58,7 @@ export function classNotContain(matcher: ExpressionMatcher): Condition<ClassDecl
           violations.push({
             ...createViolation(
               cls,
-              `${getElementName(cls)} contains ${matcher.description} at line ${String(node.getStartLineNumber())}`,
+              `${getElementName(cls)} contains ${matcher.description} at line ${String(reportedLine(node, result.triviaPositions[index]))}`,
               context,
             ),
             identity: identities[index],
@@ -103,7 +103,7 @@ export function classUseInsteadOf(
           violations.push({
             ...createViolation(
               cls,
-              `${getElementName(cls)} contains ${bad.description} at line ${String(node.getStartLineNumber())} — use ${good.description} instead`,
+              `${getElementName(cls)} contains ${bad.description} at line ${String(reportedLine(node, badResult.triviaPositions[index]))} — use ${good.description} instead`,
               context,
             ),
             identity: identities[index],
