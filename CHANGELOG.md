@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.37.0] - 2026-08-01
+
+### Fixed
+
+- **Inline `// ts-archunit-exclude` comments now work for every condition** ([bug 0041](bugs/fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md)). They previously did nothing unless the producing condition stamped `ruleId` itself — so they worked for `classes()` and were **silently inert** for the dependency, exports, slice, reverse-dependency and module-body families, which is most of them. No error, no warning: the comment was ignored. `applyFilters` stamped the rule id _after_ running the comment filter, and `isExcludedByComment` opens by bailing on a missing id. The suite could not see it because its only end-to-end test used a helper that stamped the field itself — test and code written from one understanding, agreeing while the feature did not work.
+
+- **The empty-layer finding carries its own remedy, and the remedy is now true** ([bug 0042](bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)). `crossLayer`'s "Layer X matched 0 files" finding copied the rule author's `suggestion`, so a configuration finding printed a `Fix:` for an unrelated problem — measured, an empty-layer finding advising "Split the cycle by extracting a shared module." With no author metadata it shipped with **no remedy at all**, the only configuration finding of the twelve that could. Its remedy is now its own, names the offending glob, and its removal clause is computed from the chain length rather than stated flat — because "remove the layer from the chain" throws `RangeError` on a two-layer chain, which is the only shape that produces the finding.
+
+- **Three published `haveMatchingCounterpart()` examples did not compile**, two of them JSDoc on the public `crossLayer()` and `CrossLayerBuilder`, so every user saw them on IDE hover. Part of [bug 0040](bugs/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md), fixed ahead of the runtime work.
+
+### Added
+
+- **Inline exclusion comments now say what they suppressed.** Every other filter in the pipeline discloses itself — `.excluding()` warns on an unused pattern, diff-aware has a suppression notice, the baseline reports unmatched entries. The comment filter dropped findings and printed nothing, and the fix above made it the widest filter we ship. A run that suppresses anything now prints the **rule and file** for each (identities, not a bare count, per ADR-008 rule 4), capped with the remainder stated rather than truncated silently. `check --format json` carries the same list as `commentSuppressed`, always present so a consumer can tell "nothing suppressed" from "this version does not report it".
+
+- The "this finding cannot be suppressed" sentence named **five** suppression surfaces where the code refuses **six** — the omission being the inline exclusion comment, which the fix above made reachable everywhere. An agent reading a five-item list infers exhaustiveness. It is now sourced from one place and guarded by a set comparison: each mechanism probed behaviourally, compared against the names parsed from the sentence, failing on over-claim and under-claim alike.
+
+### Changed
+
+- `docs/violation-reporting.md` documents **where an exclusion comment has to go**, which was written down nowhere: a single-line directive covers exactly the line below it, and the line that counts is the one the _finding_ reports. A class-level condition reports at the class declaration, not the offending statement; a file-level condition reports at line 1, which **no single-line comment can cover** — use the block form. It also retracts the claim that inline comments "survive renames": they have no staleness signal and structurally cannot have one, which is the opposite of the advantage that was advertised.
+
+### Upgrade note
+
+**Your report may shrink, and the exit code may drop.** Exemptions you wrote and believed had failed are now honoured. A comment matches by rule id, file, and the line immediately below it — nothing else — so a comment left in place after the code beneath it changed will suppress whatever violation of that rule now lands there.
+
+The sharpest case: the `Undocumented exclusion` warning is **unchanged in wording**, and on the previous release it accompanied a red build because the exclusion did not apply. It now accompanies a green one. If you learned that warning was noise, that heuristic has inverted.
+
+Before upgrading, audit with `grep -rn "ts-archunit-exclude" src/`. After upgrading, `check --format json` → `commentSuppressed` lists every suppression by rule and file.
+
+Baselines are unaffected: identity hashing does not incorporate the fields involved, and a baseline generated on 0.36.3 matches on 0.37.0 — measured.
+
 ## [0.36.3] - 2026-08-01
 
 ### Fixed

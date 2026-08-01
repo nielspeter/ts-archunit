@@ -9,6 +9,7 @@ import { formatViolationsJson } from './format-json.js'
 import { activeNotice } from './diff-disclosure.js'
 import { formatViolationsGitHub } from './format-github.js'
 import { parseExclusionComments, isExcludedByComment } from './exclusion-comments.js'
+import { recordCommentSuppression } from './comment-suppression.js'
 import { writeStderr } from './stderr.js'
 import type { EdgeCoverage } from './edge-coverage.js'
 
@@ -25,17 +26,91 @@ export interface ExecuteRuleContext {
 }
 
 /**
- * Apply exclusion patterns, inline exclusion comments, baseline,
- * and diff filtering to a set of violations, then execute the
- * terminal action (throw or warn).
+ * Complete each violation's identity, then apply `.excluding()` patterns and
+ * inline exclusion comments.
  *
  * Extracted to eliminate terminal-method duplication across builders.
+ *
+ * **Not** baseline or diff filtering, despite what this said for several
+ * releases — those run in `executeCheck` / `executeWarn`, after this returns.
+ *
+ * ## The invariant, for whoever adds the next filter
+ *
+ * **Enrichment runs first, so every filter sees a complete violation.** That is
+ * the whole reason for the ordering, and it is easy to undo by accident because
+ * enrichment looks like output formatting rather than identity. It is not: the
+ * comment filter matches on `ruleId`, and when enrichment ran last that filter
+ * saw `undefined` for every condition that did not stamp the field itself
+ * (bug 0041) — a documented feature that silently did nothing.
+ *
+ * Enrichment is pure, idempotent, and writes a **disjoint field set** from
+ * everything the filters read: it touches `ruleId`, `because`, `suggestion` and
+ * `docs`; `.excluding()` matches on `element`/`file`/`message`, and the
+ * `bypassFilters` refusal path reads a flag enrichment never writes. So
+ * "identity is complete before anything reads it" is a simpler invariant to hold
+ * than "each filter must know which fields exist yet". Add a filter that reads
+ * one of those four fields and it will work; add a mutation of them below a
+ * filter and you have reintroduced 0041.
  */
 export function applyFilters(
   violations: ArchViolation[],
   ctx: ExecuteRuleContext,
 ): ArchViolation[] {
   let result = violations
+
+  // Enrich FIRST, because a filter cannot match on a field that is not set yet.
+  //
+  // [Bug 0041](../../bugs/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md):
+  // this block used to run LAST, after the inline-comment filter below. That
+  // filter's first statement is `if (!violation.ruleId) return false`
+  // (`exclusion-comments.ts:262`), so an exclusion comment matched only
+  // violations whose *producing condition* stamped `ruleId` itself. For every
+  // condition that left it to this enrichment — the dependency, exports, slice,
+  // reverse-dependency and module-body families, which is most of them — the
+  // comment was inert: no suppression, no error, no warning. Measured, with a
+  // documented comment and a rule carrying an id, `modules().notImportFrom()`
+  // returned the violation unsuppressed, and it carried the matching `ruleId`,
+  // stamped here a few lines too late.
+  //
+  // Ordering, not lookup, is the fix: giving `isExcludedByComment` a second
+  // source for the id would leave two places that decide what a rule is called.
+  //
+  // Safe ahead of `.excluding()` as well, which matches on `element`/`file`/
+  // `message` — none of which this touches. It costs a map over violations that
+  // may later be filtered out; correctness beats that.
+  const meta = ctx.metadata
+  if (ctx.reason || meta?.id || meta?.because || meta?.suggestion || meta?.docs) {
+    result = result.map((v) => ({
+      ...v,
+      ruleId: v.ruleId ?? meta?.id,
+      because: v.because ?? ctx.reason ?? meta?.because,
+      // A `bypassFilters` finding reports that the rule enforces NOTHING, so the
+      // author's `suggestion` cannot be its remedy: that text describes how to fix
+      // a real violation of the rule, and the formatter renders `suggestion` under
+      // `Fix:` — the field an agent obeys. Pairing a configuration message with an
+      // unrelated `Fix:` is a false remedy by juxtaposition (bug 0021), and it is
+      // ADR-008 rule 2: a failure may not assert a cause it cannot verify.
+      //
+      // `SliceRuleBuilder.metaViolation` argued exactly this in a comment and
+      // omitted both fields — and was overridden here, one layer up, so the
+      // omission had no effect in any shipped version. Measured: a finding reading
+      // "resolved no slices" printed "Split the cycle by extracting a shared
+      // module." as its Fix:.
+      //
+      // This guard reaches only producers that LEAVE the fields unset. A producer
+      // that assigns `context.suggestion` itself defeats it — bug 0042, where
+      // `cross-layer.ts` did exactly that and shipped the author's remedy on an
+      // empty-layer finding. Such a producer owns the discipline itself.
+      //
+      // `ruleId` and `because` stay. Neither asserts a remedy: the id says WHICH
+      // rule enforces nothing, which is the first thing the reader needs, and
+      // `because` states why the rule exists, which is context rather than a
+      // claim about this finding's cause. A producer that wants a remedy sets its
+      // own — `metaViolation` sets `docs: GLOB_DOCS`, which is about the fault.
+      suggestion: v.bypassFilters ? v.suggestion : (v.suggestion ?? meta?.suggestion),
+      docs: v.bypassFilters ? v.docs : (v.docs ?? meta?.docs),
+    }))
+  }
 
   // Apply .excluding() chain exclusions
   const exclusions = ctx.exclusions ?? []
@@ -124,43 +199,15 @@ export function applyFilters(
       // `// ts-archunit-exclude` comments ARE parsed. Without the first clause
       // a comment in a rule file would silence the finding that says the rule
       // enforces nothing. Pinned by tests/helpers/exclusion-comments.ts.
-      result = result.filter(
-        (v) => v.bypassFilters === true || !isExcludedByComment(v, allComments),
-      )
+      result = result.filter((v) => {
+        if (v.bypassFilters === true) return true
+        if (!isExcludedByComment(v, allComments)) return true
+        // Disclose it. Silently dropping is what made this the only filter in
+        // the pipeline a reader could not see — see `comment-suppression.ts`.
+        recordCommentSuppression(v.ruleId ?? ctx.metadata?.id ?? '(unnamed rule)', v.file)
+        return false
+      })
     }
-  }
-
-  // Enrich each violation with rule-level metadata so a rule author's
-  // `.rule({ id, because, suggestion, docs })` (or `.because()`) reaches
-  // per-violation output — e.g. the agent's `check --format json` payload —
-  // when the condition did not set its own. Per-violation values take precedence.
-  const meta = ctx.metadata
-  if (ctx.reason || meta?.id || meta?.because || meta?.suggestion || meta?.docs) {
-    result = result.map((v) => ({
-      ...v,
-      ruleId: v.ruleId ?? meta?.id,
-      because: v.because ?? ctx.reason ?? meta?.because,
-      // A `bypassFilters` finding reports that the rule enforces NOTHING, so the
-      // author's `suggestion` cannot be its remedy: that text describes how to fix
-      // a real violation of the rule, and the formatter renders `suggestion` under
-      // `Fix:` — the field an agent obeys. Pairing a configuration message with an
-      // unrelated `Fix:` is a false remedy by juxtaposition (bug 0021), and it is
-      // ADR-008 rule 2: a failure may not assert a cause it cannot verify.
-      //
-      // `SliceRuleBuilder.metaViolation` argued exactly this in a comment and
-      // omitted both fields — and was overridden here, one layer up, so the
-      // omission had no effect in any shipped version. Measured: a finding reading
-      // "resolved no slices" printed "Split the cycle by extracting a shared
-      // module." as its Fix:.
-      //
-      // `ruleId` and `because` stay. Neither asserts a remedy: the id says WHICH
-      // rule enforces nothing, which is the first thing the reader needs, and
-      // `because` states why the rule exists, which is context rather than a
-      // claim about this finding's cause. A producer that wants a remedy sets its
-      // own — `metaViolation` sets `docs: GLOB_DOCS`, which is about the fault.
-      suggestion: v.bypassFilters ? v.suggestion : (v.suggestion ?? meta?.suggestion),
-      docs: v.bypassFilters ? v.docs : (v.docs ?? meta?.docs),
-    }))
   }
 
   return result

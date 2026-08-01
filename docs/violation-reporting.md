@@ -222,7 +222,12 @@ If an exclusion pattern matches zero violations, a warning is emitted to help de
 
 ### Inline exclusion comments
 
-Inline comments let you suppress a violation directly in the source file, right next to the code. This is better than chain-level exclusions when the exception is tightly coupled to a specific line -- it survives renames and moves with the code during refactors.
+Inline comments live next to the code, which is their advantage. They have no
+staleness signal, which is their cost: `.excluding()` warns when a pattern matches
+nothing, and an inline comment cannot -- comments are only parsed in files that
+already produced a violation, so one naming a renamed rule id is inert forever and
+silently. Prefer `.excluding()` when the exemption is about a rule rather than a
+line.
 
 Exclude at the code level -- the exclusion moves with the code:
 
@@ -252,7 +257,22 @@ doSomething()
 ```
 
 Requires a `.rule({ id })` -- exclusion comments reference the rule by ID.
-Requires a reason -- undocumented exclusions are flagged as warnings.
+A reason is expected -- an undocumented exclusion still applies and emits a warning.
+
+### Where the comment has to go
+
+A single-line directive covers **exactly the line below it**, and the line that
+counts is the one the finding reports -- which is not always the line you were
+looking at.
+
+- A **class-level** condition reports at the class declaration, so the comment goes
+  above `export class Foo {`, not above the offending statement inside a method.
+  A finding whose message says "at line 12" may be reported at line 3.
+- A **file-level** condition (`notHaveDefaultExport`, `haveMaxExports`) reports at
+  line 1. No single-line comment can cover it -- that would need a comment on line 0. Use the block form.
+- Nothing warns you when a comment matches no violation, so a misplaced one is
+  silent. Check `check --format json` -> `commentSuppressed`, which lists every
+  suppression by rule and file.
 
 ### Exclusions vs Baseline
 

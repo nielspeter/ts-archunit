@@ -7,6 +7,10 @@ import { ArchRuleError } from '../../core/errors.js'
 import { setCallerAggregatesReports, writeReport } from '../../core/execute-rule.js'
 import { suppressionNotice } from '../../core/diff-disclosure.js'
 import { edgeCoverageNotice, resetEdgeCoverage, untestedRules } from '../../core/edge-coverage.js'
+import {
+  commentSuppressionNotice,
+  resetCommentSuppression,
+} from '../../core/comment-suppression.js'
 import { writeStderr } from '../../core/stderr.js'
 import { loadRuleFiles } from '../load-rules.js'
 import { dedupeConfigFindings } from '../../core/dedupe-config-findings.js'
@@ -40,6 +44,7 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   // second `runCheck` in one process — the CLI's watch loop, or a test — must
   // not inherit the first run's rules.
   resetEdgeCoverage()
+  resetCommentSuppression()
   const format: OutputFormat = args.format === 'auto' ? detectFormat() : args.format
   const baseline = args.baseline !== undefined ? withBaseline(args.baseline) : undefined
   const diff = args.changed ? diffAware(args.base) : undefined
@@ -139,6 +144,14 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   if (format !== 'json') {
     const coverage = edgeCoverageNotice()
     if (coverage !== undefined) writeStderr(`${coverage}\n`)
+  }
+
+  // Inline exclusion comments, same footnote position and the same reason. Kept
+  // out of the JSON prose for the same reason coverage is: a consumer parsing
+  // that document gets the identities structurally, not as a sentence to grep.
+  if (format !== 'json') {
+    const suppressed = commentSuppressionNotice()
+    if (suppressed !== undefined) writeStderr(`${suppressed}\n`)
   }
 
   // Exit code = error-severity count; warns are reported but never fail.
