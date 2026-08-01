@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.39.1] - 2026-08-01
+
+### Fixed
+
+- **A symlinked `node_modules` was not pruned from the disk walk, so globs beneath it were misdiagnosed** ([bug 0045](bugs/fixed/0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md)). `Dirent.isDirectory()` is `false` for a symlink, and the prune check sat inside that branch — so the directory was recorded as a _file_, and a glob under it classified `absent` ("no such path exists") instead of `not-determined` ("this walk cannot tell"). Those carry different advice, and `absent` is the one that asserts something false. **`pnpm` builds `node_modules` out of symlinks and `git worktree add` leaves a symlinked one behind**, so this reached real projects, not just CI. Pruning now happens by name, before the directory test; no symlink is followed, so the loop-safety argument is unchanged.
+
+This is a diagnostic-quality fix: it changes the advice attached to a finding, never whether one fires. No enforcement, exit-code or baseline change.
+
 ## [0.39.0] - 2026-08-01
 
 ### Fixed
