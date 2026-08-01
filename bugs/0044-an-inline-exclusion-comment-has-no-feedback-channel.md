@@ -64,6 +64,6 @@ on a command someone ran rather than in output nobody reads.
 
 - [Bug 0043](./0043-an-exclusion-directive-inside-a-string-literal-suppresses.md) — a directive
   that should not count at all but does.
-- [Bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) — the
+- [Bug 0039](./fixed/0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) — the
   reason-free directive.
 - `src/core/comment-suppression.ts` — the half that shipped.

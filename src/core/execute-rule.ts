@@ -247,7 +247,12 @@ export function applyFilters(
           `suppression rather than preventing one — the audience is the reviewer ` +
           `reading the diff. If the exemption is not justifiable, delete it and fix ` +
           `the finding instead. ${UNSUPPRESSABLE}`,
-        severity: 'error',
+        // No explicit `severity`. `bypassFilters` already forces `error` through
+        // `severityFor`, which every consumer path runs — `violations()`
+        // (`terminal-builder.ts:229`), `executeCheck` and `executeWarn`. Setting
+        // it here was dead: a sabotage row that flipped it to `warn` left the
+        // suite green, because the flag overrode it downstream. A line that
+        // reads load-bearing and is not is worse than no line.
         bypassFilters: true,
       })
     }

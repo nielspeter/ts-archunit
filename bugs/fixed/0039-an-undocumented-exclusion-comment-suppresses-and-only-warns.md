@@ -1,8 +1,9 @@
 # Bug 0039: an undocumented exclusion comment suppresses the finding and only warns
 
-**Reported:** 2026-08-01 · **Verified:** 2026-08-01, all four parse paths run behaviourally
+**Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased — **both halves**
+**Verified:** all four parse paths run behaviourally, before and after
 **Found in:** v0.36.3, by the ADR-008 compliance audit
-**Severity:** **High** as of v0.37.0 — see "Re-rated" below. Filed as Medium, and genuinely arguable — the ceiling on any fix is one round of friction,
+**Severity:** High. Filed as Medium, re-rated after v0.37.0 widened its reach, and genuinely arguable — the ceiling on any fix is one round of friction,
 and the scope is narrowed by three gates (see "How narrow this actually is"). Against Low: it
 is a silent green on a constraint the docs call required.
 
@@ -92,7 +93,7 @@ Three gates, all measured. The bug is materially narrower than "an agent can sta
    in a currently-clean file is never parsed. The warning only ever appears alongside the
    finding it is about to suppress.
 3. **The producing condition must stamp `ruleId` itself.** This is a separate defect, filed as
-   [bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md): the exclusion
+   [bug 0041](./0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md): the exclusion
    feature is a **no-op** for the library's most-used conditions. So the fail-open above reaches
    only `createViolation`-based conditions — `classes()`, and the others listed in 0041.
 
@@ -128,7 +129,7 @@ Four options, on different axes:
 ## Re-rated High, and the reason is on this branch
 
 Two paragraphs of this document became false the moment
-[bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) landed, which
+[bug 0041](./0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) landed, which
 was **the same branch**:
 
 - _"the fail-open above reaches only `createViolation`-based conditions"_ — false. It reaches
@@ -197,11 +198,88 @@ Rows:
 
 ## Related
 
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1, and rule 3's corollary on markers.
-- [Bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) — the ordering defect
+- [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 1, and rule 3's corollary on markers.
+- [Bug 0041](./0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) — the ordering defect
   that gates this one. Fix first.
-- [Plan 0072](../plans/0072-a-denylist-glob-that-cannot-match.md) — the _unused_ exclusion
+- [Plan 0072](../../plans/0072-a-denylist-glob-that-cannot-match.md) — the _unused_ exclusion
   (`execute-rule.ts:93`) is a different fault in the same area, already deliberated there.
 - Bug 0024 is **not** the argument. It was fixed in v0.26.0 and its fix is the very
   `writeStderr` this path uses; the warning is delivered. The argument is that a delivered
   warning still never reaches the exit code.
+
+## Fix as shipped
+
+Both halves, and they needed different answers — which is why this document said to split it.
+
+### The undocumented directive now fails
+
+A reason-free directive produces an unsuppressable configuration finding. **The exemption still
+applies**, and that is deliberate: refusing to apply it would make the stated remedy ("add a
+reason") trade one failure for another — the violation itself — which is a remedy that does not
+remediate. Add the reason and the finding clears while the exclusion keeps working. Measured.
+
+The message does not overclaim, per the analysis above that survived review:
+
+> Add a reason: `// ts-archunit-exclude <id>: <why>`. A reason is prose and nothing verifies it,
+> so this raises the cost of a suppression rather than preventing one — the audience is the
+> reviewer reading the diff. If the exemption is not justifiable, delete it and fix the finding
+> instead.
+
+`ExclusionWarning` gained a `kind` so the three **malformed** shapes keep their stderr line.
+That distinction is load-bearing: two of the three decline to create the exclusion at all, so
+the original violation still fires and the build is already red. A finding there would be noise
+about a failure the reader can already see.
+
+### Nested blocks nest
+
+Block state moved from `Map<string, ExclusionComment>` to a **stack of frames** — one frame per
+`-start` line, one `-end` closes one frame. Every currently-valid input behaves identically;
+what changes is that nesting works instead of mangling both regions.
+
+The old code refused _any_ nested `-start`, including one for a different rule, then let the
+inner `-end` close the outer block. So exempting `arch/no-cycles` across a module and
+`arch/no-any` across one function inside it produced two wrong results at once: the inner never
+applied, and the outer stopped early at the inner's `-end`. Re-opening a rule that is _already_
+open still warns — the likeliest cause is a missing `-end` — but now applies, because refusing
+it is what produced the early close.
+
+## Sabotage — 6 rows, 5 caught here, 1 caught elsewhere
+
+Enumerated from `git diff`, verdicts from exit codes, each patch asserted to apply, baseline
+asserted green first.
+
+| Revert                                                  | Result                         |
+| ------------------------------------------------------- | ------------------------------ |
+| S1 — stop emitting the finding                          | CAUGHT                         |
+| S3 — `bypassFilters: false` (suppressable)              | CAUGHT                         |
+| S4 — `-end` closes the OUTERmost frame                  | CAUGHT                         |
+| S5 — `-end` closes every open frame (the old behaviour) | CAUGHT                         |
+| S6 — an unclosed frame goes unreported                  | CAUGHT                         |
+| S2 — downgrade the finding to `severity: 'warn'`        | **GREEN — the field was dead** |
+
+**S2 is the useful row.** The explicit `severity: 'error'` never did anything: `bypassFilters`
+already forces `error` through `severityFor`, which every consumer path runs
+(`terminal-builder.ts:229`, `executeCheck`, `executeWarn`). The line was removed rather than
+left reading load-bearing. Sabotaging the **real** mechanism instead — making `severityFor` stop
+forcing — is green against this bug's own tests and **red** against
+`tests/core/unsuppressable-sentence.test.ts`, so the guarantee is guarded, one file over.
+
+## What this does not fix
+
+The ceiling stated when this was filed, unchanged and now shipped against: **`: needed` reaches
+green in one step.** This buys a reason string in the diff for a human reviewer and one round of
+friction. It does not prevent a determined suppression, and the release note says so.
+
+Two related defects stay open: [bug 0043](../0043-an-exclusion-directive-inside-a-string-literal-suppresses.md)
+(a directive inside a string literal counts) and
+[bug 0044](../0044-an-inline-exclusion-comment-has-no-feedback-channel.md) (nothing reports a
+comment that matched nothing). The rule-3-corollary answer — exclusion by construction — remains
+unexplored.
+
+## Two stale claims retracted
+
+The "source and docs disagree" argument was wrong and is retracted above; v0.37.0 rewrote the
+docs sentence anyway. And two tests that pinned the nested-block defect —
+`exclusion-comments.test.ts:77` and `coverage-gaps.test.ts:1198` — asserted a warning existed
+and **never inspected `result.exclusions`**, which is precisely how the real behaviour stayed
+invisible. Both now assert the exclusions.

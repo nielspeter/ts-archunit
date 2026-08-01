@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.38.0] - 2026-08-01
+
+### Fixed
+
+- **An undocumented exclusion comment now fails the build** ([bug 0039](bugs/fixed/0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md)). `// ts-archunit-exclude arch/no-cycles` with no reason silenced a finding and printed a warning nobody had to act on. Since v0.37.0 made inline comments work for every condition family, one un-reasoned line was a build-green kill switch for any rule id anywhere. It is now an unsuppressable configuration finding. **The exemption still applies** — what fails is the missing justification, so adding a reason clears the finding and keeps the exclusion working. Stated honestly on the finding itself: a reason is prose and nothing verifies it, so this raises the cost of a suppression rather than preventing one. The audience is the reviewer reading the diff.
+
+- **Nested exclusion blocks now nest** (same bug, second half). The parser refused _any_ nested `// ts-archunit-exclude-start`, including one naming a different rule, and then let the inner `-end` close the outer block. So exempting one rule across a module and another across a function inside it produced two wrong results at once: the inner exemption never applied, and the outer stopped early. Block state is now a stack — one `-start` opens a frame, one `-end` closes the innermost. Every previously-valid input behaves identically. Re-opening a rule that is already open still warns, since the likeliest cause is a missing `-end`, but now applies.
+
+### Upgrade note
+
+**Any exclusion comment without a reason will fail your build.** Find them with
+`grep -rn "ts-archunit-exclude" src/` — anything lacking a `:` needs one:
+
+```ts
+// ts-archunit-exclude arch/no-cycles: legacy gateway, tracked in TICKET-123
+```
+
+Adding the reason clears the finding and leaves the exemption in place; nothing else changes. If an exemption cannot be justified in a sentence, that is the signal to delete it and fix the finding instead.
+
+The finding cannot be suppressed — not by `.warn()`, `.asSeverity('warn')`, `.excluding()`, another exclusion comment, a baseline, or diff-aware mode. A suppression mechanism that can suppress the complaint about itself is not a mechanism.
+
+If you rely on nested exclusion blocks, re-check them: the previous behaviour silently ended the outer block at the inner `-end`, so regions you believed were exempt may not have been, and will now report findings that were always there.
+
 ## [0.37.0] - 2026-08-01
 
 ### Fixed
