@@ -44,8 +44,14 @@ import { registerCacheReset } from './cache-registry.js'
  * deliberately not taken here for two reasons worth writing down rather than
  * rediscovering: caching `getDescendants()` would retain every wrapper in every
  * body rather than one kind's worth, which is a materially different memory
- * profile; and `comment()` carries per-matcher dedup state, so only its walk is
- * shareable, not its filter. Filed rather than done.
+ * profile; and the broad matchers' filters differ per matcher, so only the walk
+ * is shareable. Filed rather than done.
+ *
+ * (This paragraph used to cite `comment()`'s per-matcher dedup state as the
+ * second half of that reason. Bug 0034 removed that state — it was never reset,
+ * so a rule object evaluated twice went silent — and dedup now lives in the
+ * traversal, keyed on the comment's position. The conclusion is unchanged:
+ * `expression()`'s regex still differs per matcher.)
  *
  * ## Invalidation, which is the whole difficulty
  *
@@ -181,8 +187,9 @@ export function descendantsOfKind(node: Node, kind: SyntaxKind): readonly Node[]
  *     + regex test on each      68 ms
  *
  * The walk is roughly three quarters of a broad matcher's cost; the filter is the
- * rest and is not shareable — `expression()`'s regex differs per matcher and
- * `comment()` carries per-matcher dedup state. End to end, six successive broad
+ * rest and is not shareable — `expression()`'s regex differs per matcher.
+ * (`comment()`'s dedup state was the other half of this until bug 0034 removed
+ * it; the filter is still per-matcher.) End to end, six successive broad
  * rules over the same bodies: **~57 ms each becomes ~17 ms each.**
  *
  * The memory objection — that this retains every wrapper in every body rather

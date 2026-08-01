@@ -213,6 +213,8 @@ comment(STUB_PATTERNS) // matches TODO, FIXME, HACK, XXX, STUB, "not implemented
 
 The exported `STUB_PATTERNS` constant matches common deferred-work markers: `TODO`, `FIXME`, `HACK`, `XXX`, `STUB`, `DEFERRED`, `PLACEHOLDER`, `not implemented`, and `coming soon`.
 
+**One finding per comment.** Since 0.36.0 every matching comment is reported, deduplicated by its own position — so four stacked `// TODO` lines are four findings, not one. Findings name the comment's line, including the **opening** line of a multi-line block or JSDoc comment, and come out in source order. Before 0.36.0 the first comment in each scope was swallowed and the reported line was the statement's; see [bug 0034](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0034-comment-matcher-underreports-and-goes-silent-on-re-evaluation.md).
+
 ```typescript
 // No stub comments in production code
 functions(p).that().resideInFolder('**/src/**').should().notContain(comment(STUB_PATTERNS)).check()

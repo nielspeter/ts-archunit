@@ -3,7 +3,7 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchCall } from '../models/arch-call.js'
-import { getFunctionBody, findMatchesInNode } from '../helpers/body-traversal.js'
+import { getFunctionBody, findMatchesInNode, reportedLine } from '../helpers/body-traversal.js'
 import { identifyMatches } from './match-identity.js'
 import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
 
@@ -125,14 +125,14 @@ export function notHaveCallbackContaining(matcher: ExpressionMatcher): Condition
         const identities = identifyMatches(
           'call-callback',
           archCall.getSourceFile().getFilePath(),
-          matches,
+          matches.map((m) => m.node),
           `${identityNameOf(archCall, context)} :: ${matcher.description}`,
         )
         matches.forEach((match, index) => {
           violations.push({
             ...createCallViolation(
               archCall,
-              `${callName} has callback containing ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+              `${callName} has callback containing ${matcher.description} at line ${String(reportedLine(match.node, match.triviaPos))}`,
               context,
             ),
             identity: identities[index],
@@ -335,14 +335,14 @@ export function notHaveArgumentContaining(matcher: ExpressionMatcher): Condition
         const identities = identifyMatches(
           'call-argument',
           archCall.getSourceFile().getFilePath(),
-          matches,
+          matches.map((m) => m.node),
           `${identityNameOf(archCall, context)} :: ${matcher.description}`,
         )
         matches.forEach((match, index) => {
           violations.push({
             ...createCallViolation(
               archCall,
-              `${callName} argument contains ${matcher.description} at line ${String(match.getStartLineNumber())}`,
+              `${callName} argument contains ${matcher.description} at line ${String(reportedLine(match.node, match.triviaPos))}`,
               context,
             ),
             identity: identities[index],

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.36.0] - 2026-08-01
+
+### Fixed
+
+- **`comment()` missed comments, and named the wrong line** ([bug 0034](bugs/0034-comment-matcher-underreports-and-goes-silent-on-re-evaluation.md)). Three defects with one root cause: a comment is not the node it is attached to. The broad traversal keeps only the deepest matching node — right for `expression()`, which matches at every ancestor level, wrong for a comment, whose node is where it is _attached_. Measured on a corpus with **9** `TODO` comments: `noStubComments()` reported **5**, and now reports **9**.
+
+  The miss scaled with nesting rather than with comment count, so the worst cases are the longest functions. Stacked comments were the sharpest: several `// TODO` lines leading one statement collapsed to a single finding, so appending more to an already-accepted one never turned a build red — in the rule `agentGuardrails` ships to catch exactly that.
+
+  Findings also name the **comment's** line now rather than the line of the statement it leads, including the opening line of a multi-line block or JSDoc comment. At function scope the `line` field remains the function's, as it is for every function-body finding; the per-hit line is in the message.
+
+- **A rule object evaluated twice returned nothing the second time.** `comment()` held a dedup `Set` that was never reset. It now holds no state at all. This did **not** affect `check --watch`, which re-imports rule files on every run. It affected any process evaluating one builder more than once — including the hoisted-builder shape [running in tests](docs/running-in-tests.md) recommends so `diagnose()` and `.check()` share one object. If you use that shape with a `comment()` rule, your second assertion has been passing vacuously.
+
+### Changed
+
+- `ExpressionMatcher` gains one optional member, `matchedTriviaPositions`, whose presence marks a matcher as matching comment trivia. Additive; existing matchers are unaffected.
+
 ## [0.35.0] - 2026-08-01
 
 Plan 0067 part C — the second leg of the 1.0 path, and the root-cause fix for the mistake 0.34.0 started failing on.

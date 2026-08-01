@@ -3,7 +3,7 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
-import { searchFunctionBody } from '../helpers/body-traversal.js'
+import { searchFunctionBody, reportedLine } from '../helpers/body-traversal.js'
 import { identifyMatches } from './match-identity.js'
 
 /**
@@ -72,7 +72,7 @@ export function functionNotContain(matcher: ExpressionMatcher): Condition<ArchFu
           violations.push({
             ...createFunctionViolation(
               fn,
-              `${fn.getName() ?? '<anonymous>'} contains ${matcher.description} at line ${String(node.getStartLineNumber())}`,
+              `${fn.getName() ?? '<anonymous>'} contains ${matcher.description} at line ${String(reportedLine(node, result.triviaPositions[index]))}`,
               context,
             ),
             identity: identities[index],
@@ -109,7 +109,7 @@ export function functionUseInsteadOf(
           violations.push({
             ...createFunctionViolation(
               fn,
-              `${fn.getName() ?? '<anonymous>'} contains ${bad.description} at line ${String(node.getStartLineNumber())} — use ${good.description} instead`,
+              `${fn.getName() ?? '<anonymous>'} contains ${bad.description} at line ${String(reportedLine(node, badResult.triviaPositions[index]))} — use ${good.description} instead`,
               context,
             ),
             identity: identities[index],
