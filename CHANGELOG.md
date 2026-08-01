@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.39.0] - 2026-08-01
+
+### Fixed
+
+- **A finding with no source location no longer invents one** ([bug 0047](bugs/fixed/0047-a-fileless-finding-renders-a-meaningless-location.md)). A configuration finding reports that a _rule_ enforces nothing, not that a line of code is wrong, so it has no location. Two of the four renderers said so already — the rich terminal format omits it, and the GitHub formatter special-cases it because `::error file=,line=0` is not a valid annotation and GitHub silently drops it. The plain format emitted a bare `(:1)`, and `--format json` emitted `"file": "", "line": 1`. Both now render nothing and `null` respectively.
+
+### Added
+
+- **`kind` on every JSON violation**, `"violation"` or `"configuration"`. The payload previously carried **no field at all** distinguishing a finding about your code from a finding about a rule that enforces nothing — a consumer could only infer it from an empty `file`, which is exactly the misleading signal being removed. The distinction is the one that changes what you do: for a configuration finding, editing the named source cannot clear it. Treat an unrecognised `kind` as `"violation"`, so future values are non-breaking.
+
+- **The JSON document is now a type.** `ArchJsonReport`, `ArchJsonViolation`, `ArchJsonSuppression` and `ArchJsonUntestedAllowlist` are exported. An unexported contract is one a consumer discovers by breaking; TypeScript consumers now get a compile error instead of a runtime one. The type is pinned against the emitter, so it cannot drift from what is actually produced.
+
+- `commentSuppressed` is documented (`docs/cli.md`). It shipped in v0.37.0 and was described only in that release note, never in the payload reference.
+
+### Changed
+
+- `docs/ai-agents.md` gains a section on `kind`, including the part that is easy to get wrong: **detect a configuration finding by `kind`, never by an empty `file`.** The CLI attributes these findings to the **rule file** that declared them before rendering, so most carry a real, useful path — open it, find the rule by `ruleId`, and edit the declaration. Only the baseline meta-findings, produced after attribution, arrive with `file: null`.
+
+### Upgrade note
+
+**`--format json` only. No enforcement, exit-code or baseline change** — a baseline generated on 0.38.0 still matches, measured.
+
+`file` and `line` are now `null` instead of `""` and a meaningless number, on findings that have no location. If you consume the JSON, the failure you _want_ is the loud one: `v.file.endsWith('.ts')` throws immediately and takes five minutes to fix. Look for the quiet ones first:
+
+| Pattern                     | Was           | Now                              |
+| --------------------------- | ------------- | -------------------------------- |
+| `` `${v.file}:${v.line}` `` | `":1"`        | the literal string `"null:null"` |
+| `byFile[v.file] ??= []`     | a `""` bucket | a `"null"` bucket                |
+| `v.file?.length > 0`        | `false`       | `false` — unchanged, so it hides |
+
+The direct fix is to branch on `v.kind === 'configuration'` before touching the location at all, which is what the field is for.
+
 ## [0.38.0] - 2026-08-01
 
 ### Fixed

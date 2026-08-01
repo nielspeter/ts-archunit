@@ -1,6 +1,6 @@
 /**
  * The empty-layer finding carries its own remedy, never the author's —
- * [bug 0042](../../bugs/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md),
+ * [bug 0042](../../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md),
  * a live recurrence of [bug 0021](../../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md).
  *
  * `conditions/cross-layer.ts` reported an empty left layer correctly and then

@@ -1,7 +1,7 @@
 /**
  * The library's single stderr channel.
  *
- * [Bug 0024](../../bugs/0024-warn-terminal-is-invisible-inside-a-test-runner.md):
+ * [Bug 0024](../../bugs/fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md):
  * every library-originated message went through `console.warn`, and vitest's
  * default reporter **intercepts** console output and replays it only for
  * **failing** tests. `.warn()` never fails a test, so its output was always

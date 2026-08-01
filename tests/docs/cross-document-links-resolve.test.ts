@@ -119,6 +119,44 @@ function resolvesAsRoute(file: string, target: string): boolean {
   )
 }
 
+/**
+ * Source files cite these documents too, and heavily — a bug link in a JSDoc
+ * block is how a reader of the code reaches the reasoning. The first version of
+ * this check walked `.md` only and missed them, which review caught: the guard
+ * for bug 0047 linked to `bugs/fixed/` while the bug was still in `bugs/`, and
+ * nothing noticed.
+ */
+function sourceFiles(): string[] {
+  const out: string[] = []
+  const walk = (d: string): void => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(full)
+      } else if (entry.name.endsWith('.ts')) {
+        out.push(full)
+      }
+    }
+  }
+  for (const dir of ['src', 'tests']) {
+    const root = path.join(REPO, dir)
+    if (fs.existsSync(root)) walk(root)
+  }
+  return out
+}
+
+/** Only links that name one of our documents — not every parenthesised URL. */
+function documentLinksIn(file: string): Link[] {
+  const found: Link[] = []
+  for (const match of fs.readFileSync(file, 'utf-8').matchAll(LINK)) {
+    const raw = match[1]?.trim()
+    if (raw === undefined || !raw.endsWith('.md')) continue
+    if (/^(https?:|mailto:)/.test(raw)) continue
+    found.push({ from: path.relative(REPO, file), target: raw })
+  }
+  return found
+}
+
 describe('cross-document links resolve (bug 0046)', () => {
   const docFiles = DOC_DIRS.flatMap(markdownFiles)
   const siteFiles = markdownFiles(SITE_DIR)
@@ -143,6 +181,20 @@ describe('cross-document links resolve (bug 0046)', () => {
     // Identities, not a count (ADR-008 rule 4): the message names every dead
     // link, so the failure is the work list.
     expect(broken, `broken links:\n  ${broken.join('\n  ')}`).toEqual([])
+  })
+
+  it('every .md link in a source comment points at a real document', () => {
+    const files = sourceFiles()
+    const links = files.flatMap((f) => documentLinksIn(f).map((l) => ({ ...l, file: f })))
+
+    // Vacuity: source really does cite documents, so an empty result would mean
+    // a broken walk rather than a clean repo.
+    expect(links.length).toBeGreaterThan(15)
+
+    const broken = links
+      .filter((l) => !resolvesAsPath(l.file, l.target))
+      .map((l) => `${l.from} -> ${l.target}`)
+    expect(broken, `broken document links in source:\n  ${broken.join('\n  ')}`).toEqual([])
   })
 
   it('every route in docs/ points at a page that exists', () => {

@@ -15,7 +15,7 @@
  *
  * So the predicate half was a **present-tense** detection gap: a typo'd glob in a
  * custom predicate narrowed the selection to nothing and `doctor` exited 0. The
- * condition half is latent until [plan 0074](../../plans/0074-r3b-the-selector-glob-flip.md).
+ * condition half is latent until [plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md).
  *
  * ## Why this asserts `diagnose()` and calls it the `doctor` surface
  *

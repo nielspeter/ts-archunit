@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.38.0 · **Open:** 6 · **Fixed:** 42 (`fixed/`) · **Updated:** 2026-08-01
+**Version:** 0.39.0 · **Open:** 5 · **Fixed:** 43 (`fixed/`) · **Updated:** 2026-08-01
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -23,7 +23,10 @@ lower-severity items are ahead of higher-severity ones because of what they unbl
 | 3   | [0038](./0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md) — a typo in a preset override key is a silent false green | High            | Do **option zero only** — type the override key as a union of the preset's rule IDs, so the typo is a compile error. Cheap, catches at authorship, costs no CI. The runtime finding is a separate release: it turns currently-green builds red, and must not ride along with anything else that surprises people.                                                                                                          |
 | 4   | [0040](./0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — cross-layer reports nothing on an empty layer | High (API half) | `haveMatchingCounterpart` needs a `Layer[]` **no public API can produce** — a first-five-minutes failure. Fixing it also makes [0042](./fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)'s remedy true and unblocks the runtime half. Note: a control in `cross-layer-finding-owns-its-remedy.test.ts` is **designed to fail** when this lands — that is the signal to rewrite the remedy text. |
 | 5   | [0044](./0044-an-inline-exclusion-comment-has-no-feedback-channel.md) — an inline exclusion comment has no feedback channel         | Medium          | Half-mitigated: v0.37.0 disclosed what comments _do_ suppress. What remains is the other direction — a misplaced or stale directive is silent. Take the `doctor` option; it catches the rename case cheaply and needs no per-rule work.                                                                                                                                                                                    |
-| 6   | [0047](./0047-a-fileless-finding-renders-a-meaningless-location.md) — a fileless finding renders a meaningless location             | Low             | **In flight** on `fix/0047-fileless-finding-location`: fixed, guarded, documented, under review. Listed for completeness.                                                                                                                                                                                                                                                                                                  |
+
+**Shipped since this list was written:** [0047](./fixed/0047-a-fileless-finding-renders-a-meaningless-location.md)
+in v0.39.0 — and its review found the boolean it first shipped was flattening four distinct
+remedies, so the payload now carries `kind` instead.
 
 ### Deliberately not next
 
@@ -43,7 +46,6 @@ lower-severity items are ahead of higher-severity ones because of what they unbl
 | [0043](./0043-an-exclusion-directive-inside-a-string-literal-suppresses.md) — an exclusion directive inside a string literal suppresses | **OPEN, high.** `parseExclusionComments` splits on newlines and regexes each line with no comment-token awareness. A directive inside a string kills a real finding, silently — a reason suppresses the only warning that would have fired. Pre-existing; v0.37.0 widened its reach.                                                                                                                                                                 |
 | [0044](./0044-an-inline-exclusion-comment-has-no-feedback-channel.md) — an inline exclusion comment has no feedback channel             | **OPEN, medium.** Nothing reports a comment that matched nothing, and nothing can on the current path: comments are parsed only in files that already produced a violation. A stale directive naming a renamed rule id is inert forever. `doctor` can catch the rename case without per-rule work.                                                                                                                                                   |
 | [0045](./0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md) — environment failures corrupt sabotage verdicts          | **OPEN, medium — but first in priority.** `diagnose.test.ts:583` fails wherever `node_modules` is a symlink (i.e. any git worktree); `warn-survives-the-test-runner.test.ts` flakes on a shared generated directory. Neither affects a user. Both make a matrix score every row CAUGHT, silently and in the reassuring direction. ADR-008 rule 5's verdict-mechanism corollary, landing on our own suite.                                            |
-| [0047](./0047-a-fileless-finding-renders-a-meaningless-location.md) — a fileless finding renders a meaningless location                 | **IN FLIGHT.** Plain emitted a bare `(:1)`; JSON emitted `"file": "", "line": 1` and carried no field distinguishing a configuration finding from a real one. Both fixed, plus `kind: "configuration" \| "violation"`. The rich and GitHub formatters always handled it — `format-github.ts:58` because `::error file=,line=0` is not a valid annotation.                                                                                            |
 
 ---
 

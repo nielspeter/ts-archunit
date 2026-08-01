@@ -235,7 +235,7 @@ export function strictBoundaries(
           // boundary's entry point instead". Applied exactly, that reproduces
           // the identical violation: measured, `reporting -> billing/index.ts`
           // and `reporting -> billing/internal.ts` fail identically
-          // ([bug 0017](../../bugs/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)).
+          // ([bug 0017](../../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)).
           // An agent obeying it loops, and its only exits are unsanctioned.
           because:
             'boundaries may only depend on themselves and the shared modules — an import from another boundary couples the two, whichever file it names',
