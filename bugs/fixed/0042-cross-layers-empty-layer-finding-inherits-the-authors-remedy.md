@@ -140,3 +140,62 @@ assertion vacuous — which is exactly the trap 0040 was originally filed on.
 | S4 — strip the remedy entirely                | red      | CAUGHT |
 
 Both directions, because the two faults are independent: the wrong remedy and no remedy.
+
+## Review round — the remedy was wrong twice more
+
+Five reviewers ran against the first fix. Two independently applied the shipped remedy instead
+of reading it, and it failed both times. Recorded because the pattern is the point: **this
+document's own subject is a wrong remedy, and fixing it produced two more.**
+
+**First wrong version — an impossible clause.** _"…or remove the layer from the chain"_ throws
+`RangeError` on a two-layer chain (`cross-layer-builder.ts:111`), and the finding cannot fire
+below two layers (`cross-layer.ts:27`), so the advice was unreachable on exactly the shape that
+produces it. A reviewer also measured the worse path: dropping the layer from the **condition's**
+array instead falls into `if (layers.length < 2) return []` and turns the rule into a permanent
+vacuous green. The clause is now **computed** from `layers.length` — offered only where it is
+true, and at two layers replaced with "delete the rule instead".
+
+**Second wrong version — the right advice pointing at the wrong file.** _"Fix the glob for layer
+X"_ reads as the `.layer()` call. Measured: widening the builder's glob to `**/src/**` left the
+finding in place, because the condition reads the `Layer[]` the caller passed and never sees the
+builder's resolution (bug 0040's adjacent defect). The remedy now names the array explicitly.
+
+Both are bug 0017's shape. Neither was caught by asserting the message's content — the first
+guard checked `toContain('ghost')` and `not.toBe(AUTHOR.suggestion)`, which both versions passed.
+Only applying the fix found them, which is rule 2's behavioural corollary stated as an
+experiment rather than a principle.
+
+## What is pinned now
+
+- The two-layer finding offers the delete-the-rule clause and **not** the drop-the-layer one;
+  a three-layer chain offers the reverse. Both asserted.
+- **A control that widens the builder glob and asserts the finding does NOT clear.** That pins
+  the caveat, so when bug 0040 makes the builder pass its own layers this row fails and forces
+  whoever lands it to rewrite the remedy.
+- Applying the clause the remedy actually names clears the finding.
+- `docs` is asserted `toBeUndefined()`, not `not.toBe(AUTHOR.docs)` — `undefined` passes the
+  latter for free, which is the trap this file's docstring names for `suggestion`, one field
+  over. There is deliberately no docs page: `GLOB_DOCS` points at the slices page and would be a
+  wrong link.
+- The producer's pass-through on the **real-violation** branch is asserted by calling the
+  condition directly. Sabotage row C6: deleting those two lines left the whole suite green,
+  because `applyFilters` backfills them — so the original CONTROL tested the pipeline, not this
+  file.
+
+## Scope correction
+
+This bug is **left-layer only**. The loop at `cross-layer.ts:33` inspects `layers[i]` and never
+`layers[i+1]`, so an empty **final** layer is not emptiness-checked at all and reports a
+confidently wrong cause instead. That is
+[bug 0040](../0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)'s
+"missing case" section, not this one.
+
+## Supersession
+
+When 0040 lands — admit `discovery` sites at `terminal-builder.ts:433` and reuse
+`deadSelectorViolation` — this producer becomes redundant and should be deleted rather than
+maintained. Otherwise [plan 0078](../../plans/0078-derive-the-configuration-finding-census.md)
+inherits a thirteenth configuration-finding producer, which is what that plan exists to prevent.
+`GLOB_DOCS` and `FAULT_ADVICE` are **not** reusable here in the meantime: the first is a
+slices-specific URL, the second is keyed by a `GlobFault` this condition cannot compute without
+a path universe.

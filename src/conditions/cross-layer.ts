@@ -60,8 +60,12 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
             // assigned it, so there was nothing to withhold. Same escape
             // `correspondence-builder.ts` closed with a producer-side remedy.
             //
-            // `ruleId` and `because` stay: the id says which rule enforces nothing,
-            // `because` is context. Neither claims a cause for this finding.
+            // `ruleId` and `because` are **redundant with enrichment**, which
+            // backfills both — removing either leaves the suite green, measured.
+            // Kept for locality: a reader of this producer should see the whole
+            // finding, and `terminal-builder.ts` documents the same discovery.
+            // Neither claims a cause, which is why they are safe to carry where
+            // `suggestion` and `docs` are not.
             //
             // The removal clause is COMPUTED, because no fixed text is true for
             // both chain lengths — and the first version of this remedy shipped
@@ -74,13 +78,25 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
             // argument in this file for rule 2's behavioural corollary: a remedy
             // is a claim, and reading well is not evidence.
             //
-            // The glob is named because a rule may declare several layers and
-            // "fix the glob" does not say which. It is `leftLayer.pattern` — the
-            // pattern from the `Layer[]` the CALLER passed, which is not
-            // necessarily the builder's resolved one until bug 0040 lands.
+            // The remedy must name WHICH array to edit, and this is the second
+            // wrong version of this sentence rather than the first. "Fix the glob
+            // for layer X" reads as the `.layer()` call, and doing that does not
+            // work: measured, widening the builder's glob to `**/src/**` left the
+            // finding in place, because this condition reads the `Layer[]` the
+            // caller passed and never sees the builder's resolution (bug 0040's
+            // adjacent defect). An agent that follows the obvious reading edits
+            // the wrong line, sees no change, and improvises — which is the
+            // failure rule 2 exists to prevent, and it survived one round of
+            // fixing this very sentence.
+            //
+            // Pinned by a control that widens the builder glob and asserts the
+            // finding does NOT clear, so the caveat cannot quietly become false
+            // when 0040 lands — it will fail, and whoever lands it rewrites this.
             suggestion:
               `Fix the glob for layer "${leftLayer.name}" (currently ` +
-              `'${leftLayer.pattern}') so it matches at least one file.` +
+              `'${leftLayer.pattern}') in the Layer[] passed to this condition — it reads that ` +
+              `array, not the builder's .layer() call, so editing .layer() alone will not clear ` +
+              `this. It must match at least one file.` +
               (layers.length >= 3
                 ? ` Or drop the layer: ${String(layers.length - 1)} would remain, still a valid chain.`
                 : ` Dropping the layer is not available here — a chain needs two, and this one has` +

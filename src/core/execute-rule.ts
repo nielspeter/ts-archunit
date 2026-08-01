@@ -25,11 +25,31 @@ export interface ExecuteRuleContext {
 }
 
 /**
- * Apply exclusion patterns, inline exclusion comments, baseline,
- * and diff filtering to a set of violations, then execute the
- * terminal action (throw or warn).
+ * Complete each violation's identity, then apply `.excluding()` patterns and
+ * inline exclusion comments.
  *
  * Extracted to eliminate terminal-method duplication across builders.
+ *
+ * **Not** baseline or diff filtering, despite what this said for several
+ * releases — those run in `executeCheck` / `executeWarn`, after this returns.
+ *
+ * ## The invariant, for whoever adds the next filter
+ *
+ * **Enrichment runs first, so every filter sees a complete violation.** That is
+ * the whole reason for the ordering, and it is easy to undo by accident because
+ * enrichment looks like output formatting rather than identity. It is not: the
+ * comment filter matches on `ruleId`, and when enrichment ran last that filter
+ * saw `undefined` for every condition that did not stamp the field itself
+ * (bug 0041) — a documented feature that silently did nothing.
+ *
+ * Enrichment is pure, idempotent, and writes a **disjoint field set** from
+ * everything the filters read: it touches `ruleId`, `because`, `suggestion` and
+ * `docs`; `.excluding()` matches on `element`/`file`/`message`, and the
+ * `bypassFilters` refusal path reads a flag enrichment never writes. So
+ * "identity is complete before anything reads it" is a simpler invariant to hold
+ * than "each filter must know which fields exist yet". Add a filter that reads
+ * one of those four fields and it will work; add a mutation of them below a
+ * filter and you have reintroduced 0041.
  */
 export function applyFilters(
   violations: ArchViolation[],

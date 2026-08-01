@@ -107,7 +107,11 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
     for (const f of findings) {
       // The direction that `toBeTruthy()` cannot see.
       expect(f.suggestion).not.toBe(AUTHOR.suggestion)
-      expect(f.docs).not.toBe(AUTHOR.docs)
+      // Asserted as a value, not as `not.toBe(AUTHOR.docs)` — `undefined` passes
+      // that for free, which is exactly the trap this file's docstring names for
+      // `suggestion`, one field over. There is deliberately no docs page for this
+      // fault: `GLOB_DOCS` points at the slices page and would be a wrong link.
+      expect(f.docs).toBeUndefined()
       // …and the remedy it does carry names the layer, so it is about THIS fault.
       expect(f.suggestion).toContain('ghost')
       // Kept deliberately: neither asserts a remedy.
@@ -138,6 +142,8 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
     expect(two.length).toBeGreaterThan(0)
     for (const f of two) {
       expect(f.suggestion).toContain('Dropping the layer is not available here')
+      // Names the array to edit, not just "the glob" — see the control below.
+      expect(f.suggestion).toContain('Layer[] passed to this condition')
       expect(f.suggestion).not.toContain('Or drop the layer')
       // It names the glob, so "fix the glob" says WHICH glob.
       expect(f.suggestion).toContain('**/src/routes/**')
@@ -145,7 +151,30 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
       expect(f.suggestion).toContain('cannot be suppressed')
     }
 
-    // Applying the clause that IS offered clears the finding — measured, not read.
+    // CONTROL — the caveat is load-bearing, so it is pinned. Widening the
+    // BUILDER's glob, the obvious reading of "fix the glob", does NOT clear the
+    // finding: this condition reads the caller's Layer[] and never sees the
+    // builder's resolution. Measured. When bug 0040 makes the builder pass its
+    // own layers, this row fails and forces the remedy text to be rewritten.
+    const project = load()
+    const schemas = project
+      .getSourceFiles()
+      .filter((f) => f.getFilePath().includes('/src/schemas/'))
+    const builderWidened = crossLayer(project)
+      .layer('ghost', '**/src/**')
+      .layer('schemas', '**/src/schemas/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(
+        haveMatchingCounterpart([
+          { name: 'ghost', pattern: '**/src/**', files: [] },
+          { name: 'schemas', pattern: '**/src/schemas/**', files: schemas },
+        ]),
+      )
+      .violations()
+    expect(builderWidened.filter((v) => v.bypassFilters === true)).toHaveLength(1)
+
+    // Applying the clause the remedy actually names clears it — measured, not read.
     const widened = crossLayer(load())
       .layer('ghost', '**/src/routes/**')
       .layer('schemas', '**/src/schemas/**')
