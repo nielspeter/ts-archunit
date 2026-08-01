@@ -156,19 +156,33 @@ function build(project: ArchProject, budgetLimit: number): DiskSet {
     }
     for (const entry of entries) {
       const full = path.join(dir, entry.name).replaceAll('\\', '/')
+      // Prune by NAME, before asking whether it is a directory.
+      //
+      // [Bug 0045](../../bugs/fixed/0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md):
+      // `Dirent.isDirectory()` is false for a symlink, so a symlinked
+      // `node_modules` — what pnpm produces, and what `git worktree add`
+      // leaves behind — fell through to the `else` branch and was recorded as
+      // a **file**. It never entered `pruned`, so a glob under it classified
+      // `absent` ("no such path") instead of `not-determined` ("this walk
+      // cannot say"). Those carry different advice, and `absent` is the one
+      // that asserts something false.
+      //
+      // Safe: pruning records the path and does not recurse, so no link is
+      // followed and the loop argument below is untouched.
+      if (PRUNE.has(entry.name)) {
+        pruned.push(full)
+        continue
+      }
       // `Dirent.isDirectory()` is false for a symlink under `withFileTypes`,
       // so symlink loops are impossible by construction. Do not "fix" this
       // with `statSync`, which follows them.
       //
-      // The cost: a symlinked source directory — pnpm and yarn workspaces
-      // create them — is recorded as a file, so a glob naming it classifies
-      // `no-typescript`. Wrong, but wrong in the direction that only weakens a
-      // message; following the link risks a walk that never terminates.
+      // The cost, for symlinks we do NOT prune: a symlinked source directory —
+      // pnpm and yarn workspaces create them — is recorded as a file, so a glob
+      // naming it classifies `no-typescript`. Wrong, but wrong in the direction
+      // that only weakens a message; following the link risks a walk that never
+      // terminates.
       if (entry.isDirectory()) {
-        if (PRUNE.has(entry.name)) {
-          pruned.push(full)
-          continue
-        }
         dirs.push(full)
         walk(full)
       } else {
