@@ -60,9 +60,7 @@ const AUTHOR: RuleMetadata = {
  * 0040 was originally filed on.
  */
 function layers(project: ArchProject, ghostIsEmpty: boolean): Layer[] {
-  const files = project
-    .getSourceFiles()
-    .filter((f) => f.getFilePath().includes('/src/schemas/'))
+  const files = project.getSourceFiles().filter((f) => f.getFilePath().includes('/src/schemas/'))
   const left = project.getSourceFiles().filter((f) => f.getFilePath().includes('/src/routes/'))
   return [
     { name: 'ghost', pattern: '**/src/routes/**', files: ghostIsEmpty ? [] : left },

@@ -183,7 +183,7 @@ argument for fixing it there rather than in the builder.
 ## Related
 
 - [Bug 0036](./fixed/0036-the-relative-glob-audit-is-incomplete.md) — where this surfaced.
-- [Bug 0042](./0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md) — a second,
+- [Bug 0042](./fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md) — a second,
   independent defect in the same `cross-layer.ts:39-53` block.
 - [Plan 0074](../plans/completed/0074-r3b-the-selector-glob-flip.md) — the gate whose
   `position !== 'selector'` filter this sits outside.

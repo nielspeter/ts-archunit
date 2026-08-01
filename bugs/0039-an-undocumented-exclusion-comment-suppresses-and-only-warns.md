@@ -92,7 +92,7 @@ Three gates, all measured. The bug is materially narrower than "an agent can sta
    in a currently-clean file is never parsed. The warning only ever appears alongside the
    finding it is about to suppress.
 3. **The producing condition must stamp `ruleId` itself.** This is a separate defect, filed as
-   [bug 0041](./0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md): the exclusion
+   [bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md): the exclusion
    feature is a **no-op** for the library's most-used conditions. So the fail-open above reaches
    only `createViolation`-based conditions — `classes()`, and the others listed in 0041.
 
@@ -161,7 +161,7 @@ Rows:
 ## Related
 
 - [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1, and rule 3's corollary on markers.
-- [Bug 0041](./0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) — the ordering defect
+- [Bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) — the ordering defect
   that gates this one. Fix first.
 - [Plan 0072](../plans/0072-a-denylist-glob-that-cannot-match.md) — the _unused_ exclusion
   (`execute-rule.ts:93`) is a different fault in the same area, already deliberated there.

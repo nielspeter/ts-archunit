@@ -46,7 +46,7 @@ discovery **succeed**, so `assertDiscovered` returns `[]` and `shared.ts:71` is 
 **Eleven of twelve carry a `suggestion`, not twelve.** `cross-layer.ts:52` sets
 `suggestion: context.suggestion`, which is optional, so with no `.rule({...})` the finding
 reaches the reader bare — and _with_ author metadata it carries the author's unrelated remedy.
-That is [bug 0042](../bugs/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md),
+That is [bug 0042](../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md),
 filed separately, and it is the live proof of this plan's premise: a hand-written list cannot
 fail when the list is what went stale.
 
@@ -216,7 +216,7 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
   site that _should_ produce a configuration finding and does not. The census guards producers
   that exist; it structurally cannot find a missing one. Fix 0038 separately, then let the census
   pick up the new site.
-- **[Bug 0042](../bugs/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)** —
+- **[Bug 0042](../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)** —
   fix it on its own terms; this plan only ensures nothing like it can hide again.
 - **The 215 count-only test assertions** from the audit. An untriaged upper bound from a
   heuristic scan with known false positives; sample before filing.

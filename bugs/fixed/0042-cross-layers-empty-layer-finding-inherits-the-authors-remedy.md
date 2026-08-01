@@ -1,9 +1,10 @@
 # Bug 0042: cross-layer's empty-layer finding inherits the author's remedy
 
-**Reported:** 2026-08-01 · **Verified:** 2026-08-01, measured through the public API
-**Found in:** v0.36.3, by the review of [plan 0078](../plans/0078-derive-the-configuration-finding-census.md)
+**Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased
+**Verified:** measured through the public API before and after
+**Found in:** v0.36.3, by the review of [plan 0078](../../plans/0078-derive-the-configuration-finding-census.md)
 **Severity:** Medium. A live recurrence of
-[bug 0021](./fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) at a
+[bug 0021](./0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) at a
 producer that bug's fix never reached — and it also ships a configuration finding with **no
 remedy at all** when the author supplied none.
 
@@ -64,7 +65,7 @@ universal case asserts `expect(f.suggestion).toBeTruthy()`, which is presence ra
 correctness, so it would pass on the first fault above even if it did reach this producer.
 
 That hand-written enumeration is the subject of
-[plan 0078](../plans/0078-derive-the-configuration-finding-census.md). This bug is the live
+[plan 0078](../../plans/0078-derive-the-configuration-finding-census.md). This bug is the live
 instance proving the plan's premise.
 
 ## Fix
@@ -95,9 +96,47 @@ anything about its fields.
 
 ## Related
 
-- [Bug 0021](./fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) — the
+- [Bug 0021](./0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) — the
   original, and the source of the two-direction test shape.
-- [Bug 0040](./0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — a
+- [Bug 0040](../0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — a
   different defect in the same block: two sibling conditions have no empty-layer guard at all.
-- [Plan 0078](../plans/0078-derive-the-configuration-finding-census.md) — the census that would
+- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census that would
   have found this, and whose Phase 2 must assert correctness rather than presence.
+
+## Fix as shipped
+
+`suggestion` / `docs` are no longer copied from `context`. The producer states its own remedy,
+naming the layer:
+
+> Widen the glob for layer "ghost" until it matches at least one file, or remove the layer from
+> the chain. Until then every pair through it is unchecked, so the rule reports nothing whether
+> the code complies or not.
+
+`ruleId` and `because` stay, per bug 0021's own reasoning. `docs` is dropped rather than
+replaced — there is no fault-specific page to point at, and the author's is about their rule.
+
+## Guard
+
+`tests/conditions/cross-layer-finding-owns-its-remedy.test.ts`, four cases, two-directional
+because `toBeTruthy()` passes on the defect:
+
+- with author metadata — `not.toBe(AUTHOR.suggestion)`, `not.toBe(AUTHOR.docs)`, and the remedy
+  names the layer; `ruleId` and `because` still inherited;
+- with none — a remedy is present;
+- **control** — a real violation of the same rule inherits all four, without which "strip the
+  author's fields everywhere" passes;
+- vacuity — the empty layer actually produces the finding.
+
+The fixture hand-builds `Layer[]` because `haveMatchingCounterpart` takes it as an argument
+(the adjacent defect in [bug 0040](../0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)).
+Passing `[]` would switch the condition off at `if (layers.length < 2) return []` and make every
+assertion vacuous — which is exactly the trap 0040 was originally filed on.
+
+## Sabotage — 2 of 2
+
+| Revert                                        | Expected | Result |
+| --------------------------------------------- | -------- | ------ |
+| S2 — restore `suggestion: context.suggestion` | red      | CAUGHT |
+| S4 — strip the remedy entirely                | red      | CAUGHT |
+
+Both directions, because the two faults are independent: the wrong remedy and no remedy.

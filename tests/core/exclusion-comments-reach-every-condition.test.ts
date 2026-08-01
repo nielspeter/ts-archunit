@@ -33,6 +33,7 @@ import { Project } from 'ts-morph'
 import { modules } from '../../src/builders/module-rule-builder.js'
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
+import { isExcludedByComment } from '../../src/core/exclusion-comments.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const RULE_ID = 'probe/no-forbidden'
@@ -200,6 +201,31 @@ describe('an exclusion comment reaches every condition family (bug 0041)', () =>
       .violations()
 
     expect(offendingFiles(violations)).toEqual(['consumer-excluded.ts'])
+  })
+
+  it('the public isExcludedByComment still refuses an unstamped violation', () => {
+    // Residue of this fix, found by sabotage. `if (!ruleId) return false`
+    // (`exclusion-comments.ts:262`) is now **unreachable through `applyFilters`**:
+    // the comment scan is gated on `ctx.metadata?.id`, and enrichment has already
+    // stamped every violation by the time the filter runs. Measured — inverting
+    // that line to `return true` left the whole suite green.
+    //
+    // It is not dead code, though: `isExcludedByComment` is a public export
+    // (`src/index.ts`), so a direct caller can still pass an unstamped violation,
+    // and no test covered that. Asserted here rather than left as a green
+    // sabotage row nobody can account for.
+    const comment = {
+      ruleId: RULE_ID,
+      reason: 'r',
+      file: 'src/x.ts',
+      line: 1,
+      isBlock: false,
+    }
+    expect(
+      isExcludedByComment({ rule: 'r', element: 'e', file: 'src/x.ts', line: 2, message: 'm' }, [
+        comment,
+      ]),
+    ).toBe(false)
   })
 
   it('a rule with no id ignores the comment, as before', () => {

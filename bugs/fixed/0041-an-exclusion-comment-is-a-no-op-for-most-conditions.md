@@ -1,7 +1,8 @@
 # Bug 0041: an inline exclusion comment is a no-op for most conditions
 
-**Reported:** 2026-08-01 · **Verified:** 2026-08-01, measured through the public API
-**Found in:** v0.36.3, by the review of [bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md)
+**Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased
+**Verified:** measured through the public API before and after
+**Found in:** v0.36.3, by the review of [bug 0039](../0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md)
 **Severity:** High. A **documented public feature that silently does nothing** for the
 library's most-used conditions. The user writes the sanctioned exemption, the finding keeps
 firing, and nothing says why. There is no error, no warning, and no diagnostic — the comment is
@@ -67,7 +68,7 @@ and it uses `alwaysFail` from `tests/support/test-rule-builder.ts`, which stamps
 
 The test and the code were written from the same understanding of where `ruleId` comes from, so
 they agree — and they agree even though the feature does not work.
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 5, on our own suite: _a test that
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 5, on our own suite: _a test that
 restates the implementation is not a test of the implementation._
 
 ## Fix
@@ -86,7 +87,7 @@ routes, and the choice is not obvious:
 Either way, this is a behaviour change in the direction of **more suppression**: rules that were
 silently ignoring a user's exemption will start honouring it, so findings will disappear from
 reports. That is the user getting what they asked for, but it must be in the release note, and
-it interacts with [bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) —
+it interacts with [bug 0039](../0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) —
 fixing this widens 0039's fail-open from `createViolation` conditions to all of them. **Sequence
 0039's decision first, or ship them together.**
 
@@ -111,8 +112,61 @@ red, since the `classes()` control is green either way.
 
 ## Related
 
-- [Bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) — gated by
+- [Bug 0039](../0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) — gated by
   this one; its fail-open currently reaches only the conditions that stamp.
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 5 — the same-derivation test that
+- [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 5 — the same-derivation test that
   hid this.
 - `docs/violation-reporting.md:223-255` — the documentation this bug makes untrue for most rules.
+
+## Fix as shipped
+
+Route 1, the reorder. The enrichment block in `applyFilters` moved from the end of the
+function to the **top**, ahead of both `.excluding()` and the comment scan, so every filter
+sees a violation whose identity is complete. Ordering rather than lookup: giving
+`isExcludedByComment` a second source for the id would have left two places deciding what a
+rule is called.
+
+Safe ahead of `.excluding()`, which matches on `element` / `file` / `message` — none of which
+enrichment touches. It costs a map over violations that may later be filtered out; correctness
+beats that, and the comment says so.
+
+## Guard
+
+`tests/core/exclusion-comments-reach-every-condition.test.ts`, seven cases over real files on
+disk (the scanner uses `fs.readFileSync`, so an in-memory project silently yields no comments).
+
+The independent derivation is **the same source under two builders**: `classes()` stamps
+`ruleId`, `modules().notImportFrom()` does not. Before the fix they disagreed about identical
+comment text; after it they agree. A test against either one alone proves nothing — it is the
+disagreement that names the bug.
+
+## Sabotage — 4 of 5, and the fifth is accounted for
+
+Enumerated from `git diff`, verdicts read from the **exit code**, each patch asserted to apply.
+The asserted-green baseline earned its keep: the first run scored 1 because an unquoted `$SUITE`
+does not word-split in zsh, so vitest found no files — which would have scored every row CAUGHT.
+
+| Revert                                                      | Expected  | Result              |
+| ----------------------------------------------------------- | --------- | ------------------- |
+| S1 — enrichment block back after the comment filter         | red       | CAUGHT              |
+| S5 — enrichment between `.excluding()` and the comment scan | **green** | GREEN — the control |
+| S6 — `if (!ruleId) return true`                             | red       | **MISSED**          |
+| S6b — `comment.ruleId === ruleId` → `true`                  | red       | CAUGHT              |
+
+**S5 is the row that matters most.** It is a legitimate alternative placement that still fixes
+the bug, and it stays green — so the guard tests the property, not the line the diff happened
+to touch.
+
+**S6 is honest residue, not a gap.** After the fix `if (!ruleId) return false` is
+**unreachable through `applyFilters`**: the comment scan is gated on `ctx.metadata?.id`, and
+enrichment has already stamped every violation by the time the filter runs. There is nothing
+left to catch on that path. The line is still live for a direct caller — `isExcludedByComment`
+is a public export — and nothing covered that, so the guard now asserts it directly.
+
+## Follow-up
+
+A single-line directive covers `comment.line + 1`, and a class-level condition reports its
+violation at the **class declaration's** line, not the offending expression's. So an exclusion
+comment above a `console.log` inside a method does nothing; it has to sit above the class.
+Measured while writing the guard. Existing behaviour, orthogonal to this bug, and a usability
+wrinkle worth a docs note or its own issue.
