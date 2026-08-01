@@ -71,6 +71,14 @@ describe('a project-relative path glob means the same thing everywhere (bug 0033
     expect(count('src/domain/**')).toBe(count(`${path.dirname(tsconfigPath)}/src/domain/**`))
   })
 
+  it.each(surfaces)('$name means the ROOT folder, not any folder of that name', ({ count }) => {
+    // The discriminator, and it was missing. The fixture had exactly one
+    // `src/domain`, so relative and "anywhere" selected the same set and an
+    // implementation using the looser rewrite `matching()` uses would have
+    // passed every row. A nested second copy separates them: 3 against 4.
+    expect(count('src/domain/**')).toBeLessThan(count('**/src/domain/**'))
+  })
+
   it.each(surfaces)('$name still selects nothing for a genuinely absent folder', ({ count }) => {
     // The control. Normalizing everything into a match would satisfy both
     // assertions above.

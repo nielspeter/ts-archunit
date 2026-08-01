@@ -35,7 +35,7 @@ Slices can represent:
 
 **File-path** globs are matched against the **absolute** path, and a
 project-relative glob like `'src/services/**'` is resolved against the directory
-holding your `tsconfig.json`. Since **0.36.1** every surface accepts one:
+holding your `tsconfig.json`. Since **0.36.1** the surfaces below accept one:
 
 | Where                                                          | `'src/services/**'`               |
 | -------------------------------------------------------------- | --------------------------------- |
@@ -43,6 +43,8 @@ holding your `tsconfig.json`. Since **0.36.1** every surface accepts one:
 | `slices().matching()`                                          | ✅                                |
 | Preset options that name a location (`shared`, `repositories`) | ✅                                |
 | `slices().assignedFrom()`, and the layer options that use it   | ✅ (was ❌ before 0.36.1)         |
+
+Other entry points that take a path glob — `crossLayer().layer()`, `smells.*.inFolder()`, `onlyBeImportedVia()` — have **not** been audited for this and may still need `'**/'`. Tracked in [bug 0036](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0036-the-relative-glob-audit-is-incomplete.md).
 
 ::: tip When in doubt, anchor with `**/`
 `'**/src/services/**'` works everywhere. It means a `src/services` **anywhere**

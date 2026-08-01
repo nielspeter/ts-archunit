@@ -232,9 +232,15 @@ describe('an empty selection is a fault by default (plan 0074, emptyIsPass)', ()
       .should()
       .notImportFrom('**/x/**')
 
+    // Derived, not hard-coded: `'matched 3'` sat here and broke the day an
+    // unrelated file was added to the shared fixture. The property is that the
+    // message reports the REAL count, so take the count from the same selector.
+    const matched = modules(p).that().resideInFolder('**/domain/**').subjects().length
+    expect(matched).toBeGreaterThan(0)
+
     const [finding] = rule.violations()
     expect(finding?.message).toContain('.expectEmpty() asserted this selector matches nothing')
-    expect(finding?.message).toContain('matched 3')
+    expect(finding?.message).toContain(`matched ${String(matched)}`)
     expect(finding?.bypassFilters).toBe(true)
   })
 

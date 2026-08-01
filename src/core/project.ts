@@ -2,6 +2,7 @@ import { Project, type SourceFile, type CompilerOptions } from 'ts-morph'
 import path from 'node:path'
 import { clearRegisteredCaches } from './cache-registry.js'
 import fs from 'node:fs'
+import { registerProjectRoots } from './project-relative.js'
 
 /**
  * A loaded TypeScript project. Returned by `project()`.
@@ -60,6 +61,8 @@ export function project(tsConfigPath: string): ArchProject {
   const tsMorphProject = new Project({
     tsConfigFilePath: resolved,
   })
+
+  registerProjectRoots(tsMorphProject, [resolved])
 
   const archProject: ArchProject = {
     tsConfigPath: resolved,
@@ -152,6 +155,11 @@ export function workspace(tsConfigPaths: string[]): ArchProject {
     const configPath = resolvedPaths[i]
     if (configPath) tsMorphProject.addSourceFilesFromTsConfig(configPath)
   }
+
+  // EVERY config, not just the primary: a relative glob resolves against the
+  // package that contains the file, so `'src/api/**'` means each package's
+  // `src/api` rather than the alphabetically-first one's (bug 0035).
+  registerProjectRoots(tsMorphProject, resolvedPaths)
 
   const archProject: ArchProject = {
     tsConfigPath: primaryConfig,
