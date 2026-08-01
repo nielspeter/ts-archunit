@@ -45,8 +45,26 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
             message: `Layer "${leftLayer.name}" matched 0 files — a correspondence over an empty layer enforces nothing. Fix the layer glob.`,
             because: context.because,
             ruleId: context.ruleId,
-            suggestion: context.suggestion,
-            docs: context.docs,
+            // Its own remedy, never the author's (bug 0042, a live recurrence of
+            // bug 0021). This used to be `suggestion: context.suggestion` /
+            // `docs: context.docs`, which failed two ways at once. With author
+            // metadata it printed the author's fix for a real violation as this
+            // finding's `Fix:` — measured, an empty-layer finding advising "Split
+            // the cycle by extracting a shared module." With none, `suggestion` is
+            // optional on `ConditionContext`, so the finding shipped with no remedy
+            // at all: the only configuration finding of the twelve that could.
+            //
+            // `execute-rule.ts`'s bug-0021 guard cannot help here. It withholds the
+            // author's text from producers that leave the field unset; this one
+            // assigned it, so there was nothing to withhold. Same escape
+            // `correspondence-builder.ts` closed with a producer-side remedy.
+            //
+            // `ruleId` and `because` stay: the id says which rule enforces nothing,
+            // `because` is context. Neither claims a cause for this finding.
+            suggestion:
+              `Widen the glob for layer "${leftLayer.name}" until it matches at least one ` +
+              `file, or remove the layer from the chain. Until then every pair through it ` +
+              `is unchecked, so the rule reports nothing whether the code complies or not.`,
             // Config-level meta-finding: no source file, so it must survive
             // diff-aware/baseline or the guard re-greens under standard CI.
             bypassFilters: true,

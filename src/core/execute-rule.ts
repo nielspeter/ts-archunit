@@ -37,6 +37,60 @@ export function applyFilters(
 ): ArchViolation[] {
   let result = violations
 
+  // Enrich FIRST, because a filter cannot match on a field that is not set yet.
+  //
+  // [Bug 0041](../../bugs/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md):
+  // this block used to run LAST, after the inline-comment filter below. That
+  // filter's first statement is `if (!violation.ruleId) return false`
+  // (`exclusion-comments.ts:262`), so an exclusion comment matched only
+  // violations whose *producing condition* stamped `ruleId` itself. For every
+  // condition that left it to this enrichment — the dependency, exports, slice,
+  // reverse-dependency and module-body families, which is most of them — the
+  // comment was inert: no suppression, no error, no warning. Measured, with a
+  // documented comment and a rule carrying an id, `modules().notImportFrom()`
+  // returned the violation unsuppressed, and it carried the matching `ruleId`,
+  // stamped here a few lines too late.
+  //
+  // Ordering, not lookup, is the fix: giving `isExcludedByComment` a second
+  // source for the id would leave two places that decide what a rule is called.
+  //
+  // Safe ahead of `.excluding()` as well, which matches on `element`/`file`/
+  // `message` — none of which this touches. It costs a map over violations that
+  // may later be filtered out; correctness beats that.
+  const meta = ctx.metadata
+  if (ctx.reason || meta?.id || meta?.because || meta?.suggestion || meta?.docs) {
+    result = result.map((v) => ({
+      ...v,
+      ruleId: v.ruleId ?? meta?.id,
+      because: v.because ?? ctx.reason ?? meta?.because,
+      // A `bypassFilters` finding reports that the rule enforces NOTHING, so the
+      // author's `suggestion` cannot be its remedy: that text describes how to fix
+      // a real violation of the rule, and the formatter renders `suggestion` under
+      // `Fix:` — the field an agent obeys. Pairing a configuration message with an
+      // unrelated `Fix:` is a false remedy by juxtaposition (bug 0021), and it is
+      // ADR-008 rule 2: a failure may not assert a cause it cannot verify.
+      //
+      // `SliceRuleBuilder.metaViolation` argued exactly this in a comment and
+      // omitted both fields — and was overridden here, one layer up, so the
+      // omission had no effect in any shipped version. Measured: a finding reading
+      // "resolved no slices" printed "Split the cycle by extracting a shared
+      // module." as its Fix:.
+      //
+      // This guard reaches only producers that LEAVE the fields unset. A producer
+      // that assigns `context.suggestion` itself defeats it — bug 0042, where
+      // `cross-layer.ts` did exactly that and shipped the author's remedy on an
+      // empty-layer finding. Such a producer owns the discipline itself.
+      //
+      // `ruleId` and `because` stay. Neither asserts a remedy: the id says WHICH
+      // rule enforces nothing, which is the first thing the reader needs, and
+      // `because` states why the rule exists, which is context rather than a
+      // claim about this finding's cause. A producer that wants a remedy sets its
+      // own — `metaViolation` sets `docs: GLOB_DOCS`, which is about the fault.
+      suggestion: v.bypassFilters ? v.suggestion : (v.suggestion ?? meta?.suggestion),
+      docs: v.bypassFilters ? v.docs : (v.docs ?? meta?.docs),
+    }))
+  }
+
   // Apply .excluding() chain exclusions
   const exclusions = ctx.exclusions ?? []
   if (exclusions.length > 0) {
@@ -128,39 +182,6 @@ export function applyFilters(
         (v) => v.bypassFilters === true || !isExcludedByComment(v, allComments),
       )
     }
-  }
-
-  // Enrich each violation with rule-level metadata so a rule author's
-  // `.rule({ id, because, suggestion, docs })` (or `.because()`) reaches
-  // per-violation output — e.g. the agent's `check --format json` payload —
-  // when the condition did not set its own. Per-violation values take precedence.
-  const meta = ctx.metadata
-  if (ctx.reason || meta?.id || meta?.because || meta?.suggestion || meta?.docs) {
-    result = result.map((v) => ({
-      ...v,
-      ruleId: v.ruleId ?? meta?.id,
-      because: v.because ?? ctx.reason ?? meta?.because,
-      // A `bypassFilters` finding reports that the rule enforces NOTHING, so the
-      // author's `suggestion` cannot be its remedy: that text describes how to fix
-      // a real violation of the rule, and the formatter renders `suggestion` under
-      // `Fix:` — the field an agent obeys. Pairing a configuration message with an
-      // unrelated `Fix:` is a false remedy by juxtaposition (bug 0021), and it is
-      // ADR-008 rule 2: a failure may not assert a cause it cannot verify.
-      //
-      // `SliceRuleBuilder.metaViolation` argued exactly this in a comment and
-      // omitted both fields — and was overridden here, one layer up, so the
-      // omission had no effect in any shipped version. Measured: a finding reading
-      // "resolved no slices" printed "Split the cycle by extracting a shared
-      // module." as its Fix:.
-      //
-      // `ruleId` and `because` stay. Neither asserts a remedy: the id says WHICH
-      // rule enforces nothing, which is the first thing the reader needs, and
-      // `because` states why the rule exists, which is context rather than a
-      // claim about this finding's cause. A producer that wants a remedy sets its
-      // own — `metaViolation` sets `docs: GLOB_DOCS`, which is about the fault.
-      suggestion: v.bypassFilters ? v.suggestion : (v.suggestion ?? meta?.suggestion),
-      docs: v.bypassFilters ? v.docs : (v.docs ?? meta?.docs),
-    }))
   }
 
   return result
