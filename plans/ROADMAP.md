@@ -1,8 +1,8 @@
 # ts-archunit Roadmap
 
-**Version:** 0.34.0 · **Tests:** 2754 across 198 files · **Updated:** 2026-08-01
+**Version:** 0.35.0 · **Tests:** 2767 across 199 files · **Updated:** 2026-08-01
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
-**Plans:** 68 completed (`completed/`) · 4 open (below) · proposals in `../proposals/` ·
+**Plans:** 69 completed (`completed/`) · 3 open (below) · proposals in `../proposals/` ·
 open defects in `../bugs/`
 
 > Conventions: a plan is **READY** when its design is settled and it can be built as

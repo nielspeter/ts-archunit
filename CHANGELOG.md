@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.35.0] - 2026-08-01
+
+Plan 0067 part C — the second leg of the 1.0 path, and the root-cause fix for the mistake 0.34.0 started failing on.
+
+### Added
+
+- **A project-relative path glob works.** `resideInFolder('src/domain/**')`, `resideInFile()` and `havePathMatching()` now resolve an unanchored glob against the directory holding your `tsconfig.json`, in addition to the absolute path. It means **that folder at the project root** — narrower, and usually more accurate, than the `'**/src/domain/**'` the old advice prescribed, which also matches a `src/domain` inside `vendor/` or a nested package. Both spellings keep working and mean different things.
+
+  Skipped when the project was not loaded from a tsconfig — an in-memory project has no root to be relative to, and inventing one would match against something you never named.
+
+  A `./` segment is still an error. It never occurs in an absolute path and adds nothing to a relative one, and normalizing it would have made the rule _match_ while the gate still reported it dead.
+
+### Changed
+
+- **The `unanchored` diagnostic no longer fires for those three predicates.** A glob stops being reported dead for being unanchored exactly when it starts working, so `doctor` and `check` continue to agree.
+
+### Known gap
+
+- **`slices().assignedFrom()` still requires an anchored glob**, and the layer options that discover through it do too — [bug 0033](bugs/0033-assignedFrom-does-not-accept-a-project-relative-glob.md). `docs/slices.md` carries the table of which surfaces accept which spelling.
+
 ## [0.34.0] - 2026-08-01
 
 **Breaking.** Plan 0074 (R3b) completes [plan 0069](plans/completed/0069-no-rule-may-certify-nothing.md): a rule that cannot enforce anything now fails instead of passing. It reds on globs and selectors the adopting team wrote, and every one it reds on was already enforcing nothing.

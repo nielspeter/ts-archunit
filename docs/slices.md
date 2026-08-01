@@ -33,13 +33,22 @@ Slices can represent:
 
 ## Glob conventions (read this first)
 
-**File-path** globs are matched against the **absolute** path, so a
-project-relative glob like `'src/services/**'` matches nothing:
+**File-path** globs are matched against the **absolute** path. Whether a
+project-relative glob like `'src/services/**'` works depends on where you write
+it, and since **0.35.0** most places accept it:
 
-::: tip Anchor file-path globs with `**/`
-Write `'**/src/services/**'`, not `'src/services/**'`. This applies to
-`assignedFrom()`, the preset options (`layers`, `folders`, `shared`, `src`), and
-path predicates like `resideInFolder()` / `resideInFile()`.
+| Where                                                          | `'src/services/**'`                |
+| -------------------------------------------------------------- | ---------------------------------- |
+| `resideInFolder()`, `resideInFile()`, `havePathMatching()`     | ✅ the folder **at project root**  |
+| `slices().matching()`                                          | ✅                                 |
+| Preset options that name a location (`shared`, `repositories`) | ✅ — they use the predicates above |
+| `slices().assignedFrom()`, and the layer options that use it   | ❌ anchor it with `**/`            |
+
+::: tip When in doubt, anchor with `**/`
+`'**/src/services/**'` works everywhere. It means a `src/services` **anywhere**
+in the project — including one nested in `vendor/` or another package — whereas
+the relative spelling means the one at the project root, which is usually what
+you meant.
 
 **Import** globs need the anchor too, with one exception. They are matched against
 **both** the _resolved_ absolute path and — for non-relative specifiers only — the

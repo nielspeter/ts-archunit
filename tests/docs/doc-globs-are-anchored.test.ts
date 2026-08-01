@@ -49,8 +49,16 @@ const docsDir = path.resolve(import.meta.dirname, '../../docs')
 /**
  * APIs whose string arguments are matched against an **absolute** path, so an
  * unanchored glob cannot match and the example is dead as written.
+ *
+ * **Empty since v0.35.0** (plan 0067 part C). It held `resideInFile`,
+ * `resideInFolder` and `havePathMatching`, and those three now resolve an
+ * unanchored glob against the project root — so an unanchored example is
+ * correct, and the narrower spelling of the two. The set is kept rather than
+ * deleted because the classification is the mechanism here: a new API matched
+ * against absolute paths belongs in it, and an empty set states that none
+ * currently is.
  */
-const ANCHORING_REQUIRED = new Set(['resideInFile', 'resideInFolder', 'havePathMatching'])
+const ANCHORING_REQUIRED = new Set<string>([])
 
 /**
  * APIs that accept a project-relative glob **by design**, so unanchored is correct.
@@ -63,7 +71,21 @@ const ANCHORING_REQUIRED = new Set(['resideInFile', 'resideInFolder', 'havePathM
  * warned about, and the reason per-API classification is the mechanism rather than a
  * refinement of it.
  */
-const RELATIVE_ALLOWED = new Set(['matching', 'assignedFrom'])
+const RELATIVE_ALLOWED = new Set([
+  'matching',
+  // `assignedFrom` is listed here and MEASURED NOT TO BE — it discovers nothing
+  // from a relative glob, which `docs/troubleshooting.md` also states. So this
+  // entry lets a dead example through. Left as-is deliberately: correcting it
+  // would flag that page's intentional `// ❌ 0 files` counter-example, so it
+  // needs the guard to distinguish a counter-example first. Recorded in
+  // bug 0033, which is about the same inconsistency one level up.
+  'assignedFrom',
+  // Since v0.35.0 — an unanchored glob here means the folder at the project
+  // root, which is narrower than the anchored spelling rather than broken.
+  'resideInFile',
+  'resideInFolder',
+  'havePathMatching',
+])
 
 /**
  * APIs whose glob is matched against a resolved module path **or a bare specifier**.
@@ -174,11 +196,17 @@ describe('globs in documented examples', () => {
     // The discriminator. Without this the rule is 8 false positives to 1 true one,
     // and the cheapest way to green those 8 would be to anchor globs that are correct
     // as written — making the docs wrong to satisfy a test.
-    // `matching()` / `assignedFrom()`: 8 args, and measured, **all 8 are unanchored**.
-    // They are the population that makes the exemption load-bearing rather than
-    // theoretical — without it this file reds 8 correct examples.
-    expect(found.relativeAllowed.length).toBe(8)
-    expect(found.relativeAllowed.filter((g) => !isAnchored(g.glob))).toHaveLength(8)
+    // A FLOOR, not the exact count. It was pinned at 8 — `matching()` and
+    // `assignedFrom()`, all of them unanchored — and v0.35.0 moved the three
+    // path predicates into this set, taking it past 130. Re-pinning the new
+    // number would buy a test that reds on the next doc edit and says nothing;
+    // what this assertion is for is that the exemption is **exercised**, so
+    // that is what it now asserts. The `toBe` was the snapshot ADR-008 rule 4
+    // warns about, and it took a behaviour change to notice.
+    expect(found.relativeAllowed.length).toBeGreaterThan(20)
+    // At least some are genuinely unanchored — an exemption nothing exercises
+    // is not load-bearing, which is the property the old count stood for.
+    expect(found.relativeAllowed.filter((g) => !isAnchored(g.glob)).length).toBeGreaterThan(5)
 
     // Import-target APIs: 31 args, and measured, **all 31 happen to be anchored**.
     // So the exemption is currently UNEXERCISED — the docs contain no bare-specifier

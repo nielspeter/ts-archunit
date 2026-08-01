@@ -42,12 +42,17 @@ Leave rule-file builders un-terminated; use `.asSeverity('warn')` for warnings. 
 
 ## "Slice discovery matched no files" / a rule selects nothing
 
-Almost always an **unanchored glob**. Globs are matched against the _absolute_ file
-path, so `'src/services/**'` matches nothing — write `'**/src/services/**'`:
+Almost always an **unanchored glob** in a place that does not normalize one.
+Since **0.35.0** the path predicates and `slices().matching()` accept a
+project-relative glob and resolve it against the project root, but
+`assignedFrom()` still does not:
 
 ```typescript
 slices(p).assignedFrom({ services: 'src/services/**' }) // ❌ 0 files
 slices(p).assignedFrom({ services: '**/src/services/**' }) // ✅
+
+modules(p).that().resideInFolder('src/services/**') // ✅ since 0.35.0 — the root one
+modules(p).that().resideInFolder('**/src/services/**') // ✅ any src/services, anywhere
 ```
 
 The same applies to preset options (`layers`, `folders`, `shared`, `src`) and to

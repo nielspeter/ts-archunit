@@ -143,6 +143,21 @@ Available on all entry points:
 | `areExported`             | Element is exported      |
 | `areNotExported`          | Element is not exported  |
 
+#### Path Globs
+
+`resideInFolder()`, `resideInFile()` and `havePathMatching()` accept two spellings, and they mean different things:
+
+```typescript
+.resideInFolder('src/domain/**')      // that folder AT THE PROJECT ROOT (0.35.0+)
+.resideInFolder('**/src/domain/**')   // any src/domain, anywhere in the project
+```
+
+The relative form resolves against the directory holding your `tsconfig.json`, so it is the narrower and usually the intended one — `'**/src/domain/**'` also matches a `src/domain` inside `vendor/` or a nested package. Before 0.35.0 the relative spelling matched nothing; since 0.34.0 it was a hard failure telling you to anchor it.
+
+A glob with a `./` segment is still an error in both forms — remove it.
+
+Project-relative resolution is skipped when the project was not loaded from a `tsconfig.json` (an in-memory project has no root to be relative to), in which case only the absolute form matches.
+
 ### Type-Specific Predicates
 
 Each entry point adds its own predicates. See the dedicated pages: [Classes](/classes), [Functions](/functions), [Types](/types), [Modules](/modules), [Calls](/calls), [JSX Elements](/jsx).
