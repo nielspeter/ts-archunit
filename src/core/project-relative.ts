@@ -76,8 +76,8 @@ export function isProjectRelative(glob: string): boolean {
   // `./` is a mistake in both worlds — it never occurs in an absolute path and
   // it says nothing extra in a relative one — so the honest fix is to leave it
   // failing, with advice that says to remove it.
-  // `..` is not relative-to-the-root in any usable sense: `relativeToGivenRoot`
-  // returns `undefined` for anything above the root, deliberately, so a `../`
+  // `..` is not relative-to-the-root in any usable sense: containment returns
+  // `undefined` for anything above the root, deliberately, so a `../`
   // glob would normalize to nothing and be reported dead with three false
   // causes. Excluded alongside `./` — both are mistakes in both readings.
   if (/(?:^|\/)\.\.?\//.test(glob)) return false
@@ -127,7 +127,17 @@ export function isProjectRelative(glob: string): boolean {
  */
 const rootsByProject = new WeakMap<TsMorphProject, readonly string[]>()
 
-/** Record the directories a project was loaded from. Called by `project()` and `workspace()`. */
+/**
+ * Record the directories a project was loaded from.
+ *
+ * Load-bearing for `workspace()`, which has several. For a single-tsconfig
+ * `project()` it is **defence in depth and not independently observable**:
+ * removing that call leaves every test green, because `rootOf` then falls
+ * through to ts-morph's `configFilePath`, which agrees. Recorded rather than
+ * papered over — a sabotage row that survives because the behaviour is
+ * genuinely redundant is a different thing from a missing guard, and the next
+ * person to see it green should not go hunting for a test to write.
+ */
 export function registerProjectRoots(
   tsMorphProject: TsMorphProject,
   tsConfigPaths: readonly string[],
@@ -166,12 +176,6 @@ export function rootFromTsConfigPath(tsConfigPath: string): string | undefined {
 /** The prefix a path under `root` starts with. `'/'` is its own prefix. */
 function prefixOf(root: string): string {
   return root === '/' ? '/' : `${root}/`
-}
-
-/** `absolutePath` relative to `root`, or `undefined` when it sits outside. */
-export function relativeToGivenRoot(root: string, absolutePath: string): string | undefined {
-  const prefix = prefixOf(root)
-  return absolutePath.startsWith(prefix) ? absolutePath.slice(prefix.length) : undefined
 }
 
 export function rootOf(sourceFile: SourceFile, fallbackTsConfigPath?: string): string | undefined {

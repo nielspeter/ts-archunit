@@ -2,11 +2,7 @@ import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import { workspace, modules } from '../../src/index.js'
-import {
-  isProjectRelative,
-  rootFromTsConfigPath,
-  relativeToGivenRoot,
-} from '../../src/core/project-relative.js'
+import { isProjectRelative, rootFromTsConfigPath } from '../../src/core/project-relative.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { resolveByDefinition } from '../../src/models/slice.js'
 
@@ -65,14 +61,19 @@ describe('a relative glob resolves per package in a workspace (bug 0035)', () =>
     // root wins for a file inside an inner package, and the inner tsconfig
     // never applies — unguarded until this test, because the flat two-package
     // fixture cannot tell the two orderings apart.
+    // `zpkg`, deliberately: the roots are sorted alphabetically, and
+    // `<fixture>/tsconfig.json` sorts BEFORE `<fixture>/zpkg/tsconfig.json`.
+    // So without the longest-first pick the OUTER root wins for zpkg's file,
+    // its relative path becomes `zpkg/src/api/handler.ts`, and `src/api/**`
+    // misses it. With `packages/alpha` the alphabetical order happened to give
+    // the right answer anyway, which is why that version of this test could not
+    // fail.
     const outer = path.join(fixture, 'tsconfig.json')
-    const nested = workspace([outer, alpha])
+    const zpkg = path.join(fixture, 'zpkg/tsconfig.json')
+    const nested = workspace([outer, zpkg])
     const files = resolveByDefinition(nested, { api: 'src/api/**' })[0]?.files ?? []
-    // alpha's file resolves against `packages/alpha`, the outer file against the
-    // fixture root. Both must be found; with the outer root winning, alpha's
-    // relative path would be `packages/alpha/src/api/handler.ts` and miss.
     expect(files.map((f) => f.getFilePath())).toContain(
-      path.join(fixture, 'packages/alpha/src/api/handler.ts'),
+      path.join(fixture, 'zpkg/src/api/handler.ts'),
     )
   })
 
@@ -98,7 +99,6 @@ describe('a relative glob resolves per package in a workspace (bug 0035)', () =>
     // the glob dead. Reachable in a container that mounts the repo at /.
     expect(rootFromTsConfigPath('/tsconfig.json')).toBe('/')
     expect(rootFromTsConfigPath('')).toBeUndefined()
-    expect(relativeToGivenRoot('/', '/src/api/a.ts')).toBe('src/api/a.ts')
   })
 
   it('a ".." segment is a fault, not a project-relative glob', () => {
