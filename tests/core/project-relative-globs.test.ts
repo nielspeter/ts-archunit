@@ -143,14 +143,18 @@ describe('a project-relative path glob (plan 0067 C)', () => {
     const outside = '/repo/other/src/domain/a.ts'
     // Derived from the same helper the predicates use, via a stub source file
     // — the point is the path arithmetic, not ts-morph.
-    const stub = (configFilePath: string | undefined) =>
+    // `getFilePath` too: `rootOf` picks the root that CONTAINS the file, so it
+    // needs the path. The stub was written when there was only one root to
+    // return and predates that (bug 0035).
+    const stub = (configFilePath: string | undefined, filePath: string) =>
       ({
+        getFilePath: () => filePath,
         getProject: () => ({ getCompilerOptions: () => ({ configFilePath }) }),
       }) as unknown as Parameters<typeof relativeToRoot>[0]
 
-    expect(relativeToRoot(stub(`${root}/tsconfig.json`), inside)).toBe('src/domain/a.ts')
-    expect(relativeToRoot(stub(`${root}/tsconfig.json`), outside)).toBeUndefined()
-    expect(relativeToRoot(stub(undefined), inside)).toBeUndefined()
+    expect(relativeToRoot(stub(`${root}/tsconfig.json`, inside), inside)).toBe('src/domain/a.ts')
+    expect(relativeToRoot(stub(`${root}/tsconfig.json`, outside), outside)).toBeUndefined()
+    expect(relativeToRoot(stub(undefined, inside), inside)).toBeUndefined()
   })
 
   it('skips normalization when the project has no tsconfig to be relative to', () => {

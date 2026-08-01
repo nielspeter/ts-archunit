@@ -1,9 +1,5 @@
 import picomatch from 'picomatch'
-import {
-  isProjectRelative,
-  rootFromTsConfigPath,
-  relativeToGivenRoot,
-} from '../core/project-relative.js'
+import { isProjectRelative, relativeToRoot } from '../core/project-relative.js'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
 
@@ -246,14 +242,13 @@ export function resolveByDefinition(project: ArchProject, definition: SliceDefin
     }),
   )
 
-  // From the ArchProject's own tsconfig path, not from ts-morph's recorded
-  // `configFilePath` — the latter is undefined for an in-memory project, so
-  // normalization silently did not happen there and the failure message then
-  // described a relative glob as "anchored but matched no file".
-  const root = rootFromTsConfigPath(project.tsConfigPath)
   for (const sf of sourceFiles) {
     const filePath = sf.getFilePath()
-    const fromRoot = root === undefined ? undefined : relativeToGivenRoot(root, filePath)
+    // Per FILE, not once per project: a workspace has several roots and each
+    // file belongs to one of them (bug 0035). `project.tsConfigPath` is only
+    // the fallback, for a project built without `project()`/`workspace()` —
+    // an in-memory test double, where ts-morph records no config path either.
+    const fromRoot = relativeToRoot(sf, filePath, project.tsConfigPath)
     for (const matcher of matchers) {
       const hit =
         matcher.isMatch(filePath) ||

@@ -31,13 +31,18 @@ export interface GlobDiagnosis {
 export const GLOB_DOCS = 'https://nielspeter.github.io/ts-archunit/slices'
 
 /**
- * Whether a glob can already match an absolute path, so the `**\/` hint would
- * be a no-op (or worse). Covers POSIX-absolute and Windows drive-absolute
- * globs as well as an explicit globstar.
+ * Whether a glob can already match an absolute path.
+ *
+ * Defined in `project-relative.ts` and re-exported here, where its callers are.
+ * It has to live at the lower level: `isProjectRelative` is defined as its
+ * negation, and importing it upward from there closed a cycle —
+ * `disk-set -> path-universe -> glob-diagnosis -> project-relative -> project
+ * -> disk-set`, caught by this repository's own `beFreeOfCycles` rule. The
+ * predicate is pure string syntax with no dependencies, so the lower level is
+ * where it belonged anyway.
  */
-export function isAnchored(glob: string): boolean {
-  return glob.startsWith('**/') || glob.startsWith('/') || /^[A-Za-z]:\//.test(glob)
-}
+export { isAnchored } from './project-relative.js'
+import { isAnchored } from './project-relative.js'
 
 /**
  * The faults decidable from the glob string alone, with no project to compare

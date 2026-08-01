@@ -6,6 +6,8 @@ import { resideInFile, resideInFolder, havePathMatching } from '../../src/predic
 import { atPath } from '../../src/presets/shared.js'
 import { resolveByDefinition } from '../../src/models/slice.js'
 import { diagnose } from '../../src/core/diagnose.js'
+import { onlyImportFrom } from '../../src/conditions/dependency.js'
+import { candidatesFor } from '../../src/core/import-candidates.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const tsconfigPath = path.resolve(import.meta.dirname, '../fixtures/modules/tsconfig.json')
@@ -71,10 +73,68 @@ describe('a project-relative path glob means the same thing everywhere (bug 0033
     expect(count('src/domain/**')).toBe(count(`${path.dirname(tsconfigPath)}/src/domain/**`))
   })
 
+  it.each(surfaces)('$name means the ROOT folder, not any folder of that name', ({ count }) => {
+    // The discriminator, and it was missing. The fixture had exactly one
+    // `src/domain`, so relative and "anywhere" selected the same set and an
+    // implementation using the looser rewrite `matching()` uses would have
+    // passed every row. A nested second copy separates them: 3 against 4.
+    expect(count('src/domain/**')).toBeLessThan(count('**/src/domain/**'))
+  })
+
   it.each(surfaces)('$name still selects nothing for a genuinely absent folder', ({ count }) => {
     // The control. Normalizing everything into a match would satisfy both
     // assertions above.
     expect(count('src/no-such-folder/**')).toBe(0)
+  })
+
+  it('an IMPORT glob accepts the relative spelling too (bug 0037)', () => {
+    // The false red this closed: `shared` in `layeredArchitecture` reaches
+    // `onlyImportFrom(...)`, an import-target glob matched against the
+    // ABSOLUTE resolved path — so `'src/shared/**'` could never match and a
+    // correct architecture reported a violation. No configuration finding, and
+    // `diagnose()` silent, because condition-position globs are exempt by
+    // design. For an agent that is worse than a false green: it edits real
+    // imports to satisfy a broken allowlist.
+    const relative = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .satisfy(onlyImportFrom('src/**'))
+      .violations().length
+    const anchored = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .satisfy(onlyImportFrom('**/src/**'))
+      .violations().length
+    expect(relative).toBe(anchored)
+  })
+
+  it('CONTROL: a BARE specifier glob still matches, with no resolved path at all', () => {
+    // Bug 0014's case, and the one the fix must not break: `'fastify'` names a
+    // package, resolves to nothing inside the project, and has no root to be
+    // relative to. The early return for `resolvedPath === undefined` is what
+    // preserves it — assert through the real condition, not the helper.
+    const candidates = candidatesFor('fastify', undefined, '/some/root')
+    expect(candidates).toEqual(['fastify'])
+  })
+
+  it('CONTROL: the PRIMARY candidate is unchanged, so baselined findings do not move', () => {
+    // The relative form is appended, never prepended. `[0]` is interpolated
+    // into violation messages and hashed into baseline identities, so putting
+    // it first would silently invalidate every existing dependency entry.
+    const withRoot = candidatesFor('@scope/pkg', '/root/src/lib/a.ts', '/root')
+    expect(withRoot[0]).toBe('/root/src/lib/a.ts')
+    expect(withRoot).toContain('src/lib/a.ts')
+    const withoutRoot = candidatesFor('@scope/pkg', '/root/src/lib/a.ts', undefined)
+    expect(withoutRoot[0]).toBe(withRoot[0])
+  })
+
+  it('CONTROL: a target outside the root gets no relative candidate', () => {
+    expect(candidatesFor('@scope/pkg', '/elsewhere/a.ts', '/root')).toEqual([
+      '/elsewhere/a.ts',
+      '@scope/pkg',
+    ])
   })
 
   it('runtime and diagnosis agree for every surface', () => {
