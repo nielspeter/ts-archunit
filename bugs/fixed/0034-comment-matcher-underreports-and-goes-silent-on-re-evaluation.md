@@ -2,7 +2,7 @@
 
 **Reported:** 2026-08-01
 **Found in:** v0.35.0 and every earlier version — by the architect review of [plan 0047](../plans/0047-typescript-escape-hatch-matchers.md), which was going to build on this machinery
-**Status:** **FIXED** 2026-08-01, unreleased.
+**Status:** **FIXED** 2026-08-01, released in **v0.36.0**.
 **Severity:** High. Two independent under-reports in a shipped rule, and one of them is a **rule that passes the second time it runs**. `noStubComments()` (`src/rules/hygiene.ts`) is affected today, and it is in this repository's own architecture suite.
 
 ## Two defects, measured
