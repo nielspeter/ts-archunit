@@ -205,10 +205,15 @@ describe('an exclusion comment reaches every condition family (bug 0041)', () =>
 
   it('the public isExcludedByComment still refuses an unstamped violation', () => {
     // Residue of this fix, found by sabotage. `if (!ruleId) return false`
-    // (`exclusion-comments.ts:262`) is now **unreachable through `applyFilters`**:
-    // the comment scan is gated on `ctx.metadata?.id`, and enrichment has already
-    // stamped every violation by the time the filter runs. Measured — inverting
-    // that line to `return true` left the whole suite green.
+    // (`exclusion-comments.ts:262`) is now unreachable **from any producer in
+    // `src/`**: every `ruleId:` assignment derives from `metadata.id` or
+    // `context.ruleId`, and an empty `metadata.id` disables the comment scan
+    // outright (`execute-rule.ts:156`).
+    //
+    // Not "unreachable through `applyFilters`", which is what this said first and
+    // is false: `??` does not replace an empty string, so a violation carrying
+    // `ruleId: ''` reaches the line and survives. Measured. No shipped producer
+    // can emit that — a user-authored condition can.
     //
     // It is not dead code, though: `isExcludedByComment` is a public export
     // (`src/index.ts`), so a direct caller can still pass an unstamped violation,

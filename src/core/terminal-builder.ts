@@ -15,6 +15,7 @@ import type { SilentExclusion } from './silent-exclusion.js'
 import { isSilent } from './silent-exclusion.js'
 import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 import { shallowClone } from './shallow-clone.js'
+import { UNSUPPRESSABLE } from './unsuppressable.js'
 
 /**
  * The single root of every rule builder.
@@ -185,7 +186,7 @@ export abstract class TerminalBuilder {
     // reader given only the remedy tries `.asSeverity('warn')`, `.excluding()`,
     // the baseline and `--changed` — four CI cycles — because nothing told them
     // those were refused.
-    const advice = `${this.assertionAdvice()} This finding cannot be suppressed: not by .warn(), .asSeverity('warn'), .excluding(), a baseline, or diff-aware mode.`
+    const advice = `${this.assertionAdvice()} ${UNSUPPRESSABLE}`
     return [
       {
         rule: name,
@@ -465,8 +466,7 @@ export abstract class TerminalBuilder {
     const advice =
       `This rule's selector ${site.origin} can never match anything in this project, ` +
       `so it has no subjects and cannot fail — ${cause}. ` +
-      `Correct the glob, or remove the rule. This finding cannot be suppressed: not by ` +
-      `.warn(), .asSeverity('warn'), .excluding(), a baseline, or diff-aware mode.`
+      `Correct the glob, or remove the rule. ${UNSUPPRESSABLE}`
     return {
       rule: name,
       ruleId: described.id,

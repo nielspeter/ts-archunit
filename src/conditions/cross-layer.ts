@@ -4,6 +4,7 @@ import type { ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { LayerPair, Layer } from '../models/cross-layer.js'
 import { setCorrespondence } from '../core/correspondence-core.js'
+import { UNSUPPRESSABLE } from '../core/unsuppressable.js'
 
 /**
  * Every element in the left layer must have at least one match in the right layer.
@@ -61,10 +62,31 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
             //
             // `ruleId` and `because` stay: the id says which rule enforces nothing,
             // `because` is context. Neither claims a cause for this finding.
+            //
+            // The removal clause is COMPUTED, because no fixed text is true for
+            // both chain lengths — and the first version of this remedy shipped
+            // the false one. "Or remove the layer from the chain" is impossible
+            // on a two-layer chain: `.mapping()` throws `RangeError` below two
+            // layers (`cross-layer-builder.ts:111`) and this finding cannot fire
+            // below two either (`:27`), so the advice was unreachable on exactly
+            // the shape that produces it. Measured. That is bug 0017's shape, in
+            // the change whose subject was bug 0017's shape — which is the best
+            // argument in this file for rule 2's behavioural corollary: a remedy
+            // is a claim, and reading well is not evidence.
+            //
+            // The glob is named because a rule may declare several layers and
+            // "fix the glob" does not say which. It is `leftLayer.pattern` — the
+            // pattern from the `Layer[]` the CALLER passed, which is not
+            // necessarily the builder's resolved one until bug 0040 lands.
             suggestion:
-              `Widen the glob for layer "${leftLayer.name}" until it matches at least one ` +
-              `file, or remove the layer from the chain. Until then every pair through it ` +
-              `is unchecked, so the rule reports nothing whether the code complies or not.`,
+              `Fix the glob for layer "${leftLayer.name}" (currently ` +
+              `'${leftLayer.pattern}') so it matches at least one file.` +
+              (layers.length >= 3
+                ? ` Or drop the layer: ${String(layers.length - 1)} would remain, still a valid chain.`
+                : ` Dropping the layer is not available here — a chain needs two, and this one has` +
+                  ` ${String(layers.length)}. Delete the rule instead if the layer should not exist.`) +
+              ` Until then every pair through this layer is unchecked, so the rule reports` +
+              ` nothing whether the code complies or not. ${UNSUPPRESSABLE}`,
             // Config-level meta-finding: no source file, so it must survive
             // diff-aware/baseline or the guard re-greens under standard CI.
             bypassFilters: true,
