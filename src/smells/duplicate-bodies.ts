@@ -7,6 +7,7 @@ import type { Fingerprint } from './fingerprint.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ArchProject } from '../core/project.js'
 import type { ArchFunction } from '../models/arch-function.js'
+import { relativeToRoot } from '../core/project-relative.js'
 
 /** A function paired with its structural fingerprint. */
 interface FingerprintedFunction {
@@ -49,10 +50,15 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     folderMatchers: picomatch.Matcher[],
     ignoreMatchers: picomatch.Matcher[],
     testMatchers: picomatch.Matcher[],
+    fromRoot?: string,
   ): boolean {
-    if (folderMatchers.length > 0 && !folderMatchers.some((m) => m(filePath))) return false
-    if (ignoreMatchers.some((m) => m(filePath))) return false
-    if (testMatchers.some((m) => m(filePath))) return false
+    // Both forms, for every set — bug 0036. A project-relative `inFolder()` or
+    // `ignorePaths()` glob could never match an absolute path.
+    const hits = (ms: picomatch.Matcher[]): boolean =>
+      ms.some((m) => m(filePath)) || (fromRoot !== undefined && ms.some((m) => m(fromRoot)))
+    if (folderMatchers.length > 0 && !hits(folderMatchers)) return false
+    if (hits(ignoreMatchers)) return false
+    if (hits(testMatchers)) return false
     return true
   }
 
@@ -74,7 +80,15 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     const allFunctions: ArchFunction[] = []
 
     for (const sf of sourceFiles) {
-      if (!this.passesFileFilters(sf.getFilePath(), folderMatchers, ignoreMatchers, testMatchers)) {
+      if (
+        !this.passesFileFilters(
+          sf.getFilePath(),
+          folderMatchers,
+          ignoreMatchers,
+          testMatchers,
+          relativeToRoot(sf, sf.getFilePath(), this.project.tsConfigPath),
+        )
+      ) {
         continue
       }
 

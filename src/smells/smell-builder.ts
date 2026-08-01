@@ -3,6 +3,7 @@ import type { ArchViolation } from '../core/violation.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
+import { isProjectRelative } from '../core/project-relative.js'
 
 /**
  * Base class for smell detector builders.
@@ -79,7 +80,11 @@ export abstract class SmellBuilder extends TerminalBuilder {
     if (this._folders.length > 0) {
       trees.push(
         stampGlobs(
-          globAnyOf(this._folders, 'file-path'),
+          globAnyOf(
+            this._folders,
+            'file-path',
+            this._folders.every((g) => isProjectRelative(g)) ? 'normalized' : 'absolute',
+          ),
           'discovery',
           (g) => `inFolder("${g.glob}")`,
         ),

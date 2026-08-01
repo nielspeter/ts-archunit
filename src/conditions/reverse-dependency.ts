@@ -5,6 +5,7 @@ import type { ArchViolation } from '../core/violation.js'
 import { moduleEdges } from '../core/module-edges.js'
 import { recordEdgeCoverage } from '../core/edge-coverage.js'
 import { globAnyOf } from '../core/glob-site.js'
+import { relativeToRoot } from '../core/project-relative.js'
 
 // ─── Reverse import graph (cached per ts-morph Project) ──────────
 
@@ -132,7 +133,17 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
         for (const importer of importers) {
           tested++
           const importerPath = importer.getFilePath()
-          if (!matchers.some((m) => m(importerPath))) {
+          // Also the importer's path named from the project root — bug 0036.
+          // This glob is matched against an ABSOLUTE path, so a
+          // project-relative one could never match and every importer was
+          // reported: measured, `onlyBeImportedVia('src/**')` produced 5
+          // violations where `'**/src/**'` produced none. A false red, the same
+          // shape as bug 0037 one layer over.
+          const fromRoot = relativeToRoot(importer, importerPath)
+          const matched =
+            matchers.some((m) => m(importerPath)) ||
+            (fromRoot !== undefined && matchers.some((m) => m(fromRoot)))
+          if (!matched) {
             violations.push({
               rule: context.rule,
               element: sf.getBaseName(),
