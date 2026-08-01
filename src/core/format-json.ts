@@ -62,8 +62,24 @@ export function formatViolationsJson(
       ruleId: v.ruleId ?? null,
       severity: v.severity ?? 'error',
       element: v.element,
-      file: v.file,
-      line: v.line,
+      // `null`, not `''`/`1`, when there is no source location. A configuration
+      // finding reports that a RULE enforces nothing; it has no line, and saying
+      // `"file": "", "line": 1` states one that looks real (bug 0047). A human
+      // skims past it; an agent may open it or anchor an edit to it.
+      //
+      // `null` rather than omission, and consistent with the rest of this
+      // document — `ruleId`, `because`, `suggestion`, `docs` and `measured` all
+      // null when absent, so a consumer already handles the idiom here.
+      file: v.file === '' ? null : v.file,
+      line: v.file === '' ? null : v.line,
+      // Whether this is a configuration finding: the rule enforces nothing, as
+      // against a real violation of a rule that works. The distinction drives
+      // what a reader should DO — fix the rule, not the code — and it was not
+      // in this payload at all, so an agent parsing JSON could not tell them
+      // apart by any field. Named `configuration` rather than `bypassFilters`
+      // because the consumer cares what the finding IS, not which filters it
+      // survives; the flag's name is an implementation detail of our pipeline.
+      configuration: v.bypassFilters === true,
       message: v.message,
       because: v.because ?? null,
       suggestion: v.suggestion ?? null,

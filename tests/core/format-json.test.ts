@@ -33,6 +33,11 @@ describe('formatViolationsJson', () => {
           element: 'MyService.getTotal',
           file: '/project/src/service.ts',
           line: 42,
+          // Bug 0047. `false` here and `true` for a configuration finding, which
+          // had no distinguishing field in this payload at all — a consumer could
+          // only infer it from an empty `file`, the misleading signal that bug
+          // removed. Guarded properly in `a-fileless-finding-has-no-location.test.ts`.
+          configuration: false,
           message: 'bad call to parseInt',
           because: null,
           suggestion: null,
