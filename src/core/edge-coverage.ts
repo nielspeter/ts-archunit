@@ -13,7 +13,7 @@
  *
  * ## Why this reports rather than fails
  *
- * [Bug 0015](../../bugs/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)
+ * [Bug 0015](../../bugs/fixed/0015-allowlist-conditions-pass-vacuously-on-edgeless-subjects.md)
  * refuted failing, per-subject and per-rule, on measurement:
  *
  * - **Per-subject has no statable remedy.** 14 of this repo's `src/` files have

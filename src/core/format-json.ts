@@ -11,6 +11,81 @@ import { commentSuppressions } from './comment-suppression.js'
  * const violations = collectViolations(rule1, rule2)
  * console.log(formatViolationsJson(violations))
  */
+/**
+ * The `check --format json` document, as a type.
+ *
+ * Exported because it is a **contract**, and an unexported contract is one a
+ * consumer can only discover by breaking. Without it a TypeScript consumer gets
+ * a runtime failure where they could have had a red build — and our own tests
+ * had to hand-roll the shape and cast through `unknown`, which is the kind of
+ * ADR-005 exemption that should not be needed against our own output.
+ *
+ * Changing these types is changing the agent contract. Treat a field removal or
+ * a narrowed union as breaking.
+ */
+export interface ArchJsonViolation {
+  readonly rule: string
+  readonly ruleId: string | null
+  readonly severity: 'error' | 'warn'
+  readonly element: string
+  /**
+   * The source file, or `null` when the finding has no location.
+   *
+   * For `kind: 'configuration'` this is the **rule file** that declared the
+   * rule — not the code under test — because the CLI attributes findings to
+   * their origin before rendering. It is `null` only for findings produced
+   * after that step. Never use it to detect a configuration finding; use `kind`.
+   */
+  readonly file: string | null
+  /** `null` when there is no location; `1` on an attributed file means the file, not a position. */
+  readonly line: number | null
+  /**
+   * What kind of finding this is, and therefore what to do about it.
+   *
+   * `'violation'` — the code is wrong. `'configuration'` — the **rule**
+   * enforces nothing, so editing the code cannot clear it.
+   *
+   * A consumer should treat an **unrecognised** value as `'violation'`: that
+   * keeps widening this union non-breaking, and configuration findings today
+   * already span four distinct remedies (a rule that matched nothing, a rule
+   * file that could not be evaluated, rules after a failure that never ran, and
+   * a stale baseline) which may earn their own names later.
+   */
+  readonly kind: 'violation' | 'configuration'
+  readonly message: string
+  readonly because: string | null
+  readonly suggestion: string | null
+  readonly docs: string | null
+  readonly codeFrame: string | null
+  readonly measured: number | null
+}
+
+/** One finding removed by an inline `// ts-archunit-exclude` comment. */
+export interface ArchJsonSuppression {
+  readonly ruleId: string
+  readonly file: string
+}
+
+/** An allowlist rule that had subjects but tested no edges. */
+export interface ArchJsonUntestedAllowlist {
+  readonly rule: string
+  readonly subjects: number
+  readonly edges: number
+}
+
+/** The whole document emitted by `check --format json`. */
+export interface ArchJsonReport {
+  readonly summary: {
+    readonly total: number
+    readonly errors: number
+    readonly warnings: number
+    readonly reason: string | null
+  }
+  readonly untestedAllowlists: readonly ArchJsonUntestedAllowlist[]
+  readonly commentSuppressed: readonly ArchJsonSuppression[]
+  readonly violations: readonly ArchJsonViolation[]
+}
+
 export function formatViolationsJson(
   violations: ArchViolation[],
   reason?: string,
@@ -62,8 +137,33 @@ export function formatViolationsJson(
       ruleId: v.ruleId ?? null,
       severity: v.severity ?? 'error',
       element: v.element,
-      file: v.file,
-      line: v.line,
+      // `null`, not `''`/`1`, when there is no source location. A configuration
+      // finding reports that a RULE enforces nothing; it has no line, and saying
+      // `"file": "", "line": 1` states one that looks real (bug 0047). A human
+      // skims past it; an agent may open it or anchor an edit to it.
+      //
+      // `null` rather than omission, and consistent with the rest of this
+      // document — `ruleId`, `because`, `suggestion`, `docs` and `measured` all
+      // null when absent, so a consumer already handles the idiom here.
+      file: v.file === '' ? null : v.file,
+      line: v.file === '' ? null : v.line,
+      // What kind of finding this is, which drives what the reader should DO:
+      // `'violation'` — the code is wrong, edit the named file;
+      // `'configuration'` — the RULE enforces nothing, so editing the code
+      // cannot clear it. This distinction was absent from the payload entirely,
+      // so an agent could not tell them apart by any field.
+      //
+      // A string rather than a boolean, decided deliberately. There are twelve
+      // configuration-finding producers with materially different causes — an
+      // empty selector, a dead glob, a rule with no condition, a preset that
+      // discovered nothing — and someone will want to distinguish them. A
+      // boolean leaves nowhere to put that; adding a second overlapping field
+      // later is worse than one field with room in it. This is the agent
+      // contract, so the cost of the wrong shape is permanent.
+      //
+      // Not named after `bypassFilters`: the consumer cares what the finding
+      // IS, not which of our filters it happens to survive.
+      kind: v.bypassFilters === true ? 'configuration' : 'violation',
       message: v.message,
       because: v.because ?? null,
       suggestion: v.suggestion ?? null,

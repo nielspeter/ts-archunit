@@ -33,6 +33,11 @@ describe('formatViolationsJson', () => {
           element: 'MyService.getTotal',
           file: '/project/src/service.ts',
           line: 42,
+          // Bug 0047. `'violation'` here and `'configuration'` for a finding that
+          // says the rule enforces nothing. The payload had no such field at all — a consumer could
+          // only infer it from an empty `file`, the misleading signal that bug
+          // removed. Guarded properly in `a-fileless-finding-has-no-location.test.ts`.
+          kind: 'violation',
           message: 'bad call to parseInt',
           because: null,
           suggestion: null,

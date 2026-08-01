@@ -1,6 +1,6 @@
 /**
  * An exclusion comment works for every condition, not only the ones that stamp
- * `ruleId` — [bug 0041](../../bugs/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md).
+ * `ruleId` — [bug 0041](../../bugs/fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md).
  *
  * `isExcludedByComment` opens with `if (!violation.ruleId) return false`
  * (`exclusion-comments.ts:262`). `applyFilters` used to stamp `ruleId` from the

@@ -277,6 +277,12 @@ export type { CheckOptions, OutputFormat } from './core/check-options.js'
 
 // Output formats
 export { formatViolationsJson } from './core/format-json.js'
+export type {
+  ArchJsonReport,
+  ArchJsonViolation,
+  ArchJsonSuppression,
+  ArchJsonUntestedAllowlist,
+} from './core/format-json.js'
 export { formatViolationsGitHub } from './core/format-github.js'
 export { detectFormat, isCI } from './core/environment.js'
 

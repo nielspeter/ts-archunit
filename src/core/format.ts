@@ -103,8 +103,15 @@ export function formatViolationsPlain(violations: ArchViolation[], reason?: stri
 
   const details = violations
     .map((v, i) => {
+      // A configuration finding has no source location — it reports that a RULE
+      // enforces nothing, not that a line is wrong — so it carries `file: ''`
+      // and a `line` that means nothing. Rendering it produced a bare `(:1)`
+      // (bug 0047). The rich formatter and the GitHub formatter
+      // (`format-github.ts:58`) both already special-case this; plain and JSON
+      // were the two that did not.
+      const where = v.file === '' ? '' : ` (${v.file}:${String(v.line)})`
       const parts = [
-        `  [${String(i + 1)}/${String(violations.length)}] ${v.element}: ${v.message} (${v.file}:${String(v.line)})`,
+        `  [${String(i + 1)}/${String(violations.length)}] ${v.element}: ${v.message}${where}`,
       ]
       if (v.codeFrame) parts.push(v.codeFrame)
       // This format always renders `message`, so a remedy identical to it is

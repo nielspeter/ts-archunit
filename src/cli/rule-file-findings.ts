@@ -6,7 +6,7 @@ import { basename } from 'node:path'
  * Attribute findings that have no source location of their own to the rule file
  * they came from.
  *
- * [Bug 0026](../../bugs/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md):
+ * [Bug 0026](../../bugs/fixed/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md):
  * a configuration finding carries `file: ''` because it reports a fault in the
  * rule rather than in the code, so two identical vacuous rules in two rule files
  * rendered as two identical paragraphs with nothing saying which to open. In a
@@ -38,7 +38,7 @@ export function attributeToRuleFile(
 /**
  * A rule file, or one rule in it, that could not be evaluated at all.
  *
- * [Bug 0025](../../bugs/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md):
+ * [Bug 0025](../../bugs/fixed/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md):
  * `runCheck` and `runBaseline` caught `ArchRuleError` and rethrew everything
  * else, so any other error escaped the per-file loop and terminated the process
  * — no report written, no exit code returned, and every finding already
@@ -112,8 +112,8 @@ export function failureOrViolations(
 /**
  * A rule file stopped evaluating partway, so the rules after that point never ran.
  *
- * [Bug 0029](../../bugs/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md),
- * and the half [plan 0069](../../plans/0069-no-rule-may-certify-nothing.md)'s R3a
+ * [Bug 0029](../../bugs/fixed/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md),
+ * and the half [plan 0069](../../plans/completed/0069-no-rule-may-certify-nothing.md)'s R3a
  * specified and did not build: *"R3a states the semantics, and the CLI **reports the
  * truncation rather than absorbing it**."* The semantics shipped in v0.23.0; this is
  * the reporting.

@@ -121,6 +121,7 @@ which emits a single JSON document the agent parses to self-correct:
       "because": "a generic Error loses the type/context callers need to handle it",
       "suggestion": "throw a domain-specific error (NotFoundError, ValidationError, …)",
       "codeFrame": "  41 |   if (!order) {\n> 42 |     throw new Error('not found')\n  43 |   }",
+      "kind": "violation",
     },
   ],
 }
@@ -129,6 +130,48 @@ which emits a single JSON document the agent parses to self-correct:
 `severity` lets the agent distinguish blocking from advisory; `suggestion` and
 `codeFrame` tell it what to change and where. `check` exits non-zero only on
 **error**-severity violations, so warnings surface without failing the loop.
+
+### `kind` — the field that changes what you do
+
+`kind: "configuration"` means **the rule enforces nothing**: its selector matched
+no subjects, its glob cannot match, it asserts nothing. The code is not the
+problem, so editing the named file will not clear it — the fix is in the rule
+definition.
+
+**Detect them by `kind`, never by an empty `file`.** On the CLI most of these
+carry a real path — the **rule file** that declared the rule, not the code under
+test — because `check` attributes them to their origin so you can find the
+declaration. When it is non-null, `line: 1` is a file-level marker, not a
+position:
+
+```jsonc
+{
+  "ruleId": "arch/domain-isolation",
+  "severity": "error",
+  "element": "arch/domain-isolation",
+  // The rule FILE, not the code under test. `line: 1` marks the file, not a spot in it.
+  "file": "arch.rules.ts",
+  "line": 1,
+  "message": "Selector matched 0 subjects…",
+  "suggestion": "Widen the selector until it matches at least one subject…",
+  "kind": "configuration",
+}
+```
+
+So: open `file`, find the rule by `ruleId`, and edit the **rule declaration**.
+Do not anchor an edit to `line`, and do not look for the problem in your source.
+
+A few of these arrive with `"file": null, "line": null` — the baseline
+meta-findings, which are produced after attribution and have no origin to name.
+Handle both: `file` is _either_ `null` _or_ the rule file, and never a location
+in the code being judged.
+
+Two more things about this kind of finding, both deliberate:
+
+- **It cannot be suppressed** — not by `.warn()`, `.asSeverity('warn')`,
+  `.excluding()`, a `// ts-archunit-exclude` comment, a baseline, or
+  diff-aware mode. A rule that enforces nothing is not something to grade down.
+- **It is always `error`.** There is no advisory version.
 
 ## Composing with topology rules
 
