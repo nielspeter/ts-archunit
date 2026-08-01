@@ -1,6 +1,6 @@
 # Plan 0074 — R3b: the selector glob flip
 
-**Status:** GATE OPEN and UNBLOCKED as of v0.33.0 — bugs 0031 and 0032 are fixed. Previously DESIGNED, GATED. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
+**Status:** **DONE — shipped in v0.34.0** (2026-08-01). Gate opened by run 4; bugs 0031/0032 shipped in v0.33.0. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
 on 2026-07-30 so that a 90%-shipped plan stops being held open by one slice waiting on a
 precondition that does not exist yet. Nothing here is undecided — the design and both open
 decisions are settled in 0069 and [its appendix](./completed/0069-appendix-vacuous-tests.md).
@@ -170,3 +170,50 @@ rule 2 — a remedy must be verified to remediate — asked of R3b's own output.
 - **Path normalization** — making `'src/*'` _work_ rather than merely diagnosing it. 0069
   keeps this separable, and it is the second breaking change on the 1.0 path.
 - **Bug 0015**, the `only*` edgeless-subject exposure.
+
+## Result
+
+Shipped in v0.34.0, in three pieces, each with its own guard file and matrix.
+
+**1. The glob flip.** A selector glob that can never match is a configuration finding at check time. The gate reuses `diagnose()`'s own functions rather than reimplementing deadness — `doctor`'s promise is "this is what R3b will fail on", and two computations would void it, so a test pins both surfaces to one answer. Ordered after the assertion gate, honouring a comment `terminal-builder.ts` already carried: no selector makes an assertion-less rule capable of failing.
+
+**2. `emptyIsPass`.** An empty selection fails. Escape hatch `.expectEmpty()`, per the appendix, which rejected `.allowEmpty()` as _"one word, silent forever, typo or not, and nothing revisits it"_. Declaring both throws a `TypeError` at build time.
+
+**3. Preset dedupe.** Measured at **83 configuration findings from one bad `shared` glob** on this repository — the appendix recorded 38 for the same shape, before the repo grew boundary folders. Collapses on `(rule file, rule id, offending glob)`, and the option name reaches the message through a new `Predicate.originLabel`.
+
+### The design gained one thing implementation found
+
+**The cardinality exemption belongs to the glob gate too.** 0069 specified it for `emptyIsPass` only, but `.should().notExist()` over an absent folder is a legitimate pre-emptive guard where zero subjects is the rule being _satisfied_ — and the selector row of the decision table would have redded it. It was **5 of the 9** failures the glob gate first produced on this repository's own suite.
+
+### Two of the appendix's four constraints were violated and then caught
+
+Both by reading further, not by testing:
+
+- The cardinality flag shipped as a plain `assertsCardinality?: true` on the **exported** `Condition` interface — a one-line silent opt-out on any user condition, which is `.allowEmpty()` relocated onto the condition object, the shape review had already rejected. Now a module-private `unique symbol`, unreachable because `package.json` has no wildcard subpath.
+- `.some()` where the appendix says **every** condition must be exempt, since `andShould()` ANDs.
+
+### Blast radius, measured rather than estimated
+
+| Piece         | Failures on this repo's suite | Disposition                                                                    |
+| ------------- | ----------------------------- | ------------------------------------------------------------------------------ |
+| Glob flip     | 9                             | 5 exempt via cardinality, 3 pinned a superseded message, 1 was 0077's own test |
+| `emptyIsPass` | 10                            | 2 were real violations of our own arch rules, 8 asserted the old default       |
+| Preset dedupe | 0                             | new surface                                                                    |
+
+0069's appendix estimated 35 vacuous tests. The real number was lower because the glob flip and the cardinality exemption absorbed most of them first.
+
+**On a real adopting codebase the flip adds nothing to a first run**: hono's unedited `init --preset layered` scaffold produces 27 violation blocks and 4 dead globs, none of them selector-position — they are all `discovery`, already failing under 0067-D. The concern that R3b would red every new adopter was raised and refuted by running it.
+
+### Sabotage
+
+8/8 (glob flip), 8/8 (`emptyIsPass`), 10/10 (dedupe). Three rows across the three matrices first scored MISSED or SKIPPED and were right to:
+
+- the condition-position test used `notImportFrom`, whose `import-target` kind has no path-universe views — it passed by **kind** while claiming to test **position**, so deleting the position filter left it green;
+- the dedupe tests all called the helper directly, so removing the call from `checkAll` left every one of them green. A helper nobody calls is not a feature;
+- three rows could not find their anchor because the file on disk held **NUL bytes** where the source appeared to hold spaces — see below.
+
+### Two self-inflicted incidents worth recording
+
+**A source file with NUL bytes nearly shipped.** `dedupe-config-findings.ts`'s key read `` `${file} ${id} ${element}` ``. The full suite passed, because NUL is a valid character in a template literal and the key worked. It surfaced only because git flagged the file binary and a sabotage anchor failed to match.
+
+**A restore destroyed seven of nine edits.** A gratuitous `git stash push/pop` unstaged everything, so the checkpoint commit captured 2 files, and `git checkout -- src/` then discarded the rest. Recovered deterministically. The rule that came out of it: **verify what a checkpoint captured before relying on it as a restore point**, and commit before sabotaging so the restore is `git`, not hand-rolled copies.

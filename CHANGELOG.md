@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.34.0] - 2026-08-01
+
+**Breaking.** Plan 0074 (R3b) completes [plan 0069](plans/completed/0069-no-rule-may-certify-nothing.md): a rule that cannot enforce anything now fails instead of passing. It reds on globs and selectors the adopting team wrote, and every one it reds on was already enforcing nothing.
+
+**Run `ts-archunit doctor` on 0.33.x before upgrading** — it reports the dead-glob half of what this release will fail on, without a red build.
+
+### Changed
+
+- **A selector glob that can never match is a configuration finding.** Unsatisfiable in the project — a typo, a stale path — so the rule can never have subjects. `condition` and `exclusion` globs are unaffected: a condition glob matching nothing is indistinguishable from an armed tripwire that has not fired, and banning a folder before it exists stays legitimate.
+- **An empty selection fails.** A condition reports a violation when _some_ subject fails; over an empty set that is vacuously false, so the rule passed. Exempt: a rule whose conditions **all** assert cardinality (`.notExist()`), where zero subjects is the assertion being satisfied.
+- **One bad preset option is one finding.** A preset generates rules combinatorially, so one wrong character produced a finding per generated rule — measured at **83 findings from one bad `shared` glob** on this repository. They now collapse to one finding naming the option you wrote, with the affected rule count as context.
+- Configuration findings from all three are **unsuppressable** — not by `.warn()`, `.asSeverity('warn')`, `.excluding()`, a baseline, or `--changed`.
+
+### Added
+
+- **`.expectEmpty()`** — assert a selector matches nothing, and fail the day it matches something. The escape hatch for a legitimately-empty selection, and an assertion rather than a silencer: an intent that expires reports itself. Declaring it with `.expectNonEmpty()` throws a `TypeError` when the rule is built.
+
+### Deprecated in effect
+
+- **`.expectNonEmpty()` is redundant.** It asks for what is now the default. Still legal, still reads as intent, no behaviour of its own.
+
 ## [0.33.0] - 2026-07-31
 
 Both fixes came out of [plan 0074](plans/0074-r3b-the-selector-glob-flip.md)'s gate run against a

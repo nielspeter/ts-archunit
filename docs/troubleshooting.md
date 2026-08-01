@@ -89,6 +89,40 @@ const p = project('./config/tsconfig.build.json')
 
 In a monorepo, load the specific package's tsconfig, or use [`workspace()`](/core-concepts#monorepo-workspace) to unify several.
 
+## A rule that passed for months now fails: "selector can never match" or "matched 0 subjects"
+
+**0.34.0** turned two silent passes into failures. Both mean the rule was never enforcing anything; neither is a new problem in your code.
+
+**"This rule's selector … can never match anything in this project"** — the glob is unsatisfiable: no file or directory in the project can match it, whatever you write in your source. Usually a typo or a stale path. `ts-archunit doctor` reported this before 0.34.0 and still does, without running any rule.
+
+**"Selector matched 0 subjects"** — the glob is fine, but nothing matched _this run_. Either the selection is genuinely empty today, or the predicate chain is narrower than you meant.
+
+If the emptiness is correct and intended, say so in the rule:
+
+```typescript
+classes(p)
+  .that()
+  .haveDecorator('Deprecated')
+  .expectEmpty() // nothing is deprecated yet
+  .should()
+  .beExported()
+  .check()
+```
+
+`.expectEmpty()` fails the day the selector matches something, so it cannot rot into a permanent silencer. If the rule is a pre-emptive ban — "nothing may ever appear here" — use `.notExist()` instead, which is exempt because zero subjects is what it asserts:
+
+```typescript
+modules(p).that().resideInFolder('**/legacy/**').should().notExist().check()
+```
+
+Neither finding can be suppressed by `.warn()`, `.asSeverity('warn')`, `.excluding()`, a baseline, or `--changed`. That is deliberate ([ADR-008](https://github.com/nielspeter/ts-archunit/blob/main/adr/008-agent-first-failure-surfaces.md)): a rule that cannot fail is counted as coverage, and accepting that into a baseline would make the gap permanent and invisible.
+
+**Before upgrading**, run `ts-archunit doctor` on 0.33.x to see the dead-glob half of this list without a red build.
+
+## One preset option produced dozens of identical findings
+
+Fixed in **0.34.0** — a fan-out now collapses to one finding naming the option you wrote, with the number of generated rules it affects as context. If you are on an earlier version and see dozens of identical `preset/...` findings with the same glob, they are one edit: fix the option named in the message.
+
 ## Every rule passes, and `doctor` says the project loaded 0 source files
 
 Your tsconfig is **solution-style** — `"files": []` plus `"references"` — which is what a monorepo root usually looks like. TypeScript loads no sources from it; it only points at the projects that do. So every glob in every rule matches nothing, every rule passes over an empty set, and the run is green while enforcing nothing.

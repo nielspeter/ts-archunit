@@ -212,6 +212,49 @@ const repos = classes(p).that().extend('BaseRepository')
 repos.should().beExported().should().notContain(call('parseInt')).check() // both asserted
 ```
 
+### What an Empty Selection Means
+
+A condition reports a violation when **some** subject fails it. Over an empty subject set that is vacuously false, so before 0.34.0 a rule whose selector matched nothing **passed** — and the suite counted it as coverage.
+
+```typescript
+// Before 0.34.0: green, and checked nothing at all.
+classes(p)
+  .that()
+  .resideInFolder('**/repostories/**') // typo
+  .should()
+  .beExported()
+  .check()
+```
+
+Since **0.34.0** an empty selection is a **configuration finding**: it fails, and the failure cannot be downgraded by `.warn()`, `.asSeverity('warn')`, `.excluding()`, a baseline, or diff-aware mode. A rule that selects nothing certifies nothing, and reporting that as a pass is the lie this library exists to remove.
+
+Two things are legitimately empty, and both are exempt.
+
+**A rule whose condition asserts cardinality.** `.notExist()` says "nothing matching this may exist", so zero subjects is the rule being _satisfied_:
+
+```typescript
+// Passes, and keeps passing until someone creates the folder.
+modules(p).that().resideInFolder('**/legacy/**').should().notExist().check()
+```
+
+The exemption requires **every** condition on the rule to be of that kind — `andShould()` ANDs, so a rule that also asserts something about subjects that exist is not satisfied by emptiness.
+
+**A selection you expect to be empty today.** Declare it with `.expectEmpty()`:
+
+```typescript
+classes(p)
+  .that()
+  .haveDecorator('Deprecated')
+  .expectEmpty() // nothing is deprecated yet
+  .should()
+  .beExported()
+  .check()
+```
+
+`.expectEmpty()` is an **assertion, not a silencer**: it fails the day the selector matches something, so an intent that expires reports itself instead of going quiet forever. That is the whole difference from a hypothetical `.allowEmpty()`, which was considered and rejected — one word, silent forever, typo or not, and nothing revisits it. Declaring `.expectEmpty()` and `.expectNonEmpty()` on the same rule is a contradiction and throws when the rule is built.
+
+`.expectNonEmpty()` still exists and is still legal. It is now redundant, because it asks for the default.
+
 ## Named Selections
 
 Save a `.that()` chain and reuse it across rules:
