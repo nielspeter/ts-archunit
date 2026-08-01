@@ -55,7 +55,23 @@ const repoRoot = path.resolve(import.meta.dirname, '../..')
  *
  * Pinned below by `the generated directory is invisible to the root project`.
  */
-const generatedDir = path.join(repoRoot, 'tests/__generated__')
+/**
+ * Per-process, and that is load-bearing —
+ * [bug 0045](../../bugs/fixed/0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md).
+ *
+ * This used to be `tests/__generated__` flat, with `beforeAll` deleting the whole
+ * directory. One checkout running two suites at once — two agents, or a watch
+ * run beside a manual one — meant each process's setup destroyed the other's
+ * files mid-flight, surfacing as `ENOENT … channel.mjs` from a line that had
+ * just written it. Observed once in ten full runs, and the reason matters more
+ * than the rate: a sabotage matrix reads exit codes, so a spurious failure scores
+ * the row CAUGHT, which is the reassuring direction.
+ *
+ * `tests/__generated__/` is gitignored and tsconfig-excluded by directory
+ * prefix, so a nested per-process directory is still invisible to both.
+ */
+const generatedRoot = path.join(repoRoot, 'tests/__generated__')
+const generatedDir = path.join(generatedRoot, `run-${String(process.pid)}`)
 
 /** A test file that uses the library exactly as a consumer's test would. */
 function writeProbe(name: string, body: string): string {
@@ -65,10 +81,15 @@ function writeProbe(name: string, body: string): string {
     [
       `import { describe, it, expect } from 'vitest'`,
       `import { Project } from 'ts-morph'`,
-      `import path from 'node:path'`,
-      `import { functions } from '../../src/builders/function-rule-builder.js'`,
+      // ABSOLUTE imports and paths, not `../../`. The probe now lives one level
+      // deeper (a per-process directory, bug 0045), and a relative depth encoded
+      // in a generated file breaks silently the moment that layout changes —
+      // the child run simply finds no tests, which reads as a library failure.
+      // Deriving both from `repoRoot` at write time makes the probe indifferent
+      // to where it is written.
+      `import { functions } from ${JSON.stringify(path.join(repoRoot, 'src/builders/function-rule-builder.js'))}`,
       ``,
-      `const tsconfig = path.resolve(import.meta.dirname, '../fixtures/poc/tsconfig.json')`,
+      `const tsconfig = ${JSON.stringify(path.join(repoRoot, 'tests/fixtures/poc/tsconfig.json'))}`,
       `const p = new Project({ tsConfigFilePath: tsconfig })`,
       `const proj = { tsConfigPath: tsconfig, _project: p, getSourceFiles: () => p.getSourceFiles() }`,
       `const parsers = () => functions(proj).that().haveNameMatching(/^parse/).should().notExist()`,
@@ -100,11 +121,21 @@ function runVitest(file: string): { output: string; status: number } {
 beforeAll(() => {
   // Cleaned on the way IN as well as out: a crashed earlier run would otherwise
   // leave probe files that the next parent run collects as its own tests.
+  // Only this process's own directory. Removing `generatedRoot` here is what
+  // let one run delete another's files (bug 0045).
   fs.rmSync(generatedDir, { recursive: true, force: true })
   fs.mkdirSync(generatedDir, { recursive: true })
 })
 afterAll(() => {
   fs.rmSync(generatedDir, { recursive: true, force: true })
+  // Tidy the shared parent, but only when this was the last run using it —
+  // `rmdir` fails harmlessly if a sibling process still has a directory there,
+  // which is exactly the check we want and why it is not `rmSync`.
+  try {
+    fs.rmdirSync(generatedRoot)
+  } catch {
+    // A sibling run still owns a subdirectory. Leave it.
+  }
 })
 
 describe('the generated directory is invisible to the root project', () => {
@@ -200,6 +231,41 @@ describe('the other library warnings, on the same channel', () => {
     expect(output).toContain('1 passed')
     expect(output).toContain('Unused exclusion')
     expect(output).toContain('NoSuchElement')
+  })
+})
+
+describe('the generated directory is this process’s alone (bug 0045)', () => {
+  // A STRUCTURAL pin, and labelled as one rather than dressed up as a guard.
+  //
+  // The defect needs two processes sharing a checkout, and a suite run is one
+  // process — measured: reverting to the shared directory leaves the rest of the
+  // suite green. So it cannot be guarded behaviourally from inside the suite.
+  // What this CAN do is stop the property being removed casually.
+  //
+  // The behavioural proof was taken by hand and is recorded on the bug: with the
+  // old code, deleting the shared root mid-run — exactly what a sibling's
+  // `beforeAll` did — killed the run with the same `ENOENT` the flake reported;
+  // with the new code, deleting a sibling's directory changes nothing.
+  it('the path is unique per process, so two runs cannot collide', () => {
+    expect(generatedDir).toContain(String(process.pid))
+    expect(generatedDir.startsWith(generatedRoot)).toBe(true)
+    expect(generatedDir).not.toBe(generatedRoot)
+  })
+
+  it('cleanup never removes a sibling’s directory', () => {
+    // The other half: owning a subdirectory is worthless if teardown still
+    // deletes the parent recursively. `rmdirSync` on the root is deliberate —
+    // it fails while a sibling still has one, which is the check we want.
+    const sibling = path.join(generatedRoot, 'run-000000')
+    fs.mkdirSync(sibling, { recursive: true })
+    try {
+      expect(() => {
+        fs.rmdirSync(generatedRoot)
+      }).toThrow()
+      expect(fs.existsSync(sibling)).toBe(true)
+    } finally {
+      fs.rmSync(sibling, { recursive: true, force: true })
+    }
   })
 })
 
