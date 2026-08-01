@@ -19,6 +19,7 @@ import {
 
 export type { ImportOptions } from '../core/import-options.js'
 import type { ImportOptions } from '../core/import-options.js'
+import { rootOf } from '../core/project-relative.js'
 
 /**
  * Which edge kinds a forward dependency condition reports on.
@@ -59,8 +60,16 @@ const TYPE_IMPORT_KINDS: Record<ModuleEdgeKind, boolean> = {
 }
 
 /** The strings this edge's globs may be matched against, primary first. */
-function edgeCandidates(edge: ModuleEdge): ReturnType<typeof candidatesFor> {
-  return candidatesFor(edge.specifier, edge.resolvedPath)
+function edgeCandidates(
+  edge: ModuleEdge,
+  sourceFile: SourceFile,
+): ReturnType<typeof candidatesFor> {
+  // The IMPORTING file's root. In a workspace the target may live in another
+  // package, whose absolute path is not under this root — then no relative
+  // candidate is produced and matching falls back to the absolute form, which
+  // is the honest answer: `'src/shared/**'` written in one package means that
+  // package's `src/shared`.
+  return candidatesFor(edge.specifier, edge.resolvedPath, rootOf(sourceFile))
 }
 
 /**
@@ -116,7 +125,10 @@ function edgeViolation(
     identity: [
       sourceFile.getBaseName(),
       edge.kind,
-      edgeCandidates(edge)[0],
+      // No root here: `[0]` is the primary candidate either way, and this string
+      // is a baseline identity — feeding it anything new would rewrite every
+      // existing dependency entry for no gain.
+      edgeCandidates(edge, sourceFile)[0],
       [...edge.names].sort((a, b) => a.localeCompare(b)).join(','),
     ].join('::'),
   }
@@ -193,7 +205,7 @@ export function onlyImportFrom(
           seen++
           if (ignoreType && edge.typeOnly) continue
           tested++
-          const candidates = edgeCandidates(edge)
+          const candidates = edgeCandidates(edge, sf)
           const importPath = candidates[0]
           if (matchedCandidate(candidates, matchers) === undefined) {
             violations.push(
@@ -258,7 +270,7 @@ export function notImportFrom(
         for (const edge of edgesOf(sf)) {
           if (!DEPENDENCY_KINDS[edge.kind]) continue
           if (ignoreType && edge.typeOnly) continue
-          const importPath = matchedCandidate(edgeCandidates(edge), matchers)
+          const importPath = matchedCandidate(edgeCandidates(edge, sf), matchers)
           if (importPath !== undefined) {
             violations.push(
               edgeViolation(
@@ -370,7 +382,7 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
           // naive widening turns a real violation into a pass — and on the
           // baseline side that reads as "the violation was fixed".
           if (edge.kind === 'import' ? ignoreType && edge.typeOnly : edge.typeOnly) continue
-          if (matchedCandidate(edgeCandidates(edge), matchers) !== undefined) {
+          if (matchedCandidate(edgeCandidates(edge, sf), matchers) !== undefined) {
             hasMatch = true
             break
           }
@@ -471,7 +483,7 @@ export function onlyHaveTypeImportsFrom(...globs: string[]): Condition<SourceFil
         for (const edge of edgesOf(sf)) {
           if (!TYPE_IMPORT_KINDS[edge.kind]) continue
           seen++
-          const importPath = matchedCandidate(edgeCandidates(edge), matchers)
+          const importPath = matchedCandidate(edgeCandidates(edge, sf), matchers)
           // In scope only when the allowlist matched it: an edge the glob does
           // not name is one this rule never had an opinion about.
           if (importPath !== undefined) tested++

@@ -58,10 +58,36 @@ export function importCandidates(decl: ImportDeclaration): ImportCandidates {
 export function candidatesFor(
   specifier: string,
   resolvedPath: string | undefined,
+  projectRoot?: string,
 ): ImportCandidates {
   if (resolvedPath === undefined) return [specifier]
-  if (isRelativeSpecifier(specifier)) return [resolvedPath]
-  return [resolvedPath, specifier]
+  const alternates: string[] = isRelativeSpecifier(specifier) ? [] : [specifier]
+  // The resolved path named from the project root, **appended** — bug 0037.
+  //
+  // An import glob is matched against an ABSOLUTE resolved path, so a
+  // project-relative one could never match it: measured,
+  // `layeredArchitecture({ shared: ['src/shared/**'] })` reported a violation
+  // on a correct architecture, because `shared` also reaches
+  // `onlyImportFrom(...)`. A **false red**, with no configuration finding and a
+  // silent `doctor` — worse than a false green for an agent, which will edit
+  // real imports to satisfy a broken allowlist.
+  //
+  // Appended, never prepended: `[0]` is the primary candidate that violation
+  // messages interpolate and `hashViolation` hashes, so putting the relative
+  // form first would rewrite every baselined dependency finding.
+  //
+  // Bare specifiers are untouched — they have no `resolvedPath`, and returning
+  // early above is what keeps `notImportFrom('fastify')` working (bug 0014).
+  const fromRoot = relativeTo(projectRoot, resolvedPath)
+  if (fromRoot !== undefined) alternates.push(fromRoot)
+  return [resolvedPath, ...alternates]
+}
+
+/** `absolutePath` named from `root`, or `undefined` when it is outside or unknown. */
+function relativeTo(root: string | undefined, absolutePath: string): string | undefined {
+  if (root === undefined) return undefined
+  const prefix = root === '/' ? '/' : `${root}/`
+  return absolutePath.startsWith(prefix) ? absolutePath.slice(prefix.length) : undefined
 }
 
 /**
