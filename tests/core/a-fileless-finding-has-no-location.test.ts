@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest'
 import { formatViolations, formatViolationsPlain } from '../../src/core/format.js'
 import { formatViolationsJson } from '../../src/core/format-json.js'
 import type { ArchViolation } from '../../src/core/violation.js'
+import type { ArchJsonReport } from '../../src/core/format-json.js'
 
 const CONFIG: ArchViolation = {
   rule: 'arch/example',
@@ -44,19 +45,23 @@ const REAL: ArchViolation = {
   message: 'bad call',
 }
 
-interface JsonPayload {
-  violations: { file: string | null; line: number | null; configuration: boolean }[]
+/**
+ * Parse against the **exported** contract type, not a hand-rolled copy.
+ *
+ * The first draft declared its own `interface JsonPayload` and cast through
+ * `unknown` with an ADR-005 exemption — against our own output, which is a
+ * smell rather than an interop boundary. `ArchJsonReport` now exists precisely
+ * so a consumer (including us) gets a compile error instead of a runtime one,
+ * and the cast is gone: `structuredClone`-free narrowing via a type predicate.
+ */
+function parse(json: string): ArchJsonReport {
+  const parsed: unknown = JSON.parse(json)
+  if (!isReport(parsed)) throw new Error('payload does not match ArchJsonReport')
+  return parsed
 }
 
-function parse(json: string): JsonPayload {
-  const parsed: unknown = JSON.parse(json)
-  if (typeof parsed !== 'object' || parsed === null || !('violations' in parsed)) {
-    throw new Error('unexpected payload')
-  }
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- JSON.parse
-  // returns `unknown` by design; this is the single JS-interop boundary in the file
-  // and the shape is asserted immediately below by the tests themselves (ADR-005).
-  return parsed as JsonPayload
+function isReport(value: unknown): value is ArchJsonReport {
+  return typeof value === 'object' && value !== null && 'violations' in value
 }
 
 describe('a fileless finding renders no location (bug 0047)', () => {
@@ -92,11 +97,39 @@ describe('a fileless finding renders no location (bug 0047)', () => {
     expect(v?.line).toBe(42)
   })
 
+  it('the exported contract type matches what is actually emitted', () => {
+    // `ArchJsonReport` is a claim about our own output, so it is checked against
+    // the output rather than trusted. If a field is added to the emitter and not
+    // to the type — or vice versa — this reds.
+    const report = parse(formatViolationsJson([CONFIG, REAL]))
+    const [v] = report.violations
+    expect(Object.keys(v ?? {}).sort()).toEqual(
+      [
+        'because',
+        'codeFrame',
+        'docs',
+        'element',
+        'file',
+        'kind',
+        'line',
+        'measured',
+        'message',
+        'rule',
+        'ruleId',
+        'severity',
+        'suggestion',
+      ].sort(),
+    )
+    expect(Object.keys(report).sort()).toEqual(
+      ['commentSuppressed', 'summary', 'untestedAllowlists', 'violations'].sort(),
+    )
+  })
+
   it('json: the two kinds are distinguishable by a field, not by inference', () => {
     // The point of the pair. Before this, a consumer had to guess from an empty
     // `file` — which is exactly the misleading signal being removed.
     const { violations } = parse(formatViolationsJson([CONFIG, REAL]))
-    expect(violations.map((v) => v.configuration)).toEqual([true, false])
+    expect(violations.map((v) => v.kind)).toEqual(['configuration', 'violation'])
   })
 
   it('the RICH formatter still omits it too — it always did', () => {

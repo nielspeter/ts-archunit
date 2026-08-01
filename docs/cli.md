@@ -286,11 +286,12 @@ count down into errors vs warnings:
       "because": "…",
       "suggestion": "use this.extractCount()",
       "docs": "…",
-      // `true` when the rule enforces nothing (empty selector, dead glob, no
-      // condition) rather than the code being wrong. Those findings carry
+      // `"configuration"` when the rule enforces nothing (empty selector, dead
+      // glob, no condition) rather than the code being wrong; `"violation"`
+      // otherwise. Configuration findings carry
       // `"file": null, "line": null` — they have no source location — and are
       // always `error`, never suppressible. See the AI agents page.
-      "configuration": false,
+      "kind": "violation",
     },
   ],
   // Findings removed by an inline `// ts-archunit-exclude` comment, by rule and

@@ -360,8 +360,12 @@ A **configuration finding** — one reporting that the rule itself enforces
 nothing — carries `file: ''` and a `line` that means nothing, because it
 describes a rule rather than a place in your code. In the programmatic object
 those stay as they are, for backwards compatibility. In `check --format json`
-they are emitted as `null`, and the finding carries `"configuration": true`, so
-a consumer never sees a location that looks real and is not.
+they are emitted as `null` and the finding carries `"kind": "configuration"`.
+
+Note that the CLI attributes most of them to the **rule file** that declared the
+rule before rendering, so in `check --format json` you will usually see that path
+with `line: 1` rather than `null`. Either way, `kind` is the field to test — an
+empty or null `file` is not a reliable signal.
 
 ## Programmatic Access
 
