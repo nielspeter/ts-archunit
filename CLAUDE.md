@@ -37,7 +37,9 @@ ts-archunit is an architecture testing library for TypeScript, inspired by Java'
 
 Implementation plans are in `/plans/`. Completed plans move to `/plans/completed/`. The roadmap is `/plans/ROADMAP.md`.
 
-Plans follow a specific format: Status/Priority/Effort header, Problem section, phased implementation with real code examples, Files Changed per phase, Test inventory, Out of Scope section. See existing plans for examples.
+Plans follow a specific format: Status/Priority/Effort/**Blast radius** header, Problem section, phased implementation with real code examples, Files Changed per phase, Test inventory, Out of Scope section. See existing plans for examples.
+
+**Blast radius** is one line naming which row of ADR-008 rule 6's table the work sits in — published API / a gate on an irreversible effect / an internal check over a corpus we control / a check with a scheduled expiry — and therefore how far to chase rule 5. It goes in the header because that is where the decision is made; recorded afterwards it is a retrospective, and rule 6 exists to be decided in advance.
 
 ## Key Implementation Rules
 

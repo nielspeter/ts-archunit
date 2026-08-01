@@ -1,9 +1,14 @@
 # Plan 0078 — Derive the configuration-finding census
 
-**Status:** Open, not started. Filed 2026-08-01 from the ADR-008 compliance audit; revised the
-same day after adversarial review found two structural defects and one live bug.
-**Priority:** High. One mechanism closes a rule 2 gap nine sites wide and a rule 3 gap ten sites
-wide, and the review already turned up a live instance of each while checking the numbers.
+**Status:** **PARTIALLY SHIPPED.** Phase 3 (the unsuppressability sentence) landed in
+**v0.37.0** — it was the user-facing part, and bug 0041 made its omission reachable from every
+condition family, so it could not wait behind an internal census. Phases 1 and 2 are open and
+not started. Filed 2026-08-01 from the ADR-008 compliance audit; revised the same day after
+adversarial review found two structural defects and one live bug.
+**Priority:** **Medium** for what remains, downgraded from High after review pointed out the
+plan sequenced two user-facing bugs ahead of itself and still outranked them. The rule 2 gap is
+nine sites wide and the rule 3 gap was ten — but the ten shipped, and the nine are guards rather
+than defects.
 **Effort:** Medium. The census is a test file; the message edits are ten strings; but the key
 has to be `file:line` with a follow-through arm, which is more than the first draft assumed.
 **Blast radius:** Internal check over a corpus we control, guarding **published** messages. Per
@@ -133,7 +138,12 @@ one of two things must be true, and the census records which:
 Do not let "it's a judgement" become the default. If more than a handful land there, the
 classification is doing the work the test should.
 
-## Phase 3 — the unsuppressability sentence
+## Phase 3 — the unsuppressability sentence — **SHIPPED v0.37.0**
+
+Done: `src/core/unsuppressable.ts` holds the sentence once, with the sixth surface added, and
+`tests/core/unsuppressable-sentence.test.ts` guards it by set comparison — behavioural probes
+against the parsed names, failing on over-claim and under-claim alike. Sabotaged in both
+directions plus a real refusal break: 3 of 3 caught. The original text follows, for the record.
 
 **The sentence is itself incomplete, and this is the part the first draft got wrong.** Six
 suppression surfaces are refused; the sentence names five. The omission is the inline
