@@ -35,16 +35,17 @@ Slices can represent:
 
 **File-path** globs are matched against the **absolute** path, and a
 project-relative glob like `'src/services/**'` is resolved against the directory
-holding your `tsconfig.json`. Since **0.36.1** the surfaces below accept one:
+holding your `tsconfig.json`. Since **0.36.3** every surface accepts one:
 
 | Where                                                          | `'src/services/**'`               |
 | -------------------------------------------------------------- | --------------------------------- |
 | `resideInFolder()`, `resideInFile()`, `havePathMatching()`     | ✅ the folder **at project root** |
 | `slices().matching()`                                          | ✅                                |
 | Preset options that name a location (`shared`, `repositories`) | ✅                                |
-| `slices().assignedFrom()`, and the layer options that use it   | ✅ (was ❌ before 0.36.1)         |
+| `slices().assignedFrom()`, and the layer options that use it   | ✅                                |
+| `crossLayer().layer()`, `smells.*.inFolder()`, import globs    | ✅ (since 0.36.3)                 |
 
-Other entry points that take a path glob — `crossLayer().layer()`, `smells.*.inFolder()`, `onlyBeImportedVia()` — have **not** been audited for this and may still need `'**/'`. Tracked in [bug 0036](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0036-the-relative-glob-audit-is-incomplete.md).
+Every path-glob entry point accepts it, and that list is **derived from the source** rather than maintained by hand — adding a new one fails the suite until someone decides what a relative spelling means there. The one exception is `slices().matching()`, which normalizes by prefixing `'**/'` instead: there the relative spelling means _anywhere_, not the root, and both spellings select the same set.
 
 ::: tip When in doubt, anchor with `**/`
 `'**/src/services/**'` works everywhere. It means a `src/services` **anywhere**

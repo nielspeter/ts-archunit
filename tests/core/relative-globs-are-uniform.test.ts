@@ -162,10 +162,16 @@ describe('a project-relative path glob means the same thing everywhere (bug 0033
     expect(rel).toBe(anchored)
   })
 
-  it('crossLayer().layer resolves a relative glob', () => {
-    // Measured before the fix: the layer resolved nothing and `diagnose()`
-    // reported its glob dead. A layer that resolves nothing makes every
-    // cross-layer rule over it unfalsifiable.
+  it('crossLayer().layer stops reporting a relative glob as dead', () => {
+    // Only the DIAGNOSIS is assertable here, and the gap is worth stating.
+    // Measured: a `crossLayer` pair rule produces zero violations whether its
+    // layer resolves three files or none, so the runtime half of this fix is
+    // unobservable through the public API on any fixture — sabotaging it
+    // survives, and no test I can write here would catch that.
+    //
+    // That is itself a finding, recorded in bug 0036: an empty `crossLayer`
+    // layer is silent at check time and visible only to `doctor`, which is the
+    // 0067-D/R3b discovery-fault shape one entry point over.
     const rule = (g: string) =>
       crossLayer(p)
         .layer('a', g)
@@ -174,6 +180,11 @@ describe('a project-relative path glob means the same thing everywhere (bug 0033
         .forEachPair()
         .should(haveMatchingCounterpart([]))
     expect(diagnose([rule('src/domain/**')]).map((f) => f.glob)).not.toContain('src/domain/**')
+    // The control that keeps the assertion above meaningful: a genuinely dead
+    // layer glob IS still reported.
+    expect(diagnose([rule('src/no-such-folder/**')]).map((f) => f.glob)).toContain(
+      'src/no-such-folder/**',
+    )
   })
 
   it('onlyBeImportedVia accepts the relative spelling — it was a false red', () => {
