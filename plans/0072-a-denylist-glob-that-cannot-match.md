@@ -99,7 +99,7 @@ Recorded because draft 1 asserted the opposite of each, and whoever reads 0073 n
    sites, and the conditions' own globs never reach `globSitesOf` at all.
 3. **`viewsFor` gives `import-target` no views**, deliberately (`path-universe.ts:72`),
    because a bare specifier legitimately matches no project path — which is what
-   [bug 0014](../bugs/fixed/0014-import-globs-do-not-match-bare-package-names.md) was
+   [bug 0014](../bugs/fixed/0014-bare-package-import-globs-match-nothing.md) was
    fixed to support.
 
 ## What is actually left: an author-declared expectation

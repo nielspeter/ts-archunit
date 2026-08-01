@@ -142,11 +142,11 @@ the throw path already carries the findings.
 
 - **Plan 0069 R3a** specified exactly this reporting and shipped without it. Its Releases section is
   the record.
-- **[Bug 0025](./fixed/0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md)**
+- **[Bug 0025](./0025-a-non-archruleerror-from-one-rule-file-drops-every-other-finding.md)**
   made a throwing rule file stop discarding _other files_' findings, and made the error visible.
   It cannot detect truncation _within_ a file — the module simply never finished — so this is the
   remaining half.
-- **[Bug 0026](./fixed/0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md)**
+- **[Bug 0026](./0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md)**
   supplies the file attribution this finding needs.
 
 ## How it was fixed

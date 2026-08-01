@@ -4,7 +4,7 @@
 `doctor`. Four measurements refuted the premise it rested on; the reversal is left visible below
 because the refuted argument is the one a future reader will reach for again.
 **Priority:** High as a decision, Low as work. It settles the open question
-[plan 0069](./completed/0069-no-rule-may-certify-nothing.md) required be answered **before R3**,
+[plan 0069](./0069-no-rule-may-certify-nothing.md) required be answered **before R3**,
 and which has now been deferred across five sessions — 0069 named the mechanism exactly:
 _"shipping it experimental/hidden is precisely the mechanism that defers the decision."_
 **Effort:** ~2 hours. It is documentation and one `HELP_TEXT` entry.

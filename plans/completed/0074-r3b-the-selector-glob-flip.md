@@ -1,9 +1,9 @@
 # Plan 0074 — R3b: the selector glob flip
 
-**Status:** **DONE — shipped in v0.34.0** (2026-08-01). Gate opened by run 4; bugs 0031/0032 shipped in v0.33.0. Split out of [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)
+**Status:** **DONE — shipped in v0.34.0** (2026-08-01). Gate opened by run 4; bugs 0031/0032 shipped in v0.33.0. Split out of [plan 0069](./0069-no-rule-may-certify-nothing.md)
 on 2026-07-30 so that a 90%-shipped plan stops being held open by one slice waiting on a
 precondition that does not exist yet. Nothing here is undecided — the design and both open
-decisions are settled in 0069 and [its appendix](./completed/0069-appendix-vacuous-tests.md).
+decisions are settled in 0069 and [its appendix](./0069-appendix-vacuous-tests.md).
 **Priority:** High, and startable. Bugs 0031 and 0032 shipped in v0.33.0; what remains is
 version sequencing, since R3b is breaking.
 **Breaking.** A dead selector glob becomes a hard failure, so it reds on globs the adopting
@@ -28,7 +28,7 @@ failure — and `emptyIsPass`.
 | `condition` | negative | **no fault** — indistinguishable from an armed tripwire                 |
 | `exclusion` | —        | **never** — proposal 006: an exclusion matching zero is remedy-optional |
 
-The two `condition` rows are the ones [plan 0072](./0072-a-denylist-glob-that-cannot-match.md)
+The two `condition` rows are the ones [plan 0072](../0072-a-denylist-glob-that-cannot-match.md)
 re-opened and got wrong twice. They stay as written.
 
 ## The gate, and why it is not closeable here
@@ -64,7 +64,7 @@ Note the exclusion's _stated_ reason was also wrong and is corrected in 0069:
 `arch-rules.test.ts` predates the plan by four months, so the sites are not uniformly
 curated. The binding constraint turned out to be **size**, not curation.
 
-**What the gate still needs — restated by [plan 0077](./completed/0077-doctor-promote-it.md).** The
+**What the gate still needs — restated by [plan 0077](./0077-doctor-promote-it.md).** The
 original wording demanded "a loadable `arch.rules.ts`, not a vitest test file". That constraint
 belongs to `doctor`'s **loader**, not to the diagnosis: `diagnose()` is handed rules, so it runs
 wherever they are built, including inside a test file. So the gate is:
@@ -108,14 +108,14 @@ state, which is exactly the population R3b exists to act on.
 **Verdict against the registered decision rule** — _does any finding's message assert a cause that
 is wrong for that input?_ **Yes, twice, and both are now filed.**
 
-1. **[Bug 0031](../bugs/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md)** —
+1. **[Bug 0031](../../bugs/fixed/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md)** —
    hono's root tsconfig is `"files": []` plus project references, so it loads nothing (confirmed
    independently: `tsc --listFilesOnly` also lists 0). `check` says so correctly; `doctor`, in the
    same run, blames each glob in turn. `slice-rule-builder.ts:345` already states the rule —
    _"blaming the glob would send the caller to the wrong file entirely"_ — and `diagnose()` does
    not apply it. The 4 selector findings in that same run got the **right** cause, which is what
    makes it a defect rather than a limit.
-2. **[Bug 0032](../bugs/0032-an-absent-path-defers-to-a-cause-list-it-refutes.md)** — `onDisk:
+2. **[Bug 0032](../../bugs/fixed/0032-an-absent-path-defers-to-a-cause-list-it-refutes.md)** — `onDisk:
 'absent'` maps to `''`, so it falls through to `no-match`'s three causes, two of which are
    refuted by what `absent` means. `ON_DISK_ADVICE`'s own docstring states that principle and
    applies it to the other two known-fact cases.
@@ -139,7 +139,7 @@ rule 2 — a remedy must be verified to remediate — asked of R3b's own output.
 1. **`doctor`: keep as a supported command, or retire it?** 0069 requires this be decided
    **before** R3, and says why it cannot drift: _"shipping it experimental/hidden is precisely
    the mechanism that defers the decision."_ It currently ships experimental/hidden.
-   **SETTLED by [plan 0077](./completed/0077-doctor-promote-it.md), shipped in v0.32.0**: promoted,
+   **SETTLED by [plan 0077](./0077-doctor-promote-it.md), shipped in v0.32.0**: promoted,
    listed in `--help`, scope stated. What earns it the slot is a **dead selector glob** — `check`
    never calls `diagnose()`, so it exits 0 with no output where `doctor` exits 1 and names the
    site. 0077 also asserted that only `doctor` catches load failures; that was false and review
@@ -159,12 +159,12 @@ rule 2 — a remedy must be verified to remediate — asked of R3b's own output.
   Rust crate.
 - `doctor`, reporting glob faults **and** condition-less rules — R2a.
 - The severity floor and the `.warn()` throw — R3a, v0.20.0. Its unbuilt half was
-  [bug 0029](../bugs/fixed/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md), now fixed.
+  [bug 0029](../../bugs/fixed/0029-a-throwing-warn-truncates-the-rest-of-the-rule-file.md), now fixed.
 
 ## Out of scope
 
 - **Condition globs.** Declared as of
-  [plan 0073](./completed/0073-conditions-declare-their-globs.md) (12 conditions, stamped
+  [plan 0073](./0073-conditions-declare-their-globs.md) (12 conditions, stamped
   `position: 'condition'`), so R3b now sees them — and the two `condition` rows above still say
   "no fault", which is why 0073 changed no verdict and R3b must not start changing them either.
 - **Path normalization** — making `'src/*'` _work_ rather than merely diagnosing it. 0069

@@ -200,6 +200,6 @@ The three additions accepted in 2026-07-29 all came from rules failing on their 
 - Rule 2's **behavioural** corollary came from bug 0017, where a remedy that reads correctly and would satisfy any contains-assertion reproduces the violation it claims to fix.
 - Rule 1's **migration** corollary came from building the warn-first release this ADR's own logic recommends against, and measuring it invisible. The rule was right; the corollary is what it implies for a gate that has to land on existing code.
 
-Rule 1's carve-out for optional-remedy findings currently rests on a channel that does not deliver — see [bug 0024](../bugs/0024-warn-terminal-is-invisible-inside-a-test-runner.md). Until that is fixed, "this should warn" means "this should warn and nobody in a test run will see it", and the carve-out is weaker than the rule assumes.
+Rule 1's carve-out for optional-remedy findings currently rests on a channel that does not deliver — see [bug 0024](../bugs/fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md). Until that is fixed, "this should warn" means "this should warn and nobody in a test run will see it", and the carve-out is weaker than the rule assumes.
 
 The Context table is evidence, not self-flagellation. It is kept because rule 5 was invisible for three rounds precisely because each individual instance looked like a local mistake.

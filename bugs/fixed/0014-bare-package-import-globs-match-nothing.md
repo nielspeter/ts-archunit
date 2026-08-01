@@ -76,7 +76,7 @@ A glob matches the import if it matches **either**. That makes
 every existing path-glob rule unchanged — the resolved path is still tested.
 
 Prefer this over failing loudly on a bare name. The principle
-[plan 0069](../../plans/0069-no-rule-may-certify-nothing.md) settles on: **first
+[plan 0069](../../plans/completed/0069-no-rule-may-certify-nothing.md) settles on: **first
 make the natural spelling work, then fail loudly when it still cannot match.**
 0067-C reached the same conclusion for path normalization: make the
 project-relative glob spelling resolve, rather than only reporting it loudly.

@@ -2,7 +2,7 @@
 
 **Reported:** 2026-07-30
 **Found in:** all versions since v0.20.0 (R2a) for `definePredicate`; the asymmetry with
-built-ins dates from v0.29.0 and [plan 0073](../plans/completed/0073-conditions-declare-their-globs.md)
+built-ins dates from v0.29.0 and [plan 0073](../../plans/completed/0073-conditions-declare-their-globs.md)
 **Fixed:** 2026-07-30, released in **v0.30.0**. Additive and non-breaking; both parameters are
 optional, so every existing two-argument call is unaffected.
 **Severity:** Medium for `definePredicate`, Low for `defineCondition`, and the split is the
@@ -48,7 +48,7 @@ Measured against what the machinery does with each position today:
 So `definePredicate` is a **present-tense** detection gap: a team that writes a custom
 path-matching predicate with a typo'd glob gets a clean bill of health from `doctor`, and
 `doctor` exits 0. `defineCondition` is a **latent** one, and it only matters once
-[plan 0074](../plans/0074-r3b-the-selector-glob-flip.md) or 0072's successor starts acting on
+[plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md) or 0072's successor starts acting on
 condition globs — at which point built-in conditions would be checkable and user-defined ones
 silently exempt.
 
