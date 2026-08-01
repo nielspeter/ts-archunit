@@ -2,6 +2,7 @@ import type { RuleBuilderLike } from './rule-builder-like.js'
 import type { CheckOptions } from './check-options.js'
 import { ArchRuleError } from './errors.js'
 import { writeReport } from './execute-rule.js'
+import { dedupeConfigFindings } from './dedupe-config-findings.js'
 import { suppressionNotice } from './diff-disclosure.js'
 import { writeStderr } from './stderr.js'
 import { edgeCoverageNotice, resetEdgeCoverage, untestedRules } from './edge-coverage.js'
@@ -25,7 +26,9 @@ export function checkAll(rules: RuleBuilderLike[], options?: CheckOptions): void
   // Per run, like `runCheck` — a second `checkAll` in one vitest file must
   // not inherit the first's rules.
   resetEdgeCoverage()
-  let violations = rules.flatMap((rule) => rule.violations())
+  // One option, one finding (plan 0074). A preset fans a single bad option out
+  // across every generated rule, and only an aggregation point can see that.
+  let violations = dedupeConfigFindings(rules.flatMap((rule) => rule.violations()))
 
   if (options?.baseline) {
     violations = options.baseline.filterNew(violations)

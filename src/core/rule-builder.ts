@@ -230,8 +230,17 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       if (predicate.globs) {
         const count = countDeclaredGlobs(predicate.globs)
         trees.push(
-          stampGlobs(predicate.globs, 'selector', (g) =>
-            describeOrigin(predicate.description, g, count),
+          stampGlobs(
+            predicate.globs,
+            'selector',
+            (g) =>
+              // A preset's `originLabel` names the option the user wrote rather
+              // than the calls it expanded into. Used VERBATIM, skipping
+              // `describeOrigin`: that appends `("glob")` to disambiguate a
+              // predicate holding several sites, and a label already names
+              // exactly one option and one glob — left in, the finding read
+              // `shared: "**/x/**" ("**/x/**")`.
+              predicate.originLabel ?? describeOrigin(predicate.description, g, count),
           ),
         )
       }

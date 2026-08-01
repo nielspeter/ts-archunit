@@ -117,6 +117,9 @@ export function validateOverrides(
  * `resideInFile` or `resideInFolder` knowing which they mean; a preset option
  * has to accept whichever its caller wrote.
  */
-export function atPath<T extends Located>(glob: string): Predicate<T> {
-  return or(resideInFile<T>(glob), resideInFolder<T>(glob))
+export function atPath<T extends Located>(glob: string, option?: string): Predicate<T> {
+  const combined = or(resideInFile<T>(glob), resideInFolder<T>(glob))
+  // The option name, when the caller knows it, so a configuration finding names
+  // `shared: "…"` rather than the two calls `or()` expanded into (plan 0074).
+  return option === undefined ? combined : { ...combined, originLabel: `${option}: "${glob}"` }
 }

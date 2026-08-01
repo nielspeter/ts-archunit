@@ -9,6 +9,7 @@ import { suppressionNotice } from '../../core/diff-disclosure.js'
 import { edgeCoverageNotice, resetEdgeCoverage, untestedRules } from '../../core/edge-coverage.js'
 import { writeStderr } from '../../core/stderr.js'
 import { loadRuleFiles } from '../load-rules.js'
+import { dedupeConfigFindings } from '../../core/dedupe-config-findings.js'
 import {
   attributeToRuleFile,
   failureOrViolations,
@@ -47,7 +48,7 @@ export async function runCheck(args: CheckArgs): Promise<number> {
   // self-executing rule file's own terminals must not also write the findings that
   // travel on their thrown error — see `setCallerAggregatesReports`.
   setCallerAggregatesReports(true)
-  const collected: ArchViolation[] = []
+  let collected: ArchViolation[] = []
   const total = args.ruleFiles.length
   for (const file of args.ruleFiles) {
     // TWO catches, at the two boundaries that can fail independently. Loading is
@@ -95,6 +96,11 @@ export async function runCheck(args: CheckArgs): Promise<number> {
       }
     }
   }
+
+  // One option, one finding (plan 0074) — after the per-file loop, because the
+  // key includes the rule file: two files with the same bad preset option are
+  // two edits and must both be reported.
+  collected = dedupeConfigFindings(collected)
 
   let filtered = collected
   if (baseline) filtered = baseline.filterNew(filtered)

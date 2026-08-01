@@ -37,7 +37,11 @@ export function dataLayerIsolation(
   if (options.baseClass) {
     builders.push(
       ...collectRule(
-        classes(p).that().satisfy(atPath(options.repositories)).should().extend(options.baseClass),
+        classes(p)
+          .that()
+          .satisfy(atPath(options.repositories, 'repositories'))
+          .should()
+          .extend(options.baseClass),
         {
           id: 'preset/data/extend-base',
           because:
@@ -58,7 +62,7 @@ export function dataLayerIsolation(
       ...collectRule(
         classes(p)
           .that()
-          .satisfy(atPath<ClassDeclaration>(options.repositories))
+          .satisfy(atPath<ClassDeclaration>(options.repositories, 'repositories'))
           .should()
           .notContain(newExpr('Error')),
         {

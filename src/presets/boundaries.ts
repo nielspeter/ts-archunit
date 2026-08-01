@@ -44,7 +44,7 @@ function applySharedIsolation(
         ...collectRule(
           modules(p)
             .that()
-            .satisfy(atPath<SourceFile>(sharedGlob))
+            .satisfy(atPath<SourceFile>(sharedGlob, 'shared'))
             .should()
             .notImportFrom(`${dir}/**`),
           {
