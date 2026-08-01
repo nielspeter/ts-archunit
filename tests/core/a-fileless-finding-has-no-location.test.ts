@@ -20,7 +20,7 @@
  * The two changes are one change.
  */
 import { describe, expect, it } from 'vitest'
-import { formatViolations } from '../../src/core/format.js'
+import { formatViolations, formatViolationsPlain } from '../../src/core/format.js'
 import { formatViolationsJson } from '../../src/core/format-json.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 
@@ -61,7 +61,12 @@ function parse(json: string): JsonPayload {
 
 describe('a fileless finding renders no location (bug 0047)', () => {
   it('plain: no bare "(:1)"', () => {
-    const out = formatViolations([CONFIG], 'plain')
+    // `formatViolationsPlain`, NOT `formatViolations(v, 'plain')` — the second
+    // parameter of that one is `reason`, so the first draft of this test passed
+    // 'plain' as a reason and exercised the RICH formatter, which already
+    // handled fileless findings. It passed while testing nothing. Found by
+    // sabotage: reverting the plain-formatter fix left the suite green.
+    const out = formatViolationsPlain([CONFIG])
     expect(out).toContain('this rule enforces nothing')
     expect(out).not.toContain('(:1)')
     expect(out).not.toContain('(:0)')
@@ -71,7 +76,7 @@ describe('a fileless finding renders no location (bug 0047)', () => {
 
   it('plain CONTROL: a real violation still shows file:line', () => {
     // Without this, deleting the location unconditionally passes the row above.
-    const out = formatViolations([REAL], 'plain')
+    const out = formatViolationsPlain([REAL])
     expect(out).toContain('/project/src/service.ts:42')
   })
 
@@ -92,6 +97,13 @@ describe('a fileless finding renders no location (bug 0047)', () => {
     // `file` — which is exactly the misleading signal being removed.
     const { violations } = parse(formatViolationsJson([CONFIG, REAL]))
     expect(violations.map((v) => v.configuration)).toEqual([true, false])
+  })
+
+  it('the RICH formatter still omits it too — it always did', () => {
+    // The control that says the plain fix did not regress the format that was
+    // already correct, and the reason the mistake above was invisible.
+    const out = formatViolations([CONFIG])
+    expect(out).not.toMatch(/\(\s*:/)
   })
 
   it('VACUITY: the two fixtures really do differ in kind', () => {
