@@ -1,6 +1,13 @@
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { Project } from 'ts-morph'
 import { workspace, modules } from '../../src/index.js'
+import {
+  isProjectRelative,
+  rootFromTsConfigPath,
+  relativeToGivenRoot,
+} from '../../src/core/project-relative.js'
+import type { ArchProject } from '../../src/core/project.js'
 import { resolveByDefinition } from '../../src/models/slice.js'
 
 const fixture = path.resolve(import.meta.dirname, '../fixtures/workspace-roots')
@@ -51,6 +58,56 @@ describe('a relative glob resolves per package in a workspace (bug 0035)', () =>
     // In a workspace the two spellings coincide for a folder every package has.
     // They diverge only when one package lacks it — which is the next test.
     expect(modules(p).that().resideInFolder('**/src/api/**').subjects()).toHaveLength(2)
+  })
+
+  it('a NESTED package resolves against its own root, not the outer one', () => {
+    // W2: the containing-root pick sorts longest-first. Without it the outer
+    // root wins for a file inside an inner package, and the inner tsconfig
+    // never applies — unguarded until this test, because the flat two-package
+    // fixture cannot tell the two orderings apart.
+    const outer = path.join(fixture, 'tsconfig.json')
+    const nested = workspace([outer, alpha])
+    const files = resolveByDefinition(nested, { api: 'src/api/**' })[0]?.files ?? []
+    // alpha's file resolves against `packages/alpha`, the outer file against the
+    // fixture root. Both must be found; with the outer root winning, alpha's
+    // relative path would be `packages/alpha/src/api/handler.ts` and miss.
+    expect(files.map((f) => f.getFilePath())).toContain(
+      path.join(fixture, 'packages/alpha/src/api/handler.ts'),
+    )
+  })
+
+  it('a plain project() registers its root too, not only workspace()', () => {
+    // W3: removing registration from `project()` left every test green, because
+    // `rootOf` then fell through to ts-morph's `configFilePath` — which happens
+    // to agree for a single-tsconfig project. It does NOT agree for an
+    // in-memory one, so assert the path that has no `configFilePath` at all.
+    const inMemory = new Project({ useInMemoryFileSystem: true })
+    inMemory.createSourceFile('/repo/src/api/a.ts', 'export const a = 1')
+    const built: ArchProject = {
+      tsConfigPath: '/repo/tsconfig.json',
+      _project: inMemory,
+      getSourceFiles: () => inMemory.getSourceFiles(),
+    }
+    expect(inMemory.getCompilerOptions().configFilePath).toBeUndefined()
+    expect(resolveByDefinition(built, { api: 'src/api/**' })[0]?.files).toHaveLength(1)
+  })
+
+  it('a tsconfig at the filesystem root gives "/" — not "", which meant two things', () => {
+    // W4: `''` was read as "the root is /" by one derivation and "no root
+    // known" by another, so the rule discovered its file while diagnose() called
+    // the glob dead. Reachable in a container that mounts the repo at /.
+    expect(rootFromTsConfigPath('/tsconfig.json')).toBe('/')
+    expect(rootFromTsConfigPath('')).toBeUndefined()
+    expect(relativeToGivenRoot('/', '/src/api/a.ts')).toBe('src/api/a.ts')
+  })
+
+  it('a ".." segment is a fault, not a project-relative glob', () => {
+    // W6: `relativeToGivenRoot` returns undefined for anything above the root,
+    // deliberately — so a `../` glob would normalize to nothing and be reported
+    // with three causes, none of them true.
+    expect(isProjectRelative('../x/**')).toBe(false)
+    expect(isProjectRelative('./x/**')).toBe(false)
+    expect(isProjectRelative('src/x/**')).toBe(true)
   })
 
   it('CONTROL: still selects nothing for a folder no package has', () => {
