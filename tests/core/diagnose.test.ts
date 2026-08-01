@@ -163,10 +163,28 @@ describe('diagnose', () => {
   })
 
   it('carries a verifiable remedy for a syntactic fault', () => {
-    const rule = classes(p).that().resideInFolder('src/domain/**').should().beExported()
+    // A `./` segment, not an unanchored glob. This test used to use
+    // `resideInFolder('src/domain/**')` and assert `unanchored` — plan 0067 C
+    // made that spelling WORK (project-root-relative), so reporting it would be
+    // telling the author to break a working rule. `./` is still a fault,
+    // because it is a mistake in both readings: it never occurs in an absolute
+    // path and says nothing extra in a relative one.
+    const rule = classes(p).that().resideInFolder('./src/domain/**').should().beExported()
     const findings = diagnose([rule])
-    expect(findings[0]?.fault).toBe('unanchored')
-    expect(findings[0]?.advice).toContain('**/')
+    expect(findings[0]?.fault).toBe('dot-segment')
+    expect(findings[0]?.advice).toContain('remove it')
+  })
+
+  it('does not report a project-relative path glob, which now works', () => {
+    // Plan 0067 C. `'src/domain/**'` means that folder AT THE PROJECT ROOT —
+    // narrower than the `'**/src/domain/**'` the old advice prescribed, and
+    // exactly what the author meant. The sibling test below established this
+    // for `slices().matching()`; the path predicates now behave the same way.
+    const rule = classes(p).that().resideInFolder('src/domain/**').should().beExported()
+    expect(diagnose([rule])).toEqual([])
+
+    // And it is not merely undiagnosed — it selects real subjects.
+    expect(modules(p).that().resideInFolder('src/domain/**').subjects().length).toBeGreaterThan(0)
   })
 
   it('does NOT tell a normalized-base glob to anchor itself', () => {

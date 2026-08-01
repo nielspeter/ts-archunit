@@ -2,6 +2,7 @@ import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
 import { globNode } from '../core/glob-site.js'
+import { isProjectRelative, relativeToRoot } from '../core/project-relative.js'
 
 /** Types that have a name — ClassDeclaration, FunctionDeclaration, InterfaceDeclaration, etc. */
 export interface Named {
@@ -74,10 +75,21 @@ export function haveNameEndingWith<T extends Named>(suffix: string): Predicate<T
  */
 export function resideInFile<T extends Located>(glob: string): Predicate<T> {
   const isMatch = picomatch(glob)
+  const relative = isProjectRelative(glob)
   return {
-    globs: globNode({ glob, kind: 'file-path' }),
+    // `base: 'normalized'` when the glob is project-relative — the anchor check
+    // in `syntacticFault` calls an unanchored glob dead against absolute paths,
+    // and it stops being dead exactly when it starts working (plan 0067 C).
+    globs: globNode({ glob, kind: 'file-path', base: relative ? 'normalized' : 'absolute' }),
     description: `reside in file matching "${glob}"`,
-    test: (element) => isMatch(element.getSourceFile().getFilePath()),
+    test: (element) => {
+      const sourceFile = element.getSourceFile()
+      const filePath = sourceFile.getFilePath()
+      if (isMatch(filePath)) return true
+      if (!relative) return false
+      const fromRoot = relativeToRoot(sourceFile, filePath)
+      return fromRoot !== undefined && isMatch(fromRoot)
+    },
   }
 }
 
@@ -91,16 +103,29 @@ export function resideInFile<T extends Located>(glob: string): Predicate<T> {
  */
 export function resideInFolder<T extends Located>(glob: string): Predicate<T> {
   const isMatch = picomatch(glob)
+  const relative = isProjectRelative(glob)
   return {
     // `parent-dir`, not `file-path`: the test below reads the directory
     // portion, so this glob is matched against the immediate parent and
     // nothing else. It is the only selector in src/ that does.
-    globs: globNode({ glob, kind: 'parent-dir' }),
+    globs: globNode({
+      glob,
+      kind: 'parent-dir',
+      base: relative ? 'normalized' : 'absolute',
+    }),
     description: `reside in folder matching "${glob}"`,
     test: (element) => {
-      const filePath = element.getSourceFile().getFilePath()
+      const sourceFile = element.getSourceFile()
+      const filePath = sourceFile.getFilePath()
       const dirPath = filePath.substring(0, filePath.lastIndexOf('/'))
-      return isMatch(dirPath)
+      if (isMatch(dirPath)) return true
+      // Project-relative: the same directory, named from the project root
+      // (plan 0067 C). `'src/domain/**'` means that folder AT THE ROOT, which
+      // is narrower and more accurate than the `'**/src/domain/**'` the old
+      // advice prescribed.
+      if (!relative) return false
+      const fromRoot = relativeToRoot(sourceFile, dirPath)
+      return fromRoot !== undefined && isMatch(fromRoot)
     },
   }
 }
@@ -127,10 +152,17 @@ export function resideInFolder<T extends Located>(glob: string): Predicate<T> {
  */
 export function havePathMatching(glob: string): Predicate<SourceFile> {
   const isMatch = picomatch(glob)
+  const relative = isProjectRelative(glob)
   return {
-    globs: globNode({ glob, kind: 'file-path' }),
+    globs: globNode({ glob, kind: 'file-path', base: relative ? 'normalized' : 'absolute' }),
     description: `have path matching "${glob}"`,
-    test: (sourceFile) => isMatch(sourceFile.getFilePath()),
+    test: (sourceFile) => {
+      const filePath = sourceFile.getFilePath()
+      if (isMatch(filePath)) return true
+      if (!relative) return false
+      const fromRoot = relativeToRoot(sourceFile, filePath)
+      return fromRoot !== undefined && isMatch(fromRoot)
+    },
   }
 }
 
