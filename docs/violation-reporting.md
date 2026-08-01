@@ -356,6 +356,13 @@ Each violation contains:
 | `docs`       | `string \| undefined` | Link to documentation (ADR, wiki, style guide)               |
 | `codeFrame`  | `string \| undefined` | Source code snippet around the violation line                |
 
+A **configuration finding** — one reporting that the rule itself enforces
+nothing — carries `file: ''` and a `line` that means nothing, because it
+describes a rule rather than a place in your code. In the programmatic object
+those stay as they are, for backwards compatibility. In `check --format json`
+they are emitted as `null`, and the finding carries `"configuration": true`, so
+a consumer never sees a location that looks real and is not.
+
 ## Programmatic Access
 
 For custom reporting, catch the error and process violations:

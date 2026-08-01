@@ -286,8 +286,18 @@ count down into errors vs warnings:
       "because": "…",
       "suggestion": "use this.extractCount()",
       "docs": "…",
+      // `true` when the rule enforces nothing (empty selector, dead glob, no
+      // condition) rather than the code being wrong. Those findings carry
+      // `"file": null, "line": null` — they have no source location — and are
+      // always `error`, never suppressible. See the AI agents page.
+      "configuration": false,
     },
   ],
+  // Findings removed by an inline `// ts-archunit-exclude` comment, by rule and
+  // file. Always present; empty when nothing was suppressed. Every other filter
+  // in the pipeline reports itself, and this one now does too — a run with every
+  // finding excluded should not read the same as a clean one.
+  "commentSuppressed": [{ "ruleId": "arch/no-cycles", "file": "src/legacy/gateway.ts" }],
 }
 ```
 

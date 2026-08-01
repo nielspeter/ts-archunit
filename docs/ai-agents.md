@@ -121,6 +121,7 @@ which emits a single JSON document the agent parses to self-correct:
       "because": "a generic Error loses the type/context callers need to handle it",
       "suggestion": "throw a domain-specific error (NotFoundError, ValidationError, …)",
       "codeFrame": "  41 |   if (!order) {\n> 42 |     throw new Error('not found')\n  43 |   }",
+      "configuration": false,
     },
   ],
 }
@@ -129,6 +130,38 @@ which emits a single JSON document the agent parses to self-correct:
 `severity` lets the agent distinguish blocking from advisory; `suggestion` and
 `codeFrame` tell it what to change and where. `check` exits non-zero only on
 **error**-severity violations, so warnings surface without failing the loop.
+
+### `configuration` — the field that changes what you do
+
+`configuration: true` means **the rule enforces nothing**: its selector matched
+no subjects, its glob cannot match, it asserts nothing. The code is not the
+problem, so editing the named file will not clear it — the fix is in the rule
+definition.
+
+These findings have no source location, and say so rather than inventing one:
+
+```jsonc
+{
+  "ruleId": "arch/domain-isolation",
+  "severity": "error",
+  "element": "arch/domain-isolation",
+  "file": null,
+  "line": null,
+  "message": "Selector matched 0 subjects…",
+  "suggestion": "Widen the selector until it matches at least one subject…",
+  "configuration": true,
+}
+```
+
+`file` and `line` are `null`, not `""` and `1`. Do not open them. Act on
+`ruleId`, `message` and `suggestion`.
+
+Two more things about this kind of finding, both deliberate:
+
+- **It cannot be suppressed** — not by `.warn()`, `.asSeverity('warn')`,
+  `.excluding()`, a `// ts-archunit-exclude` comment, a baseline, or
+  diff-aware mode. A rule that enforces nothing is not something to grade down.
+- **It is always `error`.** There is no advisory version.
 
 ## Composing with topology rules
 
