@@ -89,7 +89,7 @@ for, and it catches every failure above including the metacharacter case.
 This report proposed a bespoke file-set identity assertion, on the grounds that
 `.expectNonEmpty()` is "necessary but not sufficient". The 0067-C measurement
 supersedes that. Running the empty-selector-fails-by-default experiment
-(`spike/0067c-empty-by-default`) from a checkout **not** named `ts-archunit`
+(on the since-deleted `spike/0067c-empty-by-default` branch) from a checkout **not** named `ts-archunit`
 produces **23** failures; from a correctly-named one, **10**. The 13-failure
 delta is precisely the rules below.
 
