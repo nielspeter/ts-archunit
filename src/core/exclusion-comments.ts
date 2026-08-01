@@ -28,6 +28,19 @@ export interface ExclusionWarning {
   file: string
   /** Line number */
   line: number
+  /**
+   * What kind of fault this is, so a caller can act on it differently.
+   *
+   * `'undocumented'` — the directive is well-formed and **applied**; it just
+   * states no reason. Since v0.38.0 this fails the build ([bug 0039](../../bugs/fixed/0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md)),
+   * because a suppression nobody justified is the marker ADR-008 rule 3's
+   * corollary warns about.
+   *
+   * `'malformed'` — the directive is broken syntax and was **not** applied. Two
+   * of the three malformed shapes therefore leave the original violation firing,
+   * so the build is already red and a stderr line is the right weight.
+   */
+  kind: 'undocumented' | 'malformed'
 }
 
 /**
@@ -78,26 +91,31 @@ function parseRuleIdsAndReason(content: string): { ruleIds: string[]; reason: st
 
 /** Handle a block-end directive line. */
 function handleBlockEnd(
-  openBlocks: Map<string, ExclusionComment>,
+  frames: ExclusionComment[][],
   exclusions: ExclusionComment[],
   warnings: ExclusionWarning[],
   filePath: string,
   lineNum: number,
 ): void {
-  if (openBlocks.size === 0) {
+  const innermost = frames.pop()
+  if (innermost === undefined) {
     warnings.push({
       message: `ts-archunit-exclude-end without matching start`,
       file: filePath,
       line: lineNum,
+      kind: 'malformed',
     })
     return
   }
 
-  for (const [, comment] of openBlocks) {
+  // Close the innermost frame only. This used to close **every** open block,
+  // which is how a nested region silently ended its parent early (bug 0039):
+  // the inner `-end` closed the outer, and everything after it was unexcluded
+  // while looking excluded in the source.
+  for (const comment of innermost) {
     comment.endLine = lineNum
     exclusions.push(comment)
   }
-  openBlocks.clear()
 }
 
 /** Emit undocumented-exclusion warnings for each rule ID when no reason is given. */
@@ -116,6 +134,7 @@ function warnUndocumented(
         `  Fix: Add a reason — // ${directive} ${ruleId}: <why>`,
       file: filePath,
       line: lineNum,
+      kind: 'undocumented',
     })
   }
 }
@@ -123,35 +142,51 @@ function warnUndocumented(
 /** Handle a block-start directive line. */
 function handleBlockStart(
   content: string,
-  openBlocks: Map<string, ExclusionComment>,
+  frames: ExclusionComment[][],
   warnings: ExclusionWarning[],
   filePath: string,
   lineNum: number,
 ): void {
-  if (openBlocks.size > 0) {
-    warnings.push({
-      message: `Nested ts-archunit-exclude-start — close existing block first`,
-      file: filePath,
-      line: lineNum,
-    })
-    return
-  }
-
   const { ruleIds, reason } = parseRuleIdsAndReason(content)
 
   if (reason === '') {
     warnUndocumented(warnings, ruleIds, 'ts-archunit-exclude-start', filePath, lineNum)
   }
 
+  // Nesting a DIFFERENT rule is legitimate and used to be refused outright —
+  // exempting `arch/no-cycles` across a module and `arch/no-any` across one
+  // function inside it is an ordinary thing to want. The old code warned and
+  // dropped the inner directive, then let the inner `-end` close the outer
+  // block, so both exemptions were wrong: the inner never applied and the outer
+  // stopped early. Frames make both work.
+  //
+  // Re-opening a rule that is ALREADY open is different — it is redundant, and
+  // the likeliest cause is a missing `-end`. Warned, but still pushed: refusing
+  // it is what produced the early-close bug.
+  const alreadyOpen = new Set(frames.flat().map((c) => c.ruleId))
   for (const ruleId of ruleIds) {
-    openBlocks.set(ruleId, {
+    if (alreadyOpen.has(ruleId)) {
+      warnings.push({
+        message:
+          `ts-archunit-exclude-start for '${ruleId}' is already open — ` +
+          `the enclosing block covers this region. Fix: remove this directive, ` +
+          `or close the enclosing block first if the nesting was unintended.`,
+        file: filePath,
+        line: lineNum,
+        kind: 'malformed',
+      })
+    }
+  }
+
+  frames.push(
+    ruleIds.map((ruleId) => ({
       ruleId,
       reason,
       file: filePath,
       line: lineNum,
       isBlock: true,
-    })
-  }
+    })),
+  )
 }
 
 /** Handle a single-line exclude directive. */
@@ -195,7 +230,10 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
   const lines = sourceText.split('\n')
   const exclusions: ExclusionComment[] = []
   const warnings: ExclusionWarning[] = []
-  const openBlocks = new Map<string, ExclusionComment>()
+  // A STACK of frames, one per `-start` line, each holding that line's rule ids.
+  // One `-end` closes one frame. A single-level block behaves exactly as before;
+  // nesting now works instead of silently mangling both regions.
+  const frames: ExclusionComment[][] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -204,14 +242,14 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
 
     // Check block end first (before start/single so we don't match -start as single)
     if (BLOCK_END_RE.test(line)) {
-      handleBlockEnd(openBlocks, exclusions, warnings, filePath, lineNum)
+      handleBlockEnd(frames, exclusions, warnings, filePath, lineNum)
       continue
     }
 
     // Check block start
     const startMatch = BLOCK_START_RE.exec(line)
     if (startMatch?.[1]) {
-      handleBlockStart(startMatch[1], openBlocks, warnings, filePath, lineNum)
+      handleBlockStart(startMatch[1], frames, warnings, filePath, lineNum)
       continue
     }
 
@@ -222,12 +260,14 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
     }
   }
 
-  // Any unclosed blocks are errors
-  for (const [, comment] of openBlocks) {
+  // Any unclosed frame is an error, and pushes no exclusion — so an unterminated
+  // block fails closed: the violation it meant to cover still fires.
+  for (const comment of frames.flat()) {
     warnings.push({
       message: `ts-archunit-exclude-start without matching end for rule '${comment.ruleId}'`,
       file: filePath,
       line: comment.line,
+      kind: 'malformed',
     })
   }
 

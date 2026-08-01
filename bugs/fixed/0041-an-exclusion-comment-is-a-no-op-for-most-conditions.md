@@ -2,7 +2,7 @@
 
 **Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased
 **Verified:** measured through the public API before and after
-**Found in:** v0.36.3, by the review of [bug 0039](../0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md)
+**Found in:** v0.36.3, by the review of [bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md)
 **Severity:** High. A **documented public feature that silently does nothing** for the
 library's most-used conditions. The user writes the sanctioned exemption, the finding keeps
 firing, and nothing says why. There is no error, no warning, and no diagnostic — the comment is
@@ -87,7 +87,7 @@ routes, and the choice is not obvious:
 Either way, this is a behaviour change in the direction of **more suppression**: rules that were
 silently ignoring a user's exemption will start honouring it, so findings will disappear from
 reports. That is the user getting what they asked for, but it must be in the release note, and
-it interacts with [bug 0039](../0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) —
+it interacts with [bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) —
 fixing this widens 0039's fail-open from `createViolation` conditions to all of them. **Sequence
 0039's decision first, or ship them together.**
 
@@ -112,7 +112,7 @@ red, since the `classes()` control is green either way.
 
 ## Related
 
-- [Bug 0039](../0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) — gated by
+- [Bug 0039](./0039-an-undocumented-exclusion-comment-suppresses-and-only-warns.md) — gated by
   this one; its fail-open currently reaches only the conditions that stamp.
 - [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 5 — the same-derivation test that
   hid this.

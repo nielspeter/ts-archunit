@@ -124,6 +124,14 @@ beforeAll(() => {
   ])
   write('src/module-body-plain.ts', ['export const go = (): unknown => eval("2")'])
 
+  // Bug 0039: a directive with no reason. It still suppresses; what fails is the
+  // missing justification.
+  write('src/undocumented.ts', [
+    '// ts-archunit-exclude probe/no-forbidden',
+    "import { secret } from './forbidden.js'",
+    'export const used = secret',
+  ])
+
   write('src/logger-plain.ts', [
     'export class LoggerPlain {',
     '  run(): void {',
@@ -287,6 +295,68 @@ describe('an exclusion comment reaches every condition family (bug 0041)', () =>
       .violations()
     expect(commentSuppressions()).toHaveLength(0)
     expect(commentSuppressionNotice()).toBeUndefined()
+  })
+
+  it('an undocumented exclusion fails the build (bug 0039)', () => {
+    const violations = modules(project)
+      .that()
+      .resideInFile('**/undocumented.ts')
+      .should()
+      .notImportFrom('**/forbidden*')
+      .rule({ id: RULE_ID })
+      .violations()
+
+    // The exemption still applies — the import violation is gone.
+    expect(violations.filter((v) => v.bypassFilters !== true)).toHaveLength(0)
+
+    // …and a configuration finding takes its place.
+    const config = violations.filter((v) => v.bypassFilters === true)
+    expect(config).toHaveLength(1)
+    expect(config[0]?.message).toContain('states no reason')
+    expect(config[0]?.severity).toBe('error')
+    expect(config[0]?.file).toContain('undocumented.ts')
+    // Rule 3: it says there is no escape hatch.
+    expect(config[0]?.suggestion).toContain('cannot be suppressed')
+    // Rule 2, honestly: it does not claim to prevent anything.
+    expect(config[0]?.suggestion).toContain('raises the cost')
+  })
+
+  it('the remedy remediates: adding a reason clears the finding and keeps the exemption', () => {
+    // Rule 2's behavioural corollary. Applying the stated fix must clear the
+    // finding WITHOUT resurrecting the violation — otherwise "add a reason"
+    // trades one failure for another, which is a remedy that does not remediate.
+    write('src/undocumented.ts', [
+      '// ts-archunit-exclude probe/no-forbidden: deliberate, guarded by 0039',
+      "import { secret } from './forbidden.js'",
+      'export const used = secret',
+    ])
+    const reloaded = new Project({ tsConfigFilePath: path.join(tmpDir, 'tsconfig.json') })
+    const fixed: ArchProject = {
+      tsConfigPath: path.join(tmpDir, 'tsconfig.json'),
+      _project: reloaded,
+      getSourceFiles: () => reloaded.getSourceFiles(),
+    }
+
+    const violations = modules(fixed)
+      .that()
+      .resideInFile('**/undocumented.ts')
+      .should()
+      .notImportFrom('**/forbidden*')
+      .rule({ id: RULE_ID })
+      .violations()
+
+    expect(violations).toHaveLength(0)
+  })
+
+  it('CONTROL: a documented exclusion produces no configuration finding', () => {
+    const violations = modules(project)
+      .that()
+      .resideInFile('**/consumer-excluded.ts')
+      .should()
+      .notImportFrom('**/forbidden*')
+      .rule({ id: RULE_ID })
+      .violations()
+    expect(violations.filter((v) => v.bypassFilters === true)).toHaveLength(0)
   })
 
   it('a comment naming a DIFFERENT rule id does not suppress', () => {
