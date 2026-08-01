@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.36.2] - 2026-08-01
+
+### Fixed
+
+- **A workspace has no single root** ([bug 0035](bugs/fixed/0035-a-workspace-has-no-single-root.md)). `workspace([a, b])` sets its `tsConfigPath` to the alphabetically first config — a tie-breaker chosen so compiler options are deterministic — and v0.35.0/v0.36.1 promoted that into meaning: a project-relative glob silently meant _that one package_. Measured on a two-package workspace, `'src/api/**'` matched one and not the other, green, with a silent `doctor`; adding a package named `aaa` would have re-pointed every relative glob in the suite. Each file now resolves against the root that **contains** it, longest match first so a nested package's tsconfig wins.
+
+- **An import glob rejected the relative spelling, and `layeredArchitecture` reported a false red** ([bug 0037](bugs/fixed/0037-an-import-glob-rejects-the-relative-spelling.md)). `shared: ['src/shared/**']` reported a violation on a correct architecture, because `shared` also reaches `onlyImportFrom(...)` — matched against the absolute resolved path. Import globs now accept the relative form too. Bare specifiers are unaffected (`notImportFrom('fastify')`), and the primary candidate is unchanged, so no baselined dependency finding moves.
+
+- A tsconfig at the filesystem root produced `''`, which one derivation read as "the root is `/`" and another as "no root known" — the rule discovered its file while `diagnose()` called the same glob dead. And `isProjectRelative` disagreed with `isAnchored` on a drive-absolute `C:/x/**`.
+
+### Known gap
+
+- Three path-glob surfaces — `crossLayer().layer()`, `smells.*.inFolder()`, `onlyBeImportedVia()` — are **not** audited for relative globs; anchor them with `'**/'`. [Bug 0036](bugs/0036-the-relative-glob-audit-is-incomplete.md), which also records that the uniformity guard's surface list is hand-maintained and so cannot fail when a new surface is added.
+
 ## [0.36.1] - 2026-08-01
 
 ### Fixed
