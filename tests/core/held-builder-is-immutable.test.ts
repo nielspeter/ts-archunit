@@ -93,11 +93,18 @@ describe('a held builder is immutable — behavioural', () => {
       .that()
       .haveNameMatching(/^definitelyNotAFunction$/)
 
-    // Opted in: the empty selection is a config finding, so this fails.
+    // Plan 0074 (R3b) inverted this: an empty selection is a configuration finding by default now. Both spellings now fail, so this can no longer prove non-leakage by
+    // contrasting them. The property under test is immutability of the HELD
+    // selection, so assert that directly: the flag must not survive onto the
+    // held builder, whatever the default does with it.
     expect(() => nothing.expectNonEmpty().should().beExported().check()).toThrow(ArchRuleError)
-    // Not opted in: an empty selection stays green. The opt-in is per rule, and
-    // a leaked one turns a later legitimately-empty rule red.
-    expect(() => nothing.should().beExported().check()).not.toThrow()
+    expect(() => nothing.should().beExported().check()).toThrow(ArchRuleError)
+
+    // The discriminator, now that both throw: `.expectEmpty()` is refused on a
+    // builder that leaked `.expectNonEmpty()`, and accepted on a clean one.
+    // A leak makes the second line throw a TypeError instead of passing.
+    expect(() => nothing.expectNonEmpty().expectEmpty()).toThrow(TypeError)
+    expect(() => nothing.expectEmpty()).not.toThrow()
   })
 
   it('SliceRuleBuilder: a second rule off a held selection has only its own condition', () => {

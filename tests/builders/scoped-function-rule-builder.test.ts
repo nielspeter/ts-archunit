@@ -74,10 +74,10 @@ describe('ScopedFunctionRuleBuilder', () => {
     const noMatchSelection = calls(p).that().onObject('nonexistent')
     const scoped = new ScopedFunctionRuleBuilder(noMatchSelection)
 
-    // Empty call selection -> empty elements -> no violations
+    // Plan 0074 (R3b) inverted this: an empty selection is a configuration finding by default now. Empty call selection -> empty elements -> nothing checked.
     expect(() => {
       scoped.should().contain(call('anything')).check()
-    }).not.toThrow()
+    }).toThrow()
   })
 
   it('works with notContain condition', () => {

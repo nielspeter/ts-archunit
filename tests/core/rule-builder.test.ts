@@ -179,7 +179,10 @@ describe('RuleBuilder', () => {
   })
 
   describe('empty element set', () => {
-    it('.check() passes when no elements match predicates', () => {
+    it('.check() FAILS when no elements match predicates', () => {
+      // Plan 0074 (R3b) inverted this: an empty selection is a configuration finding by default now. The condition here is `alwaysFail`, and it never ran — the rule
+      // was green because there was nothing to run it on, which is the exact
+      // shape ADR-008 calls a lie.
       const builder = new TestRuleBuilder(stubProject, elements)
       expect(() => {
         builder
@@ -188,14 +191,15 @@ describe('RuleBuilder', () => {
           .should()
           .withCondition(alwaysFail('unreachable'))
           .check()
-      }).not.toThrow()
+      }).toThrow(ArchRuleError)
     })
 
-    it('.check() passes when element list is empty', () => {
+    it('.check() FAILS when the element list is empty', () => {
+      // Plan 0074 (R3b) inverted this: an empty selection is a configuration finding by default now.
       const builder = new TestRuleBuilder(stubProject, [])
       expect(() => {
         builder.should().withCondition(alwaysFail('unreachable')).check()
-      }).not.toThrow()
+      }).toThrow(ArchRuleError)
     })
   })
 
@@ -517,14 +521,30 @@ describe('RuleBuilder', () => {
       expect(v).toEqual([])
     })
 
-    it('is opt-in — an empty selector WITHOUT it stays green (default unchanged)', () => {
-      const v = new TestRuleBuilder(stubProject, elements)
+    it('is now the DEFAULT — the opt-in it used to be is redundant', () => {
+      // Plan 0074 (R3b) inverted this: an empty selection is a configuration finding by default now. This test asserted the opposite and was named "default
+      // unchanged"; the default is what changed. `.expectNonEmpty()` still
+      // reads as documentation of intent, but it no longer alters behaviour —
+      // and `terminal-builder.ts` recorded why the opt-in had to go: it is
+      // "the opt-in this whole plan exists because nobody uses".
+      const withoutOptIn = new TestRuleBuilder(stubProject, elements)
         .that()
         .withPredicate(nameMatches(/^NothingMatches$/))
         .should()
         .withCondition(alwaysFail('unreachable'))
         .violations()
-      expect(v).toEqual([])
+      const withOptIn = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+        .expectNonEmpty()
+        .should()
+        .withCondition(alwaysFail('unreachable'))
+        .violations()
+
+      expect(withoutOptIn).toHaveLength(1)
+      expect(withoutOptIn[0]?.bypassFilters).toBe(true)
+      // Identical either way — that IS the inversion.
+      expect(withoutOptIn.map((v) => v.message)).toEqual(withOptIn.map((v) => v.message))
     })
 
     it('survives a .should() fork', () => {

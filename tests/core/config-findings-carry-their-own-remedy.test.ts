@@ -56,6 +56,9 @@ describe('a config finding carries its own remedy, not the author’s (bug 0021)
     const findings = functions(p)
       .that()
       .haveNameMatching(/^definitelyNotAFunction$/)
+      // `.expectNonEmpty()` is redundant since R3b — the empty selection is a
+      // finding either way — but kept here so the test still describes the
+      // shape a reader will meet in existing rule files.
       .expectNonEmpty()
       .should()
       .beExported()
@@ -66,7 +69,14 @@ describe('a config finding carries its own remedy, not the author’s (bug 0021)
     const [f] = findings
     expect(f?.bypassFilters).toBe(true)
     expect(f?.suggestion).not.toBe(AUTHOR.suggestion)
-    expect(f?.suggestion).toContain('.expectNonEmpty()')
+    // R3b changed this remedy, and had to: it used to say "drop
+    // .expectNonEmpty() if matching nothing is valid here", which stopped being
+    // true the moment empty became the default fault. Dropping the opt-in now
+    // changes nothing, so an agent following that advice fails and then
+    // improvises — ADR-008 rule 2, a remedy impossible on the path that
+    // produced it.
+    expect(f?.suggestion).toContain('.expectEmpty()')
+    expect(f?.suggestion).not.toContain('drop .expectNonEmpty()')
     expect(f?.docs).not.toBe(AUTHOR.docs)
     // Kept: neither asserts a remedy for this finding.
     expect(f?.ruleId).toBe('arch/example')

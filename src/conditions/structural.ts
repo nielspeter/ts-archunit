@@ -5,6 +5,7 @@ import type { ArchViolation } from '../core/violation.js'
 import { createViolation, getElementFile, getElementName } from '../core/violation.js'
 import { elementCondition } from './helpers.js'
 import { globNode } from '../core/glob-site.js'
+import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
 
 /**
  * Elements must reside in a file matching the glob pattern.
@@ -130,7 +131,7 @@ export function notExist<T extends Node>(): Condition<T> {
     description: 'not exist',
     // Zero subjects is this condition's PASSING state, so an empty selection
     // and an unsatisfiable selector glob are both correct here (plan 0074).
-    assertsCardinality: true,
+    [ASSERTS_CARDINALITY]: true,
     evaluate(elements: T[], context: ConditionContext): ArchViolation[] {
       return elements.map((element) =>
         createViolation(element, `${getElementName(element)} should not exist`, context),

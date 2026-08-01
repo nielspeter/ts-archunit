@@ -5,6 +5,7 @@ import type { DeclaredGlobs } from '../core/glob-site.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import type { TypeMatcher } from '../helpers/type-matchers.js'
+import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
 
 /**
  * Helper to create a per-element condition for ArchFunction.
@@ -57,7 +58,7 @@ export function notExist(): Condition<ArchFunction> {
     description: 'not exist',
     // Zero subjects is this condition's PASSING state, so an empty selection
     // and an unsatisfiable selector glob are both correct here (plan 0074).
-    assertsCardinality: true,
+    [ASSERTS_CARDINALITY]: true,
     evaluate(elements: ArchFunction[], context: ConditionContext): ArchViolation[] {
       return elements.map((fn) => ({
         rule: context.rule,

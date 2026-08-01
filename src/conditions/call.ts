@@ -5,6 +5,7 @@ import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchCall } from '../models/arch-call.js'
 import { getFunctionBody, findMatchesInNode } from '../helpers/body-traversal.js'
 import { identifyMatches } from './match-identity.js'
+import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
 
 /**
  * Helper to create a violation from an ArchCall.
@@ -57,7 +58,7 @@ export function notExist(): Condition<ArchCall> {
     description: 'not exist',
     // Zero subjects is this condition's PASSING state, so an empty selection
     // and an unsatisfiable selector glob are both correct here (plan 0074).
-    assertsCardinality: true,
+    [ASSERTS_CARDINALITY]: true,
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
       return elements.map((archCall) =>
         createCallViolation(

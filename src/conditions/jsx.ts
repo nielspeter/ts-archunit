@@ -2,6 +2,7 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import { createViolation } from '../core/violation.js'
 import type { ArchJsxElement } from '../models/arch-jsx-element.js'
+import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
 
 /**
  * Create a violation from an ArchJsxElement.
@@ -37,7 +38,7 @@ export function notExist(): Condition<ArchJsxElement> {
     description: 'not exist',
     // Zero subjects is this condition's PASSING state, so an empty selection
     // and an unsatisfiable selector glob are both correct here (plan 0074).
-    assertsCardinality: true,
+    [ASSERTS_CARDINALITY]: true,
     evaluate(elements: ArchJsxElement[], context: ConditionContext): ArchViolation[] {
       return elements.map((el) =>
         createJsxViolation(el, `<${el.getName()}> should not exist`, context),

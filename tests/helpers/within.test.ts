@@ -106,13 +106,15 @@ describe('within()', () => {
     }).not.toThrow()
   })
 
-  it('returns no elements when no calls match the selection', () => {
+  it('FAILS when no calls match the selection', () => {
     const noRoutes = calls(p).that().onObject('nonexistent')
 
-    // No matched calls -> no callbacks -> no violations (empty set passes)
+    // Plan 0074 (R3b) inverted this: an empty selection is a configuration finding by default now. A scoped rule over a selection that matched nothing checked nothing;
+    // `within()` makes that easy to write by accident, because the outer
+    // selection is where the emptiness comes from.
     expect(() => {
       within(noRoutes).functions().should().contain(call('anything')).check()
-    }).not.toThrow()
+    }).toThrow()
   })
 
   it('preserves .because() reason in scoped rule violations', () => {

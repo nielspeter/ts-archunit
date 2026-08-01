@@ -1,5 +1,6 @@
 import type { ArchViolation } from './violation.js'
 import type { DeclaredGlobs } from './glob-site.js'
+import type { ASSERTS_CARDINALITY } from './cardinality.js'
 
 /**
  * Context passed to conditions during evaluation.
@@ -78,6 +79,9 @@ export interface Condition<T> {
    * **Declared, never probed.** Evaluating a condition against `[]` to see
    * whether it returns violations answers "yes, it passed" for all of them.
    *
+   * Keyed by a module-private symbol so it cannot be set from outside this
+   * library — see `cardinality.ts`. `defineCondition` has no parameter for it.
+   *
    * `notExist()` is the only shipped condition of this kind, in all four of its
    * element-specific forms. It makes the pre-emptive guard legitimate:
    * `modules(p).that().resideInFolder('**\/legacy/**').should().notExist()`
@@ -86,5 +90,5 @@ export interface Condition<T> {
    * glob gate reds it, which is a false red on a correct rule; measured, it was
    * one of the nine failures the gate produced on this repo's own suite.
    */
-  readonly assertsCardinality?: true
+  readonly [ASSERTS_CARDINALITY]?: true
 }

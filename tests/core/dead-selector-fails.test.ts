@@ -1,7 +1,8 @@
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
-import { modules, classes, functions, or } from '../../src/index.js'
+import fs from 'node:fs'
+import { modules, functions, or, defineCondition } from '../../src/index.js'
 import { resideInFolder } from '../../src/predicates/identity.js'
 import { notExist } from '../../src/conditions/structural.js'
 import { diagnose } from '../../src/core/diagnose.js'
@@ -127,11 +128,16 @@ describe('a dead selector fails at check time (plan 0074, R3b)', () => {
   it('does not fire for a live tree that merely contains a dead branch', () => {
     // `or(dead, live)` is a working rule. Reporting its dead branch is the false
     // red the tree model exists to prevent.
-    const rule = classes(p)
+    // `modules`, not `classes`: the live branch has to actually select
+    // something, or `emptyIsPass` fires on the empty runtime selection and this
+    // stops testing the tree model at all. Measured — `**/domain/**` holds 3
+    // modules and 0 classes, so the first version of this test passed for the
+    // wrong reason until R3b made it fail.
+    const rule = modules(p)
       .that()
       .satisfy(or(resideInFolder('**/no-such-folder/**'), resideInFolder('**/domain/**')))
       .should()
-      .haveNameMatching(/./)
+      .notImportFrom('**/nothing-imports-this/**')
     expect(rule.violations().filter((v) => v.bypassFilters === true)).toEqual([])
   })
 
@@ -161,5 +167,130 @@ describe('a dead selector fails at check time (plan 0074, R3b)', () => {
 
     expect(diagnose([rule]).map((f) => f.kind)).toEqual(['dead-glob'])
     expect(rule.violations()).toHaveLength(1)
+  })
+})
+
+/**
+ * `emptyIsPass` — an empty selection is a fault by default (plan 0074, R3b).
+ *
+ * The other half of the flip, and the one that fires at **runtime** rather than
+ * statically. A condition reports a violation when SOME subject fails; over an
+ * empty subject set that is vacuously false, so the rule passed and the suite
+ * counted it as coverage. `.expectNonEmpty()` was the opt-in, and
+ * `terminal-builder.ts` records why that was not enough: it is "the opt-in this
+ * whole plan exists because nobody uses".
+ *
+ * The escape hatch is `.expectEmpty()`, not `.allowEmpty()` — 0069's appendix
+ * rejected the latter as "one word, silent forever, typo or not, and nothing
+ * revisits it". The difference is that `.expectEmpty()` is an **assertion**.
+ */
+describe('an empty selection is a fault by default (plan 0074, emptyIsPass)', () => {
+  it('fails when the selector matches nothing at runtime', () => {
+    // The glob is satisfiable — `**/domain/**` exists — so this is not the
+    // static fault. Nothing in it has this name, which is the runtime case.
+    const rule = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .and()
+      .haveNameMatching(/^definitely-not-a-module-name$/)
+      .should()
+      .notImportFrom('**/x/**')
+
+    const [finding] = rule.violations()
+    expect(finding?.bypassFilters).toBe(true)
+    expect(finding?.suggestion).toContain('.expectEmpty()')
+  })
+
+  it('CONTROL: a selection with subjects is untouched', () => {
+    const rule = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .should()
+      .notImportFrom('**/no-such-target/**')
+    expect(rule.violations()).toEqual([])
+  })
+
+  it('.expectEmpty() accepts an empty selection', () => {
+    const rule = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .and()
+      .haveNameMatching(/^definitely-not-a-module-name$/)
+      .expectEmpty()
+      .should()
+      .notImportFrom('**/x/**')
+    expect(rule.violations()).toEqual([])
+  })
+
+  it('.expectEmpty() FAILS the day the selection stops being empty', () => {
+    // This is the whole difference from the rejected `.allowEmpty()`. A silencer
+    // stays silent forever; an assertion reports when its premise expires.
+    const rule = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .expectEmpty()
+      .should()
+      .notImportFrom('**/x/**')
+
+    const [finding] = rule.violations()
+    expect(finding?.message).toContain('.expectEmpty() asserted this selector matches nothing')
+    expect(finding?.message).toContain('matched 3')
+    expect(finding?.bypassFilters).toBe(true)
+  })
+
+  it('refuses both emptiness assertions on one rule, at build time', () => {
+    // 0069's appendix: "a contradiction and must fail at build time, not
+    // silently pick one". Both orders, because picking one silently would be
+    // order-dependent and only one order would be caught.
+    const base = modules(p).that().resideInFolder('**/domain/**')
+    expect(() => base.expectEmpty().expectNonEmpty()).toThrow(TypeError)
+    expect(() => base.expectNonEmpty().expectEmpty()).toThrow(TypeError)
+  })
+
+  it('a cardinality condition still exempts, and only when EVERY condition is one', () => {
+    // `andShould()` ANDs. A rule that asserts `notExist()` AND something about
+    // subjects that exist is not satisfied by emptiness — exempting it on the
+    // strength of one condition would silence the other. 0069's appendix names
+    // this as an implementation constraint, and the first cut used `.some()`.
+    const onlyCardinality = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .and()
+      .haveNameMatching(/^nope$/)
+      .should()
+      .satisfy(notExist())
+    expect(onlyCardinality.violations()).toEqual([])
+
+    const mixed = modules(p)
+      .that()
+      .resideInFolder('**/domain/**')
+      .and()
+      .haveNameMatching(/^nope$/)
+      .should()
+      .satisfy(notExist())
+      .andShould()
+      .notImportFrom('**/x/**')
+    expect(mixed.violations()).toHaveLength(1)
+  })
+
+  it('the exemption cannot be set from outside this library', () => {
+    // 0069's appendix constraint 2: `Condition` is a public export and
+    // `defineCondition` is its sanctioned constructor, so a plain property
+    // would be a one-line silent opt-out on any user condition — `.allowEmpty()`
+    // relocated onto the condition object. The key is a module-private symbol.
+    //
+    // Derived independently of the implementation: the public entry point is
+    // read for the symbol's name rather than the source of `cardinality.ts`.
+    const publicApi = fs.readFileSync(
+      path.resolve(import.meta.dirname, '../../src/index.ts'),
+      'utf-8',
+    )
+    expect(publicApi).not.toContain('ASSERTS_CARDINALITY')
+    expect(publicApi).not.toContain('cardinality.js')
+
+    // And `defineCondition` has no parameter for it, so the sanctioned
+    // constructor cannot produce one either.
+    const userCondition = defineCondition<never>('user condition', () => [])
+    expect(Object.getOwnPropertySymbols(userCondition)).toEqual([])
   })
 })
