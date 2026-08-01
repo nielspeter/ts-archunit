@@ -4,7 +4,7 @@ import { Project } from 'ts-morph'
 import { modules, classes } from '../../src/index.js'
 import { resideInFolder, resideInFile } from '../../src/predicates/identity.js'
 import { diagnose } from '../../src/core/diagnose.js'
-import { isProjectRelative } from '../../src/core/project-relative.js'
+import { isProjectRelative, relativeToRoot } from '../../src/core/project-relative.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 const tsconfigPath = path.resolve(import.meta.dirname, '../fixtures/modules/tsconfig.json')
@@ -119,6 +119,38 @@ describe('a project-relative path glob (plan 0067 C)', () => {
       .notImportFrom('**/x/**')
     expect(modules(p).that().resideInFolder('./src/domain/**').subjects()).toEqual([])
     expect(diagnose([rule]).map((f) => f.fault)).toEqual(['dot-segment'])
+  })
+
+  it('CONTROL: an explicitly-anchored glob is NOT normalized', () => {
+    // Sabotage found this unguarded. Normalizing everything only ADDS matches,
+    // so every "selects something" assertion above stays green while `'**/x'`
+    // and `'/abs/x'` quietly stop meaning what they say.
+    //
+    // `'*/domain/**'` is the discriminator: as an absolute path it matches
+    // nothing (no absolute path has a single segment before `domain`), but the
+    // ROOT-RELATIVE form of the directory is `src/domain`, which it does match.
+    // So it selects nothing iff anchored globs are left alone.
+    expect(isProjectRelative('*/domain/**')).toBe(false)
+    expect(modules(p).that().resideInFolder('*/domain/**').subjects()).toEqual([])
+  })
+
+  it('CONTROL: a file outside the project root is never matched relatively', () => {
+    // Also found by sabotage. `relativeToRoot` must return undefined for a path
+    // that does not sit under the root — trimming the prefix wherever it
+    // happens to occur would relativise a file the root does not contain.
+    const root = '/repo/pkg'
+    const inside = '/repo/pkg/src/domain/a.ts'
+    const outside = '/repo/other/src/domain/a.ts'
+    // Derived from the same helper the predicates use, via a stub source file
+    // — the point is the path arithmetic, not ts-morph.
+    const stub = (configFilePath: string | undefined) =>
+      ({
+        getProject: () => ({ getCompilerOptions: () => ({ configFilePath }) }),
+      }) as unknown as Parameters<typeof relativeToRoot>[0]
+
+    expect(relativeToRoot(stub(`${root}/tsconfig.json`), inside)).toBe('src/domain/a.ts')
+    expect(relativeToRoot(stub(`${root}/tsconfig.json`), outside)).toBeUndefined()
+    expect(relativeToRoot(stub(undefined), inside)).toBeUndefined()
   })
 
   it('skips normalization when the project has no tsconfig to be relative to', () => {
