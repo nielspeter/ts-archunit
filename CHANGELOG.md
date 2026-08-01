@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.36.1] - 2026-08-01
+
+### Fixed
+
+- **`slices().assignedFrom()` accepts a project-relative glob** ([bug 0033](bugs/0033-assignedFrom-does-not-accept-a-project-relative-glob.md)), resolving it against the project root like every other surface. It was the one holdout after 0.35.0, so `layers: { api: 'src/api/**' }` failed beside a `shared: ['src/shared/**']` that worked — in the same `layeredArchitecture()` call. Purely additive: an anchored glob still means "anywhere", and a relative glob naming a folder that genuinely does not exist still matches nothing.
+
+  The failure message moved with it. A relative glob naming a missing folder is no longer told to "prefix these with `**/`" — advice that would change a spelling which is already correct and leave the rule just as empty.
+
 ## [0.36.0] - 2026-08-01
 
 ### Fixed

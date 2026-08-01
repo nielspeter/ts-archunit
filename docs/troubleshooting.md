@@ -42,18 +42,20 @@ Leave rule-file builders un-terminated; use `.asSeverity('warn')` for warnings. 
 
 ## "Slice discovery matched no files" / a rule selects nothing
 
-Almost always an **unanchored glob** in a place that does not normalize one.
-Since **0.35.0** the path predicates and `slices().matching()` accept a
-project-relative glob and resolve it against the project root, but
-`assignedFrom()` still does not:
+Since **0.36.1** a project-relative glob works on every surface, so this is
+usually a folder that is genuinely missing or misspelled rather than an
+anchoring problem:
 
 ```typescript
-slices(p).assignedFrom({ services: 'src/services/**' }) // ❌ 0 files
-slices(p).assignedFrom({ services: '**/src/services/**' }) // ✅
+slices(p).assignedFrom({ services: 'src/services/**' }) // ✅ the one at the project root
+slices(p).assignedFrom({ services: '**/src/services/**' }) // ✅ any services/, anywhere
 
-modules(p).that().resideInFolder('src/services/**') // ✅ since 0.35.0 — the root one
-modules(p).that().resideInFolder('**/src/services/**') // ✅ any src/services, anywhere
+modules(p).that().resideInFolder('src/services/**') // ✅ same rule, same meaning
 ```
+
+Both spellings work everywhere and mean different things — the relative one is
+the **root** folder, the anchored one is any folder of that name at any depth.
+Check the folder exists and holds `.ts` files your tsconfig includes.
 
 The same applies to preset options (`layers`, `folders`, `shared`, `src`) and to
 path predicates like `resideInFolder()`. Anchoring `layers` but forgetting

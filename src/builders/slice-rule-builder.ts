@@ -20,6 +20,7 @@ import {
   respectLayerOrder as respectLayerOrderCondition,
   notDependOn as notDependOnCondition,
 } from '../conditions/slice.js'
+import { isProjectRelative } from '../core/project-relative.js'
 
 /**
  * How slices were sourced. Recorded so an empty-discovery failure can state the
@@ -143,7 +144,18 @@ export class SliceRuleBuilder extends TerminalBuilder {
     }
     return this._discovery.entries.map((entry) =>
       stampGlobs(
-        globAnyOf([entry.glob], 'file-path'),
+        // `base: 'normalized'` for a project-relative glob — bug 0033. The
+        // anchor check calls an unanchored glob dead against absolute paths,
+        // and since this entry point now resolves one against the project root
+        // it stops being dead exactly when it starts working. Without this,
+        // `doctor` reds a rule that discovers slices correctly: measured, a
+        // relative `assignedFrom` glob gave 0 violations and a `dead-glob`
+        // diagnosis in the same run.
+        globAnyOf(
+          [entry.glob],
+          'file-path',
+          isProjectRelative(entry.glob) ? 'normalized' : 'absolute',
+        ),
         'discovery',
         (g) => `assignedFrom({ ${entry.name}: "${g.glob}" })`,
       ),
@@ -422,7 +434,18 @@ export class SliceRuleBuilder extends TerminalBuilder {
       // slice is empty, so "matched no file" is already established and the
       // useful split is between the two causes with a verifiable fix.
       list: entries.filter(
-        (entry) => (syntacticFault(entry.glob, 'file-path') ?? 'no-match') === fault,
+        (entry) =>
+          // The SAME base the declaration uses (bug 0033). With the default
+          // `'absolute'`, a project-relative glob is classified `unanchored`
+          // and the message tells the author to prefix `"**/"` — advice that
+          // stopped being true when this entry point started resolving one
+          // against the project root. It would now send them to change a glob
+          // whose spelling is fine and whose folder is simply missing.
+          (syntacticFault(
+            entry.glob,
+            'file-path',
+            isProjectRelative(entry.glob) ? 'normalized' : 'absolute',
+          ) ?? 'no-match') === fault,
       ),
     })).filter((group) => group.list.length > 0)
 
