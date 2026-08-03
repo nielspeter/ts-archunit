@@ -190,8 +190,11 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
     const single: Layer[] = [{ name: 'solo', pattern: '**/solo/**', files: [] }]
 
     const out = haveMatchingCounterpart(usable).evaluate([], { rule: 'r', layers: single })
-    expect(out).toHaveLength(1)
-    expect(out[0]?.element).toBe('ghost')
+    // TWO findings: this fixture's `usable` array has both layers empty, and
+    // every layer is now checked — including the final one, which used to be
+    // skipped (bug 0040's missing case). The fixture was sloppy and the old
+    // behaviour hid it; the assertion is on the identities, not the count alone.
+    expect(out.map((v) => v.element).sort()).toEqual(['ghost', 'schemas'])
   })
 
   it('CONTROL: a USABLE context still wins over the argument', () => {

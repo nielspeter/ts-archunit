@@ -152,6 +152,25 @@ export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition
       const layers = fromContext ?? explicitLayers ?? []
       if (layers.length < 2) return []
 
+      // EVERY layer, before the pair loop — including the last one.
+      //
+      // This check used to live inside the loop below, which walks `layers[i]` for
+      // `i < length - 1`, so the **final** layer was never examined. Bug 0040
+      // named that its "missing case" and rated it worse than the silence, and it
+      // is: measured on a dead final layer, this condition produced **0**
+      // configuration findings and **2** ordinary ones reading *"has no matching
+      // counterpart in layer ghost"*. An agent obeying that writes files into a
+      // layer whose glob is wrong, they still do not match, and it improvises —
+      // bug 0017's shape.
+      //
+      // Its two siblings already checked all layers, so the three disagreed about
+      // the same input. Hoisting it here makes them consistent and closes the
+      // missing case with one code path rather than three.
+      const empty = layers.filter((layer) => layer.files.length === 0)
+      if (empty.length > 0) {
+        return empty.map((layer) => emptyLayerFinding(layer, layers.length, context))
+      }
+
       const violations: ArchViolation[] = []
 
       // Check consecutive layer pairs
@@ -159,12 +178,6 @@ export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition
         const leftLayer = layers[i]
         const rightLayer = layers[i + 1]
         if (!leftLayer || !rightLayer) continue
-
-        // Non-vacuity (ADR-008): a layer that matched no files enforces nothing.
-        if (leftLayer.files.length === 0) {
-          violations.push(emptyLayerFinding(leftLayer, layers.length, context))
-          continue
-        }
 
         // Collect all left files that appear in at least one pair
         const matchedLeftFiles = new Set<string>()
