@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.43.0] - 2026-08-03
+
+### Added
+
+- **`doctor` now reports exclusion comments that name a rule nobody declares** ([bug 0044](bugs/fixed/0044-an-inline-exclusion-comment-has-no-feedback-channel.md)). `.excluding()` warns when a pattern matches nothing; an inline `// ts-archunit-exclude` comment could not, and structurally cannot on the enforcement path — comments are read only in files that already produced a violation for that rule. So **rename a rule and every comment naming the old id goes inert, silently and permanently.**
+
+  `doctor` finds them, names the file and line, and exits non-zero. v0.37.0 disclosed what a comment _did_ suppress; this is the other direction — a comment that suppresses nothing.
+
+- `orphanExclusions(rules)` is exported for the vitest audience, alongside `diagnose()`. **It needs every rule at once**: the declared-id set is the union across rule files, so calling it with a subset reports directives from sibling files as orphans. `doctor` calls it once, after loading everything.
+
+### Known gap
+
+- A comment whose rule id is **correct** but whose placement is wrong is still silent. Catching that means parsing every file in scope on every run, which is the cost the current gate exists to avoid; the trade is argued in the bug. The placement rules themselves are documented (`docs/violation-reporting.md`, v0.37.0).
+
 ## [0.42.1] - 2026-08-03
 
 ### Fixed

@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.42.1 · **Open:** 1 · **Fixed:** 48 (`fixed/`) · **Updated:** 2026-08-01
+**Version:** 0.43.0 · **Open:** 0 · **Fixed:** 49 (`fixed/`) · **Updated:** 2026-08-01
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -12,6 +12,10 @@
 ---
 
 ## Priority
+
+**No open defects.** Everything filed this session is fixed. The queue below is empty by design,
+not by neglect — the remaining known gaps live in plans (0078–0080) with their reasoning recorded,
+and the honest residues are written into the bugs that own them rather than left as open tickets.
 
 The order to work them in, and the reason. This is a decision, not a sort — several
 lower-severity items are ahead of higher-severity ones because of what they unblock.
