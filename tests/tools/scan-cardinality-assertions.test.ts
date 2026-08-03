@@ -38,6 +38,61 @@ const CEILING = 98
  * question — what would this test do if the thing it guards were completely
  * broken? — answers "pass" without this line.
  */
+/**
+ * Every test file that currently holds at least one count-only block.
+ *
+ * The guard is over this SET, not over the total — see the test below. A file
+ * appearing here for the first time is the event worth catching.
+ */
+const CONTRIBUTING_FILES: readonly string[] = [
+  'tests/builders/function-rule-builder.test.ts',
+  'tests/builders/slice-rule-builder.test.ts',
+  'tests/cli/baseline-cmd.test.ts',
+  'tests/cli/load-rules.test.ts',
+  'tests/cli/rule-file-truncation.test.ts',
+  'tests/cli/watch.test.ts',
+  'tests/conditions/bare-package-imports.test.ts',
+  'tests/conditions/call-args.test.ts',
+  'tests/conditions/call.test.ts',
+  'tests/conditions/dependency.test.ts',
+  'tests/conditions/dynamic-imports.test.ts',
+  'tests/conditions/jsx.test.ts',
+  'tests/conditions/members.test.ts',
+  'tests/conditions/reverse-graph-widened.test.ts',
+  'tests/conditions/structural.test.ts',
+  'tests/conditions/type-level.test.ts',
+  'tests/config/tsconfig.test.ts',
+  'tests/core/assertion-gate.test.ts',
+  'tests/core/code-frame.test.ts',
+  'tests/core/comment-suppression-is-disclosed.test.ts',
+  'tests/core/descendant-cache.test.ts',
+  'tests/core/element-cache.test.ts',
+  'tests/core/excluding-matching.test.ts',
+  'tests/core/format-json.test.ts',
+  'tests/core/glob-declaration.test.ts',
+  'tests/core/held-builder-is-immutable.test.ts',
+  'tests/core/preset-fanout-is-one-finding.test.ts',
+  'tests/core/rule-builder.test.ts',
+  'tests/core/workspace-has-no-single-root.test.ts',
+  'tests/docs/doc-globs-are-anchored.test.ts',
+  'tests/graphql/schema-loader.test.ts',
+  'tests/helpers/baseline.test.ts',
+  'tests/helpers/callback-extractor.test.ts',
+  'tests/helpers/diff-aware-extended.test.ts',
+  'tests/helpers/diff-aware-function.test.ts',
+  'tests/helpers/diff-aware.test.ts',
+  'tests/helpers/matchers-extended.test.ts',
+  'tests/helpers/matchers-typescript.test.ts',
+  'tests/helpers/matchers.test.ts',
+  'tests/helpers/metric-ratchet.test.ts',
+  'tests/models/arch-call.test.ts',
+  'tests/predicates/jsx.test.ts',
+  'tests/presets/override-keys-are-typed.test.ts',
+  'tests/rules/errors-silent-catch.test.ts',
+  'tests/rules/typescript-function-module.test.ts',
+  'tests/rules/typescript.test.ts',
+]
+
 const BLOCKS_FLOOR = 2500
 
 describe('the cardinality-only population does not grow (plan 0079)', () => {
@@ -51,18 +106,42 @@ describe('the cardinality-only population does not grow (plan 0079)', () => {
     expect(population.length).toBeGreaterThan(20)
   })
 
-  it('no new block asserts a count with nothing pinning which elements', () => {
-    // Identities, not a total (ADR-008 rule 4): when this fails the message is the
-    // work list, so the next author reads which blocks to look at rather than a
-    // number to raise.
-    const listed = population.map((b) => `${b.file}:${String(b.line)} — ${b.name}`)
+  it('no new FILE contributes a count-only block', () => {
+    // **The guard against cardinality-only assertions was itself a
+    // cardinality-only assertion**, which review pointed out and which is funny
+    // exactly once. A bare `population.length <= CEILING` passes when a new class
+    // C block is added and an unrelated one is deleted in the same change — the
+    // net is zero and nobody is told.
+    //
+    // So the assertion is now over IDENTITIES (ADR-008 rule 4), at file
+    // granularity. Not `file:line`: line numbers shift on every edit above them,
+    // which would red this on unrelated changes and teach the next author to
+    // update the list without reading it. Paths move far less often, and a *new
+    // file* appearing in the population is the event worth catching — it means a
+    // test file that had no count-only blocks just grew one.
+    //
+    // The total is kept below as a vacuity floor, not as the guard.
+    const contributing = [...new Set(population.map((b) => b.file))].sort()
+    const added = contributing.filter((f) => !CONTRIBUTING_FILES.includes(f))
+    const gone = contributing.length < CONTRIBUTING_FILES.length
+
     expect(
-      population.length,
-      `the cardinality-only population is ${String(population.length)}, above the ${String(CEILING)} recorded when plan 0079 closed.\n` +
-        `Classify the new one: is the count the VALUE under test (fine), is there one subject and no\n` +
-        `second element to confuse it with (fine), or does the count stand in for identity?\n` +
-        `If the last, assert which elements — the population now is:\n  ${listed.join('\n  ')}`,
-    ).toBeLessThanOrEqual(CEILING)
+      added,
+      `these files newly contain an \`it()\` block that asserts a count and nothing else:\n  ${added.join('\n  ')}\n\n` +
+        `Classify it: is the count the VALUE under test (fine), is there one subject and no second\n` +
+        `element to confuse it with (fine), or does the count stand in for identity?\n` +
+        `Beware the third case's trap — a dead selector also yields exactly ONE violation, so\n` +
+        `\`toHaveLength(1)\` accepts the configuration finding when the condition never ran.`,
+    ).toEqual([])
+
+    // Shrinking is always allowed and needs no permission — but say so, because a
+    // silently shorter list is how the ratchet would rot in the safe direction.
+    if (gone) {
+      // eslint-disable-next-line no-console -- a passing test with news for the author
+      console.info(
+        `plan 0079: the count-only population now spans ${String(contributing.length)} files, down from ${String(CONTRIBUTING_FILES.length)}. Trim CONTRIBUTING_FILES.`,
+      )
+    }
   })
 
   it('the two signals that were added after a hand-read sample still fire', () => {
