@@ -1,6 +1,7 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
+import { OWNS_EMPTY_DISCOVERY } from '../core/owns-empty-discovery.js'
 import type { PairCondition, PairConditionContext } from '../core/pair-condition.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
 import type { GlobNode } from '../core/glob-site.js'
@@ -210,19 +211,27 @@ export class PairFinalBuilder extends TerminalBuilder {
   }
 
   /**
-   * The conditions diagnose their own empty layers, so the gate stays out.
+   * Does the condition this rule was built with diagnose its own empty layers?
    *
-   * All three now produce a finding naming the layer, with a remedy pointing at
-   * the `.layer()` call — corrected three times and pinned (bug 0042). The
-   * dead-glob gate can also see that a layer glob is dead, and plan 0080 admits
-   * discovery globs to it, but it short-circuits *before* the condition runs and
-   * would therefore **replace** the better message with a generic one.
+   * **Asked of the condition, not asserted about all of them** (plan 0081). This
+   * returned a bare `true` while the docstring here claimed "all three produce a
+   * finding naming the layer" — and at v0.45.0 that was false, because
+   * `haveMatchingCounterpart` missed a dead FINAL layer. The blanket declaration
+   * suppressed the gate for precisely the case its declared owner did not handle,
+   * so the reader got silence instead of a generic message
+   * ([bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)).
    *
-   * Declared here rather than special-cased in the gate: the knowledge that these
-   * conditions self-report belongs with them.
+   * A prose claim about three implementations goes stale when a fourth arrives.
+   * A tag read off the condition cannot: an untagged condition is covered by the
+   * gate, which is the recoverable direction.
+   *
+   * The gate is worth standing down for when the tag IS present: it short-circuits
+   * before the condition runs, and the condition's finding names the dead layer
+   * and points at the `.layer()` call to edit — a remedy corrected three times
+   * before it was right (bug 0042).
    */
   protected override ownsDiscoveryDiagnosis(): boolean {
-    return true
+    return OWNS_EMPTY_DISCOVERY in this.condition
   }
 
   protected collectViolations() {

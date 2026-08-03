@@ -1,6 +1,8 @@
 # Plan 0081 — a condition declares discovery-diagnosis ownership, not its builder
 
-**Status:** Open, not started. Filed 2026-08-03 from the architecture review of v0.44.0/v0.45.0.
+**Status:** **DONE, 2026-08-04 (v0.46.0).** Filed 2026-08-03 from the architecture review of
+v0.44.0/v0.45.0. Shipped as specified — one module-private symbol, three tagged conditions, the
+builder reading the tag, and the four Phase 2 rows including the one that pins the untagged default.
 **Priority:** Medium. Nothing is broken today — v0.45.1 closed the hole this granularity gap
 exposed — so this is hardening a seam whose failure mode has already fired once.
 **Effort:** Small. One module-private symbol, three tagged conditions, one predicate body, and the
@@ -8,7 +10,7 @@ tests that pin the untagged default.
 **Blast radius:** Internal seam with a **published** consequence. `ownsDiscoveryDiagnosis()` is on
 `TerminalBuilder`, which `docs/api-reference.md` documents as externally subclassable, so the
 default behaviour for an untagged condition is user-visible. Per
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 that puts it above "internal check
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 that puts it above "internal check
 over a corpus we control": the default must be proven, not argued.
 
 ## Problem
@@ -116,6 +118,34 @@ external subclass gets without doing anything.
 
 ## Related
 
-- [Bug 0040](../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — the defect whose final-layer half this granularity gap concealed.
-- [Plan 0080](./completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md) — introduced `ownsDiscoveryDiagnosis()` at builder granularity.
+- [Bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — the defect whose final-layer half this granularity gap concealed.
+- [Plan 0080](./0080-admit-discovery-globs-to-the-dead-glob-gate.md) — introduced `ownsDiscoveryDiagnosis()` at builder granularity.
 - `src/core/cardinality.ts` — the precedent being copied.
+
+---
+
+# What shipped
+
+Exactly the plan, with one thing worth recording that the plan did not anticipate.
+
+**The default is the deliverable.** `OWNS_EMPTY_DISCOVERY in this.condition` replaced `return true`,
+so an untagged condition — an external one, or the next one added to this builder — is **covered by
+the gate** rather than silently exempt. Under the old blanket declaration, v0.45.0's hole produced
+silence; under this shape the worst case is the gate's generic message, which an agent can act on.
+
+**Sabotage, 3 of 3, baseline green before each and restored after:**
+
+| Revert                                                 | Result |
+| ------------------------------------------------------ | ------ |
+| `ownsDiscoveryDiagnosis()` back to a blanket `true`    | CAUGHT |
+| One of the three conditions untagged                   | CAUGHT |
+| `OWNS_EMPTY_DISCOVERY` re-exported from `src/index.ts` | CAUGHT |
+
+The third row is the one that makes "module-private" a fact rather than a comment. Without it the
+symbol could be exported in a later refactor and become the one-line silent opt-out that
+`ASSERTS_CARDINALITY` was reshaped to prevent.
+
+**What the plan got right and why:** it insisted the ownership question was per-condition, and the
+evidence was already in the repo — the builder's own docstring asserted a fact about three
+implementations, and that fact had been false for one of them for two releases. A prose claim about
+N implementations is a hand-maintained list; the tag is a derivation.

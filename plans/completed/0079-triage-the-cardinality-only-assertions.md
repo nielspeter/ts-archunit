@@ -283,7 +283,7 @@ literal the `argIndex` is the same and `fn.getName()` is `undefined`, so **nothi
 shape tells them apart.** The tests here derive identity by walking to the enclosing
 `PropertyAssignment`; a rule author cannot, so a rule like "a `handler` callback must not call
 `db.query`" is currently inexpressible. Filed as
-[plan 0082](../0082-an-object-literal-callback-keeps-its-name.md) rather than left in a comment.
+[plan 0082](./0082-an-object-literal-callback-keeps-its-name.md) rather than left in a comment.
 
 ## The residue the review left, closed in v0.45.5
 
