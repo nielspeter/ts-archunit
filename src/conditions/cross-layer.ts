@@ -10,6 +10,7 @@ import type { ArchViolation } from '../core/violation.js'
 import type { LayerPair, Layer } from '../models/cross-layer.js'
 import { setCorrespondence } from '../core/correspondence-core.js'
 import { UNSUPPRESSABLE } from '../core/unsuppressable.js'
+import { OWNS_EMPTY_DISCOVERY } from '../core/owns-empty-discovery.js'
 
 /**
  * Every element in the left layer must have at least one match in the right layer.
@@ -170,6 +171,10 @@ function unusableLayersFinding(count: number, context: PairConditionContext): Ar
 export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition {
   return {
     description: 'have a matching counterpart in the paired layer',
+    // Reports an empty layer ITSELF, naming it — better than the gate's generic
+    // message, so the gate stands down (plan 0081). Read off the condition by the
+    // builder; an untagged condition is covered by the gate instead.
+    [OWNS_EMPTY_DISCOVERY]: true,
     evaluate(pairs: LayerPair[], context: PairConditionContext): ArchViolation[] {
       // The BUILDER's layers by default (bug 0040). The argument is kept, and
       // optional, so every existing caller still compiles — but the context
@@ -268,6 +273,10 @@ export function haveConsistentExports(
 ): PairCondition {
   return {
     description: 'have consistent exports between paired layers',
+    // Reports an empty layer ITSELF, naming it — better than the gate's generic
+    // message, so the gate stands down (plan 0081). Read off the condition by the
+    // builder; an untagged condition is covered by the gate instead.
+    [OWNS_EMPTY_DISCOVERY]: true,
     evaluate(pairs: LayerPair[], context: PairConditionContext): ArchViolation[] {
       const violations: ArchViolation[] = []
 
@@ -320,6 +329,10 @@ export function satisfyPairCondition(
 ): PairCondition {
   return {
     description,
+    // Reports an empty layer ITSELF, naming it — better than the gate's generic
+    // message, so the gate stands down (plan 0081). Read off the condition by the
+    // builder; an untagged condition is covered by the gate instead.
+    [OWNS_EMPTY_DISCOVERY]: true,
     evaluate(pairs: LayerPair[], context: PairConditionContext): ArchViolation[] {
       // Same guard, same reason (bug 0040). A custom pair assertion over an empty
       // layer is asserted about nothing, whatever the callback does.

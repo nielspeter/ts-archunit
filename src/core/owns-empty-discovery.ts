@@ -1,0 +1,43 @@
+/**
+ * A condition that diagnoses its own empty discovery population.
+ *
+ * [Plan 0081](../../plans/0081-a-condition-declares-discovery-ownership.md). The
+ * dead-glob gate can see that a `.layer()` or `.inFolder()` glob matched nothing,
+ * but it short-circuits **before** the condition runs, so where a condition
+ * produces a better finding — one that names the dead layer, with a remedy
+ * pointing at the call the reader must edit — the gate would replace it with a
+ * generic message. This symbol is how a condition says "leave it to me".
+ *
+ * ## Why per condition, and not per builder
+ *
+ * It was per builder, and the granularity was load-bearing rather than cosmetic.
+ * At v0.45.0 `PairFinalBuilder` returned `true` unconditionally while its own
+ * docstring claimed *"All three now produce a finding naming the layer"* — and
+ * that claim was false: `haveMatchingCounterpart` checked for empty layers inside
+ * its pair loop, so a dead **final** layer produced no configuration finding at
+ * all. The coarse declaration suppressed the gate for exactly the case its
+ * declared owner did not handle, and the result was silence where the truth was
+ * one dead glob
+ * ([bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)).
+ *
+ * v0.45.1 fixed the condition, so the blanket claim became true again. It would
+ * have gone false again the moment a fourth condition reached that builder,
+ * because nothing forced the new condition to say anything. Now the claim is not
+ * a claim: the builder reads the tag off the condition it was given.
+ *
+ * **An untagged condition does not own it, so the gate covers it.** That default
+ * is the load-bearing half — under it, v0.45.0's hole would have degraded to a
+ * generic message rather than silence, and a generic message is recoverable. An
+ * agent reading "this glob matched nothing" fixes the glob; silence sends it to
+ * write files into a layer that will never match.
+ *
+ * ## Module-private, by construction
+ *
+ * Not re-exported from `src/index.ts`, and `package.json`'s `exports` map has no
+ * wildcard subpath, so a consumer cannot import it to name the key. Same
+ * reasoning as `ASSERTS_CARDINALITY` in `cardinality.ts`, and the same hazard it
+ * closes: `PairCondition` is a public type, so a plain boolean property would be
+ * a one-line silent opt-out of a gate, on any user condition, permanently and
+ * invisibly (ADR-008 rule 3's corollary).
+ */
+export const OWNS_EMPTY_DISCOVERY: unique symbol = Symbol('ts-archunit.ownsEmptyDiscovery')
