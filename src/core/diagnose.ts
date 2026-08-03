@@ -82,6 +82,14 @@ export interface DiagnosticFinding {
    */
   readonly line?: number
   /**
+   * For `'orphan-exclusion'`, the **source** file holding the comment.
+   *
+   * Distinct from `ruleFile`, which names where a *rule* was written. An earlier
+   * revision reused `ruleFile` for this and gave JSON consumers two different
+   * things under one name depending on `kind`.
+   */
+  readonly sourceFile?: string
+  /**
    * The rule file this rule was written in, when the caller knows it.
    *
    * `diagnose()` never sets this — it is handed rules, not files, and inventing

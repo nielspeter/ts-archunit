@@ -125,3 +125,70 @@ exists. If it becomes worth paying, this is the section to argue with.
 
 The placement rules themselves are documented as of v0.37.0 (`docs/violation-reporting.md`), which is
 the cheap half of that problem.
+
+## Review follow-ups (v0.43.2)
+
+A post-release review found a **shipped rule-2 defect** and two silent losses. All fixed.
+
+### The false positive the design claimed to prevent was reachable
+
+`doctor a.rules.ts` — the single-file form `docs/cli.md` itself shows — sees a subset of a
+multi-file project's rules, so a directive naming a rule declared in `b.rules.ts` was reported as
+an orphan. The advice then said **"delete the comment"** on a comment that was doing its job, and
+deleting it un-waives a real violation.
+
+The footgun was pinned on the _function_ and that was mistaken for a guard on the _command_.
+`doctor` now passes its scope, and the advice leads with the caveat when the view is partial:
+_"Checked against 1 rule file only — if this id is declared in a rule file that was not inspected,
+this report is a false positive and the comment is working."_ No caveat when the caller vouches for
+full coverage, or it becomes noise on every run.
+
+### Two silent losses from one `catch`
+
+`fs.readFileSync` threw for an in-memory project and for an unreadable file, and the
+`catch { continue }` ate both — a diagnostic whose whole subject is _"this silently does nothing"_
+doing exactly that, on a **published export**. `sourceFile.getFullText()` replaces it: the text is
+already in memory, there is no second I/O, and the catch's stated cause disappears with it.
+
+### Silence when nothing declares an id was the rule 1 failure
+
+The first behaviour returned `[]`, reasoning that a wall of false orphans is worse. But without any
+declared id **every** inline exclusion really is inert, so those were all real orphans and the
+diagnostic said nothing about any of them. Now **one** aggregate finding naming the cause — neither
+noise nor silence — with a vacuity control that it does not fire on a project with no directives.
+
+### Two of the wiring row's three assertions did nothing
+
+`toContain('arch/renamed-away')` was satisfied by the advice **prose**, not the `rule` field, so
+changing `rule: orphan.ruleId` to `orphan.file` left the whole suite green. And the negative row was
+vacuous in its own fixture — no `arch/live` directive existed for "report everything" to reveal. Now
+asserted on the parsed object, with a declared-id directive in the fixture so the negative row can
+fail.
+
+### Also corrected
+
+- `ruleFile` carried a **source** path for this kind, giving JSON consumers two different things
+  under one name. New `sourceFile` field.
+- The terminal format printed neither file nor line, while the changelog claimed _"names the file
+  and line"_. It renders `source:line` now.
+- The workspace comment named the wrong mechanism: `workspace()` builds a single ts-morph project,
+  so the case `seen` actually protects is two separate `project()` calls with overlapping globs.
+
+### Seven reverts that shipped unguarded, now caught
+
+`rule` field identity · hardcoded `line` · dedupe key collapse · `sourceFile` dropped · `line`
+dropped · aggregate finding removed · scope caveat silenced.
+
+### One review claim that does NOT reproduce
+
+The review reported the orphan pass costing 3.6x (2076ms → 671ms on this repository) and proposed
+a fast-path reject. **Measured here, it is ~1.0x**: 567 files with a planted orphan asserted found
+on every run, five runs each — 100/102/100/95/100ms with the reject, 100/104/101/96/105ms without.
+The reviewer flagged that other processes were competing for the box and said to trust the ratio;
+the ratio does not hold either.
+
+The reject is **kept on soundness** — the parse only ever removes directives, so a file without the
+literal text cannot hold one — and the code comment says that instead of quoting a saving it does
+not deliver. Worth recording that my _first_ attempt at this measurement was itself vacuous
+(`findings=0`, equally consistent with scanning nothing), which is why the final one plants an
+orphan and throws if it is not found.

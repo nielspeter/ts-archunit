@@ -96,12 +96,21 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
   // Reported as `dead-glob`'s sibling kind rather than a separate output
   // section, so `--format json` consumers get it through the `findings` array
   // they already parse.
-  for (const orphan of orphanExclusions(rules)) {
+  // The scope is passed, so the advice can say what it checked. `doctor
+  // arch.rules.ts` — the single-file form `docs/cli.md` itself shows — sees a
+  // subset of a multi-file project's rules, and a directive naming a rule from
+  // another file would otherwise be reported as an orphan with "delete the
+  // comment" as its remedy. Deleting a working comment un-waives a real
+  // violation, which is the rule-2 failure this caveat exists to prevent.
+  for (const orphan of orphanExclusions(rules, { ruleFilesChecked: args.ruleFiles.length })) {
     findings.push({
       kind: 'orphan-exclusion',
       rule: orphan.ruleId,
       advice: orphan.advice,
-      ruleFile: orphan.file,
+      // `sourceFile`, not `ruleFile`: that field is documented as "the rule file
+      // this rule was written in", and putting a *source* path there gave JSON
+      // consumers two different things under one name, by `kind`, undocumented.
+      sourceFile: orphan.file,
       line: orphan.line,
     })
   }
@@ -181,8 +190,18 @@ function format(findings: readonly DiagnosticFinding[]): string {
     // The rule file first: with two identical vacuous rules in two files, the
     // rule's own description is the same sentence twice and says nothing about
     // which to open.
-    lines.push(finding.ruleFile === undefined ? `  ${finding.rule}` : `  ${finding.ruleFile}`)
-    if (finding.ruleFile !== undefined) lines.push(`    ${finding.rule}`)
+    // An orphan exclusion is located by its SOURCE file and line, not by a rule
+    // file — the subject is a comment. The changelog claimed this printed "the
+    // file and line" and the terminal format printed neither, so two stale
+    // directives in one file rendered as two identical headers.
+    if (finding.sourceFile !== undefined) {
+      const at = finding.line === undefined ? '' : `:${String(finding.line)}`
+      lines.push(`  ${finding.sourceFile}${at}`)
+      lines.push(`    ${finding.rule}`)
+    } else {
+      lines.push(finding.ruleFile === undefined ? `  ${finding.rule}` : `  ${finding.ruleFile}`)
+      if (finding.ruleFile !== undefined) lines.push(`    ${finding.rule}`)
+    }
     if (HAS_GLOB[finding.kind]) {
       lines.push(
         `    ${finding.origin ?? finding.glob ?? '(unknown)'}  [${finding.position ?? 'unknown'}]`,
