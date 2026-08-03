@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.45.4 · **Open:** 0 · **Fixed:** 49 (`fixed/`) · **Updated:** 2026-08-03
+**Version:** 0.45.4 · **Open:** 1 · **Fixed:** 49 (`fixed/`) · **Updated:** 2026-08-03
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -13,7 +13,9 @@
 
 ## Open
 
-**None.** `bugs/` holds no defect files; all 49 are in `fixed/`.
+| Bug                                                                                                          | State                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0049](./0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md) — four `as` casts in shipped source | **OPEN, low as a defect / medium as a signal.** Every cast is currently true, so nothing is broken — but we ship `noTypeAssertions()` as a guardrail and break it four times. The real deliverable is **why our own self-check did not fire**; the casts are the symptom. Found while verifying a review finding about a fifth cast, since fixed. |
 
 This file previously said `Open: 0` in its header while its tables listed 0044 and 0048 as
 **OPEN** — both already shipped and already moved to `fixed/`. Under this file's own convention
@@ -26,7 +28,7 @@ Known gaps that are **not** defects live in plans, with their reasoning recorded
 | Plan                                                                                                            | Why it is not a bug                                                                                                                                                                                                                                                    |
 | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [0081](../plans/0081-a-condition-declares-discovery-ownership.md)                                               | Filed from the v0.44/v0.45 architecture review. Ownership of the discovery diagnosis is declared per **builder** and is really per **condition** — the coarse grain concealed bug 0040's final-layer half. Nothing is broken since v0.45.1; this hardens the seam.     |
-| [0082](../plans/0082-an-extracted-callback-should-carry-its-name.md)                                            | Capability gap, not a false green: two callbacks on one object literal are indistinguishable through `ExtractedCallback`, so a rule about a `handler` callback cannot be written. Found by plan 0079 needing the identity and having to derive it outside the library. |
+| [0082](../plans/0082-an-object-literal-callback-keeps-its-name.md)                                              | Capability gap, not a false green: two callbacks on one object literal are indistinguishable through `ExtractedCallback`, so a rule about a `handler` callback cannot be written. Found by plan 0079 needing the identity and having to derive it outside the library. |
 | [0079](../plans/completed/0079-triage-the-cardinality-only-assertions.md)                                       | A sampling exercise with a stop rule, not a fault. Nothing is known to be broken; the work is finding out whether anything is.                                                                                                                                         |
 | [0072](../plans/0072-a-denylist-glob-that-cannot-match.md)                                                      | **Refuted 2026-07-30** — both proposed mechanisms died on measurement, and the question was already settled correctly elsewhere. Kept so it is not re-proposed.                                                                                                        |
 | [0047](../plans/0047-typescript-escape-hatch-matchers.md), [0048](../plans/0048-using-tagged-symbol-matcher.md) | Matcher proposals — new capability, not repair.                                                                                                                                                                                                                        |

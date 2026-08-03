@@ -81,16 +81,26 @@ on two converted tests, per rule 6's floor, and record it.
 
 ## Phase 1 — the sample, and what it said
 
-The scan had to be rebuilt, because the filed number came with no script. Written down this time at
-`scratchpad/scan.py` and reproduced from a recorded seed (`random.seed(79)` over a
-deterministically sorted population).
+The scan had to be rebuilt, because the filed number came with no script. **Committed this time** at
+`tests/tools/scan-cardinality-assertions.ts`, with a ratchet test beside it. The first version of this
+write-up cited a script in a scratch directory that was never committed — leaving every number here
+exactly as unauditable as the 215 it was replacing, while the changelog claimed a script had been
+recorded. Review caught it. Reproduced from a recorded seed (`random.seed(79)` over a deterministically
+sorted population).
 
 **The first definition was wrong, and wrong in the reassuring direction.** It counted
 `toBeTruthy`, `toThrow`, `toBeGreaterThan` and `toBeDefined` as identity signals, which they are
 not: a block asserting `toHaveLength(3)` alongside `toBeTruthy()` still passes when one element is
 lost and another gained. That definition reported **129**. Under the swap definition — only
-matchers that pin WHICH elements — it reported **166**. The filed number was 215; the difference is
-the identity list plus real conversions between 2026-08-01 and today.
+matchers that pin WHICH elements — it reported **166**.
+
+**On 215 versus 143.** The filed 215 came with no script, so it cannot be reproduced, decomposed or
+compared against anything — which is why the scan is now committed. The honest statement is therefore
+not "the difference is the identity list plus conversions since", which implies an accounting nobody
+can do: **215 was never reproducible, and 143 is the first real measurement.** The direction of the
+flattery is worth naming too — 45 of 143 is 31% where 45 of 215 would be 21%. The go/no-go depended on
+neither: the 27% that triggered Phase 2 came from the hand-read _sample_, and holds at 32% of its 25
+genuine members whichever denominator the population has.
 
 Thirty blocks, drawn by seed, classified **by reading every one**:
 
@@ -110,19 +120,59 @@ The five false positives were all one idiom: a boolean assertion **about a speci
 `REGEX.test(descriptions[0] ?? '')`. Those pin which element, through `expect(...).toBe(true)`,
 which the identity list excludes because a _bare_ `toBe(true)` pins nothing.
 
-Adding that as a second signal took the population from 166 to **143**, and the refinement was
-then checked against the independently hand-read classification — which is the different kind of
-evidence rule 5 asks for:
+Adding that as a second signal took the population from 166 to **143**, and it was checked against
+the hand-read classification:
 
-| Check                                                      | Result     |
-| ---------------------------------------------------------- | ---------- |
-| The 5 hand-identified false positives leave the population | **5 of 5** |
-| The 8 hand-confirmed class C remain in it                  | **8 of 8** |
+| Check                                                      | Result | Worth                                                                                                                                         |
+| ---------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| The 5 hand-identified false positives leave the population | 5 of 5 | **Not evidence.** The signal was _derived from those five idioms_, so it is the same derivation on both sides — rule 5's "the error cancels". |
+| The 8 hand-confirmed class C remain in it                  | 8 of 8 | Informative: a specificity check that the new signal did not over-fire.                                                                       |
+
+**The genuinely independent check is elsewhere, and it is better:** the exhaustive Phase 2 read found
+45 of 143 (31%) against the sample's 32%, and it does not depend on the refinement at all.
+
+### The direction nobody checked — and it found something
+
+Both rows above can only confirm the signal _shrinks_ the population. 215 → 143 excluded blocks that
+were never read, and under the corollary this plan quotes — recovered ≤ raw always, so it detects
+under-collection only — the refinement was tested solely where it could shrink.
+
+Checked afterwards, at review's prompting, by probing the signal with a block it should NOT exclude.
+**The element-boolean rule was over-broad:** it treated a bare index as reaching into the collection,
+so `expect(violations[0]).toBeTruthy()` counted as an identity assertion. It pins nothing about which
+element is there. Removing the bare-index arm — all five motivating idioms match on the predicate list
+alone, so it cost nothing — put **6 blocks** back into the population:
+
+| Block                                                        | Class on reading                                                                                                                                   |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slice-rule-builder.test.ts:175`, `rule-builder.test.ts:552` | B — one subject, and `v[0].bypassFilters` pins the kind                                                                                            |
+| `callback-extractor.test.ts:50`                              | F — `callbacks[0].argIndex).toBe(1)` is an identity in a numeric form `IDENTITY` misses                                                            |
+| `callback-extractor.test.ts:63`, `:155`                      | B — one callback in the fixture                                                                                                                    |
+| `callback-extractor.test.ts:212`                             | **C.** `respects depth limit` — the comment names `handler` at depth 0 and `default` at depth 3, and extracting the wrong one is also one callback |
+
+One genuine class C, hidden by the over-exclusion, now converted. The check earned its keep.
 
 ## Phase 2 — 143 read, 45 converted
 
 Every block in the population was read. Final tally: **45 class C of 143 (31%)** — against the
-sample's 32%, which is the sampling validated after the fact rather than assumed.
+sample's 32%.
+
+**What the numbers count, since three of them differ.** 45 is the classification tally: blocks judged
+class C and edited. The _measured_ effect is larger, because the scan's unit is the **block** and a
+block leaves the population as soon as one identity assertion appears anywhere in it — the population
+went 143 → **96**, i.e. **47 blocks**, across **51** replaced count assertions. Review counted the 47
+and 51 independently and they agree. The 45 is the least useful of the three and is kept only because
+it is what the classification produced.
+
+That unit also bounds what the population means: a block with one identity assertion and three
+count-only ones beside it is invisible to the scan. Visible in this plan's own diff at
+`held-builder-is-immutable.test.ts`, where a converted block still carries a `toHaveLength(1)` above
+the conversion.
+
+**And the sample-versus-population agreement is weaker than it looks.** I classified both, so a
+systematic bias in my reading appears identically in both and the agreement would look just as good.
+It is evidence the classification is _consistent_, not that it is _correct_. Testing correctness needs
+a second reader classifying the same 30 blind — not done.
 
 **The concentration heuristic was half right.** The plan predicted "a file with seven such blocks
 usually shares one helper, so one fix converts several". True where the collection has identities:
@@ -137,6 +187,17 @@ ordinary violations, however alike", asserting `toHaveLength(3)`. Probed, their 
 **identical** on ruleId, file, line, element and message, deliberately, because the claim is that
 alike violations are not merged. There is no identity to assert; the count is the value. Both
 reverted to counts with that reason written in.
+
+**One file named in the concentration list was never touched, and that was a real gap.** The
+paragraph above says `typescript-function-module.test.ts` was "1 of 10" class C — while the file has no
+diff on this branch, which either makes the number wrong or leaves a class C unconverted against a
+header claiming all are done. Review caught the contradiction. Resolved by measurement: the block is
+`:86`, `reports each cast in 'as unknown as T' double-cast as a separate violation`, and its two
+violations are **byte-identical** — `loadUser|line 3|contains type assertion at line 4` twice, because
+`as unknown as User` puts both casts on one line and the message carries only the line. So it is class
+**A**, like the two `preset-fanout` blocks, and the count is the claim. The difference was that
+preset-fanout's reclassification was _recorded in the test_ and this one was not. It is recorded now —
+an unrecorded exception is the shape plan 0078 already paid for.
 
 **One conversion revealed a live surprise.** `matchers.test.ts:158` asserted two sibling matches;
 the identity assertion showed the matcher returns the **identifier** nodes (`foo`, `bar`), not the
@@ -160,6 +221,12 @@ fixture (`handler` renamed to `onSend`; `preHandler` to `afterAll`):
 | `expect(callbacks.map(identify)).toEqual(['handler'])` | **FAILS**            |
 | `expect(...).toEqual(['handler', 'preHandler'])`       | **FAILS**            |
 
+**One weakness in that proof, stated.** It ran in a throwaway file that _reimplemented_ `identify()`
+rather than importing the shipped helper, so it shows the technique works and not that the helper does.
+The permanent guard that exercises the real thing is
+`tests/tools/scan-cardinality-assertions.test.ts`, whose probe row feeds two blocks through the actual
+scan — and that row is what found the over-broad element-boolean rule above.
+
 ## Follow-up found on the way
 
 `ExtractedCallback` carries `fn`, `callSite` and `argIndex` — and for two callbacks on one object
@@ -167,7 +234,7 @@ literal the `argIndex` is the same and `fn.getName()` is `undefined`, so **nothi
 shape tells them apart.** The tests here derive identity by walking to the enclosing
 `PropertyAssignment`; a rule author cannot, so a rule like "a `handler` callback must not call
 `db.query`" is currently inexpressible. Filed as
-[plan 0082](../0082-an-extracted-callback-should-carry-its-name.md) rather than left in a comment.
+[plan 0082](../0082-an-object-literal-callback-keeps-its-name.md) rather than left in a comment.
 
 ## What this cost, and what it is worth
 

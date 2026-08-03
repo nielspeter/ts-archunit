@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Test-quality only. No source changes, no API changes, no behaviour changes.
 
+### Fixed
+
+- **An `as` cast in shipped source, and the guard it was duplicating** ([ADR-005](adr/005-no-any-no-type-assertions.md)).
+  `cli/commands/explain.ts` narrowed a value with `(value as Record<string, unknown>)['describeRule']`
+  — a type assertion in published code with no `eslint-disable` and no interop boundary to justify it,
+  and unnecessary: once the value is narrowed to `object`, `'describeRule' in value` narrows enough.
+  Two test files had already written the cast-free version of the same guard. All three now use one
+  owner, `isDescribable` in `src/core/rule-description.ts`. Found by an architecture review asking
+  about the **duplication**, not about the cast — and grepping for siblings of the pattern found four
+  more, filed as [bug 0049](bugs/0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md),
+  whose real question is why this project's own `noTypeAssertions()` rule does not fire on its own
+  source.
+
 ### Internal
 
 - **45 test assertions that counted now name what they expect** ([plan 0079](plans/completed/0079-triage-the-cardinality-only-assertions.md)).
@@ -30,14 +43,23 @@ both predicates`. The reader knew; the test did not.
   Two things fell out. `matchers.test.ts` asserted two sibling matches; naming them showed the
   matcher returns the **identifier** nodes, not the call expressions. And
   `callback-extractor.test.ts` could not express its identity at all through the public shape —
-  filed as [plan 0082](plans/0082-an-extracted-callback-should-carry-its-name.md), since two
+  filed as [plan 0082](plans/0082-an-object-literal-callback-keeps-its-name.md), since two
   callbacks on one object literal are indistinguishable to a rule author.
 
-- **The scan that found them was itself a hand-maintained list.** Its first identity signal counted
-  `toBeTruthy`/`toThrow`/`toBeGreaterThan`, none of which survive a swap; its second missed five
-  element-boolean idioms like `.some((m) => m.includes('"offset"'))`. Refined, then checked against
-  the independently hand-read classification: 5 of 5 false positives dropped, 8 of 8 confirmed cases
-  kept. Recorded as a script rather than a remembered number.
+- **The scan that found them was itself a hand-maintained list, twice over.** Its first identity
+  signal counted `toBeTruthy`/`toThrow`/`toBeGreaterThan`, none of which survive a swap. Its second
+  missed five element-boolean idioms like `.some((m) => m.includes('"offset"'))`. And its third —
+  found by an architecture review asking the one question the earlier checks could not answer — was
+  **over-broad in the other direction**: a bare `expect(violations[0]).toBeTruthy()` counted as an
+  identity assertion, though it pins nothing about which element is there. Correcting it put six
+  blocks back into the population, one of which was a genuine case the over-exclusion had hidden
+  (`callback-extractor.test.ts` respecting its depth limit — the comment named which callback, the
+  count could not).
+
+  The scan is now **committed** at `tests/tools/scan-cardinality-assertions.ts` with a ratchet test.
+  The first version of the write-up cited a script in a scratch directory that was never committed,
+  while this changelog claimed a script had been recorded — which left every number exactly as
+  unauditable as the 215 it replaced.
 
 ## [0.45.3] - 2026-08-03
 
