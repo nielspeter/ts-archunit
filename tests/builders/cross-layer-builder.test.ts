@@ -360,7 +360,10 @@ describe('empty layer', () => {
       { name: 'empty', pattern: '**/does-not-exist/**', files: [] },
       { name: 'schemas', pattern: '**/schemas/**', files: [] },
     ]
-    const violations = haveMatchingCounterpart(layers).evaluate([], { rule: 'test' })
+    // Layers through the CONTEXT (bug 0040) — the interface the builder uses.
+    // The `layers` argument still exists and still compiles, but the context wins,
+    // so a direct call must supply it there or it is testing the deprecated path.
+    const violations = haveMatchingCounterpart().evaluate([], { rule: 'test', layers })
     expect(violations).toHaveLength(1)
     expect(violations[0]!.element).toBe('empty')
     expect(violations[0]!.message).toMatch(/matched 0 files/)
