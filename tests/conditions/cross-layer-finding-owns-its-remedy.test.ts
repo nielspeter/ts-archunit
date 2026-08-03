@@ -26,8 +26,14 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Project } from 'ts-morph'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
-import { haveMatchingCounterpart } from '../../src/conditions/cross-layer.js'
+import {
+  haveMatchingCounterpart,
+  haveConsistentExports,
+  satisfyPairCondition,
+} from '../../src/conditions/cross-layer.js'
+import type { SourceFile } from 'ts-morph'
 import type { Layer, LayerPair } from '../../src/models/cross-layer.js'
+import type { PairConditionContext } from '../../src/core/pair-condition.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import type { RuleMetadata } from '../../src/core/rule-metadata.js'
@@ -319,5 +325,83 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
       expect(f.suggestion).toBe(AUTHOR.suggestion)
       expect(f.docs).toBe(AUTHOR.docs)
     }
+  })
+})
+
+describe('a layer set too small to judge is reported, not passed (review M1)', () => {
+  // All three conditions used to `return []` here — silently. That is the exact
+  // false green this library exists to remove, inside the library.
+  //
+  // Reachable only by calling `evaluate()` directly, which is a **public** path:
+  // `PairCondition` is an exported interface and all three conditions are exported.
+  // Same reachability as the defect fixed in v0.43.1, which was also fixed.
+  //
+  // Review found it as a DIVERGENCE, not as a hole: with an empty `context.layers`
+  // and a two-layer argument, `haveMatchingCounterpart` reported 2 findings and its
+  // siblings reported 0. Chasing why the numbers differed found that all three were
+  // wrong in the same direction on a neighbouring input.
+  const ctx = (layers: Layer[]): PairConditionContext => ({
+    rule: 'crossLayer [a -> b]',
+    layers,
+    ...AUTHOR,
+  })
+  // Real `SourceFile`s: `Layer.files` is `SourceFile[]`, and the conditions call
+  // `getFilePath()` on them. A string double type-errors, and casting one would
+  // breach ADR-005.
+  const realFiles = (): SourceFile[] => load().getSourceFiles().slice(0, 2)
+  const oneLayer: Layer[] = [{ name: 'only', pattern: '**/a/**', files: [] }]
+
+  const conditions = [
+    ['haveMatchingCounterpart', haveMatchingCounterpart()],
+    [
+      'haveConsistentExports',
+      haveConsistentExports(
+        () => [],
+        () => [],
+      ),
+    ],
+    ['satisfyPairCondition', satisfyPairCondition('a custom pair assertion', () => null)],
+  ] as const
+
+  it.each(conditions)('%s reports a finding rather than nothing', (_name, condition) => {
+    const findings = condition.evaluate([], ctx(oneLayer))
+
+    expect(findings).toHaveLength(1)
+    const finding = findings[0]
+    if (finding === undefined) throw new Error('expected a finding')
+    expect(finding.bypassFilters).toBe(true)
+    expect(finding.message).toContain('it needs two')
+    // Its OWN remedy, never the author's (bug 0021/0042).
+    expect(finding.suggestion).not.toBe(AUTHOR.suggestion)
+    expect(finding.suggestion).toContain('at least two layers')
+    expect(finding.docs).toBeUndefined()
+  })
+
+  it.each(conditions)('%s: APPLYING the remedy clears the finding', (_name, condition) => {
+    // Rule 2's behavioural corollary. The remedy says to supply a `layers` holding
+    // every layer the pairs were drawn from, so do that and assert it clears —
+    // reading the sentence is not evidence that following it works.
+    const files = realFiles()
+    const left = files[0]
+    const right = files[1]
+    if (left === undefined || right === undefined) throw new Error('fixture has < 2 files')
+    const two: Layer[] = [
+      { name: 'left', pattern: '**/a/**', files: [left] },
+      { name: 'right', pattern: '**/b/**', files: [right] },
+    ]
+    const after = condition.evaluate([], ctx(two))
+
+    expect(after.filter((v) => v.message.includes('it needs two'))).toEqual([])
+  })
+
+  it('the finding is not reachable through the DSL, which is why it is not a user-facing break', () => {
+    // `.mapping()` throws below two layers, so no builder path can produce this.
+    // Asserted rather than asserted-in-prose: if the builder ever stops throwing,
+    // this finding becomes reachable and someone must decide whether that is right.
+    expect(() =>
+      crossLayer(load())
+        .layer('only', '**/src/schemas/**')
+        .mapping(() => true),
+    ).toThrow(RangeError)
   })
 })

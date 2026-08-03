@@ -79,6 +79,11 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     remedy: 'own',
     verified: 'stated-only: same — the remedy defers to the finding above it',
   },
+  'src/conditions/cross-layer.ts::unusableLayersFinding': {
+    remedy: 'own',
+    verified:
+      'behavioural: cross-layer-finding-owns-its-remedy.test.ts — supplying the second layer the remedy names clears it; all three conditions asserted, since all three used to return [] silently',
+  },
   'src/conditions/cross-layer.ts::emptyLayerFinding': {
     remedy: 'own',
     verified:
