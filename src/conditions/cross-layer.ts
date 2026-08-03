@@ -128,6 +128,45 @@ function emptyLayerFinding(
   }
 }
 
+/**
+ * The finding for a layer set too small to judge, shared by all three conditions.
+ *
+ * A pair condition needs two layers. Below that all three used to `return []` —
+ * **silently**, which is the exact false green this library exists to remove,
+ * inside the library. Review measured the divergence that exposed it: with an
+ * empty `context.layers` and a two-layer argument, `haveMatchingCounterpart`
+ * reported 2 findings and its two siblings reported 0.
+ *
+ * Unreachable through the DSL — `.mapping()` throws below two layers
+ * (`cross-layer-builder.ts:111`) — so this is the direct-`evaluate()` path, which
+ * is public: `PairCondition` is an interface external code can call and the
+ * conditions are exported. Same reachability as the defect fixed in v0.43.1.
+ *
+ * A finding rather than a `throw`, because a condition that throws takes down the
+ * whole run and this is recoverable information about one rule.
+ */
+function unusableLayersFinding(count: number, context: PairConditionContext): ArchViolation {
+  return {
+    rule: context.rule,
+    element: '(layer set)',
+    file: '',
+    line: 1,
+    message:
+      `A pair condition was evaluated against ${String(count)} layer(s) — it needs two, ` +
+      `so it judged nothing.`,
+    because: context.because,
+    ruleId: context.ruleId,
+    // Its own remedy, never the author's (bug 0021/0042).
+    suggestion:
+      `Build the rule through crossLayer(project).layer(...).layer(...).mapping(...), which ` +
+      `guarantees at least two layers. If you are calling evaluate() directly, pass a ` +
+      `PairConditionContext whose \`layers\` holds every layer the pairs were drawn from — ` +
+      `with fewer than two there are no pairs to judge, so the condition reports nothing ` +
+      `whether the code complies or not. ${UNSUPPRESSABLE}`,
+    bypassFilters: true,
+  }
+}
+
 export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition {
   return {
     description: 'have a matching counterpart in the paired layer',
@@ -153,7 +192,7 @@ export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition
       // removes the unusable-context case.
       const fromContext = context.layers.length >= 2 ? context.layers : undefined
       const layers = fromContext ?? explicitLayers ?? []
-      if (layers.length < 2) return []
+      if (layers.length < 2) return [unusableLayersFinding(layers.length, context)]
 
       // EVERY layer, before the pair loop — including the last one.
       //
@@ -234,6 +273,10 @@ export function haveConsistentExports(
 
       // The guard `haveMatchingCounterpart` had and this did not. Measured on a
       // dead left layer: **4 violations → 0**, a false green (bug 0040).
+      if (context.layers.length < 2) {
+        return [unusableLayersFinding(context.layers.length, context)]
+      }
+
       const empty = context.layers.filter((layer) => layer.files.length === 0)
       if (empty.length > 0) {
         return empty.map((layer) => emptyLayerFinding(layer, context.layers.length, context))
@@ -280,6 +323,10 @@ export function satisfyPairCondition(
     evaluate(pairs: LayerPair[], context: PairConditionContext): ArchViolation[] {
       // Same guard, same reason (bug 0040). A custom pair assertion over an empty
       // layer is asserted about nothing, whatever the callback does.
+      if (context.layers.length < 2) {
+        return [unusableLayersFinding(context.layers.length, context)]
+      }
+
       const empty = context.layers.filter((layer) => layer.files.length === 0)
       if (empty.length > 0) {
         return empty.map((layer) => emptyLayerFinding(layer, context.layers.length, context))

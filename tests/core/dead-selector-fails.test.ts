@@ -26,8 +26,14 @@ const p = loadProject()
  *
  * 0069's decision table: a **selector** glob that is unsatisfiable means the
  * rule can never have subjects, so it certifies nothing and passing is a lie.
- * `condition` and `exclusion` positions are never faults, and `discovery`
- * already failed (0067-D).
+ * `condition` and `exclusion` positions are never faults.
+ *
+ * **`discovery` did NOT already fail, and this docstring claimed it did.** That
+ * was the false premise [plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md)
+ * was filed to correct: `diagnose()` treated discovery as a fault and this gate
+ * did not, so `doctor` reported a dead layer glob and the build stayed green. The
+ * sentence survived the fix, in the one place a reader checks the premise. Both
+ * positions are faults now, and `isFaultPosition` is the single owner of that.
  *
  * The gate reuses `diagnose()`'s own functions deliberately. `doctor` is the
  * pre-flight that tells adopters what this flip will red; if the two computed
