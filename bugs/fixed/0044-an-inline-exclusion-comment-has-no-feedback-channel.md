@@ -179,16 +179,50 @@ fail.
 `rule` field identity · hardcoded `line` · dedupe key collapse · `sourceFile` dropped · `line`
 dropped · aggregate finding removed · scope caveat silenced.
 
-### One review claim that does NOT reproduce
+### The cost claim was right, and my refutation of it was wrong twice
 
-The review reported the orphan pass costing 3.6x (2076ms → 671ms on this repository) and proposed
-a fast-path reject. **Measured here, it is ~1.0x**: 567 files with a planted orphan asserted found
-on every run, five runs each — 100/102/100/95/100ms with the reject, 100/104/101/96/105ms without.
-The reviewer flagged that other processes were competing for the box and said to trust the ratio;
-the ratio does not hold either.
+I reported the review's 3.6x cost finding as not reproducing — ~1.0x on my own measurement. **I was
+wrong, and the way I was wrong is the more useful record.**
 
-The reject is **kept on soundness** — the parse only ever removes directives, so a file without the
-literal text cannot hold one — and the code comment says that instead of quoting a saving it does
-not deliver. Worth recording that my _first_ attempt at this measurement was itself vacuous
-(`findings=0`, equally consistent with scanning nothing), which is why the final one plants an
-orphan and throws if it is not found.
+Re-measured with a counter for how many files actually reach `parseExclusionComments`:
+
+|            | files seen | parsed  | time    |
+| ---------- | ---------- | ------- | ------- |
+| reject on  | 566        | **18**  | ~105 ms |
+| reject off | 566        | **566** | ~1.5 s  |
+
+**~15x**, on my own method. Command level, cold: ~670 ms against ~2.0 s — **3.0x**, with the whole
+delta attributable to this one function.
+
+Two distinct errors produced my ~1.0x:
+
+1. **The first attempt was vacuous** — `findings=0`, equally consistent with scanning nothing. I
+   caught that one myself and re-ran with a planted orphan asserted found.
+2. **The second patched the wrong occurrence.** `firstDirective` carried an identical
+   `includes('ts-archunit-exclude')` reject, and `replace(..., 1)` removed _that_ one, leaving the
+   main loop's intact. Both arms ran the same code path — and 18 parses cost the same ~105 ms
+   either way, so the numbers looked like a clean null result.
+
+The second is the one worth keeping: **removing a `continue` changes cost and not behaviour**, so no
+output distinguished the arms and no test could have. This is "assert the patch applies
+non-trivially" failing on a _duplicate anchor_ — the same shape that bit the `severity: 'error'`
+patch earlier the same day, where checking for a second occurrence was what saved it.
+
+### What changed as a result
+
+- **One predicate, `mayHoldDirective`**, used by both call sites. The duplication _caused_ the error,
+  so deleting it is the fix — not a second test. There is now one line to sabotage, and it reds.
+- **`onFileScanned`**, an optional hook, and a test asserting `parsed < seen`. Counting is the only
+  way to guard a reject whose removal changes nothing observable. Without it, deleting the reject
+  leaves the entire suite green, which is how a 3.0x regression ships unnoticed.
+- The code comment now leads with the **scaling shape**, which is the stronger argument: cost is
+  proportional to directive-bearing files, not project size. ~5.7 ms per parsed file. A 5000-file
+  consumer monorepo with no directives would have paid ~13 s per `doctor` run to report nothing.
+
+### And one process failure that cost this twice
+
+My first correction of that comment was applied, then **destroyed by a `git checkout` during the
+sabotage matrix** — it was uncommitted, and the restore between rows reverted it along with the
+patch. Fourth occurrence in one session. The rule already written down is "commit before
+sabotaging"; the gap is edits made _between_ the commit and the matrix. Commit those too, or the
+matrix eats them.
