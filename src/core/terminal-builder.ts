@@ -586,9 +586,23 @@ export abstract class TerminalBuilder {
     const diagnosis = diagnoseGlob(site, universe, diskSet(project))
     const onDisk = diagnosis.onDisk === undefined ? '' : ON_DISK_ADVICE[diagnosis.onDisk]
     const cause = onDisk === '' ? FAULT_ADVICE[diagnosis.fault] : onDisk
+    // Position-aware in BOTH clauses, not just the noun (plan 0080).
+    //
+    // Admitting `discovery` globs made this sentence wrong twice over for them.
+    // The noun was the obvious half — a `smells.duplicateBodies().inFolder()` glob
+    // is not a "selector". The **consequence clause** was the part that actually
+    // lied: "it has no subjects and cannot fail" describes a rule that selects
+    // nothing, while a dead discovery glob means the rule discovered nothing to
+    // compare — there may be plenty of subjects. Review flagged that fixing the
+    // noun alone ships a grammatical sentence that is still false.
+    const isDiscovery = site.position === 'discovery'
+    const what = isDiscovery ? 'discovery glob' : 'selector'
+    const consequence = isDiscovery
+      ? 'so it discovers nothing to check and cannot fail'
+      : 'so it has no subjects and cannot fail'
     const advice =
-      `This rule's selector ${site.origin} can never match anything in this project, ` +
-      `so it has no subjects and cannot fail — ${cause}. ` +
+      `This rule's ${what} ${site.origin} can never match anything in this project, ` +
+      `${consequence} — ${cause}. ` +
       `Correct the glob, or remove the rule. ${UNSUPPRESSABLE}`
     return {
       rule: name,
