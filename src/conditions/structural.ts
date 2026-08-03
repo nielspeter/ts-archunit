@@ -5,7 +5,7 @@ import type { ArchViolation } from '../core/violation.js'
 import { createViolation, getElementFile, getElementName } from '../core/violation.js'
 import { elementCondition } from './helpers.js'
 import { globNode } from '../core/glob-site.js'
-import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
+import { marksAssertsCardinality } from '../core/cardinality.js'
 
 /**
  * Elements must reside in a file matching the glob pattern.
@@ -127,15 +127,16 @@ export function beExported<T extends Node>(): Condition<T> {
  *   .because('use shared parseOrder() utility instead')
  */
 export function notExist<T extends Node>(): Condition<T> {
-  return {
+  // Satisfied by an EMPTY selection — registered rather than tagged, because a
+  // symbol keyed on this object is readable off it and forgeable (bug 0050).
+  return marksAssertsCardinality({
     description: 'not exist',
     // Zero subjects is this condition's PASSING state, so an empty selection
     // and an unsatisfiable selector glob are both correct here (plan 0074).
-    [ASSERTS_CARDINALITY]: true,
     evaluate(elements: T[], context: ConditionContext): ArchViolation[] {
       return elements.map((element) =>
         createViolation(element, `${getElementName(element)} should not exist`, context),
       )
     },
-  }
+  })
 }

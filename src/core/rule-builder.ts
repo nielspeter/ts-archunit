@@ -6,7 +6,7 @@ import type { RuleDescription } from './rule-description.js'
 import type { DeclaredGlob, GlobNode } from './glob-site.js'
 import { countDeclaredGlobs, stampGlobs } from './glob-site.js'
 import { TerminalBuilder } from './terminal-builder.js'
-import { ASSERTS_CARDINALITY } from './cardinality.js'
+import { assertsCardinality } from './cardinality.js'
 
 /**
  * Abstract base class for the predicate/condition rule builders.
@@ -279,7 +279,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    */
   protected override assertsCardinality(): boolean {
     if (this._conditions.length === 0) return false
-    return this._conditions.every((condition) => condition[ASSERTS_CARDINALITY] === true)
+    return this._conditions.every((condition) => assertsCardinality(condition))
   }
 
   getProject(): ArchProject {
