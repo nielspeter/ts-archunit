@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.42.1] - 2026-08-03
+
+### Fixed
+
+- **On a project that loaded no source files, the assertion gate blamed the glob** ([bug 0048](bugs/fixed/0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md)). It reported every selector glob dead and told the reader to _"Correct the glob, or remove the rule"_ — a remedy for a fault that was not theirs. Measured on an empty tsconfig: the glob was correct and the project had loaded 0 files. `diagnose()`/`doctor` short-circuited on this (v0.33.0) and the slice builders had their own branch; the gate had neither, so the wrong remedy sat on the path **every `modules()`, `classes()`, `functions()` and `types()` rule takes**. All three surfaces now report the same thing, from one owner, as one finding per project rather than one per glob.
+
+This is a diagnostic-quality fix: it changes what a finding says, never whether one fires. No enforcement, exit-code or baseline change.
+
 ## [0.42.0] - 2026-08-03
 
 ### Fixed

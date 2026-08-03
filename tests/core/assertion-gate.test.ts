@@ -631,6 +631,35 @@ describe('empty-project parity — one string, one place', () => {
     expect(messages[0]).not.toContain('Correct the glob')
   })
 
+  it('the empty-project finding is unsuppressable, as its own message claims', () => {
+    // Found by sabotage: flipping `bypassFilters` to false left the subset green.
+    // That is worse than an untested field — the message ends with "This finding
+    // cannot be suppressed: not by .warn(), .asSeverity('warn'), .excluding(), …",
+    // so a suppressable finding makes its own sentence a lie. ADR-008 rule 3.
+    const target = emptyProject()
+    const rule = modules(target)
+      .that()
+      .resideInFolder('**/src/**')
+      .should()
+      .notImportFrom('**/y/**')
+      .rule({ id: 'probe/empty' })
+
+    const [finding] = rule.violations()
+    expect(finding?.suggestion).toContain('cannot be suppressed')
+    expect(finding?.bypassFilters).toBe(true)
+
+    // And behaviourally: an `.excluding()` naming it does not remove it.
+    const excluded = modules(target)
+      .that()
+      .resideInFolder('**/src/**')
+      .should()
+      .notImportFrom('**/y/**')
+      .rule({ id: 'probe/empty' })
+      .excluding('probe/empty')
+      .violations()
+    expect(excluded).toHaveLength(1)
+  })
+
   it('CONTROL: a genuinely dead glob in a LOADED project still blames the glob', () => {
     // Without this, "always report project-empty" passes the row above and
     // destroys the distinction the gate exists to draw.
