@@ -3,6 +3,7 @@ import { diagnose } from '../../core/diagnose.js'
 import { ArchRuleError } from '../../core/errors.js'
 import { loadRuleFiles } from '../load-rules.js'
 import { writeStderr } from '../../core/stderr.js'
+import { orphanExclusions } from '../../core/orphan-exclusions.js'
 
 export interface DoctorArgs {
   ruleFiles: string[]
@@ -85,6 +86,26 @@ export async function runDoctor(args: DoctorArgs): Promise<number> {
     }
   }
 
+  // Orphan exclusion comments, AFTER the loop and over every rule at once
+  // (bug 0044). Not inside the loop and not inside `diagnose()`: the declared-id
+  // set is the union across rule files, so a per-file check would report a
+  // directive naming a rule declared in a sibling file as an orphan. That is a
+  // false positive on the commonest multi-file layout, and a diagnostic that
+  // cries wolf is one nobody runs.
+  //
+  // Reported as `dead-glob`'s sibling kind rather than a separate output
+  // section, so `--format json` consumers get it through the `findings` array
+  // they already parse.
+  for (const orphan of orphanExclusions(rules)) {
+    findings.push({
+      kind: 'orphan-exclusion',
+      rule: orphan.ruleId,
+      advice: orphan.advice,
+      ruleFile: orphan.file,
+      line: orphan.line,
+    })
+  }
+
   // A load failure is a REPORT, and this command's contract is "exits
   // non-zero when it reports anything". Review measured the mixed case —
   // one broken file, one clean file, zero findings — printing the error and
@@ -149,6 +170,9 @@ const HAS_GLOB: Readonly<Record<DiagnosticFinding['kind'], boolean>> = {
   'no-condition': false,
   'project-unknown': false,
   'project-empty': false,
+  // No glob: the subject is a comment in a source file, and the identity is the
+  // rule id it names plus where it sits. That is why this kind carries `line`.
+  'orphan-exclusion': false,
 }
 
 function format(findings: readonly DiagnosticFinding[]): string {

@@ -8,7 +8,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { runDoctor } from '../../src/cli/commands/doctor.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { Project } from 'ts-morph'
@@ -57,6 +57,63 @@ beforeAll(() => {
 })
 afterAll(() => {
   fs.rmSync(workDir, { recursive: true, force: true })
+})
+
+describe('runDoctor reports orphan exclusion comments (bug 0044)', () => {
+  // The WIRING row. `orphan-exclusions.test.ts` tests the function; sabotage
+  // showed `doctor` could stop calling it with the whole suite still green —
+  // the same gap the comment-suppression disclosure had. A module that works
+  // and a module that is reached are different claims.
+  let sourceDir: string
+  let tsconfig: string
+
+  beforeAll(() => {
+    // Its own tiny project, written here rather than added to a shared fixture:
+    // an exclusion directive in `tests/fixtures/modules` would be parsed by
+    // every other test that loads it.
+    sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'archunit-orphan-src-'))
+    fs.mkdirSync(path.join(sourceDir, 'src'))
+    tsconfig = path.join(sourceDir, 'tsconfig.json')
+    fs.writeFileSync(tsconfig, JSON.stringify({ include: ['src'] }))
+    fs.writeFileSync(
+      path.join(sourceDir, 'src/a.ts'),
+      '// ts-archunit-exclude arch/renamed-away: stale after a rename\nexport const a = 1\n',
+    )
+  })
+
+  afterAll(() => {
+    fs.rmSync(sourceDir, { recursive: true, force: true })
+  })
+
+  it('exits 1 and names the orphan in the JSON document', async () => {
+    const file = writeRuleFile(
+      'orphan.rules.ts',
+      `  modules(p).that().resideInFile('**/*.ts').should().notImportFrom('**/nope/**').rule({ id: 'arch/live' }),`,
+      tsconfig,
+    )
+    // `vi.spyOn`, not a hand-rolled swap: the first draft assigned through `any`
+    // and needed three eslint-disables, which ADR-005 reserves for genuine JS
+    // interop. This is the repo's existing idiom for the same job.
+    const out: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      out.push(String(chunk))
+      return true
+    })
+    let code: number
+    try {
+      code = await runDoctor({ ruleFiles: [file], format: 'json' })
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(code).toBe(1)
+    const doc: unknown = JSON.parse(out.join(''))
+    const text = JSON.stringify(doc)
+    expect(text).toContain('orphan-exclusion')
+    expect(text).toContain('arch/renamed-away')
+    // …and NOT the declared one, or this reports every directive.
+    expect(text).not.toContain('"rule":"arch/live"')
+  })
 })
 
 describe('runDoctor', () => {

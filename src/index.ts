@@ -445,3 +445,6 @@ export {
 // CLI config (plan 0020)
 export { defineConfig } from './cli/config.js'
 export type { CliConfig } from './cli/config.js'
+
+export { orphanExclusions } from './core/orphan-exclusions.js'
+export type { OrphanExclusion } from './core/orphan-exclusions.js'
