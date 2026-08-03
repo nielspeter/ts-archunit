@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.2] - 2026-08-03
+
+No behaviour changes. Two internal guards were found to be weaker than they claimed, and the
+correction is recorded here because the claim was published in the previous release notes.
+
+### Fixed
+
+- **The configuration-finding census checked remedies by spelling, not by meaning** ([plan 0078](plans/completed/0078-derive-the-configuration-finding-census.md)). v0.45.0 shipped a detector for "this finding prints the rule author's remedy instead of its own" — the shape of [bug 0042](bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md) — and it matched a hand-written list of strings. Probed afterwards, **three producers defeated it while the whole file stayed green**: a destructured `const { suggestion } = context`, a parameter aliased to `c`, and a read through a helper. A hand-maintained list of spellings, inside the census built to replace hand-maintained lists.
+
+  It now resolves each identifier's symbol through ts-morph and follows it one hop through a local or into a helper's `return` — a different kind of evidence than text, which is what [ADR-008](adr/008-agent-first-failure-surfaces.md) rule 5 asks for. Eight reverts, all caught, baseline asserted green before each.
+
+- **A shorthand property escaped symbol resolution too.** `getSymbol()` on the identifier in `suggestion,` resolves to the _property_, not the local — so destructuring survived the first fix for destructuring. `getValueSymbol()` is the accessor that answers the question actually being asked.
+
+- **Two producers in one function collapsed into one census entry.** The live set is a `Set` keyed on `path::function`, so a second configuration finding added inside an already-classified function inherited its classification and became invisible to every check in the file. No collision exists today; that is now a measured fact rather than an assumption, and the census fails if one appears.
+
+- **Four comments stated populations that had grown.** `diagnose.ts` named `crossLayer()` and `resolvers()` as builders that cannot identify their project — both had been given `getProject()` by the commit that fixed exactly that false green, so the comment named as examples the two shapes the fix repaired, and contradicted a passing test. `violation.ts` said "three of the four suppression paths" while the roster stood at six, and "five of the six producers" while the census held fifteen. `disk-set.ts` counted eight test doubles where the suite has 114. The counts are gone rather than refreshed — the values are named where they are derived, so there is nothing left to go stale.
+
 ## [0.45.1] - 2026-08-03
 
 ### Fixed
@@ -121,7 +138,7 @@ This is a diagnostic-quality fix: it changes what a finding says, never whether 
 
 One behaviour change worth knowing if you hand-built the array deliberately: **the builder's layers now win.** If you passed a deliberately _narrower_ set, the condition now uses what the builder resolved. That is the fix — the hand-built copy was the defect — but it is silent, so check any call site where the array was not simply mirroring your `.layer()` declarations.
 
-The remaining half of bug 0040 — two of three cross-layer conditions reporting nothing when a layer resolves to nothing — is [plan 0080](plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md). A design review measured that the obvious one-line fix would make the dead-glob gate **replace** the slice builders' own findings rather than add to them, costing 13 tests of a remedy corpus whose subject is that each branch's advice is true. It is not shipping until that is solved properly.
+The remaining half of bug 0040 — two of three cross-layer conditions reporting nothing when a layer resolves to nothing — is [plan 0080](plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md). A design review measured that the obvious one-line fix would make the dead-glob gate **replace** the slice builders' own findings rather than add to them, costing 13 tests of a remedy corpus whose subject is that each branch's advice is true. It is not shipping until that is solved properly.
 
 ## [0.41.0] - 2026-08-01
 
@@ -236,7 +253,7 @@ If you rely on nested exclusion blocks, re-check them: the previous behaviour si
 
 - **The empty-layer finding carries its own remedy, and the remedy is now true** ([bug 0042](bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)). `crossLayer`'s "Layer X matched 0 files" finding copied the rule author's `suggestion`, so a configuration finding printed a `Fix:` for an unrelated problem — measured, an empty-layer finding advising "Split the cycle by extracting a shared module." With no author metadata it shipped with **no remedy at all**, the only configuration finding of the twelve that could. Its remedy is now its own, names the offending glob, and its removal clause is computed from the chain length rather than stated flat — because "remove the layer from the chain" throws `RangeError` on a two-layer chain, which is the only shape that produces the finding.
 
-- **Three published `haveMatchingCounterpart()` examples did not compile**, two of them JSDoc on the public `crossLayer()` and `CrossLayerBuilder`, so every user saw them on IDE hover. Part of [bug 0040](bugs/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md), fixed ahead of the runtime work.
+- **Three published `haveMatchingCounterpart()` examples did not compile**, two of them JSDoc on the public `crossLayer()` and `CrossLayerBuilder`, so every user saw them on IDE hover. Part of [bug 0040](bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md), fixed ahead of the runtime work.
 
 ### Added
 
@@ -266,7 +283,7 @@ Baselines are unaffected: identity hashing does not incorporate the fields invol
 
 ### Known gap
 
-- `crossLayer()`'s runtime half is not observable through the public API: a pair rule reports nothing whether its layer resolves three files or none. Its declaration half — what `doctor` and `diagnose()` say about the glob — **is** guarded. This is [plan 0067-D](plans/completed/0067-project-relative-globs.md)'s shape at an entry point [0069](plans/completed/0069-no-rule-may-certify-nothing.md) R3b never reached, and it is recorded as a follow-up on the bug rather than left to be rediscovered.
+- `crossLayer()`'s runtime half is not observable through the public API: a pair rule reports nothing whether its layer resolves three files or none. Its declaration half — what `doctor` and `diagnose()` say about the glob — **is** guarded. This is [plan 0067-D](plans/completed/0067-empty-selector-safety.md)'s shape at an entry point [0069](plans/completed/0069-no-rule-may-certify-nothing.md) R3b never reached, and it is recorded as a follow-up on the bug rather than left to be rediscovered.
 
 ## [0.36.2] - 2026-08-01
 
@@ -286,7 +303,7 @@ Baselines are unaffected: identity hashing does not incorporate the fields invol
 
 ### Fixed
 
-- **`slices().assignedFrom()` accepts a project-relative glob** ([bug 0033](bugs/0033-assignedFrom-does-not-accept-a-project-relative-glob.md)), resolving it against the project root like every other surface. It was the one holdout after 0.35.0, so `layers: { api: 'src/api/**' }` failed beside a `shared: ['src/shared/**']` that worked — in the same `layeredArchitecture()` call. Purely additive: an anchored glob still means "anywhere", and a relative glob naming a folder that genuinely does not exist still matches nothing.
+- **`slices().assignedFrom()` accepts a project-relative glob** ([bug 0033](bugs/fixed/0033-assignedFrom-does-not-accept-a-project-relative-glob.md)), resolving it against the project root like every other surface. It was the one holdout after 0.35.0, so `layers: { api: 'src/api/**' }` failed beside a `shared: ['src/shared/**']` that worked — in the same `layeredArchitecture()` call. Purely additive: an anchored glob still means "anywhere", and a relative glob naming a folder that genuinely does not exist still matches nothing.
 
   The failure message moved with it. A relative glob naming a missing folder is no longer told to "prefix these with `**/`" — advice that would change a spelling which is already correct and leave the rule just as empty.
 
@@ -294,7 +311,7 @@ Baselines are unaffected: identity hashing does not incorporate the fields invol
 
 ### Fixed
 
-- **`comment()` missed comments, and named the wrong line** ([bug 0034](bugs/0034-comment-matcher-underreports-and-goes-silent-on-re-evaluation.md)). Three defects with one root cause: a comment is not the node it is attached to. The broad traversal keeps only the deepest matching node — right for `expression()`, which matches at every ancestor level, wrong for a comment, whose node is where it is _attached_. Measured on a corpus with **9** `TODO` comments: `noStubComments()` reported **5**, and now reports **9**.
+- **`comment()` missed comments, and named the wrong line** ([bug 0034](bugs/fixed/0034-comment-matcher-underreports-and-goes-silent-on-re-evaluation.md)). Three defects with one root cause: a comment is not the node it is attached to. The broad traversal keeps only the deepest matching node — right for `expression()`, which matches at every ancestor level, wrong for a comment, whose node is where it is _attached_. Measured on a corpus with **9** `TODO` comments: `noStubComments()` reported **5**, and now reports **9**.
 
   The miss scaled with nesting rather than with comment count, so the worst cases are the longest functions. Stacked comments were the sharpest: several `// TODO` lines leading one statement collapsed to a single finding, so appending more to an already-accepted one never turned a build red — in the rule `agentGuardrails` ships to catch exactly that.
 
@@ -324,7 +341,7 @@ Plan 0067 part C — the second leg of the 1.0 path, and the root-cause fix for 
 
 ### Known gap
 
-- **`slices().assignedFrom()` still requires an anchored glob**, and the layer options that discover through it do too — [bug 0033](bugs/0033-assignedFrom-does-not-accept-a-project-relative-glob.md). `docs/slices.md` carries the table of which surfaces accept which spelling.
+- **`slices().assignedFrom()` still requires an anchored glob**, and the layer options that discover through it do too — [bug 0033](bugs/fixed/0033-assignedFrom-does-not-accept-a-project-relative-glob.md). `docs/slices.md` carries the table of which surfaces accept which spelling.
 
 ## [0.34.0] - 2026-08-01
 
@@ -349,7 +366,7 @@ Plan 0067 part C — the second leg of the 1.0 path, and the root-cause fix for 
 
 ## [0.33.0] - 2026-07-31
 
-Both fixes came out of [plan 0074](plans/0074-r3b-the-selector-glob-flip.md)'s gate run against a
+Both fixes came out of [plan 0074](plans/completed/0074-r3b-the-selector-glob-flip.md)'s gate run against a
 real adopting codebase, and both were verified against that same input rather than against a
 fixture.
 
