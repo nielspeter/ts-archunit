@@ -237,7 +237,12 @@ describe('builders reached only through a chain', () => {
     const declared = ['src/features/*', 'src/features/*/', './src/features/*', '**/src/features/*']
       .map((glob) => rootExports.slices(p).matching(glob).globs().flatMap(globSitesOf))
       .map((sites) => sites.map((site) => site.glob))
-    expect(new Set(declared.map((g) => JSON.stringify(g))).size).toBe(1)
+    // The VALUE, not just that the four agree. `new Set(...).size === 1` is
+    // satisfied by four *empty* results too, so in isolation this row passed on
+    // the glob machinery returning nothing at all. It was guarded only by its
+    // neighbour above pinning one spelling — real, but a guard that lives in
+    // another assertion is one edit from gone.
+    expect(declared).toEqual(Array<string[]>(4).fill(['**/src/features/**/**']))
   })
 
   it('slices().assignedFrom() declares one tree per named slice', () => {

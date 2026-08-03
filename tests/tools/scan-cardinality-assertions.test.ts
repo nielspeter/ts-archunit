@@ -103,7 +103,13 @@ describe('the cardinality-only population does not grow (plan 0079)', () => {
     // And it really does find members — a population of zero here would mean the
     // identity signals had grown to swallow everything, not that the suite is
     // perfect. Classes A and B are legitimate and permanent.
+    //
+    // The total is a BAND, not the guard: the guard is the file set below. A band
+    // catches a signal collapsing in either direction (swallowing everything, or
+    // matching everything) without pretending a count can tell you which blocks
+    // changed — which is the mistake this whole file is about.
     expect(population.length).toBeGreaterThan(20)
+    expect(population.length).toBeLessThanOrEqual(CEILING)
   })
 
   it('no new FILE contributes a count-only block', () => {

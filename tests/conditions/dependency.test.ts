@@ -257,6 +257,12 @@ describe('dependency conditions', () => {
           ?.split('/')
           .at(-1),
       )
+      // Basename, not the absolute path, so the fixture root stays out of the
+      // assertion. Safe because the discriminator is `entity.ts` against the
+      // `shared/` imports, and `tests/fixtures/modules/src/shared/` holds only
+      // `logger.ts`, `utils.ts` and `validation.ts` — no collision. A future
+      // `shared/entity.ts` would silently defeat it; switch to the relative path
+      // that day.
       expect(imported).toEqual(['entity.ts'])
     })
   })
