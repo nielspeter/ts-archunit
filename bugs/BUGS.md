@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.45.5 · **Open:** 1 · **Fixed:** 49 (`fixed/`) · **Updated:** 2026-08-03
+**Version:** 0.45.6 · **Open:** 0 · **Fixed:** 50 (`fixed/`) · **Updated:** 2026-08-03
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -13,9 +13,19 @@
 
 ## Open
 
-| Bug                                                                                                          | State                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0049](./0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md) — four `as` casts in shipped source | **OPEN, low as a defect / medium as a signal.** Every cast is currently true, so nothing is broken — but we ship `noTypeAssertions()` as a guardrail and break it four times. The real deliverable is **why our own self-check did not fire**; the casts are the symptom. Found while verifying a review finding about a fifth cast, since fixed. |
+**None.** `bugs/` holds no defect files; all 50 are in `fixed/`.
+
+Known gaps that are **not** defects live in plans, with their reasoning recorded:
+
+| Plan                                                                                                            | Why it is not a bug                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0081](../plans/0081-a-condition-declares-discovery-ownership.md)                                               | Discovery-diagnosis ownership is per **builder** and is really per **condition**. Nothing broken since v0.45.1; hardening a seam whose failure mode already fired once.                            |
+| [0082](../plans/0082-an-object-literal-callback-keeps-its-name.md)                                              | A callback on an object literal loses its name, so a rule about `handler` is writable and selects nothing. Capability gap, not a false green — and the only one with a published-API blast radius. |
+| [0072](../plans/0072-a-denylist-glob-that-cannot-match.md)                                                      | **Refuted 2026-07-30** — both mechanisms died on measurement. Kept so it is not re-proposed.                                                                                                       |
+| [0047](../plans/0047-typescript-escape-hatch-matchers.md), [0048](../plans/0048-using-tagged-symbol-matcher.md) | Matcher proposals — new capability, not repair.                                                                                                                                                    |
+
+------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0049](./fixed/0049-the-type-assertion-self-check-selected-classes.md) — four `as` casts in shipped source | **OPEN, low as a defect / medium as a signal.** Every cast is currently true, so nothing is broken — but we ship `noTypeAssertions()` as a guardrail and break it four times. The real deliverable is **why our own self-check did not fire**; the casts are the symptom. Found while verifying a review finding about a fifth cast, since fixed. |
 
 This file previously said `Open: 0` in its header while its tables listed 0044 and 0048 as
 **OPEN** — both already shipped and already moved to `fixed/`. Under this file's own convention
@@ -56,6 +66,11 @@ one entry in `fixed/`.
 - **The verdict mechanism is part of the derivation.** Bug 0045 is this at the process
   layer; an unquoted `$SUITE` in zsh and a symlinked `node_modules` have each produced a
   full matrix of false CAUGHTs.
+- **A guard's SELECTOR decides what it can ever see, and nobody sabotages a selector.** Bug 0049's
+  type-assertion self-check was correct, well-tested, and selected `classes` in a codebase with 19
+  class files and 128 function files — so it guarded the shape we barely use, and never fired on any
+  of the 22 casts we shipped. Widening the glob would not have helped; the scope was wrong in a
+  different dimension. Ask what element **kind** a rule selects, not only what paths.
 - **A count of 1 is never sufficient where a configuration finding can appear.** A dead selector
   emits exactly one finding, so `toHaveLength(1)` accepts it when the condition never ran —
   measured on two blocks in `widened-module-edges.test.ts`, one of which carried the comment

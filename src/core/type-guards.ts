@@ -5,7 +5,7 @@
  * prescribes type guards. The guards existed — `isRecord` was written **twice**,
  * verbatim, in `tsconfig/tsconfig-builder.ts` and `cli/commands/init.ts` — while a
  * third site cast instead of calling either.
- * [Bug 0049](../../bugs/0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md).
+ * [Bug 0049](../../bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md).
  *
  * A duplicated predicate is not a style problem in this repo: bug 0044 was a
  * measurement error caused by exactly that, and the fix was to delete the

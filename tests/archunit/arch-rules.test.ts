@@ -329,7 +329,7 @@ describe('ADR-005: Type Safety', () => {
   })
 
   it('NO source file may use a type assertion, whatever shape it is written in', () => {
-    // The scope fix from [bug 0049](../../bugs/0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md).
+    // The scope fix from [bug 0049](../../bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md).
     //
     // The rule below this one selects **classes**. This codebase has 19 files with
     // a class and 128 with a function, so the guard covered the shape we barely
