@@ -93,6 +93,24 @@ export interface OrphanExclusion {
   readonly advice: string
 }
 
+/**
+ * Could this text hold a directive at all?
+ *
+ * One predicate, two callers — and the deduplication is the point. This test
+ * existed as two identical inline `includes` checks, and that duplication caused
+ * a real measurement error: an attempt to time the cost of removing it patched
+ * the wrong occurrence, so both arms ran the same path and the saving looked
+ * imaginary. Two identical lines where only one is guarded is a trap for
+ * whoever sabotages next, so there is now one line to remove.
+ *
+ * Sound because `parseExclusionComments` only ever *removes* directives when
+ * blanking literals (bug 0043) — it cannot invent one in a file that does not
+ * contain the text.
+ */
+function mayHoldDirective(text: string): boolean {
+  return text.includes('ts-archunit-exclude')
+}
+
 /** The first directive found anywhere, so the aggregate finding has a location. */
 function firstDirective(
   projects: readonly ArchProject[],
@@ -100,7 +118,7 @@ function firstDirective(
   for (const project of projects) {
     for (const sourceFile of project.getSourceFiles()) {
       const text = sourceFile.getFullText()
-      if (!text.includes('ts-archunit-exclude')) continue
+      if (!mayHoldDirective(text)) continue
       const path = sourceFile.getFilePath()
       const [first] = parseExclusionComments(text, path).exclusions
       if (first !== undefined) return { file: path, line: first.line }
@@ -198,7 +216,7 @@ export function orphanExclusions(
       // behaviour, so no output distinguished them, and 18 parses cost the same
       // ~105ms either way. `onFileScanned` exists because counting is the only
       // way to assert this reject still applies.
-      if (!text.includes('ts-archunit-exclude')) {
+      if (!mayHoldDirective(text)) {
         options?.onFileScanned?.(false)
         continue
       }
