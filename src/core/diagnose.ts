@@ -177,10 +177,20 @@ export function diagnose(
     const trees = rule.globs?.() ?? []
 
     // Silence here would be a false green in the tool built to remove false
-    // greens: five of the thirteen builders cannot name their project, so a
-    // rule file made entirely of `crossLayer()` or `resolvers()` rules used to
-    // report a clean bill of health and exit 0 with every one of its globs
-    // unchecked. Say so instead.
+    // greens: a rule that declares globs and cannot say which project to check
+    // them against used to be skipped, so a rule file made entirely of such
+    // rules reported a clean bill of health and exited 0 with every one of its
+    // globs unchecked. Say so instead.
+    //
+    // This comment used to name `crossLayer()` and `resolvers()` as the
+    // builders that could not name their project — and by the time it was read
+    // again, `48e3391` had given both a `getProject()`, so it named as examples
+    // the two shapes the fix had repaired. `tests/core/diagnose.test.ts` pins
+    // the truth in both directions: one test drives this branch, and a second
+    // asserts a `crossLayer` rule does NOT reach it. Hence no roster and no
+    // count here — a builder reaches this branch exactly when it implements no
+    // `getProject()` and no project was passed in, which is checked on the
+    // line below rather than remembered in prose.
     if (!target) {
       if (trees.length > 0) {
         findings.push({

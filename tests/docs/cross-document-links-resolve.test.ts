@@ -32,6 +32,26 @@ import { describe, expect, it } from 'vitest'
 const REPO = path.resolve(import.meta.dirname, '../..')
 /** Filesystem-path corpora. */
 const DOC_DIRS = ['adr', 'bugs', 'plans', 'proposals']
+
+/**
+ * Root-level prose, which this check did not cover for four releases.
+ *
+ * Found the way bug 0046 was: by writing a link that did not resolve.
+ * `CHANGELOG.md` cited `bugs/fixed/0042-a-configuration-finding-prints-the-rule-authors-remedy.md`,
+ * a file that has never existed, and the suite stayed green — the walk started at
+ * `adr/`, `bugs/`, `plans/` and `proposals/`, so the four documents at the
+ * repository root were the one place a dead link could not be seen.
+ *
+ * That is backwards from the risk. `CHANGELOG.md` is the most-read document here
+ * and the heaviest linker into `bugs/` and `plans/`, and every one of its links
+ * points at a file that gets **renamed when the bug is fixed** — which is bug
+ * 0046's exact mechanism, aimed at the file with the widest audience.
+ *
+ * Named explicitly rather than globbed at the root: a glob would walk `dist/`,
+ * `node_modules/` and every fixture, and the list of root documents changes about
+ * once a year.
+ */
+const ROOT_DOCS = ['CHANGELOG.md', 'README.md', 'CLAUDE.md', 'ts-archunit-spec.md']
 /** VitePress-routed corpus. */
 const SITE_DIR = 'docs'
 
@@ -158,7 +178,10 @@ function documentLinksIn(file: string): Link[] {
 }
 
 describe('cross-document links resolve (bug 0046)', () => {
-  const docFiles = DOC_DIRS.flatMap(markdownFiles)
+  const docFiles = [
+    ...DOC_DIRS.flatMap(markdownFiles),
+    ...ROOT_DOCS.map((f) => path.join(REPO, f)).filter((f) => fs.existsSync(f)),
+  ]
   const siteFiles = markdownFiles(SITE_DIR)
 
   it('VACUITY: the scan actually found documents and links', () => {
@@ -167,12 +190,18 @@ describe('cross-document links resolve (bug 0046)', () => {
     // beneath the real numbers so ordinary growth does not trip them, and well
     // above zero so a broken walk cannot pass.
     expect(docFiles.length).toBeGreaterThan(50)
+    // Every root document is present BY NAME. `filter(existsSync)` above means a
+    // typo in `ROOT_DOCS` drops a file silently, and the count floor is far too
+    // coarse to notice four documents going missing.
+    for (const name of ROOT_DOCS) {
+      expect(docFiles.map((f) => path.relative(REPO, f))).toContain(name)
+    }
     expect(siteFiles.length).toBeGreaterThan(10)
     expect(docFiles.flatMap(linksIn).length).toBeGreaterThan(100)
     expect(siteFiles.flatMap(linksIn).length).toBeGreaterThan(50)
   })
 
-  it('every link in adr/, bugs/, plans/ and proposals/ points at a real file', () => {
+  it('every link in adr/, bugs/, plans/, proposals/ and root prose points at a real file', () => {
     const broken = docFiles
       .flatMap((f) => linksIn(f).map((l) => ({ ...l, file: f })))
       .filter((l) => !resolvesAsPath(l.file, l.target))

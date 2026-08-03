@@ -1,6 +1,8 @@
 # Plan 0078 — Derive the configuration-finding census
 
-**Status:** **DONE — Phase 3 in v0.37.0, Phases 1–2 in v0.45.0** (2026-08-03).
+**Status:** **DONE — Phase 3 in v0.37.0, Phases 1–2 in v0.45.0, remedy check re-derived by symbol
+resolution in v0.45.2** (2026-08-03). The v0.45.2 follow-up is recorded at the end: the shipped
+Phase 2 detector was a hand-written list of spellings, and three producers defeated it.
 
 **Original status, for the record:** **PARTIALLY SHIPPED.** Phase 3 (the unsuppressability sentence) landed in
 **v0.37.0** — it was the user-facing part, and bug 0041 made its omission reachable from every
@@ -322,8 +324,63 @@ matches one literal shape, so if a spread or a variable could introduce `bypassF
 report full coverage while missing producers. That is the shape rule 5 forbids, and it is now checked
 rather than argued.
 
+## Follow-up (2026-08-03, v0.45.2): D3 was a hand-written list of spellings
+
+D3 above is scored CAUGHT, and it was — against the one spelling it was written for. It matched a
+literal list of strings (`context.suggestion`, `meta?.suggestion`, …) inside a census whose entire
+purpose is to replace hand-maintained lists. Probed after the fact with three producers, **all
+three defeated it while every row of the file stayed green**:
+
+```ts
+const { suggestion } = context // destructured
+suggestion: c.suggestion // parameter aliased to `c`
+suggestion: authorRemedy(context) // read through a helper
+```
+
+The check now asks ts-morph what each identifier **resolves to** — a different kind of evidence
+than text, which is what rule 5 asks for. Two findings from doing it:
+
+- **A shorthand needs `getValueSymbol()`.** `getSymbol()` on the identifier in `suggestion,`
+  resolves to the _property_, not the local, so the first symbol-resolution pass still let
+  destructuring through — one of three escapes surviving the fix for those escapes.
+- **A spread is not automatically a fault.** The first version flagged
+  `correspondence-builder.ts::emptyViolation` for spreading a helper shared with real violations.
+  It was correct: it overrides `suggestion` and `docs` immediately after, and a later property
+  wins. The check now asks whether the spread carries author metadata _and_ nothing after it
+  overrides — proven by removing each override in turn.
+
+Also added: **no two producers may share a census key.** `live` is a `Set`, so a second finding
+inside an already-classified function collapsed into the first and became invisible to every other
+row — a producer nobody had looked at, counted as looked at. No collision exists today; the guard
+is what makes that a measured fact.
+
+| Revert                                                            | Result |
+| ----------------------------------------------------------------- | ------ |
+| F1 — remedy destructured from the context                         | CAUGHT |
+| F2 — remedy read from an aliased parameter                        | CAUGHT |
+| F3 — remedy read through a helper                                 | CAUGHT |
+| F4 — spread's `suggestion` override removed                       | CAUGHT |
+| F5 — spread's `docs` override removed                             | CAUGHT |
+| F6 — a real producer reads the author's remedy                    | CAUGHT |
+| F7 — a real producer states no remedy                             | CAUGHT |
+| F8 — two producers in one function (collision)                    | CAUGHT |
+| Baseline asserted green before each, and restored green after all | 0      |
+
+**Residue, stated not deferred:** the walk is two hops, so a remedy laundered through three escapes.
+Bounded deliberately per rule 6 — every spelling present in `src/` is proven to fire, and the bound
+is raised when a real producer needs it, not in advance.
+
 ## One process failure
 
 I read `VALIDATE=1` and committed anyway, then found it was a lint error two lines long. The commit
 was amended, but the habit is the problem: the exit code was right there and I acted past it. Same
 class as reading `head`'s status instead of `tsc`'s earlier the same day.
+
+**And a second, during the v0.45.2 follow-up:** `git checkout -- <file>` to clean up a sabotage
+reverted an uncommitted comment fix in the same file, twice — the fix having been written _after_
+the commit that was supposed to protect it. The rule already learned earlier the same day ("commit
+before sabotaging") is not enough; it has to be **commit immediately before each revert**, because
+the window that matters is between the last commit and the `checkout`, not between the commit and
+the start of the matrix. One arm was also vacuous: the patch that was supposed to plant a second
+`bypassFilters` literal only inserted a newline, which showed up because the arm printed the literal
+count rather than trusting the patch. Print the thing the sabotage claims to have changed.

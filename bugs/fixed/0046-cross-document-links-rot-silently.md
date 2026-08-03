@@ -1,6 +1,6 @@
 # Bug 0046: cross-document links rot silently, and 39 are broken now
 
-**Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased
+**Reported:** 2026-08-01 · **Fixed:** 2026-08-01 (v0.39.0, commit `08c0e21`); scope hole in the walk fixed 2026-08-03 (v0.45.2)
 **Found in:** repository docs, by a link check run during the 0041/0042 work
 **Severity:** Medium. No user-facing effect on the library, but the `bugs/`, `plans/` and `adr/`
 corpus is how every decision in this project is carried forward, and a dead link is a decision
@@ -108,3 +108,34 @@ Checking headings means parsing them and reproducing GitHub's and VitePress's tw
 slug algorithms, which are not the same. There are only two anchored links in the repo corpus
 and 57 in `docs/`, so the payoff is small and the mechanism is fussy. Stated rather than
 silently omitted; if it becomes worth doing it is a separate change.
+
+## Follow-up (2026-08-03, v0.45.2): the walk skipped the most-read document
+
+The check shipped walking `adr/`, `bugs/`, `plans/`, `proposals/` and `docs/`. The four markdown
+files at the **repository root** were not in any of those, so `CHANGELOG.md`, `README.md`,
+`CLAUDE.md` and `ts-archunit-spec.md` were the one place a dead link could not be seen.
+
+That is backwards from the risk this bug is about. `CHANGELOG.md` is the most-read document in the
+repository and the heaviest linker into `bugs/` and `plans/` — and every one of those links points
+at a file that gets **renamed the day the bug is fixed**, which is this bug's exact mechanism. So
+the guard covered the corpus where a dead link costs a maintainer five minutes, and skipped the one
+where it costs a reader of the release notes.
+
+Found the same way this bug was: by writing a link that did not resolve. Admitting the root
+documents to the walk immediately reported **eight** broken links in `CHANGELOG.md`, seven of them
+pre-existing and every one this bug's shape — `bugs/0033-…` and `bugs/0034-…` that had moved to
+`fixed/`, `plans/0074-…` and `plans/0080-…` that had moved to `completed/`. One was a plan cited by
+the right number and the wrong slug (`0067-project-relative-globs.md`; plan 0067 is
+`0067-empty-selector-safety.md`), which a number-keyed index resolved.
+
+Two detector proofs, baseline asserted green before each and restored after:
+
+| Revert                                                           | Result |
+| ---------------------------------------------------------------- | ------ |
+| A dead link in `CHANGELOG.md`                                    | CAUGHT |
+| A typo in the `ROOT_DOCS` list, which would drop a file silently | CAUGHT |
+
+The second matters more than it looks: the root documents are named explicitly rather than globbed
+(a root glob would walk `dist/` and `node_modules/`), and a named list filtered through
+`existsSync` drops a mistyped entry without a word. The vacuity row now asserts each root document
+is present **by name**, because the count floor is far too coarse to notice four documents leaving.

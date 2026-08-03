@@ -235,28 +235,133 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
     ).toEqual([])
   })
 
+  it('no two producers share a census key', () => {
+    // The key is `path::enclosingFunction`, and `live` is a Set — so two
+    // producers in one function collapse to one entry, and the second is
+    // invisible to every other row in this file. Classifying the first would
+    // silently classify the second, which is the exact false green the census
+    // exists to remove: a producer nobody has looked at, counted as looked at.
+    //
+    // No collision exists today, measured. This row is what makes that a fact
+    // rather than an assumption — when a function grows a second finding, this
+    // fails and the key has to be refined (a per-function ordinal is the obvious
+    // next step) instead of the new producer disappearing.
+    const seen = new Map<string, number[]>()
+    for (const producer of producers(loadSource())) {
+      seen.set(producer.key, [...(seen.get(producer.key) ?? []), producer.line])
+    }
+    const collisions = [...seen.entries()]
+      .filter(([, lines]) => lines.length > 1)
+      .map(([key, lines]) => `${key} at lines ${lines.join(', ')}`)
+    expect(collisions, `census keys are not unique:\n  ${collisions.join('\n  ')}`).toEqual([])
+  })
+
   it("every producer sets its OWN suggestion, never the rule author's", () => {
-    // ADR-008 rule 2 and bug 0021, asserted **statically across every producer**
-    // rather than by a fixture each. The guard this replaces checked
-    // `expect(f.suggestion).toBeTruthy()` on three of fifteen — presence, not
-    // correctness — so it could not have caught bug 0042, which printed the
+    // ADR-008 rule 2 and bug 0021, across every producer at once. The guard this
+    // replaces asserted `toBeTruthy()` on three of fifteen — presence, not
+    // correctness — so it could not have caught bug 0042, which printed the rule
     // author's fix for a real violation on a finding about a mis-globbed layer.
     //
-    // Both directions in one check: the property must exist, and it must not read
-    // the author's metadata. A producer that assigns `context.suggestion` defeats
-    // `execute-rule.ts`'s withholding guard, which is exactly how 0042 escaped.
-    const AUTHOR_SOURCES = [
-      'context.suggestion',
-      'meta?.suggestion',
-      'meta.suggestion',
-      'metadata?.suggestion',
-      'metadata.suggestion',
-      '_metadata?.suggestion',
-      'context.docs',
-      'meta?.docs',
-      'metadata?.docs',
-      '_metadata?.docs',
+    // ## Resolved by SYMBOL, not by spelling
+    //
+    // The first version matched a hand-written list of strings —
+    // `context.suggestion`, `meta?.suggestion`, and so on. Measured, three
+    // producers defeated it while passing every row of this file:
+    //
+    //   const { suggestion } = context        // destructured
+    //   suggestion: c.suggestion              // parameter aliased to `c`
+    //   suggestion: authorRemedy(context)     // read through a helper
+    //
+    // A hand-maintained list of spellings, inside a census built to replace
+    // hand-maintained lists. So the check asks ts-morph what each identifier
+    // **resolves to** and flags anything deriving from a parameter that carries
+    // the author's metadata — a different kind of evidence than text, which is
+    // what rule 5 asks for.
+    const AUTHOR_TYPES = [
+      'ConditionContext',
+      'PairConditionContext',
+      'RuleMetadata',
+      // `ViolationMeta` is a carrier: `correspondence-builder`'s `baseViolation`
+      // reads `meta.suggestion` straight out of it, which is correct for a real
+      // violation and is precisely bug 0021 on a configuration finding.
+      'ViolationMeta',
     ]
+
+    /** Parameters of `fn` whose type is one the author's metadata travels in. */
+    const authorParams = (fn: Node): Set<string> => {
+      const names = new Set<string>()
+      if (!Node.isFunctionDeclaration(fn) && !Node.isMethodDeclaration(fn)) return names
+      for (const param of fn.getParameters()) {
+        const typeText = param.getTypeNode()?.getText() ?? param.getType().getText()
+        if (AUTHOR_TYPES.some((t) => typeText.includes(t))) names.add(param.getName())
+      }
+      return names
+    }
+
+    /**
+     * Does this expression derive from one of `params`?
+     *
+     * One hop through a local `const`, which is what covers destructuring: the
+     * initializer is a bare identifier whose declaration is
+     * `const { suggestion } = context`. And one hop into a called function, for a
+     * remedy read through a helper.
+     */
+    const derivesFrom = (expr: Node, params: Set<string>, depth = 0): boolean => {
+      // **Residue, stated rather than deferred.** Two hops, so a remedy laundered
+      // through three (`context` -> local -> helper -> helper) escapes. Bounded on
+      // purpose: ADR-008 rule 6 puts this row at "an internal check over a corpus
+      // we control", where the standard is to prove each detector fires and stop.
+      // Four shapes are proven to fire below — a direct read, an aliased
+      // parameter, a destructured local, and a helper — which covers every
+      // spelling present in `src/`. Raise the bound when a real producer needs it,
+      // not in advance.
+      if (depth > 2) return false
+      const nodes = [expr, ...expr.getDescendants()]
+
+      // `suggestion,` is a ShorthandPropertyAssignment, and `getSymbol()` on its
+      // identifier resolves to the PROPERTY, not to the local — so the walk below
+      // sees a symbol declared by the object literal itself and learns nothing.
+      // Measured: this was the one escape of three that survived the first
+      // symbol-resolution pass, `const { suggestion } = context`. `getValueSymbol()`
+      // is ts-morph's accessor for the checker's shorthand value symbol.
+      for (const node of nodes) {
+        if (!Node.isShorthandPropertyAssignment(node)) continue
+        for (const decl of node.getValueSymbol()?.getDeclarations() ?? []) {
+          if (declLeadsToAuthor(decl, params, depth)) return true
+        }
+      }
+
+      const ids = nodes.filter((n) => Node.isIdentifier(n))
+      for (const id of ids) {
+        if (params.has(id.getText())) return true
+        for (const decl of id.getSymbol()?.getDeclarations() ?? []) {
+          if (declLeadsToAuthor(decl, params, depth)) return true
+        }
+      }
+      return false
+    }
+
+    /** One hop out of a declaration, shared by the shorthand and identifier paths. */
+    const declLeadsToAuthor = (decl: Node, params: Set<string>, depth: number): boolean => {
+      if (Node.isVariableDeclaration(decl)) {
+        const init = decl.getInitializer()
+        if (init && derivesFrom(init, params, depth + 1)) return true
+      }
+      if (Node.isBindingElement(decl)) {
+        const varDecl = decl.getFirstAncestorByKind(SyntaxKind.VariableDeclaration)
+        const init = varDecl?.getInitializer()
+        if (init && derivesFrom(init, params, depth + 1)) return true
+      }
+      if (Node.isFunctionDeclaration(decl) || Node.isMethodDeclaration(decl)) {
+        const inner = authorParams(decl)
+        for (const ret of decl.getDescendantsOfKind(SyntaxKind.ReturnStatement)) {
+          const value = ret.getExpression()
+          if (value && derivesFrom(value, inner, depth + 1)) return true
+        }
+      }
+      return false
+    }
+
     const project = loadSource()
     const problems: string[] = []
     for (const sourceFile of project.getSourceFiles()) {
@@ -271,20 +376,46 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
           continue
         }
         const key = `${rel}::${enclosingName(assignment)}`
-        const suggestion = literal.getProperty('suggestion')
-        if (suggestion === undefined) {
-          problems.push(`${key}: no suggestion — a configuration finding with no remedy`)
-          continue
+
+        const enclosing = assignment.getFirstAncestor(
+          (n) => Node.isFunctionDeclaration(n) || Node.isMethodDeclaration(n),
+        )
+        const params = enclosing ? authorParams(enclosing) : new Set<string>()
+
+        // A spread can carry the author's `suggestion` in invisibly — but a later
+        // property wins, and `correspondence-builder.ts::emptyViolation` relies on
+        // exactly that: it spreads a helper shared with real violations (where
+        // inheriting the author's remedy IS correct) and then overrides. So the
+        // finding is not "there is a spread", it is "a spread carries the author's
+        // remedy and nothing after it overrides".
+        for (const spread of literal.getProperties()) {
+          if (!Node.isSpreadAssignment(spread)) continue
+          // `derivesFrom` already follows a call into the callee's own author
+          // params, so the enclosing `params` need not mention `meta`.
+          if (!derivesFrom(spread.getExpression(), params)) continue
+          for (const field of ['suggestion', 'docs'] as const) {
+            const override = literal.getProperty(field)
+            if (override === undefined || override.getPos() < spread.getPos()) {
+              problems.push(
+                `${key}: spreads \`${spread.getExpression().getText()}\`, which carries the ` +
+                  `author's metadata, and does not override ${field} after it`,
+              )
+            }
+          }
         }
-        const text = suggestion.getText()
-        for (const source of AUTHOR_SOURCES) {
-          if (text.includes(source)) problems.push(`${key}: remedy reads the author's ${source}`)
-        }
-        const docs = literal.getProperty('docs')
-        if (docs !== undefined) {
-          for (const source of AUTHOR_SOURCES) {
-            if (docs.getText().includes(source))
-              problems.push(`${key}: docs reads the author's ${source}`)
+
+        for (const field of ['suggestion', 'docs'] as const) {
+          const property = literal.getProperty(field)
+          if (field === 'suggestion' && property === undefined) {
+            problems.push(`${key}: no suggestion — a configuration finding with no remedy`)
+            continue
+          }
+          if (property === undefined) continue
+          const expr = Node.isPropertyAssignment(property)
+            ? (property.getInitializer() ?? property)
+            : property
+          if (params.size > 0 && derivesFrom(expr, params)) {
+            problems.push(`${key}: ${field} derives from the author's metadata`)
           }
         }
       }
