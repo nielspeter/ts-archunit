@@ -33,6 +33,8 @@ import { slices } from '../../src/builders/slice-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { isFaultPosition } from '../../src/core/glob-site.js'
 import { diagnose } from '../../src/core/diagnose.js'
+import { OWNS_EMPTY_DISCOVERY } from '../../src/core/owns-empty-discovery.js'
+import * as publicApi from '../../src/index.js'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
 import {
   haveConsistentExports,
@@ -242,5 +244,87 @@ describe('doctor and the build agree about a dead DISCOVERY glob (review M3)', (
 
     expect(diagnose([rule]).map((f) => f.kind)).toEqual(['dead-glob'])
     expect(rule.violations().filter((v) => v.bypassFilters === true)).toHaveLength(1)
+  })
+})
+
+describe('a condition declares discovery ownership, not its builder (plan 0081)', () => {
+  // The granularity that let bug 0040's final-layer half hide: `PairFinalBuilder`
+  // returned a blanket `true` while its docstring asserted a fact about three
+  // implementations, and that fact was false for one of them. The gate stood down
+  // for the case its declared owner did not handle, so the reader got silence.
+
+  /** A pair condition that does NOT tag itself — an external one, or a future one. */
+  const untagged: PairCondition = {
+    description: 'be untagged, and therefore covered by the gate',
+    evaluate: () => [],
+  }
+
+  it('DEFAULT: an untagged condition is covered by the gate, not exempted', () => {
+    // The load-bearing row. If this ever flips to exempt, a condition that forgets
+    // to diagnose an empty layer produces silence — which is what plan 0081 exists
+    // to make impossible, and what the blanket `true` did.
+    const rule = crossLayer(loadCrossLayer())
+      .layer('live', '**/src/schemas/**')
+      .layer('ghost', '**/src/nowhere-at-all/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(untagged)
+
+    const found = rule.violations()
+    const config = found.filter((v) => v.bypassFilters === true)
+    expect(config).toHaveLength(1)
+    // The GATE's message, generic — recoverable, which is the point. It names the
+    // glob rather than the layer, and that is the cost of not tagging.
+    expect(config[0]?.message).toContain('can never match anything')
+  })
+
+  it('VACUITY: that fixture really does resolve a dead layer', () => {
+    // Without this, the row above and the row below both pass over a project where
+    // nothing is empty and neither the gate nor the condition would fire.
+    const layers = crossLayer(loadCrossLayer())
+      .layer('live', '**/src/schemas/**')
+      .layer('ghost', '**/src/nowhere-at-all/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(haveMatchingCounterpart())
+      .violations()
+    expect(layers.filter((v) => v.bypassFilters === true).map((v) => v.element)).toEqual(['ghost'])
+  })
+
+  it.each([
+    ['haveMatchingCounterpart', haveMatchingCounterpart()],
+    [
+      'haveConsistentExports',
+      haveConsistentExports(
+        () => [],
+        () => [],
+      ),
+    ],
+    ['satisfyPairCondition', satisfyPairCondition('a custom pair assertion', () => null)],
+  ] as const)('%s owns it, so its layer-naming finding survives', (_name, condition) => {
+    const found = crossLayer(loadCrossLayer())
+      .layer('live', '**/src/schemas/**')
+      .layer('ghost', '**/src/nowhere-at-all/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(condition)
+      .violations()
+
+    const config = found.filter((v) => v.bypassFilters === true)
+    // By IDENTITY: the layer name is the whole reason the gate stands down, so a
+    // count would not distinguish this from the gate's generic finding.
+    expect(config.map((v) => v.element)).toEqual(['ghost'])
+    expect(config[0]?.message).not.toContain('can never match anything')
+  })
+
+  it('the ownership symbol is NOT exported from the public entry point', () => {
+    // "Module-private" is a comment until something checks it. `PairCondition` is
+    // public, so an importable key would be a one-line silent opt-out of the gate
+    // on any user condition — the hazard `ASSERTS_CARDINALITY` was reshaped to
+    // close (ADR-008 rule 3's corollary).
+    const exported: Record<string, unknown> = publicApi
+    const symbolValued = Object.values(exported).filter((v) => typeof v === 'symbol')
+    expect(symbolValued).not.toContain(OWNS_EMPTY_DISCOVERY)
+    expect(Object.keys(exported)).not.toContain('OWNS_EMPTY_DISCOVERY')
   })
 })
