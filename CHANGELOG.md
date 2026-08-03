@@ -37,8 +37,17 @@ Upgrading.
   disagreeing about one node's identity would make `.excluding()` patterns depend on which surface
   reported. **Positional callbacks are unchanged** and still anonymous, identified by `argIndex`.
 
-  **If you baseline violations about object-literal callbacks, regenerate it.** `hashViolation` is
-  over rule + element + message, and `element` changes from `<anonymous>` to the callback's name.
+  **If you baseline violations about object-literal callbacks, some entries move — but fewer than
+  this note first said.** `hashViolation` is `identity ?? \`${element}::${message}\``, so a producer
+that sets its own `identity`supersedes the element entirely. Measured: **body-analysis rules keep
+their hashes** —`notContain(call('x'))` and friends identify a violation by the call site, not by
+  the enclosing function's name — while **structural conditions do move**, because they compose the
+  subject from element and message. Regenerate the latter only.
+
+  The first version of this note said the hash was "over rule + element + message" and told everyone
+  to regenerate. That was wrong about the mechanism and wrong about the consequence for the very
+  rule it quoted, and it shipped because the test plan 0082 called "not optional" was not written.
+  It is now (`tests/helpers/baseline.test.ts`), over both producer classes.
 
 ### Fixed
 
