@@ -1,7 +1,9 @@
 # Bug 0040: two of three cross-layer conditions report nothing when a layer resolves nothing
 
-**Reported:** 2026-08-01 · **Verified:** 2026-08-01, reproduced with a non-vacuous control
-**Found in:** v0.36.3, while fixing [bug 0036](./fixed/0036-the-relative-glob-audit-is-incomplete.md)
+**Reported:** 2026-08-01 · **API half FIXED:** 2026-08-03, v0.42.0
+**Silence half:** split out to [plan 0080](../../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md) — it carries three criticals
+**Verified:** reproduced with a non-vacuous control
+**Found in:** v0.36.3, while fixing [bug 0036](./0036-the-relative-glob-audit-is-incomplete.md)
 **Severity:** **High** for the API defect below; Medium for the silence this bug is named after.
 Two reviewers independently said the headline is the wrong defect, and they are right — see
 "The defect an adopter hits first".
@@ -24,7 +26,7 @@ never resolved. Measured — builder glob dead, hand-built layers populated → 
 violations and no configuration finding at all.
 
 **Fix: have `.should()` pass its own resolved layers to the condition.** That closes this, makes
-[bug 0042](./fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)'s
+[bug 0042](./0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)'s
 remedy true (it currently has to caveat that it names the caller's pattern), and is a
 prerequisite for the silence fix below being meaningful.
 
@@ -119,7 +121,7 @@ tables, `bypassFilters`, the bug-0021 discipline of never inheriting the author'
 and the property the docstring at `:396-399` explicitly buys — that `doctor`'s pre-flight and
 the gate can never disagree. A builder-side producer re-implements all of it and becomes a
 thirteenth configuration-finding producer, which is what
-[plan 0078](../plans/0078-derive-the-configuration-finding-census.md) exists to stop. ADR-006
+[plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) exists to stop. ADR-006
 and the lego-bricks principle both say reuse.
 
 Two caveats for the plan:
@@ -152,7 +154,7 @@ File "user-route.ts"  in layer "routes" has no matching counterpart in layer "sc
 ```
 
 An agent obeying that writes two schema files, the glob is still wrong, and they still do not
-match. That is [bug 0017](./fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)'s
+match. That is [bug 0017](./0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)'s
 shape — rule 2's behavioural corollary — and it is arguably worse than the silence, because the
 remedy is confidently wrong rather than absent. A per-layer finding covers it.
 
@@ -205,10 +207,73 @@ argument for fixing it there rather than in the builder.
 
 ## Related
 
-- [Bug 0036](./fixed/0036-the-relative-glob-audit-is-incomplete.md) — where this surfaced.
-- [Bug 0042](./fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md) — a second,
+- [Bug 0036](./0036-the-relative-glob-audit-is-incomplete.md) — where this surfaced.
+- [Bug 0042](./0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md) — a second,
   independent defect in the same `cross-layer.ts:39-53` block.
-- [Plan 0074](../plans/completed/0074-r3b-the-selector-glob-flip.md) — the gate whose
+- [Plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md) — the gate whose
   `position !== 'selector'` filter this sits outside.
-- [Plan 0078](../plans/0078-derive-the-configuration-finding-census.md) — why the fix must reuse
+- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — why the fix must reuse
   the existing producer rather than add one.
+
+## The API half, as shipped (v0.42.0)
+
+`PairCondition.evaluate`'s context is now a **`PairConditionContext`** carrying the builder's own
+resolved `layers`, and `haveMatchingCounterpart(layers?)` takes the argument optionally with the
+context winning.
+
+**A subtype, not a field on `ConditionContext`** — on review's amendment. A pair-only field on the
+base context leaks onto every class, function, module and type condition; `identifyByArgument` is
+the single precedent and its own docstring justifies itself as "one optional primitive", which a
+second would falsify. Verified additive: `haveConsistentExports` and `satisfyPairCondition` still
+declare `ConditionContext` and compile **unchanged**, because TypeScript method parameters are
+bivariant — which is also the evidence it stays additive for an implementer outside this package.
+
+Nothing breaks at compile time. All eight in-repo call sites still compile.
+
+**One silent semantic change, pinned rather than mentioned:** a caller who deliberately passed a
+_narrower_ `Layer[]` now gets the builder's. That is the fix — the hand-built copy was the defect
+— but nothing else would notice if the precedence flipped back, so there is a test for it.
+
+### A claim of mine that was false, and it inverted the work
+
+I expected the three published no-argument examples to become correct for free. They were already
+fixed **in v0.37.0 — by me** — so nothing came free and the documentation needed editing the
+_other_ way, at **eight** sites: `cross-layer-builder.ts:69,243`, `docs/cross-layer.md:36,89,94,97,184,230`,
+`docs/what-to-check.md:498`, `docs/api-reference.md:364`. All updated.
+
+### The remedy text, wrong for the third time
+
+`cross-layer.ts`'s empty-layer suggestion said _"in the `Layer[]` passed to this condition — it
+reads that array, not the builder's `.layer()` call"_. True until this change removed that array,
+at which point the remedy pointed at something that no longer exists. Now it names
+`.layer("ghost", "**/glob/**")` — the call the reader must edit.
+
+That sentence has now been wrong three times, each time bug 0017's shape, and **none of the three
+was catchable by asserting the message's content** — every version named the layer, which is what
+the guard checked. Only applying the fix found them.
+
+### The control fired, as designed
+
+`tests/conditions/cross-layer-finding-owns-its-remedy.test.ts` carried a control asserting that
+widening the **builder's** glob does _not_ clear the finding, written deliberately so that landing
+this change would break it. It broke — 5 of 8 tests in the file failed.
+
+Review found the control was also **positioned wrong**: it sat at the end of a test that died on
+an earlier assertion, so it never executed. A control that cannot run is not a control. It is now
+its own `it()`, inverted to assert that fixing the `.layer()` glob _does_ clear the finding, and
+the file's fixtures are rebuilt around a dead **builder** glob — there is no caller array left to
+rig.
+
+## Sabotage — 5 of 5
+
+| Revert                                      | Result |
+| ------------------------------------------- | ------ |
+| the explicit argument wins over the context | CAUGHT |
+| the builder passes an empty layer set       | CAUGHT |
+| the remedy stops naming the `.layer()` call | CAUGHT |
+| the context's layer **order** reversed      | CAUGHT |
+| `layers` made optional on the context (tsc) | CAUGHT |
+
+A sixth row — reversing the `layerNames` used for the rule _description_ — came back green and was
+discarded rather than counted: that string is cosmetic and nothing consumes it, so it is not a
+revert of this fix.

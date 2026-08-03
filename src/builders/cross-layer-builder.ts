@@ -66,7 +66,7 @@ function computePairs(
  *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('Route', '') === b.getBaseName().replace('Schema', ''))
  *   .forEachPair()
- *   .should(haveMatchingCounterpart(layers))
+ *   .should(haveMatchingCounterpart())
  *   .check()
  */
 export class CrossLayerBuilder {
@@ -240,7 +240,7 @@ export class PairFinalBuilder extends TerminalBuilder {
  *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('-route', '') === b.getBaseName().replace('-schema', ''))
  *   .forEachPair()
- *   .should(haveMatchingCounterpart(layers))
+ *   .should(haveMatchingCounterpart())
  *   .check()
  */
 export function crossLayer(p: ArchProject): CrossLayerBuilder {

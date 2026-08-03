@@ -33,7 +33,7 @@ const resolved = layers.mapping(
 
 resolved
   .forEachPair()
-  .should(haveMatchingCounterpart(layers))
+  .should(haveMatchingCounterpart())
   .because('every route must have a matching schema')
   .check()
 ```
@@ -86,15 +86,15 @@ Attach a `PairCondition` to evaluate against each matched pair. Returns a termin
 
 ## Built-In Pair Conditions
 
-### `haveMatchingCounterpart(layers)`
+### `haveMatchingCounterpart()`
 
 Every element in the left layer must have at least one match in the right layer. Produces a violation for each unmatched left-layer file.
 
 ```typescript
 import { haveMatchingCounterpart } from '@nielspeter/ts-archunit'
 
-// layers must be the resolved Layer[] — typically from the builder internals
-resolved.forEachPair().should(haveMatchingCounterpart(layers)).check()
+// The builder passes its own resolved layers, so nothing to hand in.
+resolved.forEachPair().should(haveMatchingCounterpart()).check()
 ```
 
 When a route file has no matching schema:
@@ -181,7 +181,7 @@ crossLayer(p)
     return routeName === schemaName
   })
   .forEachPair()
-  .should(haveMatchingCounterpart(layers))
+  .should(haveMatchingCounterpart())
   .rule({
     id: 'api/route-schema-sync',
     because: 'Undocumented routes cause client SDK generation failures',
@@ -227,7 +227,7 @@ crossLayer(p)
     return normalize(a) === normalize(b)
   })
   .forEachPair()
-  .should(haveMatchingCounterpart(layers))
+  .should(haveMatchingCounterpart())
   .because('all three layers must stay in sync')
   .check()
 ```
