@@ -380,9 +380,11 @@ describe('empty layer', () => {
     // The `layers` argument still exists and still compiles, but the context wins,
     // so a direct call must supply it there or it is testing the deprecated path.
     const violations = haveMatchingCounterpart().evaluate([], { rule: 'test', layers })
-    expect(violations).toHaveLength(1)
-    expect(violations[0]!.element).toBe('empty')
-    expect(violations[0]!.message).toMatch(/matched 0 files/)
+    // Both fixture layers are empty, and every layer is now examined — the final
+    // one included, which the pair loop used to skip (bug 0040's missing case).
+    // Asserted by identity so the count is not the whole claim.
+    expect(violations.map((v) => v.element).sort()).toEqual(['empty', 'schemas'])
+    expect(violations.every((v) => /matched 0 files/.test(v.message))).toBe(true)
   })
 })
 

@@ -299,3 +299,32 @@ the whole system**, and the fields a finding carries are consumed by the baselin
 any test mentions them. I reached for "cosmetic" to justify not counting an inconvenient green row,
 which is the one direction [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 5 says
 never to resolve a measurement.
+
+## The "missing case" actually closed (v0.45.1)
+
+Plan 0080's write-up implied this shipped fixed. **It did not**, and I found that only by reviewing
+the code afterwards rather than by any test.
+
+`haveMatchingCounterpart`'s empty-layer check lived **inside** the pair loop, which walks `layers[i]`
+for `i < length - 1` — so the **final** layer was never examined. Its two siblings, guarded during
+plan 0080, filtered every layer. Three conditions, one input, two answers.
+
+Measured on a dead final layer:
+
+| condition                 | configuration findings | ordinary violations                                    |
+| ------------------------- | ---------------------- | ------------------------------------------------------ |
+| `haveMatchingCounterpart` | **0**                  | **2** — _"has no matching counterpart in layer ghost"_ |
+| `haveConsistentExports`   | 1                      | 0                                                      |
+| `satisfyPairCondition`    | 1                      | 0                                                      |
+
+Those two ordinary violations are the reason this bug rates the missing case **worse** than the
+silence: an agent obeying them writes files into a layer whose glob is wrong, they still do not
+match, and it improvises. Bug 0017's shape, on the condition users reach for first.
+
+The check is hoisted above the loop and covers every layer, so all three agree with one code path.
+
+Two existing tests had to change, and the reason is instructive: both used fixtures where **both**
+layers were empty while asserting a single finding — sloppy fixtures that the old behaviour hid,
+because only the left layer was ever examined. Both now assert on identities rather than a count.
+
+**3 of 3 sabotages**, including reverting to `layers.slice(0, -1)` — the exact original defect.

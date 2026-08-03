@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.1] - 2026-08-03
+
+### Fixed
+
+- **A cross-layer rule whose FINAL layer matched no files reported the wrong thing** ([bug 0040](bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)). `haveMatchingCounterpart` checked for empty layers inside its pair loop, which never reaches the last layer — so instead of reporting the mis-globbed layer it reported every file in the preceding one as _"has no matching counterpart"_. Measured: 0 configuration findings and 2 ordinary violations, where the truth was one dead glob.
+
+  That advice is actively harmful: following it means writing files into a layer whose glob is wrong, where they still will not match. `haveConsistentExports` and `satisfyPairCondition` were guarded correctly in v0.44.0, so the three conditions disagreed about the same input. All three now share one check over every layer.
+
 ## [0.45.0] - 2026-08-03
 
 ### Added

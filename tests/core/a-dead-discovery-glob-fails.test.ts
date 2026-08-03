@@ -32,6 +32,17 @@ import { resolvers } from '../../src/graphql/index.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { isFaultPosition } from '../../src/core/glob-site.js'
+import { crossLayer } from '../../src/builders/cross-layer-builder.js'
+import {
+  haveConsistentExports,
+  haveMatchingCounterpart,
+  satisfyPairCondition,
+} from '../../src/conditions/cross-layer.js'
+import type { PairCondition } from '../../src/core/pair-condition.js'
+import type { ArchViolation } from '../../src/core/violation.js'
+
+const loadCrossLayer = (): ReturnType<typeof project> =>
+  project(path.resolve(import.meta.dirname, '../fixtures/cross-layer/tsconfig.json'))
 
 const dupProject = (): ReturnType<typeof project> =>
   project(path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies/tsconfig.json'))
@@ -98,6 +109,70 @@ describe('a dead discovery glob fails at every entry point (plan 0080)', () => {
       .notContain(call(/^eval$/))
       .violations()
     expect(found.filter((v) => v.bypassFilters === true)).toEqual([])
+  })
+
+  it('a dead FINAL layer is reported, by all three conditions alike', () => {
+    // Bug 0040's "missing case", which it rates **worse** than the silence — and
+    // which plan 0080's write-up implied had shipped fixed. It had not.
+    //
+    // `haveMatchingCounterpart`'s empty check lived inside a loop over
+    // `layers[i]` for `i < length - 1`, so the last layer was never examined.
+    // Measured on a dead final layer: **0** configuration findings and **2**
+    // ordinary ones reading "has no matching counterpart in layer ghost". An
+    // agent obeying that writes files into a layer whose glob is wrong, they
+    // still do not match, and it improvises — bug 0017's shape. Its two siblings
+    // already checked every layer, so the three disagreed about one input.
+    const project = () => loadCrossLayer()
+    const deadFinal = (condition: PairCondition): ArchViolation[] =>
+      crossLayer(project())
+        .layer('routes', '**/src/routes/**')
+        .layer('ghost', '**/src/nowhere-at-all/**')
+        .mapping(() => true)
+        .forEachPair()
+        .should(condition)
+        .violations()
+
+    for (const [name, condition] of [
+      ['haveMatchingCounterpart', haveMatchingCounterpart()],
+      [
+        'haveConsistentExports',
+        haveConsistentExports(
+          () => ['X'],
+          () => [],
+        ),
+      ],
+      ['satisfyPairCondition', satisfyPairCondition('never reached', () => null)],
+    ] as const) {
+      const found = deadFinal(condition)
+      const config = found.filter((v) => v.bypassFilters === true)
+      expect(
+        config.map((v) => v.element),
+        `${name} on a dead FINAL layer`,
+      ).toEqual(['ghost'])
+      // …and NOT the confidently wrong "no matching counterpart" advice.
+      expect(found.some((v) => v.message.includes('no matching counterpart'))).toBe(false)
+    }
+  })
+
+  it('CONTROL: every layer live — none of the three reports a configuration finding', () => {
+    // Without this, "always report an empty layer" passes the row above.
+    for (const condition of [
+      haveMatchingCounterpart(),
+      haveConsistentExports(
+        (f) => [f.getBaseName()],
+        (f) => [f.getBaseName()],
+      ),
+      satisfyPairCondition('always satisfied', () => null),
+    ]) {
+      const found = crossLayer(loadCrossLayer())
+        .layer('routes', '**/src/routes/**')
+        .layer('schemas', '**/src/schemas/**')
+        .mapping(() => true)
+        .forEachPair()
+        .should(condition)
+        .violations()
+      expect(found.filter((v) => v.bypassFilters === true)).toEqual([])
+    }
   })
 
   it('slice OWNS its discovery, so the gate stays out — all-empty', () => {
