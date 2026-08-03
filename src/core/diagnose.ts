@@ -8,7 +8,7 @@ import { globSitesOf, isDeadSite } from './glob-evaluator.js'
 import { pathUniverse } from './path-universe.js'
 import { diskSet } from './disk-set.js'
 import { isDeadGlobTree } from './glob-evaluator.js'
-import { emptyProjectAdvice } from './empty-project-advice.js'
+import { emptyProjectAdvice, loadedNothing } from './empty-project-advice.js'
 import type { RuleBuilderLike } from './rule-builder-like.js'
 import type { GlobNode } from './glob-site.js'
 
@@ -187,7 +187,7 @@ export function diagnose(
     // Deduped by path rather than by object because the path is what the
     // message prints, and printing one sentence twice is the thing being
     // fixed.
-    if (target.getSourceFiles().length === 0) {
+    if (loadedNothing(target)) {
       if (!emptyProjects.has(target)) {
         emptyProjects.add(target)
         findings.push({

@@ -49,6 +49,32 @@ import type { ArchProject } from './project.js'
  * shape, it names the mechanism that produced the commonest real occurrence,
  * and it asserts nothing the tool has not checked.
  */
+/**
+ * Did this project load nothing at all?
+ *
+ * The **decision**, extracted — [bug 0048](../../bugs/fixed/0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md).
+ *
+ * `emptyProjectAdvice` already owned the *text*, and that was taken to mean the
+ * state had one owner. It did not: the test `if (getSourceFiles().length === 0)`
+ * lived in `diagnose.ts` and in `SliceRuleBuilder`, and **not** in the assertion
+ * gate — so a selector-position glob in an empty project was told its glob could
+ * never match and to correct it. The glob was correct; the tsconfig loaded
+ * nothing.
+ *
+ * Measured on `tests/fixtures/does-not-load`: the selector path said *"This
+ * rule's selector … can never match anything … Correct the glob, or remove the
+ * rule"* while `doctor` and the slice path both said *"The project loaded 0
+ * source files"*.
+ *
+ * Two texts for one state is a trust problem for an agent diffing them — which
+ * is this file's original argument. Two **decisions** about when to use the one
+ * text is the same problem one level up, and it is the level the first fix
+ * missed.
+ */
+export function loadedNothing(project: ArchProject): boolean {
+  return project.getSourceFiles().length === 0
+}
+
 export function emptyProjectAdvice(project: ArchProject): string {
   return (
     `the project loaded 0 source files (${project.tsConfigPath}), so no glob can match. ` +

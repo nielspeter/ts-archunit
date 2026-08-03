@@ -8,6 +8,7 @@ import { pathUniverse } from './path-universe.js'
 import { isDeadGlobTree, isDeadSite, globSitesOf } from './glob-evaluator.js'
 import { diagnoseGlob, FAULT_ADVICE, ON_DISK_ADVICE } from './glob-diagnosis.js'
 import { diskSet } from './disk-set.js'
+import { emptyProjectAdvice, loadedNothing } from './empty-project-advice.js'
 import type { CheckOptions } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import type { RuleDescription } from './rule-description.js'
@@ -423,6 +424,22 @@ export abstract class TerminalBuilder {
     const trees = this.globs()
     if (trees.length === 0) return []
 
+    // The project loaded nothing, so no glob can match and none of them is at
+    // fault — [bug 0048](../../bugs/fixed/0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md).
+    //
+    // Without this the gate reported every selector glob dead and told the
+    // reader to *"Correct the glob, or remove the rule"*, which is a remedy for
+    // a fault that is not theirs: measured on an empty tsconfig, the glob was
+    // correct and the tsconfig had loaded 0 files. `diagnose()` short-circuited
+    // here (bug 0031) and `SliceRuleBuilder` had its own branch; this gate had
+    // neither, so the wrong remedy sat on the path every `modules()`,
+    // `classes()`, `functions()` and `types()` rule takes.
+    //
+    // One finding for the project, not one per glob — the identity of this fault
+    // is the tsconfig, which is what ADR-008 rule 4 asks be named, and it is why
+    // `diagnose()` dedupes by project too.
+    if (loadedNothing(project)) return [this.emptyProjectViolation(project)]
+
     const universe = pathUniverse(project)
     const findings: ArchViolation[] = []
     for (const tree of trees) {
@@ -437,6 +454,39 @@ export abstract class TerminalBuilder {
       }
     }
     return findings
+  }
+
+  /**
+   * The finding for a project that loaded no source files.
+   *
+   * Deliberately **not** `deadSelectorViolation` with different text: that one
+   * names a glob as its `element`, and here no glob is at fault. The element is
+   * the rule, matching how `diagnose()` reports this state.
+   *
+   * Carries the same advice `doctor` prints, from the one owner
+   * (`empty-project-advice.ts`) — the parity `deadSelectorViolation`'s docstring
+   * claims for the whole gate, which was false for this input until bug 0048.
+   */
+  protected emptyProjectViolation(project: ArchProject): ArchViolation {
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    // `emptyProjectAdvice` deliberately returns a lowercase, period-less clause so
+    // each caller can frame it. Capitalised inline rather than via a shared helper:
+    // `slice-rule-builder.ts` has its own local `capitalize` and core has none, so
+    // importing across that boundary for one character would be the worse trade.
+    const shared = emptyProjectAdvice(project)
+    const advice = `${shared.charAt(0).toUpperCase()}${shared.slice(1)}. ${UNSUPPRESSABLE}`
+    return {
+      rule: name,
+      ruleId: described.id,
+      element: name,
+      file: '',
+      line: 0,
+      message: advice,
+      // Its own remedy, never the author's (bug 0021).
+      suggestion: advice,
+      bypassFilters: true,
+    }
   }
 
   /**

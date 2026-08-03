@@ -7,7 +7,7 @@ import { globAnyOf, stampGlobs } from '../core/glob-site.js'
 import type { GlobFault } from '../core/glob-diagnosis.js'
 import { FAULT_ADVICE, GLOB_DOCS, syntacticFault } from '../core/glob-diagnosis.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
-import { emptyProjectAdvice } from '../core/empty-project-advice.js'
+import { emptyProjectAdvice, loadedNothing } from '../core/empty-project-advice.js'
 import type { Slice, SliceDefinition } from '../models/slice.js'
 import {
   resolveByMatching,
@@ -363,7 +363,7 @@ export class SliceRuleBuilder extends TerminalBuilder {
 
     // Nothing can match when the project loaded no files at all — blaming the
     // glob would send the caller to the wrong file entirely.
-    if (this.project.getSourceFiles().length === 0) {
+    if (loadedNothing(this.project)) {
       // The SAME string `diagnose()` reports, from the one place that owns it.
       // These were two texts for one state and had already diverged: this copy
       // said only "check that this tsconfig includes your sources", which is
