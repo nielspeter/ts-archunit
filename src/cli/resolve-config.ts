@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { isRecord } from '../core/type-guards.js'
 import fs from 'node:fs'
 import type { CliConfig } from './config.js'
 
@@ -42,19 +43,24 @@ function extractDefault(mod: unknown): CliConfig {
   if (!('default' in mod)) {
     return {}
   }
-  const defaultExport: unknown = (mod as Record<string, unknown>)['default']
+  const defaultExport: unknown = mod.default
   if (defaultExport === null || defaultExport === undefined || typeof defaultExport !== 'object') {
     return {}
   }
   // Runtime validate: only pick known CliConfig fields
-  const obj = defaultExport as Record<string, unknown>
+  if (!isRecord(defaultExport)) return {}
+  const obj = defaultExport
   const config: CliConfig = {}
   if (typeof obj['project'] === 'string') config.project = obj['project']
   if (typeof obj['baseline'] === 'string') config.baseline = obj['baseline']
   if (typeof obj['format'] === 'string') {
-    const validFormats = ['terminal', 'json', 'github', 'auto']
-    if (validFormats.includes(obj['format'])) {
-      config.format = obj['format'] as CliConfig['format']
+    // A guard over the literal union, so the narrowing is the check rather than
+    // a cast that repeats it. `includes` on a `string[]` cannot narrow; a
+    // predicate over the same list can.
+    const isFormat = (v: string): v is NonNullable<CliConfig['format']> =>
+      (['terminal', 'json', 'github', 'auto'] as const).some((f) => f === v)
+    if (isFormat(obj['format'])) {
+      config.format = obj['format']
     }
   }
   if (Array.isArray(obj['rules']))

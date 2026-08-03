@@ -1,4 +1,5 @@
 import { watch, type FileChangeInfo } from 'node:fs/promises'
+import { isNullaryCallable } from '../core/type-guards.js'
 import path from 'node:path'
 import { ArchRuleError } from '../core/errors.js'
 
@@ -139,8 +140,8 @@ export function watchAndRerun(options: WatchOptions): void {
   // Graceful shutdown — close all watchers on SIGINT
   process.on('SIGINT', () => {
     for (const w of watchers) {
-      if ('return' in w && typeof w.return === 'function') {
-        void (w.return as () => Promise<unknown>)()
+      if ('return' in w && isNullaryCallable(w.return)) {
+        void w.return()
       }
     }
     process.exit(0)

@@ -1,4 +1,5 @@
 import type { RuleDescription } from '../core/rule-description.js'
+import { isRecord } from '../core/type-guards.js'
 import { ScriptTarget, ModuleKind, ModuleResolutionKind } from 'ts-morph'
 import type { CompilerOptions } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
@@ -179,8 +180,4 @@ function deepEqual(a: unknown, b: unknown): boolean {
     return ak.length === bk.length && ak.every((k) => deepEqual(a[k], b[k]))
   }
   return false
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
