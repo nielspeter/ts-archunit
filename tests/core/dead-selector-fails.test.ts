@@ -335,6 +335,15 @@ describe('the cardinality exemption cannot be forged (bug 0050)', () => {
       getSourceFiles: () => tsm.getSourceFiles(),
     }
   }
+  /**
+   * The gate's findings, BY IDENTITY — `toHaveLength(1)` cannot say WHICH finding,
+   * and on this path a dead selector and a gated empty selection both yield
+   * exactly one. Keyed on the element plus the sentence's opening clause, which is
+   * what distinguishes the empty-selection gate from every other producer.
+   */
+  const gateFindings = (condition: Condition<ClassDeclaration>): string[] =>
+    configFindings(condition).map((v) => `${v.element} :: ${v.message.split(',')[0] ?? ''}`)
+
   const configFindings = (condition: Condition<ClassDeclaration>): ArchViolation[] =>
     classes(emptyProject())
       .that()
@@ -355,7 +364,9 @@ describe('the cardinality exemption cannot be forged (bug 0050)', () => {
       description: 'asserts nothing',
       evaluate: () => [],
     }
-    expect(configFindings(honest)).toHaveLength(1)
+    expect(gateFindings(honest)).toEqual([
+      'that have name matching /NoSuchClassAnywhere/ should asserts nothing :: Selector matched 0 subjects',
+    ])
   })
 
   it('a condition carrying every own key of a real one is still gated', () => {
@@ -366,7 +377,9 @@ describe('the cardinality exemption cannot be forged (bug 0050)', () => {
       description: 'a copy of every own property notExist() exposes',
       evaluate: () => [],
     }
-    expect(configFindings(forged)).toHaveLength(1)
+    expect(gateFindings(forged)).toEqual([
+      'that have name matching /NoSuchClassAnywhere/ should a copy of every own property notExist() exposes :: Selector matched 0 subjects',
+    ])
   })
 
   it('the real condition is still exempt, so the registry works at all', () => {
