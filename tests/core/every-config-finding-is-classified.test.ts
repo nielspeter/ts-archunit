@@ -235,6 +235,27 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
     ).toEqual([])
   })
 
+  it('no two producers share a census key', () => {
+    // The key is `path::enclosingFunction`, and `live` is a Set — so two
+    // producers in one function collapse to one entry, and the second is
+    // invisible to every other row in this file. Classifying the first would
+    // silently classify the second, which is the exact false green the census
+    // exists to remove: a producer nobody has looked at, counted as looked at.
+    //
+    // No collision exists today, measured. This row is what makes that a fact
+    // rather than an assumption — when a function grows a second finding, this
+    // fails and the key has to be refined (a per-function ordinal is the obvious
+    // next step) instead of the new producer disappearing.
+    const seen = new Map<string, number[]>()
+    for (const producer of producers(loadSource())) {
+      seen.set(producer.key, [...(seen.get(producer.key) ?? []), producer.line])
+    }
+    const collisions = [...seen.entries()]
+      .filter(([, lines]) => lines.length > 1)
+      .map(([key, lines]) => `${key} at lines ${lines.join(', ')}`)
+    expect(collisions, `census keys are not unique:\n  ${collisions.join('\n  ')}`).toEqual([])
+  })
+
   it("every producer sets its OWN suggestion, never the rule author's", () => {
     // ADR-008 rule 2 and bug 0021, across every producer at once. The guard this
     // replaces asserted `toBeTruthy()` on three of fifteen — presence, not

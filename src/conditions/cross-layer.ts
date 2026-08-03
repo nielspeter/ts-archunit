@@ -68,7 +68,10 @@ function emptyLayerFinding(
     // finding's `Fix:` — measured, an empty-layer finding advising "Split
     // the cycle by extracting a shared module." With none, `suggestion` is
     // optional on `ConditionContext`, so the finding shipped with no remedy
-    // at all: the only configuration finding of the thirteen that could.
+    // at all — the only producer in the census that could. (It said "of the
+    // thirteen" until the census grew to fifteen. The count is derived in
+    // `tests/core/every-config-finding-is-classified.test.ts`; repeating it
+    // here only created something to go stale.)
     //
     // `execute-rule.ts`'s bug-0021 guard cannot help here. It withholds the
     // author's text from producers that leave the field unset; this one

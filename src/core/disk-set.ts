@@ -114,12 +114,13 @@ export function buildDiskSet(project: ArchProject, budgetLimit = ENTRY_BUDGET): 
 function build(project: ArchProject, budgetLimit: number): DiskSet {
   // Guard on the INPUT, before deriving anything. `discoverIdentityRoot` calls
   // `path.resolve`, so every root it returns is absolute and checking the
-  // output can never fail. Both halves matter: of the eight synthetic
-  // `tsConfigPath` doubles in this repo's own suite, two are the relative
-  // 'in-memory' (whose dirname is '.', which would walk the real CWD) and six
-  // are absolute paths that do not exist, where `readdirSync` throws from
-  // inside a guard. And `ArchProject` is a public type, so this protects
-  // user-constructed projects, not only test doubles.
+  // output can never fail. Both halves matter, and this repo's own suite
+  // supplies both: the relative `'in-memory'` double (whose dirname is '.',
+  // which would walk the real CWD) and absolute paths that do not exist, where
+  // `readdirSync` throws from inside a guard. Counted in prose as "eight
+  // doubles, two relative" until the suite reached 114 of them — so the shapes
+  // are named and the arithmetic is not. And `ArchProject` is a public type, so
+  // this protects user-constructed projects, not only test doubles.
   if (!path.isAbsolute(project.tsConfigPath)) return UNDETERMINED
   const root = discoverIdentityRoot(path.dirname(project.tsConfigPath))
   if (!fs.existsSync(root)) return UNDETERMINED

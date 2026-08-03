@@ -155,13 +155,17 @@ function isTopLevelDeclaration(node: Node): boolean {
  * not a violation the author gets to grade: `.asSeverity('warn')` says "these
  * violations are advisory", and a rule that cannot fire has no violations to
  * be advisory about. Under ADR-008 rule 1 an actionable finding must fail, and
- * three of the four suppression paths already refuse to silence these —
- * `.excluding()` refuses explicitly, baseline and diff honour the flag.
+ * the other suppression paths already refuse to silence these — `.excluding()`
+ * refuses explicitly, baseline and diff honour the flag. The full roster is
+ * `UNSUPPRESSABLE_MECHANISMS` in `unsuppressable.ts`, which is also what the
+ * user-facing sentence is built from; it has grown twice, so it is named here
+ * rather than counted. (This paragraph said "three of the four" while the list
+ * stood at six.)
  *
  * Applied at all three severity-stamping sites. `stampSeverity` alone is not
  * enough: `.violations()` inlines its own map in both root builders, and the
- * `executeWarn` path resolves an unset severity to `warn`, which is where five
- * of the six producers landed.
+ * `executeWarn` path resolves an unset severity to `warn`, which is where most
+ * producers landed.
  */
 export function severityFor(
   violation: ArchViolation,
