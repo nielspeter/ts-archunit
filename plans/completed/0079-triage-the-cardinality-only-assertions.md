@@ -155,8 +155,30 @@ So all ten were re-checked by reading the **fixture**, not the assertion:
 | `typescript.test.ts:76`                   | one cast, in the constructor                                                |
 | `dependency.test.ts:142`, `:151`          | two imports, but the violation is about the **file**, and there is one file |
 
-Every one has a single candidate, so no swap exists to miss. The rule holds **for the sample**. It is
-not verified across all 96 remaining blocks, and that is the honest limit of this row.
+Every one has a single candidate, so no swap exists to miss. The rule holds for those ten.
+
+**But the rule's premise was wrong, and a second reviewer found where.** It assumes _the array can
+only be filled by the subject_. It cannot: when a selector matches nothing, this library emits
+**exactly one configuration finding** — so `toHaveLength(1)` can mean "the condition never ran".
+
+Measured on `widened-module-edges.test.ts:267` and `:281`: rename the two fixtures so the selector
+matches nothing and both blocks exit **0, "2 passed"**, with the surviving element being the
+dead-glob gate's finding (`bypassFilters: true`, `file: ''`, _"can never match anything in this
+project"_). `:267` carries the comment _"The false green this release must not create"_ and was
+sitting on a false green of a different kind. Both now assert `identify(violations)`; with the
+fixtures gone they exit 1.
+
+The project already knew this shape in the **affirmative** direction — `slice-rule-builder.test.ts:175`
+and `rule-builder.test.ts:552` assert `v[0].bypassFilters === true` on purpose. Nobody had written the
+negative case: _this must be a real violation and not the gate_. That is the class B rule's real
+boundary, and it is worth stating as a rule of its own:
+
+> **A count of 1 is never sufficient on a builder chain that can produce a configuration finding.**
+> Assert the identity, or assert `bypassFilters === false`.
+
+Exposure was scoped rather than assumed: every other surviving block calling `.violations()` asserts
+4, 2 or 3 — a configuration finding is 1, so they red — or checks `bypassFilters` directly. The
+GraphQL builder returns `[]` on an empty selection, measured. The two above were the whole of it.
 
 ### The direction nobody checked — and it found something
 

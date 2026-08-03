@@ -275,7 +275,13 @@ describe('SchemaRuleBuilder — a held selection is immutable (bug 0016)', () =>
         .violations()
         .map((v) => v.element),
     ).toEqual(['BadCollection'])
-    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
+    expect(
+      collections
+        .should()
+        .haveFields('total')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(['BadCollection'])
   })
 
   it('narrowing a held schema leaves the original selection whole', () => {
@@ -292,7 +298,13 @@ describe('SchemaRuleBuilder — a held selection is immutable (bug 0016)', () =>
     ).toEqual(['BadCollection'])
     // The original still covers all three Collection types; the two good ones
     // satisfy it, so the count is unchanged rather than zero.
-    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
+    expect(
+      collections
+        .should()
+        .haveFields('total')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(['BadCollection'])
     // All three Collection types, by name — "the count is unchanged rather
     // than zero" was the comment, and the names are what it meant.
     expect(

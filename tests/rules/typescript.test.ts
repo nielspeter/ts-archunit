@@ -66,10 +66,9 @@ describe('typescript rules', () => {
       // Only process() and castNumber() should be violations
       // The two lines that DO assert, not just two violations — the comment
       // named process() and castNumber() and the assertion counted.
-      expect(violations.map((v) => v.message.match(/at line (\d+)/)?.[1]).sort()).toEqual([
-        '11',
-        '6',
-      ])
+      expect(
+        violations.map((v) => Number(v.message.match(/at line (\d+)/)?.[1])).sort((a, b) => a - b),
+      ).toEqual([6, 11])
     })
 
     it('passes for clean class with no assertions', () => {

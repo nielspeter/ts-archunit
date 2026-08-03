@@ -56,6 +56,13 @@ one entry in `fixed/`.
 - **The verdict mechanism is part of the derivation.** Bug 0045 is this at the process
   layer; an unquoted `$SUITE` in zsh and a symlinked `node_modules` have each produced a
   full matrix of false CAUGHTs.
+- **A count of 1 is never sufficient where a configuration finding can appear.** A dead selector
+  emits exactly one finding, so `toHaveLength(1)` accepts it when the condition never ran —
+  measured on two blocks in `widened-module-edges.test.ts`, one of which carried the comment
+  "The false green this release must not create". The affirmative form of this was already
+  written twice (`slice-rule-builder`, `rule-builder` assert `bypassFilters === true` on
+  purpose); nobody had written the negative. Assert the identity, or assert
+  `bypassFilters === false`.
 - **A sabotage matrix cannot enumerate an omission.** Bug 0040 named its own missing case in
   prose; the plan that fixed it reported 7 of 7 caught, all seven genuinely firing, and the
   named case was not among them because **code never written has no line to revert**. It

@@ -46,6 +46,15 @@ both predicates`. The reader knew; the test did not.
   filed as [plan 0082](plans/0082-an-object-literal-callback-keeps-its-name.md), since two
   callbacks on one object literal are indistinguishable to a rule author.
 
+- **Two tests were passing on a false green of the kind they existed to prevent.** A testing review
+  found the class-B rule used to triage this work had an unstated premise: that only the subject can
+  fill the violations array. It cannot — when a selector matches nothing, the dead-glob gate emits
+  **exactly one** configuration finding, so `toHaveLength(1)` accepts it and the condition never
+  runs. Measured on `widened-module-edges.test.ts`: delete the two fixtures and both blocks exit 0,
+  "2 passed". One of them carries the comment _"The false green this release must not create"_. Both
+  now assert identities and exit 1 under the same swap. Three further count-only blocks were
+  converted alongside them.
+
 - **The scan that found them was itself a hand-maintained list, twice over.** Its first identity
   signal counted `toBeTruthy`/`toThrow`/`toBeGreaterThan`, none of which survive a swap. Its second
   missed five element-boolean idioms like `.some((m) => m.includes('"offset"'))`. And its third —

@@ -14,12 +14,21 @@ const REPO = path.resolve(import.meta.dirname, '../..')
  * this plan spent a release removing. Going down needs no permission — lower the
  * number and say why.
  *
- * The remainder are classes **A** and **B**: the count is either the value under test (a
- * 16-char hash, "warns only once", a cache tally) or there is one subject and no
- * second element to confuse it with. Plan 0079 read all 143 and converted the 47
- * blocks where a count stood in for identity.
+ * The remainder are classes **A** and **B**: the count is either the value under
+ * test (a 16-char hash, "warns only once", a cache tally) or there is one subject
+ * and no second element to confuse it with.
+ *
+ * **The arithmetic, since three numbers are in play.** Plan 0079 read 143 and
+ * converted 47 blocks, leaving 96. Correcting the scan's over-broad
+ * element-boolean signal returned 6 blocks it had been wrongly excluding, one of
+ * which was a genuine case and was converted: 96 + 6 − 1 = **101**. Review then
+ * found five more — two in `widened-module-edges.test.ts` (a **dead selector also
+ * yields exactly one violation**, so the count accepted the configuration finding
+ * when the fixture went missing), two in `matchers.test.ts`, one in
+ * `graphql/schema-rules.test.ts` — plus two neighbours converted for consistency:
+ * **98**.
  */
-const CEILING = 101
+const CEILING = 98
 
 /**
  * A floor beneath the real number, so a broken walk cannot pass.
@@ -77,6 +86,10 @@ describe('the cardinality-only population does not grow (plan 0079)', () => {
     // on disk. Asserting on the regexes directly would test the regexes rather
     // than the decision they feed.
     const dir = path.join(REPO, 'tests', 'tools', '.scan-probe')
+    // Remove first, not only in `finally`: a hard kill between the writes and the
+    // cleanup leaves a probe file on disk, and the next run counts it — a red
+    // ratchet with a work list naming a file that is not part of the suite.
+    fs.rmSync(dir, { recursive: true, force: true })
     fs.mkdirSync(dir, { recursive: true })
     try {
       fs.writeFileSync(path.join(dir, 'a.test.ts'), swapSurvivor)

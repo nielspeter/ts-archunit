@@ -244,10 +244,9 @@ describe('call argument property conditions', () => {
       )
       // Two DISTINCT nested matches, by line — the nested one reported twice
       // also had length 2, and "per match found" is a claim about which.
-      expect(violations.map((v) => v.message.match(/at line (\d+)/)?.[1]).sort()).toEqual([
-        '5',
-        '8',
-      ])
+      expect(
+        violations.map((v) => Number(v.message.match(/at line (\d+)/)?.[1])).sort((a, b) => a - b),
+      ).toEqual([5, 8])
     })
 
     it('reports correct line number in violation', () => {

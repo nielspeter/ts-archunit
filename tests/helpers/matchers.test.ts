@@ -172,7 +172,9 @@ describe('ExpressionMatcher helpers', () => {
       const body = fn.getBody()!
       // call() uses syntaxKinds — goes through targeted path, not broad+dedup
       const callMatches = findMatchesInNode(body, call('parseInt'))
-      expect(callMatches.length).toBe(1)
+      // Identity here too: the sibling at :155 was class C for the same reason,
+      // and this block shares its helper.
+      expect(callMatches.map((m) => m.node.getText())).toEqual(["parseInt('42', 10)"])
     })
   })
 })

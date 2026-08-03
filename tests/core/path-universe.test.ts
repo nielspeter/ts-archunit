@@ -114,6 +114,6 @@ describe('viewsFor', () => {
       return view.every((p) => p.startsWith('/')) ? 'absolute' : 'tsconfig-relative'
     }
     expect(viewsFor(universe, 'file-path').map(shapeOf)).toEqual(['absolute', 'tsconfig-relative'])
-    expect(viewsFor(universe, 'parent-dir')).toHaveLength(2)
+    expect(viewsFor(universe, 'parent-dir').map(shapeOf)).toEqual(['absolute', 'tsconfig-relative'])
   })
 })
