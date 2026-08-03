@@ -67,9 +67,37 @@ export type GlobPosition = 'selector' | 'discovery' | 'condition' | 'exclusion'
  * *about* the subjects — `onlyImportFrom('**\/domain/**')` matching nothing is a
  * satisfied rule, not a broken one (bug 0014) — and an exclusion glob matching
  * nothing is an unused exemption, which `.excluding()` reports on its own terms.
+ *
+ * ## A `switch`, not an `||`, and that is the point
+ *
+ * It shipped as `position === 'selector' || position === 'discovery'` — an
+ * allow-list with no exhaustiveness check. Review measured the consequence: a
+ * **fifth** `GlobPosition` added to the union above compiles clean and leaves the
+ * whole suite green, silently a non-fault in all three consumers. A dead glob
+ * written at it would be invisible in `doctor` *and* in the build — which is the
+ * original divergence's failure direction, one level up, in the predicate that
+ * exists to remove it.
+ *
+ * The predicate's own test enumerates the four known values, which is a
+ * restatement of the implementation and structurally cannot cover a fifth. The
+ * `never` assignment below can, and it fails at compile time rather than at
+ * review time.
  */
 export function isFaultPosition(position: GlobPosition): boolean {
-  return position === 'selector' || position === 'discovery'
+  switch (position) {
+    case 'selector':
+    case 'discovery':
+      return true
+    case 'condition':
+    case 'exclusion':
+      return false
+    default: {
+      // A new position must say which it is. Deciding by default is how the two
+      // inverse lists came to disagree in the first place.
+      const exhaustive: never = position
+      return exhaustive
+    }
+  }
 }
 
 /**
