@@ -11,6 +11,7 @@ import type { GlobSite, Located, Predicate } from '../../src/index.js'
 import type { DiagnosableRule } from '../../src/core/diagnose.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { orphanExclusions } from '../../src/core/orphan-exclusions.js'
+import { resetCommentSuppression, commentSuppressions } from '../../src/core/comment-suppression.js'
 import { isDeadSite } from '../../src/core/glob-evaluator.js'
 import { edgesOf } from '../../src/core/module-edges.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
@@ -1014,4 +1015,33 @@ it('VACUITY: the orphan check really reads our directives', () => {
     .map((f) => path.relative(path.resolve('src'), f).replaceAll('\\', '/'))
     .sort()
   expect(files).toEqual(['conditions/members.ts', 'graphql/schema-loader.ts'])
+})
+
+it('every waiver in src/ actually suppresses something', () => {
+  // A DIFFERENT derivation from the vacuity row above, and that is the point
+  // (ADR-008 rule 5). That row scans source text and proves a directive is
+  // **present**; this one runs the rule and proves it is **load-bearing**.
+  //
+  // They disagree in the case that matters: remove the cast a waiver covers and
+  // the directive still scans, still names a live rule, still reads as "there is
+  // an interop boundary here" — and suppresses nothing. Dead weight that lies
+  // about the code. Only the suppression list can see it.
+  //
+  // This also dogfoods the disclosure shipped for
+  // [bug 0041](../../bugs/fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md):
+  // we built a channel to report what comments silenced, then never pointed it at
+  // ourselves.
+  resetCommentSuppression()
+  modules(p)
+    .that()
+    .satisfy(inProjectSrc())
+    .should()
+    .satisfy(moduleNoTypeAssertions())
+    .rule({ id: 'adr005/no-as-cast-module' })
+    .violations()
+
+  const silenced = commentSuppressions()
+    .map((entry) => path.relative(path.resolve('src'), entry.file).replaceAll('\\', '/'))
+    .sort()
+  expect([...new Set(silenced)]).toEqual(['conditions/members.ts', 'graphql/schema-loader.ts'])
 })
