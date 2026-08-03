@@ -1,4 +1,47 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { defineConfig } from 'vitest/config'
+
+/**
+ * Remove probe directories left by a KILLED run, before the file glob happens.
+ *
+ * `tests/core/warn-survives-the-test-runner.test.ts` writes deliberately-failing
+ * probe files under `tests/__generated__/run-<pid>/` and deletes them in
+ * `afterAll`. A killed run never reaches `afterAll`, and then:
+ *
+ *  - the leftovers are **gitignored**, so `git status` reads clean;
+ *  - `include: ['tests/**\/*.test.ts']` collects them;
+ *  - they are designed to fail.
+ *
+ * So the next run reds for a reason nothing in the working tree shows. A reviewer
+ * hit exactly that — an isolated worktree whose first baseline read exit 1 — and
+ * that is the ADR-008 rule 5 verdict-mechanism hazard at its sharpest: a sabotage
+ * matrix reads exit codes and cannot tell that failure from a real one.
+ *
+ * **Here rather than in the test's `beforeAll`**, which is where it was tried
+ * first: vitest globs its file list at startup, so a prune inside a test cleans
+ * the NEXT run and not the one already collecting. Config load is before the glob.
+ *
+ * By pid LIVENESS, never by wildcard or age: `process.kill(pid, 0)` throws for a
+ * dead pid and does nothing to a live one, so a concurrent sibling run's files are
+ * never touched — deleting those is
+ * [bug 0045](./bugs/fixed/0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md).
+ */
+function pruneDeadProbeRuns(): void {
+  const root = path.join(import.meta.dirname, 'tests/__generated__')
+  if (!fs.existsSync(root)) return
+  for (const entry of fs.readdirSync(root)) {
+    const pid = Number(/^run-(\d+)$/.exec(entry)?.[1])
+    if (!Number.isInteger(pid) || pid === process.pid) continue
+    try {
+      process.kill(pid, 0)
+    } catch {
+      fs.rmSync(path.join(root, entry), { recursive: true, force: true })
+    }
+  }
+}
+
+pruneDeadProbeRuns()
 
 export default defineConfig({
   test: {
