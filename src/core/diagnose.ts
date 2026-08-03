@@ -54,7 +54,19 @@ export interface DiagnosticFinding {
    * that asserts nothing; `'project-unknown'` — a rule whose globs could not
    * be checked because it cannot name the project it was built against.
    */
-  readonly kind: 'dead-glob' | 'no-condition' | 'project-unknown' | 'project-empty'
+  readonly kind:
+    | 'dead-glob'
+    | 'no-condition'
+    | 'project-unknown'
+    | 'project-empty'
+    /**
+     * An inline `// ts-archunit-exclude` comment naming a rule id no rule
+     * declares, so it suppresses nothing — [bug 0044](../../bugs/fixed/0044-an-inline-exclusion-comment-has-no-feedback-channel.md).
+     *
+     * Produced by `orphanExclusions()`, never by `diagnose()`: it needs every
+     * rule at once, and `diagnose()` is called per rule file.
+     */
+    | 'orphan-exclusion'
   /** The rule's id if it has one, else its assembled description. */
   readonly rule: string
   /** Where the glob was written: `resideInFolder("**\/src/x/**")`. */
@@ -65,6 +77,10 @@ export interface DiagnosticFinding {
   readonly onDisk?: OnDisk
   /** The sanctioned fix, or an honest list of causes where none is verifiable. */
   readonly advice: string
+  /**
+   * For `'orphan-exclusion'`, the line the comment sits on.
+   */
+  readonly line?: number
   /**
    * The rule file this rule was written in, when the caller knows it.
    *
