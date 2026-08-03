@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.5] - 2026-08-03
+
+Test-quality only, closing what a testing review raised after v0.45.4 was tagged.
+
+### Internal
+
+- **The guard against cardinality-only assertions was itself a cardinality-only assertion.** It
+  compared a population total against a ceiling, so adding a count-only block while deleting an
+  unrelated one nets to zero and passes silently — the exact substitution the guard exists to catch.
+  It is now keyed on the **set of contributing files**, with the total demoted to a vacuity band.
+  File granularity rather than `file:line` on purpose: line numbers shift on unrelated edits, and a
+  roster that reds constantly teaches the next author to update it without reading it.
+
+- **Three assertions that could pass over nothing, or claimed more than they checked.**
+  `glob-declaration.test.ts` asserted four spellings agreed via `new Set(...).size === 1` — which
+  four _empty_ results also satisfy, so it passed if the glob machinery returned nothing; it pins the
+  value now. `call.test.ts`'s "ignores non-function arguments" could not distinguish "skipped" from
+  "searched and found nothing", since the condition emits at most one violation per call; it asserts
+  the outcome by identity, and the skipping property is covered where it actually lives. And the two
+  basename projections now state why they are unambiguous and when that would stop being true.
+
 ## [0.45.4] - 2026-08-03
 
 Test-quality only. No source changes, no API changes, no behaviour changes.

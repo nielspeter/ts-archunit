@@ -115,10 +115,16 @@ describe('call conditions', () => {
           res.json([])
         })
       `)
-      // authenticate is an identifier, not an inline function --- skipped
-      // The arrow function does not contain handleError
+      // `haveCallbackContaining` emits at most ONE violation per ArchCall, so the
+      // count here cannot distinguish "the identifier was skipped" from "the
+      // identifier was searched and contained nothing" — `authenticate` contains
+      // no `handleError` under either reading. Review flagged that the block's
+      // name claims more than any assertion over this fixture can show. The
+      // skipping property is genuinely covered by `argIndex` at
+      // `callback-extractor.test.ts`; what this block actually asserts is the
+      // outcome, so it asserts the outcome by identity.
       const violations = haveCallbackContaining(call('handleError')).evaluate([archCall], ctx)
-      expect(violations).toHaveLength(1)
+      expect(violations.map((v) => v.element)).toEqual(['app.get'])
     })
 
     it('works with call() matcher', () => {
