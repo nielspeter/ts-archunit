@@ -123,6 +123,32 @@ describe('orphan exclusion comments are reported (bug 0044)', () => {
     }
   })
 
+  it('parses only the files that mention the literal — the reject, asserted by counting', () => {
+    // The ONLY way to guard this. Deleting the reject changes cost, not
+    // behaviour, so every other test in this file stays green — which is how a
+    // 3.0x `doctor` regression could ship unnoticed, and how I measured it twice
+    // against the wrong arm and concluded the saving was imaginary.
+    //
+    // Measured on this repository: 18 of 566 files mention the literal, so the
+    // pass costs ~105ms instead of ~1.5s. Cost scales with directive-bearing
+    // files, not project size — a large repo with no directives pays ~nothing.
+    let seen = 0
+    let parsed = 0
+    orphanExclusions([rule('arch/live')], {
+      onFileScanned: (wasParsed) => {
+        seen++
+        if (wasParsed) parsed++
+      },
+    })
+
+    // The fixture has three files, two of which carry a directive.
+    expect(seen).toBe(3)
+    expect(parsed).toBe(2)
+    // The property, stated so it survives a fixture change: strictly fewer files
+    // are parsed than scanned. Equality means the reject stopped applying.
+    expect(parsed).toBeLessThan(seen)
+  })
+
   it('the scope caveat appears only when the caller admits a partial view', () => {
     // The rule-2 fix. `doctor a.rules.ts` sees a subset of a multi-file project,
     // so a directive naming a rule from another file looks orphaned — and the

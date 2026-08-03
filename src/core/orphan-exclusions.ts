@@ -56,6 +56,15 @@ export interface OrphanExclusionOptions {
   readonly ruleFilesChecked?: number
   /** Rule files the caller believes exist, when it knows. */
   readonly ruleFilesTotal?: number
+  /**
+   * Called once per source file, with whether that file was parsed.
+   *
+   * Exists so a test can assert the cheap reject still applies. Deleting that
+   * `continue` changes **cost and not behaviour**, so every functional test stays
+   * green — which is how a 3.0x regression could ship unnoticed, and how two
+   * separate attempts to measure it could both land on the wrong arm.
+   */
+  readonly onFileScanned?: (parsed: boolean) => void
 }
 
 /** The caveat, or `''` when the caller vouched for full coverage. */
@@ -85,11 +94,23 @@ export interface OrphanExclusion {
 }
 
 /**
- * Every exclusion comment in the project naming a rule id no rule declares.
+ * Could this text hold a directive at all?
  *
- * @param rules - **All** rules, across every rule file. A subset yields false
- *   orphans; see the module docstring.
+ * One predicate, two callers — and the deduplication is the point. This test
+ * existed as two identical inline `includes` checks, and that duplication caused
+ * a real measurement error: an attempt to time the cost of removing it patched
+ * the wrong occurrence, so both arms ran the same path and the saving looked
+ * imaginary. Two identical lines where only one is guarded is a trap for
+ * whoever sabotages next, so there is now one line to remove.
+ *
+ * Sound because `parseExclusionComments` only ever *removes* directives when
+ * blanking literals (bug 0043) — it cannot invent one in a file that does not
+ * contain the text.
  */
+function mayHoldDirective(text: string): boolean {
+  return text.includes('ts-archunit-exclude')
+}
+
 /** The first directive found anywhere, so the aggregate finding has a location. */
 function firstDirective(
   projects: readonly ArchProject[],
@@ -97,7 +118,7 @@ function firstDirective(
   for (const project of projects) {
     for (const sourceFile of project.getSourceFiles()) {
       const text = sourceFile.getFullText()
-      if (!text.includes('ts-archunit-exclude')) continue
+      if (!mayHoldDirective(text)) continue
       const path = sourceFile.getFilePath()
       const [first] = parseExclusionComments(text, path).exclusions
       if (first !== undefined) return { file: path, line: first.line }
@@ -106,6 +127,12 @@ function firstDirective(
   return undefined
 }
 
+/**
+ * Every exclusion comment in the project naming a rule id no rule declares.
+ *
+ * @param rules - **All** rules, across every rule file. A subset yields false
+ *   orphans; see the module docstring.
+ */
 export function orphanExclusions(
   rules: readonly DiagnosableRule[],
   options?: OrphanExclusionOptions,
@@ -167,14 +194,33 @@ export function orphanExclusions(
       // not silently do nothing. The catch is gone because its cause is gone.
       const text = sourceFile.getFullText()
 
-      // Cheap reject before the expensive parse. `parseExclusionComments` builds
-      // a ts-morph source file per call to blank literals (bug 0043), and review
-      // measured `doctor` going from 572ms to 2076ms on this repository — 3.6x,
-      // on a run reporting zero orphans. Sound because that parse only ever
-      // *removes* directives, so a file with no occurrence of the literal text
-      // cannot hold one. Measured back to ~700ms with the planted orphan still
-      // reported.
-      if (!text.includes('ts-archunit-exclude')) continue
+      // Cheap reject before the parse, load-bearing on soundness AND on cost.
+      //
+      // Sound because `parseExclusionComments` only ever *removes* directives
+      // when blanking literals (bug 0043), so a file with no occurrence of the
+      // literal text cannot hold one.
+      //
+      // The cost shape is the better argument: it scales with **directive-bearing
+      // files, not project size** — ~5.7ms per parsed file, against ~2.6ms times
+      // *every* file without it. This repository has 18 of 566 files mentioning
+      // the literal (mostly its own source discussing the feature), so the pass
+      // costs ~105ms instead of ~1.5s and `doctor` ~670ms instead of ~2.0s. A
+      // 5000-file consumer monorepo with **no** directives would have paid ~13s
+      // per run to report nothing.
+      //
+      // I measured this as ~1.0x and concluded the saving was imaginary. Wrong
+      // twice: the first attempt was vacuous (`findings=0`, equally consistent
+      // with scanning nothing), and the second patched the **other** occurrence
+      // of this line — `firstDirective` above carries the same reject — so both
+      // arms ran the same path. Removing a `continue` changes cost and not
+      // behaviour, so no output distinguished them, and 18 parses cost the same
+      // ~105ms either way. `onFileScanned` exists because counting is the only
+      // way to assert this reject still applies.
+      if (!mayHoldDirective(text)) {
+        options?.onFileScanned?.(false)
+        continue
+      }
+      options?.onFileScanned?.(true)
 
       for (const comment of parseExclusionComments(text, path).exclusions) {
         if (declared.has(comment.ruleId)) continue

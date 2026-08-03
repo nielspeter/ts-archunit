@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.43.3] - 2026-08-03
+
+### Fixed
+
+- The `orphanExclusions` JSDoc had become attached to an internal helper rather than the exported function, so editors showed no documentation for it.
+
+### Changed
+
+- Internal only: the orphan check's cheap file reject is now one shared predicate rather than two identical inline checks, and is guarded by counting parsed files. No behaviour change.
+
+  Worth recording why, since the code comments now carry it: the duplication caused a real measurement error. An attempt to time the reject's saving patched one of the two copies, so both arms ran the same path and a **3.0x** `doctor` regression measured as ~1.0x. Removing the reject changes cost and not behaviour, so no functional test could have caught it — hence the counter.
+
 ## [0.43.2] - 2026-08-03
 
 ### Fixed
