@@ -335,24 +335,40 @@ describe('.warn() vs .check()', () => {
 describe('empty layer', () => {
   const p = loadTestProject()
 
-  it('no violations and no crash when a layer matches no files', () => {
-    expect(() => {
-      crossLayer(p)
-        .layer('routes', '**/routes/**')
-        .layer('nonexistent', '**/does-not-exist/**')
-        .mapping(() => true)
-        .forEachPair()
-        .should(
-          satisfyPairCondition('should not be called', () => ({
-            rule: 'test',
-            element: 'test',
-            file: 'test',
-            line: 1,
-            message: 'should not reach here',
-          })),
-        )
-        .check()
-    }).not.toThrow()
+  it('a layer matching no files FAILS — it used to pass in silence', () => {
+    // This test was named "no violations and no crash when a layer matches no
+    // files" and asserted `not.toThrow()`. It pinned the vacuous pass as the
+    // expected behaviour: `satisfyPairCondition`'s callback was even named
+    // 'should not be called', which is true and is the defect — a dead layer
+    // produces no pairs, so the assertion is about nothing (bug 0040).
+    //
+    // Measured then: 4 violations with the layer live, 0 with it dead.
+    const violations = crossLayer(p)
+      .layer('routes', '**/routes/**')
+      .layer('nonexistent', '**/does-not-exist/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(satisfyPairCondition('never reached, because there are no pairs', () => null))
+      .violations()
+
+    const config = violations.filter((v) => v.bypassFilters === true)
+    expect(config).toHaveLength(1)
+    expect(config[0]?.element).toBe('nonexistent')
+    expect(config[0]?.message).toContain('matched 0 files')
+    // The remedy names the `.layer()` call the reader must edit.
+    expect(config[0]?.suggestion).toContain('.layer("nonexistent"')
+  })
+
+  it('CONTROL: both layers live, and the callback governs', () => {
+    // Without this, "always report an empty layer" passes the row above.
+    const violations = crossLayer(p)
+      .layer('routes', '**/routes/**')
+      .layer('schemas', '**/schemas/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(satisfyPairCondition('always satisfied', () => null))
+      .violations()
+    expect(violations.filter((v) => v.bypassFilters === true)).toHaveLength(0)
   })
 
   it('haveMatchingCounterpart fails when the left layer matched zero files (was a vacuous green)', () => {

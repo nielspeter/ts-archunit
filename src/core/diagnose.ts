@@ -11,6 +11,7 @@ import { isDeadGlobTree } from './glob-evaluator.js'
 import { emptyProjectAdvice, loadedNothing } from './empty-project-advice.js'
 import type { RuleBuilderLike } from './rule-builder-like.js'
 import type { GlobNode } from './glob-site.js'
+import { isFaultPosition } from './glob-site.js'
 
 /**
  * Anything `diagnose()` can inspect: a rule that can describe its globs.
@@ -248,7 +249,7 @@ export function diagnose(
         // from an armed tripwire that has not fired. Reporting either asserts
         // a remedy for a non-fault — and `position` used to be copied into the
         // finding and never read, so both fired.
-        if (site.position === 'exclusion' || site.position === 'condition') continue
+        if (!isFaultPosition(site.position)) continue
         if (!isDeadSite(site, universe)) continue
         findings.push(describe(site, name, universe, target))
       }
@@ -277,7 +278,7 @@ function syntacticFindings(rule: string, trees: readonly GlobNode[]): Diagnostic
       // Same position filter as the main path: an exclusion or condition glob
       // matching nothing is not a fault, and that does not change because the
       // fault is syntactic.
-      if (site.position === 'exclusion' || site.position === 'condition') continue
+      if (!isFaultPosition(site.position)) continue
       const fault = syntacticFault(site.glob, site.kind, site.base)
       if (fault === undefined) continue
       findings.push({

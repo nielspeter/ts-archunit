@@ -252,6 +252,23 @@ export class SliceRuleBuilder extends TerminalBuilder {
     }
   }
 
+  /**
+   * Slice discovery is not per-tree, so the gate must stay out (plan 0080).
+   *
+   * `assignedFrom` fans out one glob tree per entry, and a single dead entry among
+   * populated siblings is a dead *tree* — which the gate would report. That guard
+   * was written and **withdrawn before release** for firing on legitimate
+   * projects (see `collectViolations` below): a layer not created yet, and the
+   * `strict-boundaries` scaffold itself.
+   *
+   * The all-empty case is handled here too, with a message the gate cannot match
+   * — it names the discovery mode and its remedy (bug 0009's corpus). So this
+   * builder owns both halves.
+   */
+  protected override ownsDiscoveryDiagnosis(): boolean {
+    return true
+  }
+
   protected collectViolations(): ArchViolation[] {
     // Discovery non-vacuity (ADR-008 / plan 0067): a slice selection that
     // resolved to no slices — or slices that matched no files — discovered
