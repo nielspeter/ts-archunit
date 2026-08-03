@@ -4,9 +4,12 @@ import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { classes } from '../builders/class-rule-builder.js'
 import { newExpr } from '../helpers/matchers.js'
 import type { PresetBaseOptions } from './shared.js'
-import { atPath, collectRule, validateOverrides } from './shared.js'
+import { atPath, collectRule, overrideFindings, validateOverrides } from './shared.js'
 
-export interface DataLayerIsolationOptions extends PresetBaseOptions {
+/** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
+export type DataLayerIsolationRuleId = (typeof RULE_IDS)[number]
+
+export interface DataLayerIsolationOptions extends PresetBaseOptions<DataLayerIsolationRuleId> {
   /** Glob pattern for repository files */
   repositories: string
   /** Base class that all repositories must extend */
@@ -30,6 +33,7 @@ export function dataLayerIsolation(
 ): RuleBuilderLike[] {
   const overrides = options.overrides
   validateOverrides(overrides, [...RULE_IDS])
+  const overrideProblems = overrideFindings(overrides, RULE_IDS)
 
   const builders: RuleBuilderLike[] = []
 
@@ -79,5 +83,7 @@ export function dataLayerIsolation(
     )
   }
 
-  return builders
+  // Unknown override keys FIRST: they say the configuration is wrong, which
+  // the reader needs before any finding produced under it (bug 0038).
+  return [...overrideProblems, ...builders]
 }

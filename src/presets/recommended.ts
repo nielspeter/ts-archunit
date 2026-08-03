@@ -8,9 +8,9 @@ import { functionNoSilentCatch } from '../rules/errors.js'
 import { noEmptyBodies } from '../rules/hygiene.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import type { PresetBaseOptions } from './shared.js'
-import { validateOverrides } from './shared.js'
+import { overrideFindings, validateOverrides } from './shared.js'
 
-export interface RecommendedOptions extends PresetBaseOptions {
+export interface RecommendedOptions extends PresetBaseOptions<RecommendedRuleId> {
   /**
    * Source-file glob the rules apply to. Defaults to `'**\/src/**'`, matched
    * against each file's absolute path (picomatch). This scopes the rules to your
@@ -35,7 +35,7 @@ interface RuleSpec {
  * the builder loop both derive from this — add a rule here and nothing else
  * needs updating.
  */
-const SPECS: readonly RuleSpec[] = [
+const SPECS = [
   {
     condition: functionNoEval(),
     meta: {
@@ -76,9 +76,17 @@ const SPECS: readonly RuleSpec[] = [
     },
     default: 'warn',
   },
-]
+] as const satisfies readonly RuleSpec[]
 
-const RULE_IDS = SPECS.map((s) => s.meta.id)
+/**
+ * Derived from `SPECS`, never restated. A hand-written union is a second list
+ * that drifts the moment a rule is added — which is the whole shape of
+ * [bug 0038](../../bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)
+ * and of the census in plan 0078.
+ */
+export type RecommendedRuleId = (typeof SPECS)[number]['meta']['id']
+
+const RULE_IDS: readonly string[] = SPECS.map((s) => s.meta.id)
 
 /**
  * A deliberately **thin, universal safety floor** for any TypeScript project —
@@ -98,6 +106,7 @@ const RULE_IDS = SPECS.map((s) => s.meta.id)
 export function recommended(p: ArchProject, options: RecommendedOptions = {}): RuleBuilderLike[] {
   const include = options.include ?? '**/src/**'
   validateOverrides(options.overrides, RULE_IDS)
+  const overrideProblems = overrideFindings(options.overrides, RULE_IDS)
 
   const builders: RuleBuilderLike[] = []
   for (const { condition, meta, default: def } of SPECS) {
@@ -114,5 +123,7 @@ export function recommended(p: ArchProject, options: RecommendedOptions = {}): R
     )
   }
 
-  return builders
+  // Unknown override keys FIRST: they say the configuration is wrong, which
+  // the reader needs before any finding produced under it (bug 0038).
+  return [...overrideProblems, ...builders]
 }

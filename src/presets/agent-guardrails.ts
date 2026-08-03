@@ -9,9 +9,23 @@ import { smells } from '../smells/index.js'
 import type { DuplicateBodiesBuilder } from '../smells/duplicate-bodies.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import type { PresetBaseOptions } from './shared.js'
-import { validateOverrides } from './shared.js'
+import { overrideFindings, validateOverrides } from './shared.js'
+import type { RuleSeverity } from './shared.js'
 
-export interface AgentGuardrailsOptions extends PresetBaseOptions {
+/**
+ * This preset's rule ids. The `no-inline-logic` arm is a **template literal**
+ * because those ids are built from the caller's own `noInlineLogic` entries, so
+ * the set is not closed. A typo in the API name is therefore still accepted by
+ * the type — the runtime finding is what covers that arm.
+ */
+export type AgentGuardrailsRuleId =
+  | `preset/agent/no-inline-logic/${string}`
+  | 'preset/agent/no-generic-errors'
+  | 'preset/agent/no-stubs'
+  | 'preset/agent/no-empty-bodies'
+  | 'preset/agent/no-copy-paste'
+
+export interface AgentGuardrailsOptions extends PresetBaseOptions<AgentGuardrailsRuleId> {
   /** Glob for the source files the rules apply to. */
   src: string
   /** Banned call names — one rule generated per entry (e.g. `['parseInt', 'eval']`). */
@@ -49,6 +63,7 @@ export function agentGuardrails(
   options: AgentGuardrailsOptions,
 ): RuleBuilderLike[] {
   validateOverrides(options.overrides, collectRuleIds(options))
+  const overrideProblems = overrideFindings(options.overrides, collectRuleIds(options))
 
   const builders: RuleBuilderLike[] = []
   const push = (
@@ -56,7 +71,7 @@ export function agentGuardrails(
     meta: RuleMetadata & { id: string },
     def: 'error' | 'warn',
   ): void => {
-    const sev = options.overrides?.[meta.id] ?? def
+    const sev = lookup(options.overrides, meta.id) ?? def
     if (sev !== 'off') builders.push(builder.rule(meta).asSeverity(sev))
   }
 
@@ -129,10 +144,28 @@ export function agentGuardrails(
     )
   }
 
-  return builders
+  // Unknown override keys FIRST: they say the configuration is wrong, which
+  // the reader needs before any finding produced under it (bug 0038).
+  return [...overrideProblems, ...builders]
 }
 
 /** All rule ids the given options would generate (for override validation). */
+/**
+ * Widen the typed override map for a lookup by a runtime-built id.
+ *
+ * `no-inline-logic/${api}` ids are constructed from the caller's own options, so
+ * the key here is a `string` and the map is keyed by a literal union. The
+ * widening is confined to this one function rather than loosening the option
+ * type, which is what makes the typo a compile error for every other key.
+ */
+function lookup(
+  overrides: Partial<Record<AgentGuardrailsRuleId, RuleSeverity>> | undefined,
+  id: string,
+): RuleSeverity | undefined {
+  const widened: Partial<Record<string, RuleSeverity>> | undefined = overrides
+  return widened?.[id]
+}
+
 function collectRuleIds(options: AgentGuardrailsOptions): string[] {
   const ids: string[] = []
   for (const api of options.noInlineLogic ?? []) ids.push(`preset/agent/no-inline-logic/${api}`)

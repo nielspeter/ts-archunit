@@ -6,9 +6,18 @@ import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import { smells } from '../smells/index.js'
 import type { PresetBaseOptions } from './shared.js'
-import { atPath, collectRule, validateOverrides, assertDiscovered } from './shared.js'
+import {
+  atPath,
+  collectRule,
+  overrideFindings,
+  validateOverrides,
+  assertDiscovered,
+} from './shared.js'
 
-export interface StrictBoundariesOptions extends PresetBaseOptions {
+/** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
+export type StrictBoundariesRuleId = (typeof RULE_IDS)[number]
+
+export interface StrictBoundariesOptions extends PresetBaseOptions<StrictBoundariesRuleId> {
   /** Glob pattern for boundary folders (e.g., 'src/features/*') */
   folders: string
   /** Glob patterns for shared folders accessible by all boundaries */
@@ -111,6 +120,7 @@ export function strictBoundaries(
 ): RuleBuilderLike[] {
   const overrides = options.overrides
   validateOverrides(overrides, [...RULE_IDS])
+  const overrideProblems = overrideFindings(overrides, RULE_IDS)
 
   const sharedGlobs = options.shared ?? []
   const builders: RuleBuilderLike[] = []
@@ -283,5 +293,7 @@ export function strictBoundaries(
     )
   }
 
-  return builders
+  // Unknown override keys FIRST: they say the configuration is wrong, which
+  // the reader needs before any finding produced under it (bug 0038).
+  return [...overrideProblems, ...builders]
 }
