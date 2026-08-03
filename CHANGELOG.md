@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.40.0] - 2026-08-01
+
+### Fixed
+
+- **A `// ts-archunit-exclude` directive counts only where it really is a directive** ([bug 0043](bugs/fixed/0043-an-exclusion-directive-inside-a-string-literal-suppresses.md)). The parser split the source on newlines and matched each line, with no idea what was code, what was a string and what was a comment — so the characters alone were enough. Measured: the directive text inside `"…"`, `'…'`, a template literal, a regex literal or JSX text produced a **live exclusion that silenced a real finding**, and silently, because a directive carrying a reason never triggers the undocumented-exclusion warning. Literals are now parsed and blanked before the scan.
+
+- **A comment that mentions the syntax is no longer treated as the syntax.** Once comments were being read correctly, any comment _about_ a directive became one — the first casualty was this parser's own grammar documentation, which declared a reason-less exclusion against whatever rule was running. A directive must now **begin its comment**, and block comments are excluded (the grammar is `//`-only; a `/* … */` directive never worked). The documented trailing form is unaffected: `const a = 1 // ts-archunit-exclude rule/id: why` still works, because there the comment begins with the directive.
+
+### Upgrade note
+
+**Some exclusions will stop applying, and that is the fix.** If a finding reappears after upgrading, the comment that was silencing it was one of:
+
+- inside a string, template, regex or JSX text — it was never a comment;
+- prose inside a larger comment, e.g. `// see // ts-archunit-exclude foo` or a JSDoc block explaining the feature;
+- inside a `/* … */` block, which never created an exclusion but could contribute a _warning_.
+
+None of those were intended as exemptions. If you did intend one, write it as its own line comment: `// ts-archunit-exclude rule/id: why`.
+
+Most affected are projects whose source discusses this library — its own tests, documentation examples embedded as template literals, or tooling that generates exclusion comments.
+
 ## [0.39.1] - 2026-08-01
 
 ### Fixed

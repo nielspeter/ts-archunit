@@ -270,7 +270,7 @@ The ceiling stated when this was filed, unchanged and now shipped against: **`: 
 green in one step.** This buys a reason string in the diff for a human reviewer and one round of
 friction. It does not prevent a determined suppression, and the release note says so.
 
-Two related defects stay open: [bug 0043](../0043-an-exclusion-directive-inside-a-string-literal-suppresses.md)
+Two related defects stay open: [bug 0043](./0043-an-exclusion-directive-inside-a-string-literal-suppresses.md)
 (a directive inside a string literal counts) and
 [bug 0044](../0044-an-inline-exclusion-comment-has-no-feedback-channel.md) (nothing reports a
 comment that matched nothing). The rule-3-corollary answer — exclusion by construction — remains
