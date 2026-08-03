@@ -30,7 +30,15 @@ describe('agentGuardrails preset', () => {
       noEmptyBodies: true,
       noCopyPaste: true,
     })
-    expect(builders).toHaveLength(5) // 1 inline + 4 flags
+    // One per enabled rule, BY ID — five builders with the same id also had
+    // length 5, and "per enabled rule" is a statement about which.
+    expect(builders.map((b) => b.describeRule().id)).toEqual([
+      'preset/agent/no-inline-logic/parseInt',
+      'preset/agent/no-generic-errors',
+      'preset/agent/no-stubs',
+      'preset/agent/no-empty-bodies',
+      'preset/agent/no-copy-paste',
+    ])
   })
 
   it('catches inline parseInt (error severity)', () => {
@@ -103,7 +111,12 @@ describe('agentGuardrails preset', () => {
 
   it('generates a distinct rule id per noInlineLogic entry', () => {
     const builders = agentGuardrails(p, { src: SRC, noInlineLogic: ['parseInt', 'eval'] })
-    expect(builders).toHaveLength(2)
+    // DISTINCT is the claim, and a count of 2 cannot see it: two builders
+    // sharing one id — the bug this guards — also had length 2.
+    expect(builders.map((b) => b.describeRule().id)).toEqual([
+      'preset/agent/no-inline-logic/parseInt',
+      'preset/agent/no-inline-logic/eval',
+    ])
   })
 })
 

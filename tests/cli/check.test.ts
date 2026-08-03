@@ -217,8 +217,8 @@ describe('runCheck', () => {
   it('--format github renders warns as ::warning, not ::error', async () => {
     const spy = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
     mockLoadRuleFiles.mockResolvedValue([
-      { violations: () => [v({ element: 'ErrOne', severity: 'error' })] },
-      { violations: () => [v({ element: 'WarnOne', severity: 'warn' })] },
+      { violations: () => [v({ element: 'ErrOne', message: 'the error one', severity: 'error' })] },
+      { violations: () => [v({ element: 'WarnOne', message: 'the warn one', severity: 'warn' })] },
     ])
 
     await runCheck({ ...baseArgs, format: 'github' })
@@ -230,8 +230,12 @@ describe('runCheck', () => {
       .split('\n')
     // Severity is partitioned: exactly one ::error and one ::warning
     // (the old bug rendered both as ::error).
-    expect(lines.filter((l) => l.startsWith('::error'))).toHaveLength(1)
-    expect(lines.filter((l) => l.startsWith('::warning'))).toHaveLength(1)
+    // WHICH violation got which annotation. Counting one of each passes when
+    // the two are swapped — the sharper form of the bug this guards, since a
+    // warn rendered as ::error fails the build and an error rendered as
+    // ::warning does not.
+    expect(lines.filter((l) => l.startsWith('::error')).join('')).toContain('the error one')
+    expect(lines.filter((l) => l.startsWith('::warning')).join('')).toContain('the warn one')
   })
 
   it('collects across multiple files and one file throwing on import does not abort the rest', async () => {

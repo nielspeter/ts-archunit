@@ -53,7 +53,9 @@ describe('Probe 1: Function Existence — find elements by name/location', () =>
 
     it('does not match non-arrow const declarations', () => {
       // parseBazOrder should be the only match
-      expect(matched).toHaveLength(1)
+      // The comment said "parseBazOrder should be the only match"; now the
+      // assertion does too.
+      expect(matched.map((m) => m.getName())).toEqual(['parseBazOrder'])
     })
   })
 
