@@ -1,7 +1,7 @@
 # Bug 0040: two of three cross-layer conditions report nothing when a layer resolves nothing
 
 **Reported:** 2026-08-01 · **API half FIXED:** 2026-08-03, v0.42.0
-**Silence half:** split out to [plan 0080](../../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md) — it carries three criticals
+**Silence half:** split out to [plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md) — it carries three criticals
 **Verified:** reproduced with a non-vacuous control
 **Found in:** v0.36.3, while fixing [bug 0036](./0036-the-relative-glob-audit-is-incomplete.md)
 **Severity:** **High** for the API defect below; Medium for the silence this bug is named after.

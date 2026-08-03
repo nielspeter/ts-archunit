@@ -194,10 +194,19 @@ describe('a held builder is immutable — behavioural', () => {
     const baseline = held.violations().length
     expect(baseline).toBeGreaterThan(0)
 
-    // A folder glob matching nothing scopes the detector to nothing — called
-    // directly on `held`, so a leak would land on `held` itself.
-    expect(held.inFolder('**/no-such-dir/**').violations()).toHaveLength(0)
-    expect(held.violations()).toHaveLength(baseline)
+    // A folder glob matching nothing now yields a **configuration finding**
+    // rather than an empty result (plan 0080), so the leak test asserts on the
+    // finding's presence rather than on a length of zero. The property under
+    // test is unchanged: called directly on `held`, so a leak would land on
+    // `held` itself and be visible in the line after.
+    const scopedToNothing = held.inFolder('**/no-such-dir/**').violations()
+    expect(scopedToNothing.every((v) => v.bypassFilters === true)).toBe(true)
+    expect(scopedToNothing.length).toBeGreaterThan(0)
+    // The held builder is untouched: still the ordinary duplicate findings, none
+    // of them configuration findings.
+    const after = held.violations()
+    expect(after).toHaveLength(baseline)
+    expect(after.every((v) => v.bypassFilters !== true)).toBe(true)
 
     // A threshold nothing can meet, likewise on `held`, with no re-set after.
     expect(held.minLines(1000).violations()).toHaveLength(0)

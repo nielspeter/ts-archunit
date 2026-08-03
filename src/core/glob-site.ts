@@ -45,6 +45,34 @@ export type GlobKind = 'file-path' | 'parent-dir' | 'import-target' | 'specifier
 export type GlobPosition = 'selector' | 'discovery' | 'condition' | 'exclusion'
 
 /**
+ * Is a dead glob at this position a **fault**?
+ *
+ * One owner for a decision that was written twice, inversely, and disagreed —
+ * [plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md).
+ *
+ * | site | said | i.e. |
+ * | --- | --- | --- |
+ * | `diagnose.ts` | skip `exclusion` and `condition` | selector **and discovery** are faults |
+ * | `terminal-builder.ts` | skip anything but `selector` | only selector is |
+ *
+ * So `doctor` reported a dead `discovery` glob and the check that gates the build
+ * did not — the divergence bug 0040's silence half is made of. Two hand-maintained
+ * inverse lists that must agree is the shape ADR-008 rule 5 keeps charging this
+ * project for; a shared predicate is the whole fix.
+ *
+ * **`selector` and `discovery` are faults.** Both name what a rule will judge, so
+ * a dead one means the rule judges nothing.
+ *
+ * **`condition` and `exclusion` are not.** A condition glob is an assertion
+ * *about* the subjects — `onlyImportFrom('**\/domain/**')` matching nothing is a
+ * satisfied rule, not a broken one (bug 0014) — and an exclusion glob matching
+ * nothing is an unused exemption, which `.excluding()` reports on its own terms.
+ */
+export function isFaultPosition(position: GlobPosition): boolean {
+  return position === 'selector' || position === 'discovery'
+}
+
+/**
  * Which set of paths the glob is written against.
  *
  * **This affects the verdict**, and the earlier claim here that it was

@@ -209,6 +209,22 @@ export class PairFinalBuilder extends TerminalBuilder {
     )
   }
 
+  /**
+   * The conditions diagnose their own empty layers, so the gate stays out.
+   *
+   * All three now produce a finding naming the layer, with a remedy pointing at
+   * the `.layer()` call — corrected three times and pinned (bug 0042). The
+   * dead-glob gate can also see that a layer glob is dead, and plan 0080 admits
+   * discovery globs to it, but it short-circuits *before* the condition runs and
+   * would therefore **replace** the better message with a generic one.
+   *
+   * Declared here rather than special-cased in the gate: the knowledge that these
+   * conditions self-report belongs with them.
+   */
+  protected override ownsDiscoveryDiagnosis(): boolean {
+    return true
+  }
+
   protected collectViolations() {
     const layerNames = this.layers.map((l) => l.name)
     const context: PairConditionContext = {

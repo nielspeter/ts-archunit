@@ -68,15 +68,45 @@ describe('SmellBuilder.ignorePaths()', () => {
 })
 
 describe('SmellBuilder.inFolder()', () => {
-  it('inFolder restricts scope to matching files', () => {
+  it('a LIVE inFolder glob scopes without complaint', () => {
+    // Rewritten against a REAL but narrower folder. This asserted
+    // `inFolder('**/nonexistent/**')` did `not.toThrow()`, with the comment "No
+    // files in nonexistent folder, so no violations" — which is the ∀-over-∅
+    // pass stated as the expectation. A detector scoped to nothing detects
+    // nothing, and the test called that success.
+    //
+    // A dead folder glob is now a configuration finding (plan 0080), so the
+    // scoping property needs a live folder to be about anything.
     const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
-    const builder = smells
+    const all = smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8).violations()
+    expect(all.length).toBeGreaterThan(0)
+
+    // A LIVE folder glob: no configuration finding, and the duplicates still
+    // found. `**/duplicate-bodies/**` is the fixture's own directory — it has no
+    // subfolders, so a genuinely *narrower* live glob is not available here, and
+    // the scoping-to-a-subset property is asserted in `inconsistent-siblings`
+    // where the fixture has one. Said rather than faked with a dead glob, which
+    // is what this test used to do.
+    const scoped = smells
+      .duplicateBodies(p)
+      .minLines(3)
+      .withMinSimilarity(0.8)
+      .inFolder('**/duplicate-bodies/**')
+      .violations()
+    expect(scoped.every((v) => v.bypassFilters !== true)).toBe(true)
+    expect(scoped.length).toBe(all.length)
+  })
+
+  it('a folder glob matching NOTHING is a finding, not a quiet pass', () => {
+    // The other half of the rewrite above, and the actual fix.
+    const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
+    const violations = smells
       .duplicateBodies(p)
       .minLines(3)
       .withMinSimilarity(0.8)
       .inFolder('**/nonexistent/**')
-    // No files in nonexistent folder, so no violations
-    expect(() => builder.check()).not.toThrow()
+      .violations()
+    expect(violations.filter((v) => v.bypassFilters === true).length).toBeGreaterThan(0)
   })
 })
 

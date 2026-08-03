@@ -78,7 +78,7 @@ gate's text and `doctor`'s text are equal on an empty project**, extending the p
 - empty project, **`selector`** position → gate text == `doctor` text. **This is the row that was
   missing**: the existing test asserts the discovery path, which has its own branch and always
   passed;
-- empty project, `discovery` position → unchanged (see [plan 0080](../../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md));
+- empty project, `discovery` position → unchanged (see [plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md));
 - **control:** a genuinely dead glob in a project that loaded files → both still blame the glob, and
   the texts still agree. Without this, "always say project-empty" passes.
 - vacuity: assert the fixture really loads 0 files, and that the non-empty control loads more than 0.
@@ -87,7 +87,7 @@ gate's text and `doctor`'s text are equal on an empty project**, extending the p
 
 - [Bug 0031](./0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md) — the same
   fault, fixed on `diagnose()` only.
-- [Plan 0080](../../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md) — widens this gate's
+- [Plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md) — widens this gate's
   audience to three more builders, so this should be fixed **first**. Its Critical 2.
 
 ## Fix as shipped

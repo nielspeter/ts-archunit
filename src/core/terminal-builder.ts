@@ -6,6 +6,7 @@ import type { ArchProject } from './project.js'
 import type { PathUniverse } from './path-universe.js'
 import { pathUniverse } from './path-universe.js'
 import { isDeadGlobTree, isDeadSite, globSitesOf } from './glob-evaluator.js'
+import { isFaultPosition } from './glob-site.js'
 import { diagnoseGlob, FAULT_ADVICE, ON_DISK_ADVICE } from './glob-diagnosis.js'
 import { diskSet } from './disk-set.js'
 import { emptyProjectAdvice, loadedNothing } from './empty-project-advice.js'
@@ -171,10 +172,35 @@ export abstract class TerminalBuilder {
       // of failing. The comment above already committed to that ordering; this
       // is the branch that honours it.
       //
-      // Gate-first within this branch, before `collectViolations()`: a rule
-      // whose selector cannot match will walk the whole AST to select nothing.
-      const deadGlobs = this.deadSelectorFindings()
-      if (deadGlobs.length > 0) return deadGlobs
+      // Gate-first for a dead SELECTOR, before `collectViolations()`: a rule whose
+      // selector cannot match will walk the whole AST to select nothing.
+      //
+      // But NOT gate-first for a dead **discovery** glob, and that asymmetry is
+      // plan 0080's whole design. Admitting discovery globs to the gate without
+      // it is destructive rather than additive: this early return means the gate
+      // REPLACES a builder's own finding rather than adding to it, and the slice
+      // builders already produce a better one (`emptyDiscoveryViolation`). Review
+      // measured the cost of getting this wrong — **15 slice tests, 13 of them
+      // the whole bug-0009 remedy corpus**, whose stated subject is that each
+      // branch's advice is true. Trading a rule 1 defect for a rule 2 defect.
+      //
+      // So the owner **declares itself** — `ownsDiscoveryDiagnosis()` — rather than
+      // the gate naming who to skip. An "except slice" list would be the same
+      // unchecked claim about who owns what that this file used to carry in a
+      // comment, and that comment being wrong is what plan 0080 exists to fix.
+      // The precedent is `assertsCardinality()` directly above: knowledge lives
+      // with the builder that has it.
+      //
+      // A first attempt derived it instead — run `collectViolations()` and prefer
+      // any `bypassFilters` finding it produced. That cannot work, and slice is
+      // the counterexample: for a **partially** empty `assignedFrom` it produces
+      // nothing *deliberately* (a slice with no files yet is legitimate, and that
+      // guard was withdrawn before release for firing on real projects). So
+      // "prefer what it produced" reads silence as "no opinion" when it is in
+      // fact the opinion.
+      const dead = this.deadSelectorFindings()
+      if (dead.selector.length > 0) return dead.selector
+      if (dead.discovery.length > 0 && !this.ownsDiscoveryDiagnosis()) return dead.discovery
       return this.collectViolations()
     }
 
@@ -412,17 +438,57 @@ export abstract class TerminalBuilder {
     return false
   }
 
-  protected deadSelectorFindings(): ArchViolation[] {
+  /**
+   * Does this builder diagnose its own empty discovery?
+   *
+   * `false` — the gate reports a dead `discovery` glob, which is the fix for
+   * [bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)'s
+   * silence half: two of three cross-layer conditions reported **nothing** when a
+   * layer resolved to no files.
+   *
+   * `true` — the builder owns it, and the gate stays out. `SliceRuleBuilder` is
+   * the one that does, because its discovery semantics are **not** per-tree and
+   * cannot be expressed by a position filter:
+   *
+   * | builder | one dead tree among live ones |
+   * | --- | --- |
+   * | `crossLayer` | a **fault** — that layer's pairs are unchecked |
+   * | slice `assignedFrom` | **legitimate** — a slice with no files yet is a real shape |
+   *
+   * `slice-rule-builder.ts` records that second guard being withdrawn before
+   * release for firing on real projects: "a layer not created yet, and the
+   * `strict-boundaries` scaffold itself". Slice already handles the all-empty case
+   * with a better message than the gate's, so it owns both halves.
+   *
+   * Declared, never named from the outside. A list of exceptions in the gate is
+   * an unchecked claim about who owns what — which is exactly the comment this
+   * plan was filed to correct.
+   */
+  protected ownsDiscoveryDiagnosis(): boolean {
+    return false
+  }
+
+  /**
+   * A dead glob's findings, **split by whether the builder might own the message**.
+   *
+   * `selector` and `discovery` are both faults (`isFaultPosition`), but the caller
+   * treats them differently: a dead selector short-circuits before the AST walk,
+   * while a dead discovery glob defers to whatever the builder produced. An
+   * `ArchViolation` carries no position, so the split happens here rather than
+   * being recovered by inspecting findings downstream.
+   */
+  protected deadSelectorFindings(): { selector: ArchViolation[]; discovery: ArchViolation[] } {
+    const empty = { selector: [], discovery: [] }
     const project = this.getProject()
-    if (project === undefined) return []
+    if (project === undefined) return empty
     // A condition that asserts CARDINALITY is satisfied by having no subjects,
     // so an unsatisfiable selector is this rule working rather than failing —
     // the pre-emptive guard `.should().notExist()` expresses. Declared by the
     // condition, never probed: evaluating any condition against `[]` returns no
     // violations, so probing answers "satisfied" for all of them.
-    if (this.assertsCardinality()) return []
+    if (this.assertsCardinality()) return empty
     const trees = this.globs()
-    if (trees.length === 0) return []
+    if (trees.length === 0) return empty
 
     // The project loaded nothing, so no glob can match and none of them is at
     // fault — [bug 0048](../../bugs/fixed/0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md).
@@ -438,22 +504,29 @@ export abstract class TerminalBuilder {
     // One finding for the project, not one per glob — the identity of this fault
     // is the tsconfig, which is what ADR-008 rule 4 asks be named, and it is why
     // `diagnose()` dedupes by project too.
-    if (loadedNothing(project)) return [this.emptyProjectViolation(project)]
+    if (loadedNothing(project))
+      return { selector: [this.emptyProjectViolation(project)], discovery: [] }
 
     const universe = pathUniverse(project)
-    const findings: ArchViolation[] = []
+    const selector: ArchViolation[] = []
+    const discovery: ArchViolation[] = []
     for (const tree of trees) {
       // Only inside a tree that is dead as a whole: `or(dead, live)` is a
       // working rule, and reporting its dead branch is the false red the tree
       // model exists to prevent.
       if (!isDeadGlobTree(tree, universe)) continue
       for (const site of globSitesOf(tree)) {
-        if (site.position !== 'selector') continue
+        // `isFaultPosition`, shared with `diagnose()` — the two used inverse
+        // hand-maintained lists and disagreed about exactly `discovery`, which
+        // is why `doctor` reported a dead layer glob and the build did not.
+        if (!isFaultPosition(site.position)) continue
         if (!isDeadSite(site, universe)) continue
-        findings.push(this.deadSelectorViolation(site, universe, project))
+        const finding = this.deadSelectorViolation(site, universe, project)
+        if (site.position === 'discovery') discovery.push(finding)
+        else selector.push(finding)
       }
     }
-    return findings
+    return { selector, discovery }
   }
 
   /**
@@ -513,9 +586,23 @@ export abstract class TerminalBuilder {
     const diagnosis = diagnoseGlob(site, universe, diskSet(project))
     const onDisk = diagnosis.onDisk === undefined ? '' : ON_DISK_ADVICE[diagnosis.onDisk]
     const cause = onDisk === '' ? FAULT_ADVICE[diagnosis.fault] : onDisk
+    // Position-aware in BOTH clauses, not just the noun (plan 0080).
+    //
+    // Admitting `discovery` globs made this sentence wrong twice over for them.
+    // The noun was the obvious half — a `smells.duplicateBodies().inFolder()` glob
+    // is not a "selector". The **consequence clause** was the part that actually
+    // lied: "it has no subjects and cannot fail" describes a rule that selects
+    // nothing, while a dead discovery glob means the rule discovered nothing to
+    // compare — there may be plenty of subjects. Review flagged that fixing the
+    // noun alone ships a grammatical sentence that is still false.
+    const isDiscovery = site.position === 'discovery'
+    const what = isDiscovery ? 'discovery glob' : 'selector'
+    const consequence = isDiscovery
+      ? 'so it discovers nothing to check and cannot fail'
+      : 'so it has no subjects and cannot fail'
     const advice =
-      `This rule's selector ${site.origin} can never match anything in this project, ` +
-      `so it has no subjects and cannot fail — ${cause}. ` +
+      `This rule's ${what} ${site.origin} can never match anything in this project, ` +
+      `${consequence} — ${cause}. ` +
       `Correct the glob, or remove the rule. ${UNSUPPRESSABLE}`
     return {
       rule: name,
