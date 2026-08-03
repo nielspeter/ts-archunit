@@ -3,6 +3,7 @@ import type { SourceFile } from 'ts-morph'
 import type { Predicate } from '../core/predicate.js'
 import { globAnyOf } from '../core/glob-site.js'
 import type { ImportOptions } from '../core/import-options.js'
+import { splitGlobArgs } from '../core/import-options.js'
 import { candidatesFor } from '../core/import-candidates.js'
 import { edgesOf, FORWARD_EDGE_KINDS } from '../core/module-edges.js'
 import { rootOf } from '../core/project-relative.js'
@@ -70,9 +71,7 @@ function importCandidatePaths(sourceFile: SourceFile, ignoreTypeImports = false)
 export function importFrom(globs: string[], options: ImportOptions): Predicate<SourceFile>
 export function importFrom(...globs: string[]): Predicate<SourceFile>
 export function importFrom(...args: [string[], ImportOptions] | string[]): Predicate<SourceFile> {
-  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
-  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
-  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const { globs, options } = splitGlobArgs(args)
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
@@ -95,9 +94,7 @@ export function notImportFrom(...globs: string[]): Predicate<SourceFile>
 export function notImportFrom(
   ...args: [string[], ImportOptions] | string[]
 ): Predicate<SourceFile> {
-  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
-  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
-  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const { globs, options } = splitGlobArgs(args)
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   return {
