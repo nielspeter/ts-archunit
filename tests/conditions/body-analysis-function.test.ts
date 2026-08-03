@@ -60,7 +60,9 @@ describe('functionContain()', () => {
     const condition = functionContain(call('JSON.parse'))
     const violations = condition.evaluate([fn1, fn2], context)
     // Both should fail — neither calls JSON.parse
-    expect(violations).toHaveLength(2)
+    // BOTH functions, not two violations: reporting parseFooOrder twice also
+    // had length 2, and "independently" is the claim.
+    expect(violations.map((v) => v.element).sort()).toEqual(['listItems', 'parseFooOrder'])
   })
 
   it('reports file path and line number', () => {

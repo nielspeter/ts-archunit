@@ -46,7 +46,8 @@ describe('workspace()', () => {
 
     const condition = beImported()
     const violations = condition.evaluate([orphan], ctx)
-    expect(violations).toHaveLength(1) // orphan.ts is not imported by anything
+    // The comment carried the identity; now the assertion does.
+    expect(violations.map((v) => v.element)).toEqual(['orphan.ts'])
   })
 
   it('returns the same instance for the same set of tsconfigs', () => {

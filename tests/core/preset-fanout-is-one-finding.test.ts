@@ -63,7 +63,13 @@ describe('a preset fan-out collapses to the option (plan 0074)', () => {
       config({ ruleId: 'preset/boundaries/shared-discovery' }),
       config({ ruleId: 'preset/boundaries/shared-isolation' }),
     ])
-    expect(findings).toHaveLength(2)
+    // The two rule IDS, which is the whole claim — both findings carry the
+    // same element and the same message, so a count of 2 says nothing about
+    // whether they were kept apart.
+    expect(findings.map((v) => v.ruleId).sort()).toEqual([
+      'preset/boundaries/shared-discovery',
+      'preset/boundaries/shared-isolation',
+    ])
   })
 
   it('keeps two rule FILES apart, because they are two places to edit', () => {
@@ -79,6 +85,10 @@ describe('a preset fan-out collapses to the option (plan 0074)', () => {
     // separate edit. Collapsing them is the snapshot ADR-008 rule 4 bars, and it
     // would hide real work.
     const many = [ordinary(), ordinary(), ordinary()]
+    // Class A after measurement (plan 0079): these three are IDENTICAL on
+    // ruleId, file, line, element and message — deliberately, since the claim
+    // is that alike violations are not collapsed. There is no identity to
+    // assert, so the count IS the value under test.
     expect(dedupeConfigFindings(many)).toHaveLength(3)
   })
 
@@ -101,6 +111,7 @@ describe('a preset fan-out collapses to the option (plan 0074)', () => {
   it('keeps a finding that has no element to key on', () => {
     // A missing key must mean "keep it", never "merge everything that lacks one".
     const findings = dedupeConfigFindings([config({ element: '' }), config({ element: '' })])
+    // Class A, same reason as above: both findings lack an element by design.
     expect(findings).toHaveLength(2)
   })
 

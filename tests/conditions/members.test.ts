@@ -192,7 +192,10 @@ describe('haveOnlyReadonlyProperties', () => {
   it('reports violation for mutable type alias', () => {
     const condition = haveOnlyReadonlyProperties()
     const violations = condition.evaluate([getTypeAlias('MutableConfig')], context)
-    expect(violations).toHaveLength(2)
+    expect(violations.map((v) => v.message.match(/property "(\w+)"/)?.[1]).sort()).toEqual([
+      'host',
+      'port',
+    ])
   })
 
   it('works on readonly class', () => {

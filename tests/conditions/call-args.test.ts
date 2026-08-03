@@ -129,7 +129,9 @@ describe('call argument property conditions', () => {
         [archCall],
         ctx,
       )
-      expect(violations).toHaveLength(2)
+      // WHICH properties. One reported twice also had length 2.
+      const flagged = violations.map((v) => v.message.match(/property "(\w+)"/)?.[1])
+      expect(flagged.sort()).toEqual(['deprecated', 'internal'])
     })
 
     it('throws on zero arguments', () => {

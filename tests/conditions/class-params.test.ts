@@ -58,7 +58,16 @@ describe('notAcceptParameterOfType()', () => {
     const cond = notAcceptParameterOfType(matching(/DatabaseClient/))
     const violations = cond.evaluate([getClass('RepoAcceptingDb')], ctx)
     // RepoAcceptingDb constructor has db: DatabaseClient (1 match), logger: Logger (no match)
-    expect(violations).toHaveLength(1)
+    // The comment above named the matching param and the assertion counted:
+    // flagging `logger` instead also had length 1.
+    expect(
+      violations.map((v) =>
+        v.message
+          .match(/\.(\w+) parameter "(\w+)"/)
+          ?.slice(1, 3)
+          .join('.'),
+      ),
+    ).toEqual(['constructor.db'])
   })
 
   it('reports violations across members', () => {
