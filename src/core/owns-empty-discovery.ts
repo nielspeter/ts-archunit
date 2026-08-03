@@ -68,3 +68,12 @@ export function marksOwnEmptyDiscovery<T extends object>(condition: T): T {
 export function ownsEmptyDiscovery(condition: object): boolean {
   return OWNERS.has(condition)
 }
+
+/*
+ * Not every builder needs this. `SliceRuleBuilder` declares ownership at the
+ * BUILDER level and correctly so: its reason — `assignedFrom` fanning out one glob
+ * tree per entry, where a single dead entry among populated siblings is a
+ * legitimate project shape — is identical for every condition reachable through
+ * it. Registry membership is for the case where ownership varies by condition,
+ * which is what made a blanket declaration wrong for cross-layer.
+ */
