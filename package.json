@@ -84,7 +84,7 @@
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write .",
-    "format:check": "git ls-files -z '*.ts' '*.js' '*.mjs' '*.json' '*.md' '*.yml' '*.yaml' | xargs -0 --no-run-if-empty prettier --check --ignore-unknown",
+    "format:check": "git ls-files -z --cached --others --exclude-standard '*.ts' '*.js' '*.mjs' '*.json' '*.md' '*.yml' '*.yaml' | xargs -0 --no-run-if-empty prettier --check --ignore-unknown",
     "typecheck": "tsc --noEmit",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

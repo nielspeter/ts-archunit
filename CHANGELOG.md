@@ -39,6 +39,22 @@ legacyName(req) {} }` reported `legacyName` before v0.46.0 and reports `handler`
   are now pinned: the property key wins on a property, and a positional named function keeps its own
   name.
 
+### Internal
+
+- **`format:check` could not see a file until it was staged**, so `npm run validate` passed locally
+  on a newly-written document and the publish workflow failed on it after `git add`. It globbed
+  `git ls-files`, which lists **tracked** files only; it now passes `--others --exclude-standard`
+  so untracked-but-not-ignored files are checked too. This cost v0.46.1 a failed publish, and it is
+  the house pattern: a check that cannot see something counts as coverage anyway.
+- **A killed test run no longer reds the next one.** `warn-survives-the-test-runner.test.ts` writes
+  deliberately-failing probe files under `tests/__generated__/run-<pid>/` and removes them in
+  `afterAll`; a killed run never gets there. The leftovers are gitignored — so `git status` shows
+  nothing — and were then collected by vitest **and** parsed by eslint, reddening a clean tree for
+  an invisible reason. A reviewer lost a baseline to exactly this. Now pruned by pid liveness at
+  vitest config load (before the file glob, which is why the test's own `beforeAll` was the wrong
+  place) and ignored by eslint. Liveness rather than wildcard, so a concurrent run's files are never
+  touched — deleting those is bug 0045.
+
 ### Documentation
 
 - The v0.46.0 baseline-migration note was **wrong about its own mechanism**. `hashViolation` is
