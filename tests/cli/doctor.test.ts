@@ -59,6 +59,28 @@ afterAll(() => {
   fs.rmSync(workDir, { recursive: true, force: true })
 })
 
+interface DoctorFinding {
+  readonly kind: string
+  readonly rule: string
+  readonly sourceFile?: string
+  readonly line?: number
+}
+interface DoctorDocument {
+  readonly findings: readonly DoctorFinding[]
+}
+
+/** Narrow `JSON.parse`'s `unknown` without a cast (ADR-005). */
+function isDoctorDocument(value: unknown): value is DoctorDocument {
+  // `in` narrows, so `value.findings` is reachable without a cast — ADR-005
+  // bans `as`, and the first draft of this helper reached for one out of habit.
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'findings' in value &&
+    Array.isArray(value.findings)
+  )
+}
+
 describe('runDoctor reports orphan exclusion comments (bug 0044)', () => {
   // The WIRING row. `orphan-exclusions.test.ts` tests the function; sabotage
   // showed `doctor` could stop calling it with the whole suite still green —
@@ -78,6 +100,13 @@ describe('runDoctor reports orphan exclusion comments (bug 0044)', () => {
     fs.writeFileSync(
       path.join(sourceDir, 'src/a.ts'),
       '// ts-archunit-exclude arch/renamed-away: stale after a rename\nexport const a = 1\n',
+    )
+    // A directive naming a DECLARED rule. Without it the negative assertion
+    // below is vacuous in its own fixture — review measured "report everything"
+    // leaving this file green, because no `arch/live` directive existed to appear.
+    fs.writeFileSync(
+      path.join(sourceDir, 'src/b.ts'),
+      '// ts-archunit-exclude arch/live: deliberate and correct\nexport const b = 1\n',
     )
   })
 
@@ -107,12 +136,23 @@ describe('runDoctor reports orphan exclusion comments (bug 0044)', () => {
     }
 
     expect(code).toBe(1)
+
+    // Assert on the PARSED object, not stringified text. Review measured both
+    // string assertions passing for the wrong reason: `toContain('arch/renamed-away')`
+    // was satisfied by the advice **prose**, so changing `rule: orphan.ruleId`
+    // to `orphan.file` left the whole suite green, and the negative row could
+    // not fail in its own fixture.
     const doc: unknown = JSON.parse(out.join(''))
-    const text = JSON.stringify(doc)
-    expect(text).toContain('orphan-exclusion')
-    expect(text).toContain('arch/renamed-away')
-    // …and NOT the declared one, or this reports every directive.
-    expect(text).not.toContain('"rule":"arch/live"')
+    expect(isDoctorDocument(doc)).toBe(true)
+    if (!isDoctorDocument(doc)) return
+
+    const orphans = doc.findings.filter((f) => f.kind === 'orphan-exclusion')
+    expect(orphans.map((f) => f.rule)).toEqual(['arch/renamed-away'])
+    // The location is the SOURCE file and its line, not a rule file.
+    expect(orphans[0]?.sourceFile?.endsWith('a.ts')).toBe(true)
+    expect(orphans[0]?.line).toBe(1)
+    // The correct directive in `b.ts` is not reported.
+    expect(orphans.map((f) => f.rule)).not.toContain('arch/live')
   })
 })
 

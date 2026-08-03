@@ -81,12 +81,131 @@ describe('orphan exclusion comments are reported (bug 0044)', () => {
     expect(found).toEqual([])
   })
 
-  it('reports nothing when NO rule declares an id, rather than everything', () => {
-    // A caller passing rules with no `.rule({ id })` has misconfigured this, not
-    // discovered 100 orphans. Inline comments need an id to work at all, so a
-    // wall of false orphans would be the fastest way to make this ignored.
+  it('when NO rule declares an id, reports ONE aggregate finding — not silence', () => {
+    // This test asserted silence, and review was right that silence is the
+    // ADR-008 rule 1 failure: without any declared id, **every** inline exclusion
+    // in the project genuinely is inert (`isExcludedByComment` bails without a
+    // `ruleId`, and the scan is gated on `ctx.metadata?.id`). So those are all
+    // real orphans and the diagnostic said nothing about any of them.
+    //
+    // Reporting each is the other failure — a wall of findings for one authored
+    // cause, which rule 4 calls a total standing in for an identity. One
+    // aggregate finding is neither.
     const idless = modules(project).that().resideInFile('**/*.ts').should().notImportFrom('**/x/**')
-    expect(orphanExclusions([idless])).toEqual([])
+    const found = orphanExclusions([idless])
+
+    expect(found).toHaveLength(1)
+    expect(found[0]?.advice).toContain('No rule declares an id')
+    expect(found[0]?.advice).toContain('Reported once rather than per comment')
+    // It still carries a location, so the reader has somewhere to start.
+    expect(found[0]?.file).toBeTruthy()
+  })
+
+  it('…and nothing at all when there are no directives either', () => {
+    // The vacuity control for the row above: the aggregate finding must be about
+    // real comments, not fire on any project whose rules lack ids.
+    const clean = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-archunit-orphan-clean-'))
+    try {
+      fs.mkdirSync(path.join(clean, 'src'))
+      fs.writeFileSync(path.join(clean, 'tsconfig.json'), JSON.stringify({ include: ['src'] }))
+      fs.writeFileSync(path.join(clean, 'src/a.ts'), 'export const a = 1\n')
+      const tsConfigPath = path.join(clean, 'tsconfig.json')
+      const cp = new Project({ tsConfigFilePath: tsConfigPath })
+      const cproj: ArchProject = {
+        tsConfigPath,
+        _project: cp,
+        getSourceFiles: () => cp.getSourceFiles(),
+      }
+      const idless = modules(cproj).that().resideInFile('**/*.ts').should().notImportFrom('**/x/**')
+      expect(orphanExclusions([idless])).toEqual([])
+    } finally {
+      fs.rmSync(clean, { recursive: true, force: true })
+    }
+  })
+
+  it('the scope caveat appears only when the caller admits a partial view', () => {
+    // The rule-2 fix. `doctor a.rules.ts` sees a subset of a multi-file project,
+    // so a directive naming a rule from another file looks orphaned — and the
+    // advice used to say "delete the comment", which un-waives a real violation.
+    const withScope = orphanExclusions([rule('arch/live')], { ruleFilesChecked: 1 })
+    expect(withScope[0]?.advice).toContain('Checked against 1 rule file only')
+    expect(withScope[0]?.advice).toContain('false positive')
+
+    // Vouched-for full coverage: no caveat, or it would be noise on every run.
+    const full = orphanExclusions([rule('arch/live')], {
+      ruleFilesChecked: 2,
+      ruleFilesTotal: 2,
+    })
+    expect(full[0]?.advice).not.toContain('Checked against')
+
+    // Unknown scope: silent, because the caller did not claim anything.
+    expect(orphanExclusions([rule('arch/live')])[0]?.advice).not.toContain('Checked against')
+  })
+
+  it('reports each distinct orphan, and does not collapse them', () => {
+    // Sabotage found the dedupe key untested: reducing it to the rule id alone
+    // collapsed the same stale id across every file to ONE report — under-
+    // reporting, the direction that hides work.
+    const many = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-archunit-orphan-many-'))
+    try {
+      fs.mkdirSync(path.join(many, 'src'))
+      fs.writeFileSync(path.join(many, 'tsconfig.json'), JSON.stringify({ include: ['src'] }))
+      // Same stale id in two files, and twice in one of them.
+      fs.writeFileSync(
+        path.join(many, 'src/one.ts'),
+        '// ts-archunit-exclude arch/gone: a\nexport const a = 1\n' +
+          '// ts-archunit-exclude arch/gone: b\nexport const b = 2\n',
+      )
+      fs.writeFileSync(
+        path.join(many, 'src/two.ts'),
+        '// ts-archunit-exclude arch/gone: c\nexport const c = 3\n',
+      )
+      const tsConfigPath = path.join(many, 'tsconfig.json')
+      const mp = new Project({ tsConfigFilePath: tsConfigPath })
+      const mproj: ArchProject = {
+        tsConfigPath,
+        _project: mp,
+        getSourceFiles: () => mp.getSourceFiles(),
+      }
+      const r = modules(mproj)
+        .that()
+        .resideInFile('**/*.ts')
+        .should()
+        .notImportFrom('**/x/**')
+        .rule({ id: 'arch/live' })
+      const found = orphanExclusions([r])
+
+      // Three distinct (id, file, line) identities, not one.
+      expect(found).toHaveLength(3)
+      expect(new Set(found.map((o) => `${o.file}:${String(o.line)}`)).size).toBe(3)
+      // …and the line is the comment's own, not a constant.
+      expect(found.map((o) => o.line).sort((a, b) => a - b)).toEqual([1, 1, 3])
+    } finally {
+      fs.rmSync(many, { recursive: true, force: true })
+    }
+  })
+
+  it('works on an in-memory project — the read used to lose these silently', () => {
+    // `fs.readFileSync` threw ENOENT for a virtual file and the catch ate it, so
+    // an in-memory project reported nothing. `getFullText()` has no such failure
+    // mode, and `orphanExclusions` is a published export.
+    const mem = new Project({ useInMemoryFileSystem: true })
+    mem.createSourceFile(
+      '/src/a.ts',
+      '// ts-archunit-exclude arch/gone: stale\nexport const a = 1\n',
+    )
+    const memProj: ArchProject = {
+      tsConfigPath: 'in-memory',
+      _project: mem,
+      getSourceFiles: () => mem.getSourceFiles(),
+    }
+    const r = modules(memProj)
+      .that()
+      .resideInFile('**/*.ts')
+      .should()
+      .notImportFrom('**/x/**')
+      .rule({ id: 'arch/live' })
+    expect(orphanExclusions([r]).map((o) => o.ruleId)).toEqual(['arch/gone'])
   })
 
   it('a subset of rules produces FALSE orphans — the documented footgun', () => {
