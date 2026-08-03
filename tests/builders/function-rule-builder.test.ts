@@ -240,7 +240,15 @@ describe('FunctionRuleBuilder', () => {
         .haveNameMatching(/^parse/)
       const withoutOrders = parsers.excluding(/Order$/)
 
-      expect(withoutOrders.should().notExist().violations()).toHaveLength(1)
+      // WHICH parser survives the exclusion. `parseConfig` is the only one not
+      // ending in Order, and a count of 1 could not tell it from any other.
+      expect(
+        withoutOrders
+          .should()
+          .notExist()
+          .violations()
+          .map((x) => x.element),
+      ).toEqual(['parseConfig'])
       expect(parsers.should().notExist().violations()).toHaveLength(4)
     })
 
