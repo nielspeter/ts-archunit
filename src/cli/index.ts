@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util'
+import { isRecord } from '../core/type-guards.js'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -14,8 +15,13 @@ import { watchAndRerun } from './watch.js'
 
 function getVersion(): string {
   const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../package.json')
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
-  return pkg.version
+  // `JSON.parse` returns `any`, so the shape has to be established rather than
+  // asserted — and this runs for `--version`, where a malformed package.json
+  // should not crash the CLI with a TypeError about reading a property of a
+  // string (ADR-005, bug 0049).
+  const pkg: unknown = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+  if (isRecord(pkg) && typeof pkg.version === 'string') return pkg.version
+  return '0.0.0-unknown'
 }
 
 const HELP_TEXT = `
@@ -230,7 +236,13 @@ export async function run(args: string[]): Promise<void> {
 
   const config = await resolveConfig(values.config)
   const ruleFiles = positionals.slice(1).length > 0 ? positionals.slice(1) : (config.rules ?? [])
-  const format = (values.format ?? config.format ?? 'auto') as OutputFormat | 'auto'
+  // A guard over the union, not a cast onto it: `values.format` comes from the
+  // command line and `config.format` from a file, so neither is typed by anything
+  // the compiler can see (bug 0049).
+  const requested = values.format ?? config.format ?? 'auto'
+  const isOutputFormat = (v: string): v is OutputFormat | 'auto' =>
+    (['terminal', 'json', 'github', 'auto'] as const).some((f) => f === v)
+  const format = isOutputFormat(requested) ? requested : 'auto'
   const baseline = values.baseline ?? config.baseline
   const base = values.base ?? 'main'
   const changed = values.changed ?? false
