@@ -6,9 +6,12 @@ import { resideInFolder as resideInFolderPredicate } from '../predicates/identit
 import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import type { PresetBaseOptions } from './shared.js'
-import { collectRule, validateOverrides } from './shared.js'
+import { collectRule, overrideFindings, validateOverrides } from './shared.js'
 
-export interface LayeredArchitectureOptions extends PresetBaseOptions {
+/** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
+export type LayeredArchitectureRuleId = (typeof RULE_IDS)[number]
+
+export interface LayeredArchitectureOptions extends PresetBaseOptions<LayeredArchitectureRuleId> {
   /** Layer name → glob pattern mapping. Order = dependency direction (first depends on second, etc.) */
   layers: Record<string, string>
   /** Glob patterns for shared/utility folders accessible by all layers */
@@ -129,6 +132,7 @@ export function layeredArchitecture(
 ): RuleBuilderLike[] {
   const overrides = options.overrides
   validateOverrides(overrides, [...RULE_IDS])
+  const overrideProblems = overrideFindings(overrides, RULE_IDS)
 
   const layerNames = Object.keys(options.layers)
   const layerGlobs = Object.values(options.layers)
@@ -216,5 +220,7 @@ export function layeredArchitecture(
     builders.push(...applyRestrictedPackages(p, options.restrictedPackages, overrides))
   }
 
-  return builders
+  // Unknown override keys FIRST: they say the configuration is wrong, which
+  // the reader needs before any finding produced under it (bug 0038).
+  return [...overrideProblems, ...builders]
 }

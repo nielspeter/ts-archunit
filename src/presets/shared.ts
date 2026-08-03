@@ -1,4 +1,5 @@
 import type { ArchViolation } from '../core/violation.js'
+import { UNSUPPRESSABLE } from '../core/unsuppressable.js'
 import type { Predicate } from '../core/predicate.js'
 import type { Located } from '../predicates/identity.js'
 import { resideInFile, resideInFolder } from '../predicates/identity.js'
@@ -38,7 +39,7 @@ export function collectRule(
   builder: PresetRule,
   meta: RuleMetadata & { id: string },
   defaultSeverity: RuleSeverity,
-  overrides: Record<string, RuleSeverity> | undefined,
+  overrides: Partial<Record<string, RuleSeverity>> | undefined,
 ): RuleBuilderLike[] {
   const effective = overrides?.[meta.id] ?? defaultSeverity
   if (effective === 'off') return []
@@ -73,8 +74,80 @@ export function assertDiscovered(
   return [{ violations: () => [violation] }]
 }
 
-export interface PresetBaseOptions {
-  overrides?: Record<string, RuleSeverity>
+/**
+ * Options every preset accepts.
+ *
+ * `TRuleId` is that preset's own rule ids as a literal union, so a misspelled
+ * override key is a **compile error** rather than a silent no-op
+ * ([bug 0038](../../bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)).
+ * Measured before this: `'…/no-silent-cach': 'error'` left the rule at `warn`
+ * and the build green — the escalation the author asked for simply did not
+ * happen, and the only trace was a line on stderr.
+ *
+ * Catching it in the editor is strictly better than catching it at run time:
+ * zero CI cycles, and it fires while the author is still looking at the key.
+ * The runtime finding exists as well, for the paths a type cannot reach — a
+ * JavaScript consumer, a dynamically-built overrides object, a config read from
+ * disk.
+ *
+ * Defaults to `string`, so anything outside this package that extends
+ * `PresetBaseOptions` keeps compiling.
+ */
+/**
+ * An unknown override key, as a failing configuration finding —
+ * [bug 0038](../../bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md).
+ *
+ * `validateOverrides` writes a line to stderr and returns `void`. That is not a
+ * signal: measured, `'…/no-silent-cach': 'error'` left the rule at `warn`, the
+ * build passed, and the printed warning never reached the exit code. A rule the
+ * author asked to escalate silently did not.
+ *
+ * ## Why a sibling rather than changing `validateOverrides`
+ *
+ * That function is re-exported from `src/presets/index.ts` and documented with a
+ * `void` signature. Changing it to return rules is a **published API break** for
+ * a fault this bug concedes is low-frequency, and the user-visible outcome is
+ * identical either way — so it stays as it is and this sits beside it. ADR-008
+ * rule 6 says guard the guard, not break the API.
+ *
+ * `PresetBaseOptions` now types the key as a literal union, so most typos never
+ * reach here at all. This covers what a type cannot: JavaScript consumers, a
+ * dynamically-built overrides object, and `agent-guardrails`' template-literal
+ * ids, where the API segment is open by construction.
+ */
+export function overrideFindings(
+  overrides: Partial<Record<string, RuleSeverity>> | undefined,
+  knownIds: readonly string[],
+): RuleBuilderLike[] {
+  if (!overrides) return []
+  const known = new Set(knownIds)
+  const unknown = Object.keys(overrides).filter((key) => !known.has(key))
+  if (unknown.length === 0) return []
+
+  const violations: ArchViolation[] = unknown.map((key) => ({
+    rule: `preset override '${key}'`,
+    ruleId: `preset/override/${key}`,
+    element: key,
+    file: '',
+    line: 0,
+    message:
+      `Override key '${key}' matches no rule in this preset, so it does nothing — ` +
+      `the severity you set was never applied.`,
+    because:
+      'an override that names no rule silently leaves that rule at its default, ' +
+      'which is a configured escalation that did not happen',
+    // Its own remedy, never the author's, and it names the alternatives because
+    // the commonest cause is a near-miss the reader cannot spot by staring.
+    suggestion:
+      `Correct the key, or remove it. This preset's rules are: ${knownIds.join(', ')}. ` +
+      UNSUPPRESSABLE,
+    bypassFilters: true,
+  }))
+  return [{ violations: () => violations }]
+}
+
+export interface PresetBaseOptions<TRuleId extends string = string> {
+  overrides?: Partial<Record<TRuleId, RuleSeverity>>
 }
 
 /**
@@ -82,8 +155,8 @@ export interface PresetBaseOptions {
  * Warns for unrecognized keys (likely typos).
  */
 export function validateOverrides(
-  overrides: Record<string, RuleSeverity> | undefined,
-  knownIds: string[],
+  overrides: Partial<Record<string, RuleSeverity>> | undefined,
+  knownIds: readonly string[],
 ): void {
   if (!overrides) return
   const knownSet = new Set(knownIds)

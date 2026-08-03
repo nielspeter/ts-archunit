@@ -223,7 +223,7 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
 
 ## Out of scope
 
-- **[Bug 0038](../bugs/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)** — a
+- **[Bug 0038](../bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)** — a
   site that _should_ produce a configuration finding and does not. The census guards producers
   that exist; it structurally cannot find a missing one. Fix 0038 separately, then let the census
   pick up the new site.

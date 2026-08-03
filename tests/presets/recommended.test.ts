@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import type { ArchProject } from '../../src/core/project.js'
@@ -114,12 +114,38 @@ describe('recommended preset', () => {
     expect(evalV?.severity).toBe('warn')
   })
 
-  it('warns on an unrecognized override id (typo guard)', () => {
-    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    recommended(p, { overrides: { 'preset/recommended/no-evalz': 'off' } })
-    expect(warnSpy).toHaveBeenCalled()
-    const msg = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(msg).toContain('no-evalz')
-    warnSpy.mockRestore()
+  it('an unrecognized override id FAILS, it does not merely warn (bug 0038)', () => {
+    // This test used to assert only that a spy fired, while calling itself a
+    // "typo guard" — the exact shape ADR-008's Context table names: a spy proves
+    // the call, never the consequence. The consequence was that the rule stayed
+    // at its default and the build passed.
+    //
+    // The key is built at runtime, because a literal no longer compiles: the
+    // override key is typed as a union of this preset's rule ids. That is the
+    // first line of defence, and this test necessarily exercises the second —
+    // the path a type cannot reach (a JS consumer, or a config read from disk).
+    const typo: Partial<Record<string, 'error' | 'warn' | 'off'>> = {}
+    typo['preset/recommended/no-evalz'] = 'off'
+
+    const findings = recommended(p, { overrides: typo }).flatMap((r) => r.violations())
+    const config = findings.filter((v) => v.bypassFilters === true)
+
+    expect(config).toHaveLength(1)
+    expect(config[0]?.message).toContain('no-evalz')
+    expect(config[0]?.message).toContain('does nothing')
+    // It lists the real ids, because the commonest cause is a near-miss.
+    expect(config[0]?.suggestion).toContain('preset/recommended/no-eval')
+    expect(config[0]?.suggestion).toContain('cannot be suppressed')
+  })
+
+  it('CONTROL: a correct override id produces no finding, and takes effect', () => {
+    // Without this, "always report an override problem" passes the row above.
+    const findings = recommended(p, {
+      overrides: { 'preset/recommended/no-silent-catch': 'off' },
+    }).flatMap((r) => r.violations())
+
+    expect(findings.filter((v) => v.bypassFilters === true)).toEqual([])
+    // …and the override did what it said: the rule is gone, not merely unreported.
+    expect(findings.filter((v) => v.ruleId === 'preset/recommended/no-silent-catch')).toEqual([])
   })
 })
