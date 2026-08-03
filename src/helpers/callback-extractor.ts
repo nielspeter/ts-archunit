@@ -51,8 +51,12 @@ export function extractCallbacks(callExpr: CallExpression): ExtractedCallback[] 
  * Extract function-valued properties from an object-literal argument as
  * callbacks, using the shared object-literal traversal (F3). Handles arrows,
  * function expressions, method shorthand, and nested object literals
- * (depth-limited). Callback names stay context-derived (arrows anonymous),
- * exactly as before — F3 supplies the traversal, not the naming.
+ * (depth-limited). F3 supplies the traversal AND, since plan 0082, the naming:
+ * `keyPath` reaches `fromObjectLiteralFunction`, so a property callback carries its
+ * property name. (This said "names stay context-derived, arrows anonymous, exactly
+ * as before" for one release after that stopped being true — directly contradicted
+ * by the code six lines below it.) **Positional** callbacks are still anonymous and
+ * identified by `argIndex`.
  */
 function extractFromObjectLiteral(
   arg: Node,
@@ -74,6 +78,13 @@ function extractFromObjectLiteral(
     // `undefined` for a node shape it does not recognise, and filtering those out
     // would turn an unnamed callback into a MISSING one — a silent under-report,
     // which is worse than the anonymity this change removes.
+    //
+    // **Unreachable today, and recorded rather than claimed load-bearing.**
+    // `collectObjectLiteralFunctions` emits only arrows, function expressions and
+    // method declarations — exactly the three kinds `fromObjectLiteralFunction`
+    // accepts — so no runtime test covers this branch and none can while the
+    // collector stays closed over those kinds. What guards it is the type: removing
+    // the `??` is a compile error (TS2322), and CI runs `typecheck` before `test`.
     fn: fromObjectLiteralFunction(olf.node, olf.keyPath) ?? callbackArchFunction(olf.node),
     callSite,
     argIndex,

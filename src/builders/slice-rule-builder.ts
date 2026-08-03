@@ -264,6 +264,13 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * The all-empty case is handled here too, with a message the gate cannot match
    * — it names the discovery mode and its remedy (bug 0009's corpus). So this
    * builder owns both halves.
+   *
+   * **Why this is a builder-level `true` while `PairFinalBuilder` asks its
+   * condition** (`owns-empty-discovery.ts`, plan 0081): there, ownership varies by
+   * condition, and a blanket `true` once suppressed the gate for the one condition
+   * that did not self-report. Here nothing varies — the reason is a property of
+   * `assignedFrom`'s fan-out, identical for every condition reachable through this
+   * builder. The asymmetry reflects the discovery models, not an oversight.
    */
   protected override ownsDiscoveryDiagnosis(): boolean {
     return true

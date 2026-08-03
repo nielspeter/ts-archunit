@@ -112,9 +112,9 @@ Not optional and not a follow-up: it is the reason this is a published-API chang
    (`callback-extractor.test.ts:130, 341`) and must stay green — they are the guard that Phase 1 did
    not over-reach.
 3. A method shorthand (`{ handler(req) {} }`) carries the name too.
-4. Nested carries the **dotted** path, `'hooks.onRequest'`, asserted equal to what
-   `fromObjectLiteralFunction` produces for the same node at the other call site — the two surfaces
-   compared, not each pinned separately.
+4. Nested carries the **dotted** path, `'hooks.onRequest'`. _Shipped as a literal pin, not as the
+   cross-surface comparison this row promised_ — the pin does catch a bare-vs-dotted regression
+   (measured), so the coverage is real, but the write-up should say pin.
 5. The motivating rule, end to end: `within(calls(...)).functions().that().haveNameMatching(/^handler$/)`
    selects exactly the handler and **not** `preHandler`. Without this the plan proves a field is
    populated and not that the gap is closed.

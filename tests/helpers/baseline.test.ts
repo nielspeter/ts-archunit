@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
+import type { ArchViolation } from '../../src/core/violation.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -166,5 +167,45 @@ describe('bypassFilters meta-findings (plan 0067)', () => {
     const written = JSON.parse(fs.readFileSync(outputPath, 'utf-8')) as BaselineFile
     expect(written.count).toBe(1)
     expect(written.violations.some((e) => e.rule === 'empty-selector')).toBe(false)
+  })
+})
+
+describe('which violations plan 0082 actually moved in the baseline', () => {
+  // Plan 0082's Phase 2 row 1 called this "not optional and not a follow-up", and
+  // then it did not ship — so the migration note went out unverified, and was
+  // WRONG for the rule it quoted. `docs/upgrading.md` said the hash is "over rule
+  // + element + message"; `hashViolation` is `identity ?? \`${element}::${message}\``,
+  // and a producer that sets `identity` supersedes both.
+  //
+  // The consequence is the opposite of what was published: body-analysis rules —
+  // the ones an adopter would most likely write about a callback — keep their
+  // hashes, because their identity is the call site, not the function's name.
+  // Telling those adopters to regenerate is advice that costs them work and fixes
+  // nothing. ADR-008 rule 2's behavioural corollary: nobody applied the remedy and
+  // checked it cleared.
+  const before = (extra: Partial<ArchViolation>): ArchViolation =>
+    mv({ element: '<anonymous>', message: "does not contain call to 'x'", ...extra })
+  const after = (extra: Partial<ArchViolation>): ArchViolation =>
+    mv({ element: 'handler', message: "does not contain call to 'x'", ...extra })
+
+  it('a producer that sets identity keeps its hash — the name is not in it', () => {
+    const identity = "function-body::/src/a.ts::CallExpression::call to 'x'#1"
+    expect(hashViolation(before({ identity }))).toBe(hashViolation(after({ identity })))
+  })
+
+  it('a producer with no identity DOES move, which is what the note should say', () => {
+    // Structural conditions compose the subject from element + message, so renaming
+    // `<anonymous>` to `handler` is a different violation as far as the baseline is
+    // concerned. These are the entries that need regenerating — and only these.
+    expect(hashViolation(before({}))).not.toBe(hashViolation(after({})))
+  })
+
+  it('VACUITY: the two fixtures differ only in element', () => {
+    // Without this the rows above could pass on two violations that differ in some
+    // other field, and the first would be asserting nothing about names at all.
+    const a = before({})
+    const b = after({})
+    const diff = (Object.keys(a) as (keyof ArchViolation)[]).filter((k) => a[k] !== b[k])
+    expect(diff).toEqual(['element'])
   })
 })

@@ -33,7 +33,6 @@ import { slices } from '../../src/builders/slice-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { isFaultPosition } from '../../src/core/glob-site.js'
 import { diagnose } from '../../src/core/diagnose.js'
-import { OWNS_EMPTY_DISCOVERY } from '../../src/core/owns-empty-discovery.js'
 import * as publicApi from '../../src/index.js'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
 import {
@@ -317,14 +316,44 @@ describe('a condition declares discovery ownership, not its builder (plan 0081)'
     expect(config[0]?.message).not.toContain('can never match anything')
   })
 
-  it('the ownership symbol is NOT exported from the public entry point', () => {
-    // "Module-private" is a comment until something checks it. `PairCondition` is
-    // public, so an importable key would be a one-line silent opt-out of the gate
-    // on any user condition — the hazard `ASSERTS_CARDINALITY` was reshaped to
-    // close (ADR-008 rule 3's corollary).
+  it('the ownership mark cannot be read off a shipped condition, or forged', () => {
+    // The row this replaces asserted only that a symbol was absent from the public
+    // namespace — true, and much narrower than its name. Review broke the design in
+    // two lines: `Object.getOwnPropertySymbols(haveMatchingCounterpart())` returned
+    // the tag, and copying it onto a condition that reports nothing produced **0**
+    // configuration findings on a dead layer. A symbol keyed on a public object is
+    // not private; it is merely unlisted.
+    //
+    // Ownership is now WeakSet membership, so there is no property to read and
+    // nothing to copy. Both halves asserted: nothing leaks off the object, and a
+    // hand-built condition carrying every own key of a real one still does not own
+    // the diagnosis.
+    const real = haveMatchingCounterpart()
+    expect(Object.getOwnPropertySymbols(real)).toEqual([])
+
+    const forged: PairCondition = {
+      ...real,
+      description: 'a copy of every own property a real condition exposes',
+      evaluate: () => [],
+    }
+    const found = crossLayer(loadCrossLayer())
+      .layer('live', '**/src/schemas/**')
+      .layer('ghost', '**/src/nowhere-at-all/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(forged)
+      .violations()
+
+    const config = found.filter((v) => v.bypassFilters === true)
+    // The GATE speaks, because the forgery owns nothing.
+    expect(config).toHaveLength(1)
+    expect(config[0]?.message).toContain('can never match anything')
+
+    // VACUITY: the namespace import really is populated, or the emptiness above
+    // proves nothing about exports.
     const exported: Record<string, unknown> = publicApi
-    const symbolValued = Object.values(exported).filter((v) => typeof v === 'symbol')
-    expect(symbolValued).not.toContain(OWNS_EMPTY_DISCOVERY)
+    expect(Object.keys(exported)).toContain('crossLayer')
     expect(Object.keys(exported)).not.toContain('OWNS_EMPTY_DISCOVERY')
+    expect(Object.keys(exported)).not.toContain('marksOwnEmptyDiscovery')
   })
 })

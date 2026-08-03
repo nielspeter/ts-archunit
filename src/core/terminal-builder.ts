@@ -446,9 +446,22 @@ export abstract class TerminalBuilder {
    * silence half: two of three cross-layer conditions reported **nothing** when a
    * layer resolved to no files.
    *
-   * `true` — the builder owns it, and the gate stays out. `SliceRuleBuilder` is
-   * the one that does, because its discovery semantics are **not** per-tree and
-   * cannot be expressed by a position filter:
+   * `true` — the builder owns it, and the gate stays out. Two builders override,
+   * and for different reasons, which is the thing to understand before adding a
+   * third:
+   *
+   * - `SliceRuleBuilder` returns a constant `true`, because its discovery
+   *   semantics are **not** per-tree and cannot be expressed by a position filter
+   *   (below). Nothing about that varies by condition.
+   * - `PairFinalBuilder` **asks its condition**, via the registry in
+   *   `owns-empty-discovery.ts` (plan 0081). There, ownership does vary by
+   *   condition, and a blanket `true` once suppressed the gate for the one
+   *   condition that did not self-report — which is why this used to say
+   *   "`SliceRuleBuilder` is the one that does" and was wrong.
+   *
+   * A hand-maintained roster of which builders override is the defect class plan
+   * 0081 was filed to remove, so this names the two shapes rather than the two
+   * classes:
    *
    * | builder | one dead tree among live ones |
    * | --- | --- |

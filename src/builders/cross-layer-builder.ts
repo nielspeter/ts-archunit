@@ -1,7 +1,7 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
-import { OWNS_EMPTY_DISCOVERY } from '../core/owns-empty-discovery.js'
+import { ownsEmptyDiscovery } from '../core/owns-empty-discovery.js'
 import type { PairCondition, PairConditionContext } from '../core/pair-condition.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
 import type { GlobNode } from '../core/glob-site.js'
@@ -231,7 +231,12 @@ export class PairFinalBuilder extends TerminalBuilder {
    * before it was right (bug 0042).
    */
   protected override ownsDiscoveryDiagnosis(): boolean {
-    return OWNS_EMPTY_DISCOVERY in this.condition
+    // A registry lookup, not a property read. The property form — symbol-keyed on
+    // the condition — was readable off any shipped condition via
+    // `Object.getOwnPropertySymbols` and could be copied onto a user condition that
+    // reports nothing, which measured 0 findings on a dead layer. `WeakSet`
+    // membership cannot be read off the object, so there is nothing to copy.
+    return ownsEmptyDiscovery(this.condition)
   }
 
   protected collectViolations() {

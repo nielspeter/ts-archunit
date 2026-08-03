@@ -5,7 +5,7 @@ import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchCall } from '../models/arch-call.js'
 import { getFunctionBody, findMatchesInNode, reportedLine } from '../helpers/body-traversal.js'
 import { identifyMatches } from './match-identity.js'
-import { ASSERTS_CARDINALITY } from '../core/cardinality.js'
+import { marksAssertsCardinality } from '../core/cardinality.js'
 
 /**
  * Helper to create a violation from an ArchCall.
@@ -54,11 +54,12 @@ function callNameForMessage(archCall: ArchCall, context: ConditionContext): stri
  * The filtered call set must be empty --- no calls should match the predicates.
  */
 export function notExist(): Condition<ArchCall> {
-  return {
+  // Satisfied by an EMPTY selection — registered rather than tagged, because a
+  // symbol keyed on this object is readable off it and forgeable (bug 0050).
+  return marksAssertsCardinality({
     description: 'not exist',
     // Zero subjects is this condition's PASSING state, so an empty selection
     // and an unsatisfiable selector glob are both correct here (plan 0074).
-    [ASSERTS_CARDINALITY]: true,
     evaluate(elements: ArchCall[], context: ConditionContext): ArchViolation[] {
       return elements.map((archCall) =>
         createCallViolation(
@@ -68,7 +69,7 @@ export function notExist(): Condition<ArchCall> {
         ),
       )
     },
-  }
+  })
 }
 
 /**

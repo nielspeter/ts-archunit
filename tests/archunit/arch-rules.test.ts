@@ -6,10 +6,12 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
 import type { GlobSite, Located, Predicate } from '../../src/index.js'
 import type { DiagnosableRule } from '../../src/core/diagnose.js'
 import { diagnose } from '../../src/core/diagnose.js'
+import { orphanExclusions } from '../../src/core/orphan-exclusions.js'
+import { resetCommentSuppression, commentSuppressions } from '../../src/core/comment-suppression.js'
 import { isDeadSite } from '../../src/core/glob-evaluator.js'
 import { edgesOf } from '../../src/core/module-edges.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
@@ -77,6 +79,14 @@ const p = project('tsconfig.json')
  * silently diverge if each spelled its own.
  */
 const DELIBERATELY_DEAD = '**/no-such-folder-anywhere/**'
+
+/** Every file under `dir`, recursively — for the directive-scan vacuity guard. */
+function readdirRecursive(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name)
+    return entry.isDirectory() ? readdirRecursive(full) : [full]
+  })
+}
 
 const BUILT: DiagnosableRule[] = []
 
@@ -962,4 +972,76 @@ describe('the rules in this file can all enforce something', () => {
     // `diagnose()` that simply reported everything.
     expect(diagnose([BUILT[0] as DiagnosableRule])).toEqual([])
   })
+})
+
+// Runs LAST on purpose: `gate()` fills `BUILT` as each rule-building test
+// executes, so the declared-id set is only complete once they all have. Placed
+// in `afterAll` rather than a trailing `it` so it cannot be reordered into
+// passing on a half-filled set — a check whose correctness depends on test
+// order is the kind of green this file exists to distrust.
+afterAll(() => {
+  // **Dogfooding the fix for our own bug.**
+  // [Bug 0044](../../bugs/fixed/0044-an-inline-exclusion-comment-has-no-feedback-channel.md):
+  // a `// ts-archunit-exclude` naming a renamed rule id suppresses nothing and
+  // says nothing — inert forever, because a comment is only read in a file that
+  // already produced a finding for that rule. We shipped `orphanExclusions` to
+  // catch it, and then exercised it only in its own unit test.
+  //
+  // Meanwhile v0.45.6 put two real waivers into `src/` — `members.ts` and
+  // `graphql/schema-loader.ts`, both naming `adr005/no-as-cast-module` at genuine
+  // JS-interop boundaries. Rename that rule and both go silently inert, and the
+  // casts they cover stop being waived-with-a-reason and start being unexplained.
+  // Exactly the defect we fixed, on waivers we had just written, in the repo that
+  // ships the fix.
+  //
+  // `BUILT` is every rule this file gated, so the declared-id set is derived
+  // rather than listed — `orphanExclusions` wants the union across all rule
+  // files, and this is that union.
+  const orphans = orphanExclusions(BUILT)
+  const named = orphans.map(
+    (o) => `${o.file}:${String(o.line)} names "${o.ruleId}", which no rule declares`,
+  )
+  expect(named, `orphaned exclusion directives:\n  ${named.join('\n  ')}`).toEqual([])
+})
+
+it('VACUITY: the orphan check really reads our directives', () => {
+  // Without this the row above passes on a scan that found no comments at all —
+  // and it would have, silently, for as long as nobody looked. The two waivers
+  // are asserted BY IDENTITY, so deleting one is visible here rather than
+  // shrinking a count nobody reads.
+  const files = readdirRecursive(path.resolve('src'))
+    .filter((f) => f.endsWith('.ts'))
+    .filter((f) => /^\s*\/\/ ts-archunit-exclude(-start)? /m.test(fs.readFileSync(f, 'utf-8')))
+    .map((f) => path.relative(path.resolve('src'), f).replaceAll('\\', '/'))
+    .sort()
+  expect(files).toEqual(['conditions/members.ts', 'graphql/schema-loader.ts'])
+})
+
+it('every waiver in src/ actually suppresses something', () => {
+  // A DIFFERENT derivation from the vacuity row above, and that is the point
+  // (ADR-008 rule 5). That row scans source text and proves a directive is
+  // **present**; this one runs the rule and proves it is **load-bearing**.
+  //
+  // They disagree in the case that matters: remove the cast a waiver covers and
+  // the directive still scans, still names a live rule, still reads as "there is
+  // an interop boundary here" — and suppresses nothing. Dead weight that lies
+  // about the code. Only the suppression list can see it.
+  //
+  // This also dogfoods the disclosure shipped for
+  // [bug 0041](../../bugs/fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md):
+  // we built a channel to report what comments silenced, then never pointed it at
+  // ourselves.
+  resetCommentSuppression()
+  modules(p)
+    .that()
+    .satisfy(inProjectSrc())
+    .should()
+    .satisfy(moduleNoTypeAssertions())
+    .rule({ id: 'adr005/no-as-cast-module' })
+    .violations()
+
+  const silenced = commentSuppressions()
+    .map((entry) => path.relative(path.resolve('src'), entry.file).replaceAll('\\', '/'))
+    .sort()
+  expect([...new Set(silenced)]).toEqual(['conditions/members.ts', 'graphql/schema-loader.ts'])
 })
