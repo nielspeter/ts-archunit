@@ -65,7 +65,12 @@ describe('notAcceptParameterOfType()', () => {
     const cond = notAcceptParameterOfType(matching(/DatabaseClient/))
     // ServiceWithDbEverywhere has DatabaseClient in both constructor and reconnect method
     const violations = cond.evaluate([getClass('ServiceWithDbEverywhere')], ctx)
-    expect(violations).toHaveLength(2)
+    // Both MEMBERS, not just two violations: reporting the constructor twice
+    // also had length 2, and "across members" is the whole claim.
+    expect(violations.map((v) => v.message).sort()).toEqual([
+      'ServiceWithDbEverywhere.constructor parameter "db" has type "DatabaseClient"',
+      'ServiceWithDbEverywhere.reconnect parameter "db" has type "DatabaseClient"',
+    ])
   })
 
   it('violation message includes member name and param name', () => {

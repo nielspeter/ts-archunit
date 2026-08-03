@@ -47,7 +47,13 @@ describe('loadRuleFiles', () => {
       `export default [{ violations: () => [] }, 'not-a-builder', 42, null];\n`,
     )
     const result = await loadRuleFiles([file])
-    expect(result).toHaveLength(1)
+    // WHICH item survived, not how many. Keeping `42` or `'not-a-builder'`
+    // instead of the builder-like object also had length 1, and the claim of this
+    // test is precisely that the three non-builders are the ones dropped.
+    const kinds = result.map((r) =>
+      typeof r === 'object' && r !== null && 'violations' in r ? 'builder-like' : typeof r,
+    )
+    expect(kinds).toEqual(['builder-like'])
   })
 
   it('returns empty array when default export is not an array or function', async () => {

@@ -161,8 +161,8 @@ describe('ExpressionMatcher helpers', () => {
       const fn = sf.getFunctions()[0]!
       const body = fn.getBody()!
       const matches = findMatchesInNode(body, expression(/foo|bar/))
-      // Both foo() and bar() are siblings — both should be reported
-      expect(matches.length).toBe(2)
+      // Both siblings BY NAME: matching foo() twice also had length 2.
+      expect(matches.map((m) => m.node.getText()).sort()).toEqual(['bar', 'foo'])
     })
 
     it('does not affect targeted matchers (call uses syntaxKinds path)', () => {

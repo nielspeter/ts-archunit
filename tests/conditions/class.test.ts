@@ -41,7 +41,9 @@ describe('class conditions', () => {
     it('reports violations for multiple non-conforming classes', () => {
       const cond = shouldExtend('BaseService')
       const violations = cond.evaluate([getClass('OrderService'), getClass('DomainError')], ctx)
-      expect(violations).toHaveLength(1) // Only DomainError fails
+      // The comment used to carry this and the assertion did not: flagging
+      // OrderService instead of DomainError also had length 1.
+      expect(violations.map((v) => v.element)).toEqual(['DomainError'])
     })
   })
 

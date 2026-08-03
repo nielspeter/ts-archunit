@@ -398,7 +398,9 @@ describe('RuleBuilder', () => {
       } catch (error) {
         const archError = error as ArchRuleError
         // UserService and OrderService match both predicates
-        expect(archError.violations).toHaveLength(2)
+        // WHICH two matched both predicates — the comment above said it and the
+        // assertion counted instead.
+        expect(archError.violations.map((v) => v.element)).toEqual(['UserService', 'OrderService'])
       }
     })
   })
