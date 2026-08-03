@@ -32,6 +32,7 @@ import { resolvers } from '../../src/graphql/index.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { isFaultPosition } from '../../src/core/glob-site.js'
+import { diagnose } from '../../src/core/diagnose.js'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
 import {
   haveConsistentExports,
@@ -199,5 +200,47 @@ describe('a dead discovery glob fails at every entry point (plan 0080)', () => {
       .beFreeOfCycles()
       .violations()
     expect(found.some((v) => v.bypassFilters === true)).toBe(false)
+  })
+})
+
+describe('doctor and the build agree about a dead DISCOVERY glob (review M3)', () => {
+  // The independent derivation for this defect IS the two consumers agreeing —
+  // `diagnose()` said a dead discovery glob was a fault and the gate said it was
+  // not, and that disagreement is the whole bug. `dead-selector-fails.test.ts`
+  // pins the agreement for a dead **selector**: the position that never diverged.
+  //
+  // So the guard asserted parity for the case that was already fine and left the
+  // case that was broken to a single-surface test each. Review caught it. This is
+  // the same shape as the parity test that claimed an invariant it did not check
+  // for two releases (bug 0048), which is why it is worth a row rather than a note.
+  it('a dead .layer() glob is a fault in diagnose() AND at check time', () => {
+    const rule = crossLayer(loadCrossLayer())
+      .layer('live', '**/src/schemas/**')
+      .layer('ghost', '**/src/nowhere-at-all/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(haveMatchingCounterpart())
+
+    // Both surfaces, one input, and both must object.
+    expect(diagnose([rule]).map((f) => f.kind)).toEqual(['dead-glob'])
+
+    const found = rule.violations()
+    expect(found.filter((v) => v.bypassFilters === true)).toHaveLength(1)
+    // And it names the dead layer rather than the files in the live one — the
+    // final-layer defect fixed in v0.45.1, pinned here by identity not count.
+    expect(found.map((v) => v.element)).toEqual(['ghost'])
+  })
+
+  it('a dead smells discovery glob is a fault in diagnose() AND at check time', () => {
+    // A second entry point, because the gate and `diagnose()` reach discovery
+    // globs by different routes and one builder agreeing proves one builder.
+    const rule = smells
+      .duplicateBodies(dupProject())
+      .minLines(3)
+      .withMinSimilarity(0.8)
+      .inFolder('**/no-such-folder/**')
+
+    expect(diagnose([rule]).map((f) => f.kind)).toEqual(['dead-glob'])
+    expect(rule.violations().filter((v) => v.bypassFilters === true)).toHaveLength(1)
   })
 })
