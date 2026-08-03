@@ -131,6 +131,33 @@ the hand-read classification:
 **The genuinely independent check is elsewhere, and it is better:** the exhaustive Phase 2 read found
 45 of 143 (31%) against the sample's 32%, and it does not depend on the refinement at all.
 
+### Class B was the weakest call, so it was checked against the fixtures
+
+Class B is the largest group and the one carrying the most weight: 10 of 30 in the sample, and a
+large share of the 96 blocks deliberately left alone. The rule — _one fixture, one subject, boolean
+question, so `length 1` just means the condition fired_ — has an obvious failure mode, and review
+named it: **a single-subject test where the condition can fire for the wrong reason and still
+produce exactly one violation.** A fixture holding two things the rule could object to would do it.
+
+So all ten were re-checked by reading the **fixture**, not the assertion:
+
+| Block                                     | Candidates in the fixture                                                   |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `bare-package-imports.test.ts:104`        | one relative import                                                         |
+| `bare-package-imports.test.ts:137`        | one bare import (`picomatch`)                                               |
+| `call-args.test.ts:188`                   | one property, `additionalProperties: false`                                 |
+| `call-args.test.ts:279`                   | one call, `validate()`                                                      |
+| `structural.test.ts:223`                  | one class                                                                   |
+| `type-level.test.ts:65`                   | three interfaces, each in its **own** `evaluate` call                       |
+| `excluding-matching.test.ts:145`          | one violation in, and the filter can only return a subset                   |
+| `workspace-has-no-single-root.test.ts:80` | one file in the in-memory project                                           |
+| `typescript-function-module.test.ts:22`   | one `as User`                                                               |
+| `typescript.test.ts:76`                   | one cast, in the constructor                                                |
+| `dependency.test.ts:142`, `:151`          | two imports, but the violation is about the **file**, and there is one file |
+
+Every one has a single candidate, so no swap exists to miss. The rule holds **for the sample**. It is
+not verified across all 96 remaining blocks, and that is the honest limit of this row.
+
 ### The direction nobody checked — and it found something
 
 Both rows above can only confirm the signal _shrinks_ the population. 215 → 143 excluded blocks that
