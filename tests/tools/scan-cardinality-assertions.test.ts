@@ -19,7 +19,7 @@ const REPO = path.resolve(import.meta.dirname, '../..')
  * second element to confuse it with. Plan 0079 read all 143 and converted the 47
  * blocks where a count stood in for identity.
  */
-const CEILING = 102
+const CEILING = 101
 
 /**
  * A floor beneath the real number, so a broken walk cannot pass.

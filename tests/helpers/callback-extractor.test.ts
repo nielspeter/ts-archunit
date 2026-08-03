@@ -23,7 +23,6 @@ const identify = (c: ExtractedCallback): string => {
   const parent = c.fn.getNode().getParent()
   if (parent !== undefined) {
     if (Node.isPropertyAssignment(parent)) return parent.getName()
-    if (Node.isShorthandPropertyAssignment(parent)) return parent.getName()
     if (Node.isMethodDeclaration(parent)) return parent.getName()
   }
   return c.fn.getName() ?? `arg${String(c.argIndex)}`
@@ -223,8 +222,12 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      // handler is extracted (depth 0), default at depth 3 is NOT extracted
-      expect(callbacks).toHaveLength(1)
+      // `handler` at depth 0, NOT `default` at depth 3 — and the count could not
+      // tell those apart, since extracting the wrong one is also one callback.
+      // This block was hidden from plan 0079's scan by an over-broad
+      // element-boolean signal, and surfaced by the false-negative check a review
+      // asked for. It is the only class C the correction found.
+      expect(callbacks.map(identify)).toEqual(['handler'])
       expect(callbacks[0]!.fn.isAsync()).toBe(true)
     })
 

@@ -234,8 +234,15 @@ describe('runCheck', () => {
     // the two are swapped — the sharper form of the bug this guards, since a
     // warn rendered as ::error fails the build and an error rendered as
     // ::warning does not.
-    expect(lines.filter((l) => l.startsWith('::error')).join('')).toContain('the error one')
-    expect(lines.filter((l) => l.startsWith('::warning')).join('')).toContain('the warn one')
+    const errors = lines.filter((l) => l.startsWith('::error'))
+    const warnings = lines.filter((l) => l.startsWith('::warning'))
+    // Identity AND cardinality: the identity catches a swap, and "exactly one of
+    // each" catches the same violation annotated twice. Dropping the count to gain
+    // the identity was a trade, and it did not need to be one.
+    expect(errors).toHaveLength(1)
+    expect(warnings).toHaveLength(1)
+    expect(errors.join('')).toContain('the error one')
+    expect(warnings.join('')).toContain('the warn one')
   })
 
   it('collects across multiple files and one file throwing on import does not abort the rest', async () => {

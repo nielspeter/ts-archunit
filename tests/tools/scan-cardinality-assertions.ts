@@ -139,7 +139,7 @@ export function scanCardinalityAssertions(repo: string): {
     // This module's test holds `it(...)` snippets as template literals — probe
     // inputs for the two signals — and the scan read them as real blocks and
     // reported its own fixtures as members. Same shape as
-    // [bug 0036](../../bugs/fixed/0036-a-preset-rule-is-absent-from-the-parity-list.md),
+    // [bug 0036](../../bugs/fixed/0036-the-relative-glob-audit-is-incomplete.md),
     // where a census counted the file that defined the thing it was counting.
     if (path.basename(file) === 'scan-cardinality-assertions.test.ts') continue
     const text = fs.readFileSync(file, 'utf-8')

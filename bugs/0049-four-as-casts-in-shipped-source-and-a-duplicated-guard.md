@@ -1,7 +1,7 @@
 # Bug 0049: four `as` casts in shipped source, and `isRecord` written twice
 
 **Reported:** 2026-08-03 · **Fixed:** not yet
-**Found in:** v0.45.3, while verifying an architecture-review finding about a *different* cast
+**Found in:** v0.45.3, while verifying an architecture-review finding about a _different_ cast
 **Severity:** Low as a defect, Medium as a signal. Nothing is wrong at runtime — every cast here is
 currently true. [ADR-005](../adr/005-no-any-no-type-assertions.md) is binding for a reason though:
 this project's own preset asserts that consumers write no type assertions, and it ships four.
@@ -12,12 +12,12 @@ this project's own preset asserts that consumers write no type assertions, and i
 `eslint-disable` at unavoidable JS interop boundaries (with explanation)._ Four remain in `src/`,
 none with an `eslint-disable` and none with a stated justification:
 
-| Site                          | Cast                                          | Avoidable? |
-| ----------------------------- | --------------------------------------------- | ---------- |
+| Site                           | Cast                                          | Avoidable?                                                                                                                                                               |
+| ------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/cli/resolve-config.ts:45` | `(mod as Record<string, unknown>)['default']` | **Yes.** The line above narrows `mod` to `object` and the comment says _"'in' narrows safely"_ — then it casts anyway. After `'default' in mod`, `mod.default` compiles. |
-| `src/cli/resolve-config.ts:50` | `defaultExport as Record<string, unknown>`    | **Yes**, via the `isRecord` guard that already exists twice in this repo. |
-| `src/predicates/module.ts:75`  | `args[1] as ImportOptions`                    | Needs looking at — overload dispatch, where a guard on the options shape is the ADR's prescribed route. |
-| `src/predicates/module.ts:100` | `args[1] as ImportOptions`                    | Same, and the second copy of the same dispatch. |
+| `src/cli/resolve-config.ts:50` | `defaultExport as Record<string, unknown>`    | **Yes**, via the `isRecord` guard that already exists twice in this repo.                                                                                                |
+| `src/predicates/module.ts:75`  | `args[1] as ImportOptions`                    | Needs looking at — overload dispatch, where a guard on the options shape is the ADR's prescribed route.                                                                  |
+| `src/predicates/module.ts:100` | `args[1] as ImportOptions`                    | Same, and the second copy of the same dispatch.                                                                                                                          |
 
 And the guard that would remove two of them is itself duplicated, verbatim:
 
