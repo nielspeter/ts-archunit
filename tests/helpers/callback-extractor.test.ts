@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Project, SyntaxKind } from 'ts-morph'
 import { extractCallbacks } from '../../src/helpers/callback-extractor.js'
-import type { ExtractedCallback } from '../../src/helpers/callback-extractor.js'
 
 function getFirstCallExpression(code: string) {
   const project = new Project({ useInMemoryFileSystem: true })
