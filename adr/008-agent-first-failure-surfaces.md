@@ -126,6 +126,18 @@ What independence looks like: ts-morph **static analysis** vs the **runtime ES m
 Corollaries:
 
 - **Enumerate the surface from the diff, not from memory.** This is the corollary the second body of evidence added, and it is about the question itself rather than about any guard. "What would this test do if the thing it guards were completely broken?" presupposes that you have correctly identified _the thing_ — and that step is a hand-maintained list, so rule 5 applies to it. Measured, over one release's surface: a sabotage matrix enumerated from memory reported **0 of 8** caught-by-nothing, honestly; a matrix enumerated from `git diff` over the same code found **11**; those eleven were pinned and re-measured at 0; a third enumeration, 65 reverts derived from the diff, found **9** still uncaught, six of them behavioural. The rigour never changed. The list did. So: derive the revert list mechanically from the change, assert that each patch applies non-trivially before trusting its verdict, and report **caught-by-nothing as a number** — a matrix without that number is a claim, not a measurement.
+- **A diff cannot enumerate an OMISSION, so add the cases named in prose.** The corollary above is
+  necessary and not sufficient, and the gap is structural: a revert list derived mechanically from
+  `git diff` covers every line that changed, and **code never written has no line to revert.** Bug
+  0040 named its own missing case in prose — _"The missing case: a wrong remedy, not silence"_, with
+  _"enumerate the right-hand and final-layer cases"_ written as an explicit instruction to whoever
+  built the guard. The plan that fixed it reported **7 of 7 caught**, and every one of those seven
+  fires; the final-layer case was simply not among them, because no diff line pointed at it. It
+  shipped, and `haveMatchingCounterpart` — the most-used cross-layer condition — reported 2 wrong
+  ordinary violations and 0 configuration findings on a dead final layer for two releases.
+  So: **when a bug report or plan names a case in prose and the work claims to have fixed it, add
+  that sentence to the matrix as its own row.** It will never arrive from the diff. Cheap, and it is
+  the only corollary here that catches what was left out rather than what was got wrong.
 - **The verdict mechanism is part of the derivation.** Same evidence, one layer down: a reviewer's first pass over that 65-revert matrix decided each verdict by grepping the test reporter's output, ANSI escape codes defeated the pattern, and it reported _every_ revert as caught-by-nothing. A sabotage run that reads its own result through a fragile channel has the same defect as the guards it is auditing. Read the exit code. And **prove the exit code means something before trusting it**, because the channel has failed three further ways since, every one of them in the reassuring direction — a matrix that cannot return MISSED reads as a matrix that found nothing wrong:
   - an unquoted `$SUITE` does not word-split in zsh, so vitest received one nonexistent filter, found no files and exited 1 on **every** row;
   - `tests/core/diagnose.test.ts` failed for an environmental reason in a `git worktree`, scoring all twelve rows of a matrix CAUGHT until the reviewer baselined;

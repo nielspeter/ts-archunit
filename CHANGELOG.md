@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.3] - 2026-08-03
+
+Everything here came out of an architecture review of v0.44.0/v0.45.0. No user-facing behaviour
+changes except the cross-layer fix below, which is only reachable by calling a condition's
+`evaluate()` directly.
+
+### Fixed
+
+- **A cross-layer condition handed fewer than two layers returned nothing, silently.** All three
+  conditions did — the exact false green this library exists to remove, inside the library. Not
+  reachable through the DSL (`.mapping()` throws below two layers), but `PairCondition` is an
+  exported interface and the conditions are exported, so the direct-`evaluate()` path is public —
+  the same reachability as the defect fixed in v0.43.1. They now produce an unsuppressable
+  configuration finding naming what to supply. Found as a _divergence_: with an empty
+  `context.layers` and a two-layer argument, `haveMatchingCounterpart` reported two findings and
+  its siblings reported none, and chasing why the numbers differed showed all three were wrong in
+  the same direction on a neighbouring input.
+
+- **`isFaultPosition` decided a new glob position by default.** A fifth `GlobPosition` compiled
+  clean and left the suite green, silently a non-fault in all three consumers — a dead glob written
+  at it would have been invisible to both `doctor` and the build, which is the original divergence's
+  failure direction inside the predicate written to remove it. It is now an exhaustive `switch`, so
+  a new position is a compile error.
+
+- **The census's helper call-site check could not fail** ([plan 0078](plans/completed/0078-derive-the-configuration-finding-census.md)).
+  It asserted the second argument's source text contained `remedy` — a **mandatory property key**,
+  so the assertion was satisfied by the shape of the call rather than the value of the remedy. A
+  third `assertDiscovered` call site with `remedy: ''`, a configuration finding shipping no remedy
+  at all, passed `tsc` and the full suite unchanged. It now resolves the property and judges its
+  value.
+
+### Documented
+
+- **`deadSelectorFindings()`'s return type changed in v0.44.0** from `ArchViolation[]` to
+  `{ selector; discovery }`, and that is a break on a **documented** extension point —
+  `docs/api-reference.md` states external `TerminalBuilder` subclasses are supported. It is not
+  silent (a TS override stops compiling; a JS override throws), but neither the v0.44.0 changelog
+  entry nor its upgrade row said so. Both `deadSelectorFindings()` and `ownsDiscoveryDiagnosis()`
+  are now in the API reference — the latter matters because an external subclass that already
+  self-diagnoses an empty discovery glob is otherwise preempted by the gate with a generic message,
+  and overriding it is the remedy.
+
+### Internal
+
+- A classification citing a test file that no longer exists now fails, rather than pointing at
+  nothing. Ten citations were verified by hand during review, which is a measurement with a shelf
+  life; this gives it one that does not expire.
+- `doctor` and the build are now asserted to agree about a dead **discovery** glob. The parity row
+  existed only for `selector` — the position that never diverged — while `discovery`, the position
+  the whole fix was about, had a single-surface test on each side.
+- A test docstring still asserted that a dead `discovery` glob "already failed", the precise false
+  premise plan 0080 was filed to correct, in the one place a reader checks the premise.
+
 ## [0.45.2] - 2026-08-03
 
 No behaviour changes. Two internal guards were found to be weaker than they claimed, and the
