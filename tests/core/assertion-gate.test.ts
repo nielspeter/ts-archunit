@@ -595,6 +595,59 @@ describe('empty-project parity — one string, one place', () => {
     }
   }
 
+  it('the SELECTOR path says it too — the row this test never had (bug 0048)', () => {
+    // The test below is named "the doctor's empty-project advice IS the
+    // builder's, character for character" and it passed for two releases while
+    // this was broken. It drives the builder with `slices().matching()`, whose
+    // glob sits at DISCOVERY position — so `deadSelectorFindings` skips it
+    // (`terminal-builder.ts:433`) and the text comes from `SliceRuleBuilder`'s
+    // own empty-project branch.
+    //
+    // There were three implementations of "the project loaded nothing" —
+    // `diagnose.ts`, `SliceRuleBuilder`, and none in the gate — and the parity
+    // test compared the two that had one. The selector path is the common one:
+    // every `modules()`, `classes()`, `functions()` and `types()` rule.
+    //
+    // Measured before the fix: *"This rule's selector … can never match
+    // anything … Correct the glob, or remove the rule."* The glob was correct.
+    const target = emptyProject()
+    expect(target.getSourceFiles()).toEqual([])
+
+    const rule = modules(target)
+      .that()
+      .resideInFolder('**/src/**')
+      .should()
+      .notImportFrom('**/y/**')
+    const messages = rule.violations().map((v) => v.message)
+
+    // ONE finding for the project, not one per glob: the identity of this fault
+    // is the tsconfig (ADR-008 rule 4), which is why `diagnose()` dedupes too.
+    expect(messages).toHaveLength(1)
+
+    const shared = emptyProjectAdvice(target)
+    expect(messages[0]).toContain(shared.charAt(0).toUpperCase() + shared.slice(1))
+    // …and it must NOT blame the glob, which is the whole defect.
+    expect(messages[0]).not.toContain('can never match anything')
+    expect(messages[0]).not.toContain('Correct the glob')
+  })
+
+  it('CONTROL: a genuinely dead glob in a LOADED project still blames the glob', () => {
+    // Without this, "always report project-empty" passes the row above and
+    // destroys the distinction the gate exists to draw.
+    const loaded = load('poc')
+    expect(loaded.getSourceFiles().length).toBeGreaterThan(0)
+
+    const rule = modules(loaded)
+      .that()
+      .resideInFolder('**/no-such-folder-anywhere/**')
+      .should()
+      .notImportFrom('**/y/**')
+    const [message] = rule.violations().map((v) => v.message)
+
+    expect(message).toContain('can never match anything')
+    expect(message).not.toContain('loaded 0 source files')
+  })
+
   it("the doctor's empty-project advice IS the builder's, character for character", () => {
     const target = emptyProject()
     expect(target.getSourceFiles()).toEqual([])
