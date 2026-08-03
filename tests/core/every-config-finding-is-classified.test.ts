@@ -307,6 +307,14 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
      * remedy read through a helper.
      */
     const derivesFrom = (expr: Node, params: Set<string>, depth = 0): boolean => {
+      // **Residue, stated rather than deferred.** Two hops, so a remedy laundered
+      // through three (`context` -> local -> helper -> helper) escapes. Bounded on
+      // purpose: ADR-008 rule 6 puts this row at "an internal check over a corpus
+      // we control", where the standard is to prove each detector fires and stop.
+      // Four shapes are proven to fire below — a direct read, an aliased
+      // parameter, a destructured local, and a helper — which covers every
+      // spelling present in `src/`. Raise the bound when a real producer needs it,
+      // not in advance.
       if (depth > 2) return false
       const nodes = [expr, ...expr.getDescendants()]
 
