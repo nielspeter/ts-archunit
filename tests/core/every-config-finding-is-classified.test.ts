@@ -287,26 +287,47 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
      */
     const derivesFrom = (expr: Node, params: Set<string>, depth = 0): boolean => {
       if (depth > 2) return false
-      const ids = [expr, ...expr.getDescendants()].filter((n) => Node.isIdentifier(n))
+      const nodes = [expr, ...expr.getDescendants()]
+
+      // `suggestion,` is a ShorthandPropertyAssignment, and `getSymbol()` on its
+      // identifier resolves to the PROPERTY, not to the local — so the walk below
+      // sees a symbol declared by the object literal itself and learns nothing.
+      // Measured: this was the one escape of three that survived the first
+      // symbol-resolution pass, `const { suggestion } = context`. `getValueSymbol()`
+      // is ts-morph's accessor for the checker's shorthand value symbol.
+      for (const node of nodes) {
+        if (!Node.isShorthandPropertyAssignment(node)) continue
+        for (const decl of node.getValueSymbol()?.getDeclarations() ?? []) {
+          if (declLeadsToAuthor(decl, params, depth)) return true
+        }
+      }
+
+      const ids = nodes.filter((n) => Node.isIdentifier(n))
       for (const id of ids) {
         if (params.has(id.getText())) return true
         for (const decl of id.getSymbol()?.getDeclarations() ?? []) {
-          if (Node.isVariableDeclaration(decl)) {
-            const init = decl.getInitializer()
-            if (init && derivesFrom(init, params, depth + 1)) return true
-          }
-          if (Node.isBindingElement(decl)) {
-            const varDecl = decl.getFirstAncestorByKind(SyntaxKind.VariableDeclaration)
-            const init = varDecl?.getInitializer()
-            if (init && derivesFrom(init, params, depth + 1)) return true
-          }
-          if (Node.isFunctionDeclaration(decl) || Node.isMethodDeclaration(decl)) {
-            const inner = authorParams(decl)
-            for (const ret of decl.getDescendantsOfKind(SyntaxKind.ReturnStatement)) {
-              const value = ret.getExpression()
-              if (value && derivesFrom(value, inner, depth + 1)) return true
-            }
-          }
+          if (declLeadsToAuthor(decl, params, depth)) return true
+        }
+      }
+      return false
+    }
+
+    /** One hop out of a declaration, shared by the shorthand and identifier paths. */
+    const declLeadsToAuthor = (decl: Node, params: Set<string>, depth: number): boolean => {
+      if (Node.isVariableDeclaration(decl)) {
+        const init = decl.getInitializer()
+        if (init && derivesFrom(init, params, depth + 1)) return true
+      }
+      if (Node.isBindingElement(decl)) {
+        const varDecl = decl.getFirstAncestorByKind(SyntaxKind.VariableDeclaration)
+        const init = varDecl?.getInitializer()
+        if (init && derivesFrom(init, params, depth + 1)) return true
+      }
+      if (Node.isFunctionDeclaration(decl) || Node.isMethodDeclaration(decl)) {
+        const inner = authorParams(decl)
+        for (const ret of decl.getDescendantsOfKind(SyntaxKind.ReturnStatement)) {
+          const value = ret.getExpression()
+          if (value && derivesFrom(value, inner, depth + 1)) return true
         }
       }
       return false
