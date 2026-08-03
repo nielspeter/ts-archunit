@@ -240,3 +240,36 @@ without which "always report an override problem" passes.
 
 `agentGuardrails`' `no-inline-logic/${api}` ids, at the type level. Stated above rather than left
 for someone to discover.
+
+## Sabotage — 8 rows, two instruments
+
+The two halves need two oracles, and that is the independence: a value comparison and the type
+checker cannot fail the same way.
+
+**Runtime (vitest exit code), 5 of 5:**
+
+| Revert                                | Result |
+| ------------------------------------- | ------ |
+| never report an unknown key           | CAUGHT |
+| report _every_ key as unknown         | CAUGHT |
+| `bypassFilters: false` (suppressable) | CAUGHT |
+| remedy omits the real rule ids        | CAUGHT |
+| findings computed but not returned    | CAUGHT |
+
+**Type (`tsc` exit code), 3 of 3:**
+
+| Revert                                                                | Result |
+| --------------------------------------------------------------------- | ------ |
+| widen `PresetBaseOptions` back to `Record<string, …>`                 | CAUGHT |
+| drop one preset's type argument                                       | CAUGHT |
+| `SPECS` back to `readonly RuleSpec[]` instead of `as const satisfies` | CAUGHT |
+
+`@ts-expect-error` is the right instrument for the second set because it fails in the direction
+that matters: when the type stops rejecting a bad key the directive becomes **unused**, and
+`tsc` errors on that. The guard cannot silently stop guarding.
+
+A process note, recorded because it is the fault this project keeps finding in itself: the first
+run of that matrix printed `typecheck exit=$?` after piping `tsc` through `head`, so it reported
+`head`'s exit status — **0 on every row**, the reassuring direction. Caught by noticing the
+errors printed above a green verdict. ADR-008 rule 5's verdict-mechanism corollary, committed
+while writing the guard for a bug about false greens.
