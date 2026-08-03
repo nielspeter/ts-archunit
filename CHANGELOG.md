@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.0] - 2026-08-03
+
+### Added
+
+- **The configuration-finding census** ([plan 0078](plans/completed/0078-derive-the-configuration-finding-census.md)). A finding carrying `bypassFilters: true` reports that a rule enforces nothing; there are **15 producers** of them, and the guard that was meant to hold them to a standard enumerated **three by hand** and asserted only that a remedy was present. It could not have caught [bug 0042](bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md), which shipped a producer printing the rule author's unrelated `Fix:` on a finding about a mis-globbed layer.
+
+  The census is derived from source, keyed on each producer's enclosing function, and asserts statically that every one sets its **own** remedy and never reads the author's. A new producer fails the suite until it is classified, and must declare whether its remedy has been **proven to remediate** — 11 of 15 name the test that applies the fix; the other four carry why applying it is not possible.
+
+  Internal only: no API or behaviour change. It is a guard against a class of defect this project has shipped twice.
+
 ## [0.44.0] - 2026-08-03
 
 ### Fixed

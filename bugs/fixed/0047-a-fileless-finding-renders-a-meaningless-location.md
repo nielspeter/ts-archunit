@@ -47,7 +47,7 @@ before writing code.
 
 ## Related
 
-- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census over the
+- [Plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md) — the census over the
   twelve producers; this is a rendering property of the same population, and the census is the
   natural place to assert it uniformly.
 
@@ -126,5 +126,5 @@ cannot drift.
 
 - [Bug 0026](./0026-a-location-less-finding-does-not-say-which-rule-file-it-came-from.md) — why
   configuration findings carry the rule file, which is what made the first docs draft wrong.
-- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census over the
+- [Plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md) — the census over the
   same twelve producers; rendering uniformity belongs there.

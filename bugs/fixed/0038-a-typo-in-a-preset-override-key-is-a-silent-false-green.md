@@ -114,7 +114,7 @@ Three things to settle:
 2. **Keep the available-IDs list** in the remedy. The current stderr text already has it, and
    it is the one part of today's behaviour that is right.
 3. Per rule 3 the finding must state that it cannot be suppressed — see
-   [plan 0078](../../plans/0078-derive-the-configuration-finding-census.md).
+   [plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md).
 
 ### Option zero, and it should be tried first
 
@@ -183,7 +183,7 @@ described:
   rule 6 — this is published API.
 - [Bug 0018](./0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md) — the
   other "a preset silently enforces nothing" fault, fixed by `assertDiscovered`.
-- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census guards
+- [Plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md) — the census guards
   producers that exist; it **cannot** find a missing one, so it will not catch this. Fix this
   first, then let the census pick up the new site.
 
