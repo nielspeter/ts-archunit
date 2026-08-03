@@ -58,3 +58,17 @@ app.post('/deep', {
     validateInput(req)
   },
 })
+
+// Plan 0082's motivating shape: two function callbacks on ONE object literal,
+// with different property names. Before the fix both came back anonymous and
+// shared the object's argIndex, so `/^handler$/` could not tell them apart —
+// and no fixture in this suite contained the case, which is why the integration
+// row could pass with the feature reverted.
+app.post('/pair', {
+  preHandler: (req: unknown) => {
+    authenticate(req)
+  },
+  handler: (req: unknown) => {
+    validateInput(req)
+  },
+})

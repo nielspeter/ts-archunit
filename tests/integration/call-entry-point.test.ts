@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
+import type { SourceFile } from 'ts-morph'
 import path from 'node:path'
 import { calls } from '../../src/builders/call-rule-builder.js'
 import { within } from '../../src/index.js'
@@ -331,46 +332,76 @@ describe('calls() entry point — end-to-end', () => {
 describe('an object-literal callback keeps its name (plan 0082)', () => {
   const p = loadTestProject()
 
-  // The gap this closes was not a false green — it was a rule an adopter would
-  // plausibly write that is **writable and selects nothing**: every callback came
-  // back anonymous, and both callbacks on one object shared the object's
-  // `argIndex`, so nothing in the shape told them apart. Expressible, plausible,
-  // and empty. It only reds at all because plan 0074 made an empty selection a
-  // finding; before that it was a silent pass.
+  /** `basename:line`, so the assertions name elements rather than count them. */
+  const identify = (fn: {
+    getSourceFile: () => SourceFile
+    getStartLineNumber: () => number
+  }): string =>
+    `${path.basename(fn.getSourceFile().getFilePath())}:${String(fn.getStartLineNumber())}`
 
-  it('VACUITY: the fixture really has several named callbacks on object literals', () => {
-    // Without this, every row below could pass over a selection of nothing.
-    const named = within(calls(p))
-      .functions()
-      .subjects()
-      .map((fn) => fn.getName())
-      .filter((n): n is string => n !== undefined)
-    expect(named).toContain('handler')
-    expect(named.length).toBeGreaterThan(2)
+  it('VACUITY: the fixture really has callbacks, measured WITHOUT using names', () => {
+    // Name-independent on purpose. The first version of this row asserted that
+    // `getName()` returned 'handler' — which is the thing under test, so it was a
+    // second copy of the feature assertion wearing a vacuity label, and it reddened
+    // under revert exactly like the rows it was supposed to be guarding.
+    expect(within(calls(p)).functions().subjects().length).toBeGreaterThan(20)
   })
 
-  it('the motivating rule now selects the handler, and ONLY the handler', () => {
-    // Test inventory row 5. Populating a name proves a field; this proves the gap
-    // closed — and it composes through the existing predicate, with no new API,
-    // which was the whole argument for fixing it at this layer.
+  it('the motivating rule selects the handler, and NOT its sibling', () => {
+    // **This row passed with the feature completely reverted**, in the release that
+    // introduced it saying "without this the plan proves a field is populated and
+    // not that the gap is closed". Two reasons, both found by review:
+    //
+    //  1. `expect(handlers.length).toBeGreaterThan(0)` held either way, because the
+    //     fixture already contained functions genuinely named `handler` — a method
+    //     shorthand and a positional `function handler(...)`, both named long
+    //     before this change. Reverting lost 4 of 6 selections, invisible to `> 0`.
+    //  2. `expect([...new Set(names)]).toEqual(['handler'])` was a TAUTOLOGY: the
+    //     set was already filtered by `/^handler$/`, so it could only be
+    //     `['handler']` unless `haveNameMatching` itself broke. It guarded the
+    //     predicate, not the naming.
+    //
+    // Fixed by asserting WHICH functions are selected. Reverting the one-line
+    // change drops this from seven to two.
     const handlers = within(calls(p))
       .functions()
       .that()
       .haveNameMatching(/^handler$/)
       .subjects()
+      .map(identify)
+      .sort()
 
-    expect(handlers.length).toBeGreaterThan(0)
-    expect([...new Set(handlers.map((fn) => fn.getName()))]).toEqual(['handler'])
+    expect(handlers).toEqual([
+      'nested-callbacks.ts:23',
+      'object-callbacks.ts:12',
+      'object-callbacks.ts:19',
+      'object-callbacks.ts:26',
+      'object-callbacks.ts:38',
+      'object-callbacks.ts:57',
+      'object-callbacks.ts:71',
+    ])
   })
 
-  it('two callbacks on ONE object literal are distinguishable', () => {
-    // Row 1, the case that motivated the plan: both used to be anonymous and both
-    // carried the same argIndex.
-    const names = within(calls(p))
+  it('ONLY the handler: its sibling on the same object literal is excluded', () => {
+    // "ONLY" was in the old row's title and asserted nowhere — and could not be,
+    // because no fixture had two differently-named function callbacks on one
+    // object. `object-callbacks.ts:69` now does, so exclusion is demonstrable
+    // rather than assumed.
+    const onePair = within(calls(p))
       .functions()
       .subjects()
+      // The `/pair` call site: `preHandler` at :68, `handler` at :71.
+      .filter((fn) => /^object-callbacks\.ts:(68|71)$/.test(identify(fn)))
       .map((fn) => fn.getName())
-    expect(names).toContain('handler')
-    expect(names.some((n) => n !== undefined && n !== 'handler')).toBe(true)
+      .sort()
+    expect(onePair).toEqual(['handler', 'preHandler'])
+
+    const selected = within(calls(p))
+      .functions()
+      .that()
+      .haveNameMatching(/^handler$/)
+      .subjects()
+      .map((fn) => fn.getName())
+    expect(selected).not.toContain('preHandler')
   })
 })
