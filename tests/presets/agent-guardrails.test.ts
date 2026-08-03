@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { RuleDescription } from '../../src/core/rule-description.js'
+import { isDescribable } from '../../src/core/rule-description.js'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import type { ArchProject } from '../../src/core/project.js'
@@ -25,12 +25,6 @@ const SRC = '**/mistakes.ts'
  * for the same reason: the assertions below are about WHICH rules a preset
  * produced, which is unavailable through the declared interface.
  */
-interface Describable {
-  describeRule: () => RuleDescription
-}
-function isDescribable(rule: object): rule is Describable {
-  return 'describeRule' in rule && typeof rule.describeRule === 'function'
-}
 
 /** The rule ids a preset produced, in order. */
 function idsOf(builders: readonly object[]): (string | undefined)[] {

@@ -24,7 +24,7 @@ import path from 'node:path'
 import { project } from '../../src/core/project.js'
 import { strictBoundaries } from '../../src/presets/boundaries.js'
 import type { ArchViolation } from '../../src/core/violation.js'
-import type { RuleDescription } from '../../src/core/rule-description.js'
+import { isDescribable } from '../../src/core/rule-description.js'
 
 const p = project(
   path.resolve(import.meta.dirname, '../fixtures/presets/boundaries-folder-level/tsconfig.json'),
@@ -55,12 +55,6 @@ const edges = (violations: ArchViolation[]): string[] =>
  * commit into their agent's system prompt — the surface bug 0017 called its
  * worst.
  */
-interface Describable {
-  describeRule: () => RuleDescription
-}
-function isDescribable(rule: object): rule is Describable {
-  return 'describeRule' in rule && typeof rule.describeRule === 'function'
-}
 
 describe('the rule is folder-level, and treats an entry point exactly like an internal', () => {
   it('flags BOTH cross-boundary imports, named by identity', () => {
@@ -136,7 +130,9 @@ describe('the message is honest in both configurations', () => {
     // was authorial, and this is the phrase that was wrong.
     const rules = strictBoundaries(p, { folders: FOLDERS, shared: SHARED })
     const texts = rules.flatMap((rule) => {
-      if (!isDescribable(rule)) return []
+      // Fail rather than skip: `return []` degraded a non-describable rule to
+      // an empty contribution, so the assertion below could pass over nothing.
+      if (!isDescribable(rule)) throw new Error('a preset rule cannot describe itself')
       const d = rule.describeRule()
       return [d.because ?? '', d.suggestion ?? '', d.imperative ?? '']
     })
