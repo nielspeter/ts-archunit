@@ -2,7 +2,10 @@ import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import fs from 'node:fs'
-import { modules, functions, or, defineCondition } from '../../src/index.js'
+import { modules, functions, classes, or, defineCondition } from '../../src/index.js'
+import type { Condition } from '../../src/core/condition.js'
+import type { ArchViolation } from '../../src/core/violation.js'
+import type { ClassDeclaration } from 'ts-morph'
 import { resideInFolder } from '../../src/predicates/identity.js'
 import { notExist } from '../../src/conditions/structural.js'
 import { diagnose } from '../../src/core/diagnose.js'
@@ -304,5 +307,72 @@ describe('an empty selection is a fault by default (plan 0074, emptyIsPass)', ()
     // constructor cannot produce one either.
     const userCondition = defineCondition<never>('user condition', () => [])
     expect(Object.getOwnPropertySymbols(userCondition)).toEqual([])
+  })
+})
+
+describe('the cardinality exemption cannot be forged (bug 0050)', () => {
+  // A module-private `unique symbol` keyed onto the condition was thought
+  // unreachable: a consumer cannot import it to name the key. They never needed
+  // to — four shipped conditions carried it as an own property and `notExist` is
+  // publicly exported, so the key was two lines away:
+  //
+  //   const stolen = Object.getOwnPropertySymbols(notExist())[0]
+  //   const mine = { description: 'x', evaluate: () => [], [stolen]: true }
+  //
+  // Measured before the fix: honest condition on an empty selection → 1
+  // configuration finding; that forgery → **0**. One line to exempt any rule from
+  // the empty-selection gate, through documented exports.
+  //
+  // Found by review of plan 0081, which had just closed the identical hole in a
+  // different symbol — while citing this one as the safe precedent. "Module-private"
+  // describes the binding, not the value.
+  const emptyProject = (): ArchProject => {
+    const tsm = new Project({ useInMemoryFileSystem: true })
+    tsm.createSourceFile('/a.ts', 'export class Real {}')
+    return {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+  }
+  const configFindings = (condition: Condition<ClassDeclaration>): ArchViolation[] =>
+    classes(emptyProject())
+      .that()
+      .haveNameMatching(/NoSuchClassAnywhere/)
+      .should()
+      .satisfy(condition)
+      .violations()
+      .filter((v) => v.bypassFilters === true)
+
+  it('a shipped condition leaks no own symbol to copy', () => {
+    expect(Object.getOwnPropertySymbols(notExist())).toEqual([])
+  })
+
+  it('CONTROL: an honest condition on an empty selection is still gated', () => {
+    // Without this the row below passes when the gate stops firing altogether,
+    // which would look like the forgery being blocked.
+    const honest: Condition<ClassDeclaration> = {
+      description: 'asserts nothing',
+      evaluate: () => [],
+    }
+    expect(configFindings(honest)).toHaveLength(1)
+  })
+
+  it('a condition carrying every own key of a real one is still gated', () => {
+    // The forgery, expressed the only way it now can be: copy everything the
+    // shipped object exposes. Registry membership is not among it.
+    const forged: Condition<ClassDeclaration> = {
+      ...notExist<ClassDeclaration>(),
+      description: 'a copy of every own property notExist() exposes',
+      evaluate: () => [],
+    }
+    expect(configFindings(forged)).toHaveLength(1)
+  })
+
+  it('the real condition is still exempt, so the registry works at all', () => {
+    // The other direction: if registration broke, `notExist()` would start
+    // producing a finding on the pre-emptive guard it exists to permit, and the
+    // rows above would pass for the wrong reason.
+    expect(configFindings(notExist<ClassDeclaration>())).toEqual([])
   })
 })
