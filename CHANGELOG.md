@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.43.2] - 2026-08-03
+
+### Fixed
+
+- **`doctor <one-rule-file>` reported working exclusion comments as orphans, and told you to delete them.** The v0.43.0 orphan check compares directives against the ids of the rules it was handed, and the single-file `doctor` form sees only part of a multi-file project — so a comment naming a rule declared elsewhere looked stale, with "delete the comment" as its remedy. Deleting it un-waives a real violation. The advice now leads with what was actually checked when the view is partial, and stays quiet when it is complete.
+
+- **The orphan check silently found nothing on an in-memory project, or on a file it could not read.** It read each file from disk and swallowed the failure. It now uses the text ts-morph already holds, so there is no second read to fail.
+
+- **When no rule declares an id, the check said nothing** — while in that state _every_ inline exclusion in the project is inert, so all of them were real orphans. It now reports one aggregate finding naming the cause, rather than silence or one finding per comment.
+
+- `doctor`'s terminal output prints the source file and line for these findings. v0.43.0's release note claimed it did; it printed neither.
+
+- The finding carries the source location in a new `sourceFile` field rather than reusing `ruleFile`, which is documented as naming a _rule_ file. JSON consumers were getting two different things under one name depending on `kind`.
+
 ## [0.43.1] - 2026-08-03
 
 ### Fixed
