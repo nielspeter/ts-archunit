@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.46.0 · **Open:** 0 · **Fixed:** 50 (`fixed/`) · **Updated:** 2026-08-03
+**Version:** 0.46.1 · **Open:** 0 · **Fixed:** 50 (`fixed/`) · **Updated:** 2026-08-04
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a

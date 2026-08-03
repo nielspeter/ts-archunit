@@ -484,3 +484,32 @@ describe('extractCallbacks', () => {
     })
   })
 })
+
+describe('a NAMED function expression: the property key wins (plan 0082, second arm)', () => {
+  // The arm nobody declared. Plan 0082, the CHANGELOG and `docs/upgrading.md` all
+  // described the change as `<anonymous>` → name. There is a second direction:
+  // `{ handler: function legacyName(req) {} }` reported **legacyName** before
+  // v0.46.0 and reports **handler** after. Found by review; the sabotage that
+  // restores the old behaviour for function expressions only was MISSED by the
+  // whole suite, because neither side was pinned.
+  //
+  // The new behaviour is right — the property key is how a reader and a rule refer
+  // to the callback, and it matches what `fromObjectLiteralFunction` produces at
+  // the other call site. Being right is not the same as being declared.
+  it("reports the property name, not the function expression's own identifier", () => {
+    const callExpr = getFirstCallExpression(`
+      app.post('/named', {
+        handler: function legacyName(req: unknown) { validateInput(req) },
+      })
+    `)
+    expect(extractCallbacks(callExpr).map((c) => c.fn.getName())).toEqual(['handler'])
+  })
+
+  it('CONTROL: a named function expression NOT on a property keeps its own name', () => {
+    // So the row above is about the property winning, not about names being lost.
+    const callExpr = getFirstCallExpression(`
+      app.get('/positional', function ownName(req: unknown) { validateInput(req) })
+    `)
+    expect(extractCallbacks(callExpr).map((c) => c.fn.getName())).toEqual(['ownName'])
+  })
+})

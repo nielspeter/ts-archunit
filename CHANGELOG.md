@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.46.1] - 2026-08-04
+
+Everything here came out of two reviews of v0.46.0. One finding is a **real hole in a gate**, present
+since v0.23.0 and unrelated to v0.46.0 except that reviewing v0.46.0 is how it was found.
+
+### Fixed
+
+- **The empty-selection gate could be switched off in one line, through public API**
+  ([bug 0050](bugs/fixed/0050-the-cardinality-exemption-was-forgeable.md)). The exemption that lets
+  `notExist()` pass on a selector matching nothing was a module-private `unique symbol` keyed onto
+  the condition — chosen over a boolean property precisely to stop a "one-line silent opt-out". But
+  four shipped conditions carry it as an own property and `notExist` is exported, so
+  `Object.getOwnPropertySymbols(notExist())[0]` hands it to anyone. Measured: an honest condition on
+  an empty selection produces **1** configuration finding; a forgery carrying the stolen symbol
+  produces **0**.
+
+  **"Module-private" describes the binding, not the value.** Both exemptions — this one and plan
+  0081's — are now membership of a module-level `WeakSet`: nothing to read off an object, nothing to
+  copy. The guard that existed asserted only that `defineCondition` emits no symbols, which covers
+  user-built conditions and not the shipped ones where the key was readable.
+
+- **v0.46.0's own ownership symbol had the identical hole**, and shipped with it for a day. Same
+  fix, plus the `in`-operator hazard it carried: `{ [SYMBOL]: undefined }` type-checked and `in`
+  returned true for it — also 0 findings, measured.
+
+### Changed
+
+- **A named function expression on a property now reports the property name.** `{ handler: function
+legacyName(req) {} }` reported `legacyName` before v0.46.0 and reports `handler` since. This is the
+  second arm of v0.46.0's naming change and it went out undeclared and unguarded — the sabotage that
+  restores the old behaviour for function expressions only passed the entire suite. Both directions
+  are now pinned: the property key wins on a property, and a positional named function keeps its own
+  name.
+
+### Documentation
+
+- The v0.46.0 baseline-migration note was **wrong about its own mechanism**. `hashViolation` is
+  `identity ?? element::message`, so producers that set `identity` — every body-analysis condition —
+  **keep their hashes**; only structural conditions move. The note said the hash was "over rule +
+  element + message" and told everyone to regenerate. Corrected, and the test plan 0082 called "not
+  optional" now exists over both producer classes.
+- `terminal-builder.ts` and `docs/api-reference.md` both claimed `SliceRuleBuilder` was the only
+  builder overriding `ownsDiscoveryDiagnosis()`. False since v0.44.0 — a hand-maintained roster, the
+  exact defect class plan 0081 was filed to delete, one file away from the fix.
+
 ## [0.46.0] - 2026-08-04
 
 Minor rather than patch for one reason: an object-literal callback now has a **name**, which changes

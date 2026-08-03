@@ -379,6 +379,9 @@ describe('an object-literal callback keeps its name (plan 0082)', () => {
       'object-callbacks.ts:38',
       'object-callbacks.ts:57',
       'object-callbacks.ts:71',
+      // The named function expression added for 0.46.1: the property key wins, so
+      // this is a `handler` too. Reverting the naming change drops it.
+      'object-callbacks.ts:80',
     ])
   })
 
