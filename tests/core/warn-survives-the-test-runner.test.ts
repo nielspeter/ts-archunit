@@ -121,8 +121,31 @@ function runVitest(file: string): { output: string; status: number } {
 beforeAll(() => {
   // Cleaned on the way IN as well as out: a crashed earlier run would otherwise
   // leave probe files that the next parent run collects as its own tests.
-  // Only this process's own directory. Removing `generatedRoot` here is what
-  // let one run delete another's files (bug 0045).
+  //
+  // **That intent needed the loop below to be true.** Removing only
+  // `generatedDir` handles a re-run at the same pid and nothing else — a fresh
+  // process has a different pid, so a killed run's `run-<oldpid>/` survived
+  // forever. It is gitignored, so `git status` reads clean; `include:
+  // ['tests/**/*.test.ts']` collects it; and the probe files are *designed* to
+  // fail. A reviewer hit exactly that: an isolated worktree whose very first
+  // baseline read exit 1 for a reason nothing in the working tree showed. That is
+  // the ADR-008 rule 5 verdict-mechanism hazard — a sabotage matrix reading exit
+  // codes cannot tell that failure from a real one.
+  //
+  // Pruned by LIVENESS, not by age or by wildcard: `process.kill(pid, 0)` throws
+  // for a pid that no longer exists and does nothing to one that does, so a
+  // concurrent sibling's directory is never touched. Deleting another run's files
+  // is bug 0045 and is not being reintroduced here.
+  for (const entry of fs.existsSync(generatedRoot) ? fs.readdirSync(generatedRoot) : []) {
+    const pid = Number(/^run-(\d+)$/.exec(entry)?.[1])
+    if (!Number.isInteger(pid) || pid === process.pid) continue
+    try {
+      process.kill(pid, 0)
+      continue // alive: a sibling run owns it
+    } catch {
+      fs.rmSync(path.join(generatedRoot, entry), { recursive: true, force: true })
+    }
+  }
   fs.rmSync(generatedDir, { recursive: true, force: true })
   fs.mkdirSync(generatedDir, { recursive: true })
 })
