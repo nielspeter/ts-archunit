@@ -274,6 +274,28 @@ rig.
 | the context's layer **order** reversed      | CAUGHT |
 | `layers` made optional on the context (tsc) | CAUGHT |
 
-A sixth row — reversing the `layerNames` used for the rule _description_ — came back green and was
-discarded rather than counted: that string is cosmetic and nothing consumes it, so it is not a
-revert of this fix.
+### The sixth row, and why discarding it was wrong
+
+A sixth revert — reversing the `layerNames` that build the rule _description_ — came back green,
+and I discarded it as cosmetic on the grounds that nothing consumes the string. **That was wrong,
+and a follow-up check is the only reason it is not still wrong.**
+
+`context.rule` becomes the violation's `rule` field, and `hashViolation` composes the baseline
+identity as `sha256(rule + '::' + subject)` (`baseline.ts:174`). So the layer order inside that
+sentence is part of **every cross-layer finding's baseline hash**: reversing it silently
+invalidates every baselined cross-layer entry, with no message change a reader would notice.
+Nothing asserted it — `grep 'cross-layer \['` over `tests/` returned no hits.
+
+Now pinned in two rows — the exact description for a two-layer chain, and a three-layer control so
+that **order** is asserted rather than membership. Both reverts red:
+
+| Revert                                        | Result |
+| --------------------------------------------- | ------ |
+| Z6 — `layerNames` reversed                    | CAUGHT |
+| Z7 — layer names dropped from the description | CAUGHT |
+
+The lesson is narrower than "check harder". It is that **"nothing consumes this" is a claim about
+the whole system**, and the fields a finding carries are consumed by the baseline whether or not
+any test mentions them. I reached for "cosmetic" to justify not counting an inconvenient green row,
+which is the one direction [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 5 says
+never to resolve a measurement.
