@@ -1,8 +1,10 @@
 # Plan 0082 — an object-literal callback keeps its name
 
-**Status:** Open, not started. Filed 2026-08-03 out of [plan 0079](./completed/0079-triage-the-cardinality-only-assertions.md)'s
-Phase 2, and **rewritten the same day** after an architecture review found the first draft aimed at
-the wrong layer. That draft is recorded below, because the mistake is the useful part.
+**Status:** **DONE, 2026-08-04 (v0.46.0).** Filed 2026-08-03 out of
+[plan 0079](./0079-triage-the-cardinality-only-assertions.md)'s Phase 2, and **rewritten
+the same day** after an architecture review found the first draft aimed at the wrong layer. That
+draft is recorded below, because the mistake is the useful part — and the rewritten version was a
+one-line change where the draft would have been a new field plus a new predicate.
 **Priority:** Low-medium. No false green today — but the rule an adopter would write is _writable
 and selects nothing_, which is the vacuous-selection shape ADR-008 exists for, caught only because
 plan 0074's empty-selection gate reds it.
@@ -11,7 +13,7 @@ plan 0074's empty-selection gate reds it.
 `undefined` to `'handler'` for object-literal callbacks, which changes `element` and message text on
 every `within(...)` violation over one — and therefore changes **baseline hashes**, since
 `hashViolation` is sha256(rule + element + message) (`src/helpers/baseline.ts:138`). Per
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 that is the top row: it needs a
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 that is the top row: it needs a
 `docs/upgrading.md` row telling adopters their baseline entries for these violations will need
 regenerating, and a test that pins the hash change deliberately rather than discovering it.
 
@@ -146,6 +148,44 @@ The first draft added `name?: string` to `ExtractedCallback`. Three faults, all 
 
 ## Related
 
-- [Plan 0079](./completed/0079-triage-the-cardinality-only-assertions.md) — found it, holds the measurement.
+- [Plan 0079](./0079-triage-the-cardinality-only-assertions.md) — found it, holds the measurement.
 - `src/models/arch-function.ts:277` — `fromObjectLiteralFunction`, the function already written.
 - `src/helpers/baseline.ts:138` — `hashViolation`, why this is not additive.
+
+---
+
+# What shipped
+
+One line, as the rewritten plan predicted: `collectObjectLiteralFunctions(arg)` now passes
+`olf.keyPath` to `fromObjectLiteralFunction` instead of discarding it. No new field, no new
+predicate, and the motivating rule composes through `haveNameMatching` exactly as the plan argued.
+
+**Two things the plan did not foresee:**
+
+- **`fromObjectLiteralFunction` returns `ArchFunction | undefined`.** It falls back to the previous
+  wrapper rather than filtering, because dropping an unrecognised node would turn an _anonymous_
+  callback into a **missing** one — a silent under-report, strictly worse than the anonymity being
+  fixed. `tsc` enforces this: removing the fallback is a type error, so the invariant is held by the
+  compiler rather than by a comment.
+- **The dotted-path decision cost two test updates**, and both were the plan being right. A test
+  pinned the bare `onRequest`; the shipped behaviour is `hooks.onRequest`, matching what
+  `fromObjectLiteralFunction` already produced at the other call site. The plan chose that
+  deliberately — two surfaces disagreeing about one node's identity would make `.excluding()`
+  patterns depend on which surface reported the violation.
+
+**Test inventory row 7 was the real check.** `callback-extractor.test.ts`'s local `identify()`
+helper — which walked `fn.getNode().getParent()` to recover a name the API would not give — is
+deleted, and the tests read `getName()`. A test reaching around an API is the signal that the API is
+missing something; the helper surviving would have meant the gap was still there.
+
+**Sabotage, both arms:**
+
+| Revert                                              | Result                               |
+| --------------------------------------------------- | ------------------------------------ |
+| `keyPath` discarded again (the defect)              | CAUGHT — names come back `undefined` |
+| The `?? callbackArchFunction(...)` fallback removed | CAUGHT at compile time               |
+
+**Blast radius, as declared:** `getName()` changes from `undefined` to the callback's name for
+object-literal callbacks, which changes `element` and message text on `within(...)` violations over
+them — and therefore their baseline hashes. That is in `docs/upgrading.md` as a minor-version note.
+Positional callbacks are unchanged and still anonymous, which is asserted rather than assumed.

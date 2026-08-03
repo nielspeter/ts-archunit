@@ -1,7 +1,7 @@
 /**
  * A condition that diagnoses its own empty discovery population.
  *
- * [Plan 0081](../../plans/0081-a-condition-declares-discovery-ownership.md). The
+ * [Plan 0081](../../plans/completed/0081-a-condition-declares-discovery-ownership.md). The
  * dead-glob gate can see that a `.layer()` or `.inFolder()` glob matched nothing,
  * but it short-circuits **before** the condition runs, so where a condition
  * produces a better finding — one that names the dead layer, with a remedy

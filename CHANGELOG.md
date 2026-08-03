@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.46.0] - 2026-08-04
+
+Minor rather than patch for one reason: an object-literal callback now has a **name**, which changes
+`element` and message text on violations about it — and therefore their baseline hashes. See
+Upgrading.
+
+### Changed
+
+- **A callback written as an object property keeps its name** ([plan 0082](plans/completed/0082-an-object-literal-callback-keeps-its-name.md)).
+  `extractCallbacks` discarded the property path one line from where it was produced, so both
+  callbacks in `app.post('/x', { preHandler, handler })` came back anonymous **and** shared the
+  object's `argIndex`. Nothing in the shape told them apart, so a rule an adopter would plausibly
+  write —
+
+  ```ts
+  within(calls(p).that().withMethod('post'))
+    .functions()
+    .that()
+    .haveNameMatching(/^handler$/)
+    .should()
+    .notContain(call('db.query'))
+  ```
+
+  — was writable and selected **nothing**. Not a false green, but the shape next to one: expressible,
+  plausible, empty. It reds today only because an empty selection is itself a finding.
+
+  `fromObjectLiteralFunction` already existed, already exported, already computing the name from
+  exactly that path. The fix was to call it. Nested properties get the dotted form
+  (`hooks.onRequest`), matching what that function already produced elsewhere — two surfaces
+  disagreeing about one node's identity would make `.excluding()` patterns depend on which surface
+  reported. **Positional callbacks are unchanged** and still anonymous, identified by `argIndex`.
+
+  **If you baseline violations about object-literal callbacks, regenerate it.** `hashViolation` is
+  over rule + element + message, and `element` changes from `<anonymous>` to the callback's name.
+
+### Fixed
+
+- **Discovery-diagnosis ownership is declared by the condition, not asserted about all of them**
+  ([plan 0081](plans/completed/0081-a-condition-declares-discovery-ownership.md)). `PairFinalBuilder`
+  told the dead-glob gate to stand down for _every_ cross-layer condition, on the strength of a
+  docstring claiming all three self-report. At v0.45.0 that claim was false —
+  `haveMatchingCounterpart` missed a dead final layer — so the gate stood down for exactly the case
+  its declared owner did not handle, and the reader got silence instead of a message
+  ([bug 0040](bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)).
+
+  A condition now tags itself with a module-private symbol, and the builder reads the tag. **An
+  untagged condition is covered by the gate**, which is the recoverable direction: a generic "this
+  glob matched nothing" beats silence. The symbol is not exported — asserted, not asserted-in-prose —
+  because `PairCondition` is public and an importable key would be a one-line silent opt-out of a
+  gate on any user condition.
+
+  No behaviour change for the three shipped conditions; they are tagged and their layer-naming
+  findings survive exactly as before.
+
 ## [0.45.6] - 2026-08-03
 
 ### Fixed
@@ -97,7 +151,7 @@ both predicates`. The reader knew; the test did not.
   Two things fell out. `matchers.test.ts` asserted two sibling matches; naming them showed the
   matcher returns the **identifier** nodes, not the call expressions. And
   `callback-extractor.test.ts` could not express its identity at all through the public shape —
-  filed as [plan 0082](plans/0082-an-object-literal-callback-keeps-its-name.md), since two
+  filed as [plan 0082](plans/completed/0082-an-object-literal-callback-keeps-its-name.md), since two
   callbacks on one object literal are indistinguishable to a rule author.
 
 - **Two tests were passing on a false green of the kind they existed to prevent.** A testing review

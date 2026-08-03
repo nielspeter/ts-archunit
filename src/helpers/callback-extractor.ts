@@ -60,7 +60,7 @@ function extractFromObjectLiteral(
   argIndex: number,
 ): ExtractedCallback[] {
   // `olf.keyPath` used to be dropped here, one line from where it is produced —
-  // [plan 0082](../../plans/0082-an-object-literal-callback-keeps-its-name.md).
+  // [plan 0082](../../plans/completed/0082-an-object-literal-callback-keeps-its-name.md).
   // `callbackArchFunction` routes an arrow to `fromArrowExpression`, which hardcodes
   // `getName: () => undefined`, so both callbacks on `{ preHandler, handler }` came
   // back anonymous AND shared an `argIndex` (the object's). Nothing in the shape
