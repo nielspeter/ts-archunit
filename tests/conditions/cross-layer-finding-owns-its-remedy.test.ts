@@ -199,6 +199,35 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
     expect(findings.filter((v) => v.bypassFilters === true)).toHaveLength(1)
   })
 
+  it('the rule description names the layers in declaration order — a baseline identity', () => {
+    // Filed against my own judgement. A sabotage row reversing `layerNames`
+    // (`cross-layer-builder.ts:214`) came back green and I discarded it as
+    // cosmetic, on the grounds that the string is only a description.
+    //
+    // It is not cosmetic. `context.rule` becomes the violation's `rule`, and
+    // `hashViolation` composes the baseline identity as
+    // `sha256(rule + '::' + subject)` (`baseline.ts:174`). So the layer order in
+    // this sentence is part of every cross-layer finding's baseline hash:
+    // reversing it silently invalidates every baselined cross-layer entry, with
+    // no message change a reader would notice.
+    //
+    // Nothing asserted it — `grep 'cross-layer \['` over `tests/` found no hits.
+    const findings = emptyLeftLayer().filter((v) => v.bypassFilters === true)
+    expect(findings).toHaveLength(1)
+    expect(findings[0]?.rule).toBe(
+      'cross-layer [ghost, schemas] should have a matching counterpart in the paired layer',
+    )
+  })
+
+  it('CONTROL: order is asserted, not merely membership', () => {
+    // Without this, the row above passes on a reversed description as long as
+    // both names appear. A three-layer chain makes the ordering observable.
+    const findings = emptyLeftLayerOfThree().filter((v) => v.bypassFilters === true)
+    expect(findings.length).toBeGreaterThan(0)
+    expect(findings[0]?.rule).toContain('[ghost, schemas, sdk]')
+    expect(findings[0]?.rule).not.toContain('[sdk, schemas, ghost]')
+  })
+
   it('CONTROL: a real violation of the same rule still inherits all four', () => {
     // Without this, "strip the author's fields everywhere" passes the rows above
     // while breaking the feature `.rule({ suggestion })` exists for.
