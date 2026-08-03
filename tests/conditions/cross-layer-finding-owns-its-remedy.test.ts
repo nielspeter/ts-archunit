@@ -27,7 +27,7 @@ import { describe, expect, it } from 'vitest'
 import { Project } from 'ts-morph'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
 import { haveMatchingCounterpart } from '../../src/conditions/cross-layer.js'
-import type { LayerPair } from '../../src/models/cross-layer.js'
+import type { Layer, LayerPair } from '../../src/models/cross-layer.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import type { RuleMetadata } from '../../src/core/rule-metadata.js'
@@ -170,6 +170,46 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
 
     expect(findings.length).toBeGreaterThan(0)
     expect(findings[0]?.suggestion).toContain('Or drop the layer: 2 would remain')
+  })
+
+  it('a context with too FEW layers does not win — it would pass vacuously', () => {
+    // Found by probing the precedence after v0.42.0 shipped, not by review.
+    //
+    // The first threshold was `context.layers.length > 0`, so a context carrying
+    // ONE layer beat a usable two-layer argument — and the condition then
+    // returned `[]` at its own `layers.length < 2` guard. A silent vacuous pass,
+    // measured: context 1 + argument 2 → **0 findings**.
+    //
+    // Now `>= 2`. Safe for every builder path because the builder cannot produce
+    // fewer than two — `.mapping()` throws below that — so this cannot restore
+    // the defect bug 0040 fixed (the argument beating a real resolution).
+    const usable: Layer[] = [
+      { name: 'ghost', pattern: '**/nowhere/**', files: [] },
+      { name: 'schemas', pattern: '**/schemas/**', files: [] },
+    ]
+    const single: Layer[] = [{ name: 'solo', pattern: '**/solo/**', files: [] }]
+
+    const out = haveMatchingCounterpart(usable).evaluate([], { rule: 'r', layers: single })
+    expect(out).toHaveLength(1)
+    expect(out[0]?.element).toBe('ghost')
+  })
+
+  it('CONTROL: a USABLE context still wins over the argument', () => {
+    // The threshold must not have re-opened bug 0040. Two layers in the context
+    // beat two in the argument, and the context's names are the ones reported.
+    const fromContext: Layer[] = [
+      { name: 'ctx-left', pattern: '**/a/**', files: [] },
+      { name: 'ctx-right', pattern: '**/b/**', files: [] },
+    ]
+    const fromArgument: Layer[] = [
+      { name: 'arg-left', pattern: '**/c/**', files: [] },
+      { name: 'arg-right', pattern: '**/d/**', files: [] },
+    ]
+    const out = haveMatchingCounterpart(fromArgument).evaluate([], {
+      rule: 'r',
+      layers: fromContext,
+    })
+    expect(out[0]?.element).toBe('ctx-left')
   })
 
   it('the context wins over an explicit argument, and that is the silent change', () => {

@@ -39,7 +39,19 @@ export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition
       // Note the silent semantic change this implies, and it is the fix rather
       // than a side effect: a caller who deliberately passed a NARROWER array
       // now gets the builder's. Pinned by a precedence test.
-      const layers = context.layers.length > 0 ? context.layers : (explicitLayers ?? [])
+      // `>= 2`, not `> 0`. A pair condition needs two layers to mean anything, so
+      // a context carrying ONE must not win over a usable argument: with
+      // `> 0` it did, and the condition then returned `[]` at the guard below —
+      // a silent vacuous pass, which is the class ADR-008 exists for. Measured:
+      // context 1 layer + argument 2 layers → 0 findings.
+      //
+      // Safe for every builder path, and that is why the threshold can move: the
+      // builder cannot produce fewer than two, because `.mapping()` throws below
+      // two (`cross-layer-builder.ts:111`). So this cannot let the argument win
+      // over a real builder resolution — the defect bug 0040 fixed — it only
+      // removes the unusable-context case.
+      const fromContext = context.layers.length >= 2 ? context.layers : undefined
+      const layers = fromContext ?? explicitLayers ?? []
       if (layers.length < 2) return []
 
       const violations: ArchViolation[] = []

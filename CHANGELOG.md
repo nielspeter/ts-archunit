@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.43.1] - 2026-08-03
+
+### Fixed
+
+- **A pair-condition context carrying fewer than two layers silently passed.** Introduced in v0.42.0 and found by probing the new precedence rather than by review. The threshold was "the context wins if it has _any_ layers", so a context with **one** layer beat a usable two-layer argument — and `haveMatchingCounterpart` then returned nothing at its own `layers.length < 2` guard. Measured: context 1 layer + argument 2 layers → **0 findings**, a vacuous pass.
+
+  The threshold is now "two or more", which is what a pair condition needs to mean anything. Every builder path is unchanged: the builder cannot produce fewer than two layers, because `.mapping()` throws below that — so this cannot restore the defect v0.42.0 fixed, where a hand-built argument beat the builder's real resolution.
+
+  Only reachable by calling a pair condition's `evaluate()` directly. If you do that, a context you build yourself must carry both layers or the argument is used instead.
+
 ## [0.43.0] - 2026-08-03
 
 ### Added
