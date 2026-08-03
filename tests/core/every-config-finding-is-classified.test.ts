@@ -455,23 +455,94 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
     // gets are written there, so the census would see one row and never look at
     // them. A third caller elsewhere would add a reader-facing remedy this file
     // reports nothing about.
+    //
+    // ## This row could not fail for two releases
+    //
+    // It asserted `expect(site.remedy).toContain('remedy')` where `site.remedy`
+    // was the **source text of the whole second argument** — and `remedy` is a
+    // mandatory property of `assertDiscovered`'s parameter type, so the property
+    // *key* satisfied it. Measured by review: a third call site with
+    // `remedy: ''` — a configuration finding shipping no remedy at all — passed
+    // `tsc` and the full suite unchanged.
+    //
+    // A false green inside the guard built to stop false greens, and the row's
+    // own docstring names the case it could not see. It is also precisely
+    // ADR-008 rule 5's question asked and answered wrong: "what would this do if
+    // the thing it guards were completely broken?" — pass, because the assertion
+    // read the shape of the call instead of the value of the remedy.
+    //
+    // Now: resolve the `remedy` property and judge its VALUE.
     const project = loadSource()
-    const callSites: { file: string; remedy: string }[] = []
+
+    /** The literal text of an expression, following one hop through a local const. */
+    const literalText = (expr: Node, depth = 0): string | undefined => {
+      if (depth > 1) return undefined
+      if (Node.isStringLiteral(expr) || Node.isNoSubstitutionTemplateLiteral(expr)) {
+        return expr.getLiteralText()
+      }
+      // A template with substitutions is a remedy built per-call; its static
+      // parts are what a reader is guaranteed to see.
+      if (Node.isTemplateExpression(expr)) return expr.getText()
+      if (Node.isBinaryExpression(expr)) {
+        const left = literalText(expr.getLeft(), depth)
+        const right = literalText(expr.getRight(), depth)
+        return `${left ?? ''}${right ?? ''}`
+      }
+      if (Node.isIdentifier(expr)) {
+        for (const decl of expr.getSymbol()?.getDeclarations() ?? []) {
+          if (Node.isVariableDeclaration(decl)) {
+            const init = decl.getInitializer()
+            if (init) return literalText(init, depth + 1)
+          }
+        }
+      }
+      return undefined
+    }
+
+    const problems: string[] = []
+    let sites = 0
     for (const sourceFile of project.getSourceFiles()) {
       const rel = path.relative(REPO, sourceFile.getFilePath())
       if (!rel.startsWith('src/')) continue
       for (const callExpr of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
         const name = callExpr.getExpression().getText()
         if (!REMEDY_HELPERS.some((helper) => name === helper)) continue
+        sites += 1
+        const where = `${rel}:${String(callExpr.getStartLineNumber())}`
         const arg = callExpr.getArguments()[1]
-        callSites.push({ file: rel, remedy: arg?.getText() ?? '' })
+        if (arg === undefined || !Node.isObjectLiteralExpression(arg)) {
+          // Not a defect by itself — but the remedy a reader gets is then
+          // invisible to this census, which is the whole point of the row. Fail
+          // so someone decides, rather than passing on something unexamined.
+          problems.push(
+            `${where}: second argument is not an inline object, so its remedy is unread`,
+          )
+          continue
+        }
+        const property = arg.getProperty('remedy')
+        if (property === undefined) {
+          problems.push(`${where}: no remedy property`)
+          continue
+        }
+        const expr = Node.isPropertyAssignment(property)
+          ? (property.getInitializer() ?? property)
+          : property
+        const text = literalText(expr)
+        if (text === undefined) {
+          problems.push(`${where}: remedy \`${expr.getText()}\` does not resolve to a literal`)
+          continue
+        }
+        // A remedy has to tell the reader what to DO. The floor is deliberately
+        // low — this row's job is to catch absence, and rule 2's corollary (a
+        // remedy is a claim, so apply it) is the behavioural tests' job.
+        if (text.trim().length < 20) {
+          problems.push(`${where}: remedy is ${String(text.trim().length)} chars: "${text.trim()}"`)
+        }
       }
     }
 
-    // Vacuity: the helper really is called, or the loop below asserts nothing.
-    expect(callSites.length).toBeGreaterThanOrEqual(2)
-    for (const site of callSites) {
-      expect(site.remedy, `${site.file}: assertDiscovered call has no remedy`).toContain('remedy')
-    }
+    // Vacuity: the helper really is called, or the loop above asserts nothing.
+    expect(sites).toBeGreaterThanOrEqual(2)
+    expect(problems, `helper call-site remedies:\n  ${problems.join('\n  ')}`).toEqual([])
   })
 })
