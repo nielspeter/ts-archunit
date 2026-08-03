@@ -240,7 +240,9 @@ describe('noSilentCatch() — class variant', () => {
       .satisfy(noSilentCatch())
       .violations()
 
-    expect(violations).toHaveLength(1)
+    // WHICH catch — the silent one. "Exactly one" with the wrong one flagged
+    // also had length 1.
+    expect(violations.map((v) => v.element)).toEqual(['MultipleCatches.run'])
   })
 
   it('finds silent catch inside arrow function within method', () => {

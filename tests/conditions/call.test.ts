@@ -170,7 +170,12 @@ describe('call conditions', () => {
         })
       `)
       const violations = notHaveCallbackContaining(call('db.query')).evaluate([archCall], ctx)
-      expect(violations).toHaveLength(2)
+      // "for each matching node" — two DISTINCT nodes, which a count of 2
+      // cannot distinguish from the same node reported twice.
+      expect(violations.map((v) => v.message).sort()).toEqual([
+        "app.get has callback containing call to 'db.query' at line 3",
+        "app.get has callback containing call to 'db.query' at line 4",
+      ])
     })
 
     it('reports correct line numbers for violations', () => {

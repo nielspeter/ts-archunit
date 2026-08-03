@@ -103,7 +103,17 @@ describe('viewsFor', () => {
   })
 
   it('gives path kinds the absolute view and the tsconfig-relative one', () => {
-    expect(viewsFor(universe, 'file-path')).toHaveLength(2)
-    expect(viewsFor(universe, 'parent-dir')).toHaveLength(2)
+    // WHICH two views, not that there are two: two absolute views would have
+    // counted the same, and the claim names one of each.
+    const shapeOf = (view: readonly string[]): string => {
+      // `[].every` is true, so without this an EMPTY view reads as 'absolute' and
+      // `[[], ['rel/x']]` passes — a vacuity hole the `toHaveLength(2)` this
+      // replaced could not have. ADR-008: if the inputs can be empty, assert they
+      // are not.
+      if (view.length === 0) return 'empty'
+      return view.every((p) => p.startsWith('/')) ? 'absolute' : 'tsconfig-relative'
+    }
+    expect(viewsFor(universe, 'file-path').map(shapeOf)).toEqual(['absolute', 'tsconfig-relative'])
+    expect(viewsFor(universe, 'parent-dir').map(shapeOf)).toEqual(['absolute', 'tsconfig-relative'])
   })
 })

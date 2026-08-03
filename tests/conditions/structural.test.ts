@@ -367,7 +367,8 @@ describe('notExist()', () => {
     const sf = proj.createSourceFile('t.ts', 'class A {}\nclass B {}\nclass C {}')
     const classes = sf.getClasses()
     const violations = notExist().evaluate(classes, { rule: 'test' })
-    expect(violations).toHaveLength(3)
+    // One PER element — reporting the same class three times also had length 3.
+    expect(violations.map((v) => v.element).sort()).toEqual(['A', 'B', 'C'])
   })
 
   it('violation message says "should not exist"', () => {

@@ -268,8 +268,20 @@ describe('SchemaRuleBuilder — a held selection is immutable (bug 0016)', () =>
 
     // Only BadCollection lacks `total`, so exactly one violation — not two,
     // which is what a leaked second copy of the same condition would report.
-    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
-    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
+    expect(
+      collections
+        .should()
+        .haveFields('total')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(['BadCollection'])
+    expect(
+      collections
+        .should()
+        .haveFields('total')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(['BadCollection'])
   })
 
   it('narrowing a held schema leaves the original selection whole', () => {
@@ -277,10 +289,31 @@ describe('SchemaRuleBuilder — a held selection is immutable (bug 0016)', () =>
     const collections = s.that().typesNamed(/Collection$/)
     const bad = collections.that().typesNamed(/^Bad/)
 
-    expect(bad.should().haveFields('total').violations()).toHaveLength(1)
+    expect(
+      bad
+        .should()
+        .haveFields('total')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(['BadCollection'])
     // The original still covers all three Collection types; the two good ones
     // satisfy it, so the count is unchanged rather than zero.
-    expect(collections.should().haveFields('total').violations()).toHaveLength(1)
-    expect(collections.should().haveFields('nothing').violations()).toHaveLength(3)
+    expect(
+      collections
+        .should()
+        .haveFields('total')
+        .violations()
+        .map((v) => v.element),
+    ).toEqual(['BadCollection'])
+    // All three Collection types, by name — "the count is unchanged rather
+    // than zero" was the comment, and the names are what it meant.
+    expect(
+      collections
+        .should()
+        .haveFields('nothing')
+        .violations()
+        .map((v) => v.element)
+        .sort(),
+    ).toEqual(['BadCollection', 'PostCollection', 'UserCollection'])
   })
 })

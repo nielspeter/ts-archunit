@@ -47,13 +47,27 @@ describe('a relative glob resolves per package in a workspace (bug 0035)', () =>
   it('the path predicates do the same', () => {
     // v0.35.0 shipped this behaviour for the predicates first, via ts-morph's
     // `configFilePath` — which is also the primary. Same bug, same fix.
-    expect(modules(p).that().resideInFolder('src/api/**').subjects()).toHaveLength(2)
+    // Both PACKAGES, which is the bug: with one workspace root the relative
+    // glob resolved against a single package and found one of the two.
+    expect(
+      modules(p)
+        .that()
+        .resideInFolder('src/api/**')
+        .subjects()
+        .map((m) => m.getFilePath().split('/').slice(-4).join('/')),
+    ).toEqual(['alpha/src/api/handler.ts', 'beta/src/api/handler.ts'])
   })
 
   it('agrees with the anchored spelling here, because every package matches', () => {
     // In a workspace the two spellings coincide for a folder every package has.
     // They diverge only when one package lacks it — which is the next test.
-    expect(modules(p).that().resideInFolder('**/src/api/**').subjects()).toHaveLength(2)
+    expect(
+      modules(p)
+        .that()
+        .resideInFolder('**/src/api/**')
+        .subjects()
+        .map((m) => m.getFilePath().split('/').slice(-4).join('/')),
+    ).toEqual(['alpha/src/api/handler.ts', 'beta/src/api/handler.ts'])
   })
 
   it('a NESTED package resolves against its own root, not the outer one', () => {

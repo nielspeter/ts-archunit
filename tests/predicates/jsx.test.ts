@@ -128,7 +128,8 @@ describe('JSX predicates', () => {
       `)
       const pred = withAttributeMatching('type', 'submit')
       const matched = elements.filter((e) => pred.test(e))
-      expect(matched).toHaveLength(1)
+      // WHICH input, not how many: matching `text` instead also produced one.
+      expect(matched.map((e) => e.getAttribute('type'))).toEqual(['submit'])
     })
 
     it('filters by regex value match', () => {
@@ -140,7 +141,7 @@ describe('JSX predicates', () => {
       `)
       const pred = withAttributeMatching('className', /error/)
       const matched = elements.filter((e) => pred.test(e))
-      expect(matched).toHaveLength(1)
+      expect(matched.map((e) => e.getAttribute('className'))).toEqual(['error-box'])
     })
   })
 
@@ -158,13 +159,13 @@ describe('JSX predicates', () => {
     it('haveNameStartingWith works', () => {
       const elements = createElements(`const x = <div><Button>a</Button></div>`)
       const pred = haveNameStartingWith<ArchJsxElement>('But')
-      expect(elements.filter((e) => pred.test(e))).toHaveLength(1)
+      expect(elements.filter((e) => pred.test(e)).map((e) => e.getName())).toEqual(['Button'])
     })
 
     it('haveNameEndingWith works', () => {
       const elements = createElements(`const x = <div><MyButton>a</MyButton></div>`)
       const pred = haveNameEndingWith<ArchJsxElement>('Button')
-      expect(elements.filter((e) => pred.test(e))).toHaveLength(1)
+      expect(elements.filter((e) => pred.test(e)).map((e) => e.getName())).toEqual(['MyButton'])
     })
 
     it('resideInFile works with glob', () => {

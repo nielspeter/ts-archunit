@@ -161,8 +161,8 @@ describe('ExpressionMatcher helpers', () => {
       const fn = sf.getFunctions()[0]!
       const body = fn.getBody()!
       const matches = findMatchesInNode(body, expression(/foo|bar/))
-      // Both foo() and bar() are siblings — both should be reported
-      expect(matches.length).toBe(2)
+      // Both siblings BY NAME: matching foo() twice also had length 2.
+      expect(matches.map((m) => m.node.getText()).sort()).toEqual(['bar', 'foo'])
     })
 
     it('does not affect targeted matchers (call uses syntaxKinds path)', () => {
@@ -172,7 +172,9 @@ describe('ExpressionMatcher helpers', () => {
       const body = fn.getBody()!
       // call() uses syntaxKinds — goes through targeted path, not broad+dedup
       const callMatches = findMatchesInNode(body, call('parseInt'))
-      expect(callMatches.length).toBe(1)
+      // Identity here too: the sibling at :155 was class C for the same reason,
+      // and this block shares its helper.
+      expect(callMatches.map((m) => m.node.getText())).toEqual(["parseInt('42', 10)"])
     })
   })
 })

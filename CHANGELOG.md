@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.4] - 2026-08-03
+
+Test-quality only. No source changes, no API changes, no behaviour changes.
+
+### Fixed
+
+- **An `as` cast in shipped source, and the guard it was duplicating** ([ADR-005](adr/005-no-any-no-type-assertions.md)).
+  `cli/commands/explain.ts` narrowed a value with `(value as Record<string, unknown>)['describeRule']`
+  — a type assertion in published code with no `eslint-disable` and no interop boundary to justify it,
+  and unnecessary: once the value is narrowed to `object`, `'describeRule' in value` narrows enough.
+  Two test files had already written the cast-free version of the same guard. All three now use one
+  owner, `isDescribable` in `src/core/rule-description.ts`. Found by an architecture review asking
+  about the **duplication**, not about the cast — and grepping for siblings of the pattern found four
+  more, filed as [bug 0049](bugs/0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md),
+  whose real question is why this project's own `noTypeAssertions()` rule does not fire on its own
+  source.
+
+### Internal
+
+- **45 test assertions that counted now name what they expect** ([plan 0079](plans/completed/0079-triage-the-cardinality-only-assertions.md)).
+  [ADR-008](adr/008-agent-first-failure-surfaces.md) rule 5's third corollary — _counting is the
+  shortcut; compare identities_ — was the one corollary with no guard. A scan found 143 `it()` blocks
+  asserting a non-zero count with nothing pinning which elements; a seeded sample of 30, classified
+  by reading every one, put **27% in the class where a swap passes** — one element lost and another
+  gained, assertion still green. Above the plan's ~15% stop rule, so all 45 were converted.
+
+  Six of the eight sampled cases carried a **comment naming the identity the assertion omitted** —
+  `// Only DomainError fails`, `// handler + hooks.onRequest`, `// UserService and OrderService match
+both predicates`. The reader knew; the test did not.
+
+  Two were reclassified the other way by measurement: `preset-fanout-is-one-finding.test.ts`
+  produces violations that are identical on ruleId, file, line, element and message _by design_,
+  because the claim is that alike violations are not collapsed. There is no identity to assert, so
+  the count is the value — both reverted, with the reason recorded.
+
+  Two things fell out. `matchers.test.ts` asserted two sibling matches; naming them showed the
+  matcher returns the **identifier** nodes, not the call expressions. And
+  `callback-extractor.test.ts` could not express its identity at all through the public shape —
+  filed as [plan 0082](plans/0082-an-object-literal-callback-keeps-its-name.md), since two
+  callbacks on one object literal are indistinguishable to a rule author.
+
+- **Two tests were passing on a false green of the kind they existed to prevent.** A testing review
+  found the class-B rule used to triage this work had an unstated premise: that only the subject can
+  fill the violations array. It cannot — when a selector matches nothing, the dead-glob gate emits
+  **exactly one** configuration finding, so `toHaveLength(1)` accepts it and the condition never
+  runs. Measured on `widened-module-edges.test.ts`: delete the two fixtures and both blocks exit 0,
+  "2 passed". One of them carries the comment _"The false green this release must not create"_. Both
+  now assert identities and exit 1 under the same swap. Three further count-only blocks were
+  converted alongside them.
+
+- **The scan that found them was itself a hand-maintained list, twice over.** Its first identity
+  signal counted `toBeTruthy`/`toThrow`/`toBeGreaterThan`, none of which survive a swap. Its second
+  missed five element-boolean idioms like `.some((m) => m.includes('"offset"'))`. And its third —
+  found by an architecture review asking the one question the earlier checks could not answer — was
+  **over-broad in the other direction**: a bare `expect(violations[0]).toBeTruthy()` counted as an
+  identity assertion, though it pins nothing about which element is there. Correcting it put six
+  blocks back into the population, one of which was a genuine case the over-exclusion had hidden
+  (`callback-extractor.test.ts` respecting its depth limit — the comment named which callback, the
+  count could not).
+
+  The scan is now **committed** at `tests/tools/scan-cardinality-assertions.ts` with a ratchet test.
+  The first version of the write-up cited a script in a scratch directory that was never committed,
+  while this changelog claimed a script had been recorded — which left every number exactly as
+  unauditable as the 215 it replaced.
+
 ## [0.45.3] - 2026-08-03
 
 Everything here came out of an architecture review of v0.44.0/v0.45.0. No user-facing behaviour

@@ -245,7 +245,9 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
       .violations()
 
     // The builder's truth wins: the layer is empty and it is reported.
-    expect(findings.filter((v) => v.bypassFilters === true)).toHaveLength(1)
+    expect(findings.filter((v) => v.bypassFilters === true).map((v) => v.element)).toEqual([
+      'ghost',
+    ])
   })
 
   it('the rule description names the layers in declaration order — a baseline identity', () => {

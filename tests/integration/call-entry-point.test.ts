@@ -237,7 +237,9 @@ describe('calls() entry point — end-to-end', () => {
       } catch (error) {
         const archError = error as ArchRuleError
         // /users has nested additionalProperties: true, /items has top-level
-        expect(archError.violations.length).toBe(2)
+        // The two distinct call sites, by line — reporting one of them twice
+        // also had length 2.
+        expect(archError.violations.map((v) => v.line).sort((a, b) => a - b)).toEqual([8, 58])
       }
     })
 
@@ -257,7 +259,9 @@ describe('calls() entry point — end-to-end', () => {
       } catch (error) {
         const archError = error as ArchRuleError
         // /users and /items are both POST
-        expect(archError.violations.length).toBe(2)
+        // The two distinct call sites, by line — reporting one of them twice
+        // also had length 2.
+        expect(archError.violations.map((v) => v.line).sort((a, b) => a - b)).toEqual([8, 58])
       }
     })
 

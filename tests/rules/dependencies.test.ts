@@ -74,7 +74,15 @@ describe('dependency rules', () => {
       const condition = typeOnlyFrom('**/domain/**')
       const violations = condition.evaluate([sf], ctx)
       // Only the domain import is checked, not the shared import
-      expect(violations).toHaveLength(1)
+      // WHICH import: `non-type-import.ts` also imports from `shared`, and
+      // flagging that one instead also had length 1.
+      const imported = violations.map((v) =>
+        v.message
+          .match(/from "([^"]+)"/)?.[1]
+          ?.split('/')
+          .at(-1),
+      )
+      expect(imported).toEqual(['entity.ts'])
     })
 
     it('passes for module with no imports', () => {

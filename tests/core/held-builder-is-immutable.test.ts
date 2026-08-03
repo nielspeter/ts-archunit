@@ -84,7 +84,14 @@ describe('a held builder is immutable — behavioural', () => {
     ).toHaveLength(1)
     // The held selection is still all four. Under the bug it was the empty
     // intersection of the two narrowings, and reported none.
-    expect(parsers.should().notExist().violations()).toHaveLength(4)
+    expect(
+      parsers
+        .should()
+        .notExist()
+        .violations()
+        .map((x) => x.element)
+        .sort(),
+    ).toEqual(['parseBarOrder', 'parseBazOrder', 'parseConfig', 'parseFooOrder'])
   })
 
   it('RuleBuilder: expectNonEmpty() does not leak onto the held selection', () => {

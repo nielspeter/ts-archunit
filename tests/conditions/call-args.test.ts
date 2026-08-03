@@ -129,7 +129,9 @@ describe('call argument property conditions', () => {
         [archCall],
         ctx,
       )
-      expect(violations).toHaveLength(2)
+      // WHICH properties. One reported twice also had length 2.
+      const flagged = violations.map((v) => v.message.match(/property "(\w+)"/)?.[1])
+      expect(flagged.sort()).toEqual(['deprecated', 'internal'])
     })
 
     it('throws on zero arguments', () => {
@@ -240,7 +242,11 @@ describe('call argument property conditions', () => {
         [archCall],
         ctx,
       )
-      expect(violations).toHaveLength(2)
+      // Two DISTINCT nested matches, by line — the nested one reported twice
+      // also had length 2, and "per match found" is a claim about which.
+      expect(
+        violations.map((v) => Number(v.message.match(/at line (\d+)/)?.[1])).sort((a, b) => a - b),
+      ).toEqual([5, 8])
     })
 
     it('reports correct line number in violation', () => {

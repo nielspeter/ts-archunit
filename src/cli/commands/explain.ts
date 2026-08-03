@@ -1,3 +1,4 @@
+import { isDescribable } from '../../core/rule-description.js'
 import type { RuleDescription } from '../../core/rule-description.js'
 import { loadRuleFiles } from '../load-rules.js'
 
@@ -6,20 +7,6 @@ export interface ExplainArgs {
   markdown?: boolean
   /** Explain output format: 'json' (default), 'markdown', or 'agent'. */
   format?: string
-}
-
-interface Describable {
-  describeRule(): RuleDescription
-}
-
-function isDescribable(value: unknown): value is Describable {
-  return (
-    value !== null &&
-    value !== undefined &&
-    typeof value === 'object' &&
-    'describeRule' in value &&
-    typeof (value as Record<string, unknown>)['describeRule'] === 'function'
-  )
 }
 
 /**

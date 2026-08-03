@@ -64,7 +64,11 @@ describe('typescript rules', () => {
       const violations = condition.evaluate([findClass('AssertionClass')], context)
       // safeConst() uses `as const` — should NOT be a violation
       // Only process() and castNumber() should be violations
-      expect(violations).toHaveLength(2)
+      // The two lines that DO assert, not just two violations — the comment
+      // named process() and castNumber() and the assertion counted.
+      expect(
+        violations.map((v) => Number(v.message.match(/at line (\d+)/)?.[1])).sort((a, b) => a - b),
+      ).toEqual([6, 11])
     })
 
     it('passes for clean class with no assertions', () => {

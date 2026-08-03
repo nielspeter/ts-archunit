@@ -1,6 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { Project, SyntaxKind } from 'ts-morph'
+import { Node, Project, SyntaxKind } from 'ts-morph'
 import { extractCallbacks } from '../../src/helpers/callback-extractor.js'
+import type { ExtractedCallback } from '../../src/helpers/callback-extractor.js'
+
+/**
+ * A callback's identity: its property name, or its argument slot when anonymous.
+ *
+ * [Plan 0079](../../plans/completed/0079-triage-the-cardinality-only-assertions.md).
+ * Four blocks below asserted `toHaveLength(2)` where the count stood in for WHICH
+ * callbacks were extracted, and each carried a comment naming the two — `handler +
+ * hooks.onRequest`, `Only handler, not schema` — which is the reader stating the
+ * identity the assertion did not check. Extracting `schema` instead of `handler`
+ * passed every one of them.
+ */
+const identify = (c: ExtractedCallback): string => {
+  // `fn.getName()` is undefined for `handler: (req) => {}` — an arrow assigned to
+  // a property has no name of its own, so all three object-property blocks below
+  // collapsed to the same argument slot. The name lives on the enclosing
+  // assignment, which is also worth knowing: `ExtractedCallback` carries `fn`,
+  // `callSite` and `argIndex`, so a rule author cannot currently tell two
+  // callbacks on one object apart either. Recorded as a follow-up on the plan.
+  const parent = c.fn.getNode().getParent()
+  if (parent !== undefined) {
+    if (Node.isPropertyAssignment(parent)) return parent.getName()
+    if (Node.isMethodDeclaration(parent)) return parent.getName()
+  }
+  return c.fn.getName() ?? `arg${String(c.argIndex)}`
+}
 
 function getFirstCallExpression(code: string) {
   const project = new Project({ useInMemoryFileSystem: true })
@@ -167,8 +193,7 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      // handler + hooks.onRequest
-      expect(callbacks).toHaveLength(2)
+      expect(callbacks.map(identify).sort()).toEqual(['handler', 'onRequest'])
     })
 
     it('ignores non-function properties', () => {
@@ -179,8 +204,8 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      // Only handler, not schema
-      expect(callbacks).toHaveLength(1)
+      // Not `schema` — which a length-1 assertion could not tell apart.
+      expect(callbacks.map(identify)).toEqual(['handler'])
     })
 
     it('respects depth limit (MAX_OBJECT_DEPTH = 3)', () => {
@@ -197,8 +222,12 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      // handler is extracted (depth 0), default at depth 3 is NOT extracted
-      expect(callbacks).toHaveLength(1)
+      // `handler` at depth 0, NOT `default` at depth 3 — and the count could not
+      // tell those apart, since extracting the wrong one is also one callback.
+      // This block was hidden from plan 0079's scan by an over-broad
+      // element-boolean signal, and surfaced by the false-negative check a review
+      // asked for. It is the only class C the correction found.
+      expect(callbacks.map(identify)).toEqual(['handler'])
       expect(callbacks[0]!.fn.isAsync()).toBe(true)
     })
 
@@ -210,7 +239,7 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      expect(callbacks).toHaveLength(2)
+      expect(callbacks.map(identify).sort()).toEqual(['handler', 'preHandler'])
     })
 
     it('direct inline callbacks still work alongside object extraction', () => {
@@ -218,8 +247,8 @@ describe('extractCallbacks', () => {
         app.get('/mixed', {}, (req: unknown) => { return 'ok' })
       `)
       const callbacks = extractCallbacks(callExpr)
-      // Direct callback at index 2
-      expect(callbacks).toHaveLength(1)
+      // The slot matters: `{}` sits at index 1 and must not be extracted.
+      expect(callbacks.map(identify)).toEqual(['arg2'])
     })
   })
 

@@ -138,7 +138,8 @@ describe('Baseline', () => {
     const baseline = new Baseline(new Set(), '/tmp')
     const violations = [mv({ element: 'A' }), mv({ element: 'B' })]
     const result = baseline.filterNew(violations)
-    expect(result).toHaveLength(2)
+    // "returns all" means these two, in order — returning A twice also had length 2.
+    expect(result.map((v) => v.element)).toEqual(['A', 'B'])
   })
 })
 

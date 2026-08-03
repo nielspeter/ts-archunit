@@ -53,7 +53,9 @@ describe('Probe 1: Function Existence — find elements by name/location', () =>
 
     it('does not match non-arrow const declarations', () => {
       // parseBazOrder should be the only match
-      expect(matched).toHaveLength(1)
+      // The comment said "parseBazOrder should be the only match"; now the
+      // assertion does too.
+      expect(matched.map((m) => m.getName())).toEqual(['parseBazOrder'])
     })
   })
 
@@ -84,8 +86,9 @@ describe('Probe 1: Function Existence — find elements by name/location', () =>
         })
         .filter((v) => pattern.test(v.getName()))
 
-      expect(fnDecls).toHaveLength(2) // parseFooOrder, parseBarOrder
-      expect(arrowFns).toHaveLength(1) // parseBazOrder
+      // The comments carried the names and the assertions counted.
+      expect(fnDecls.map((f) => f.getName()).sort()).toEqual(['parseBarOrder', 'parseFooOrder'])
+      expect(arrowFns.map((v) => v.getName())).toEqual(['parseBazOrder'])
     })
 
     it('no parseXxxOrder functions outside routes.ts', () => {

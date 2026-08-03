@@ -275,7 +275,14 @@ describe('item 10 — dependOn, stated so it fails on the un-widened build', () 
       .should()
       .satisfy(dependOn(BANNED))
       .violations()
-    expect(violations).toHaveLength(1)
+    // The identity, not the count — and here the count was actively dangerous.
+    // A configuration finding is also exactly one violation, so if this fixture
+    // is ever renamed or `inFixture`'s glob drifts, the selector matches nothing,
+    // the dead-glob gate emits its single finding, and `toHaveLength(1)` accepts
+    // it. Measured: with the fixture deleted this block exited 0 and reported
+    // "2 passed" — the condition never ran, in the test whose own comment above
+    // names the false green it exists to prevent (plan 0079, found by review).
+    expect(identify(violations)).toEqual(['src/consumer-reexport-type.ts:1'])
   })
 
   it('a type expression does NOT satisfy dependOn', () => {
@@ -285,7 +292,8 @@ describe('item 10 — dependOn, stated so it fails on the un-widened build', () 
       .should()
       .satisfy(dependOn(BANNED))
       .violations()
-    expect(violations).toHaveLength(1)
+    // Same trap as the block above: a dead selector also yields exactly one.
+    expect(identify(violations)).toEqual(['src/consumer-type-expr.ts:1'])
   })
 
   it('a plain `import type` still satisfies dependOn, unchanged', () => {
