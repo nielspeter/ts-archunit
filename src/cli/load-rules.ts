@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { isNullaryCallable } from '../core/type-guards.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { importFresh } from './watch.js'
 
@@ -50,9 +51,8 @@ function resolveExported(exported: unknown): unknown[] {
   if (Array.isArray(exported)) {
     return exported
   }
-  if (typeof exported === 'function') {
-    // Runtime validated: exported is a function, call it and check result
-    const result: unknown = (exported as () => unknown)()
+  if (isNullaryCallable(exported)) {
+    const result: unknown = exported()
     if (Array.isArray(result)) {
       return result
     }
@@ -66,7 +66,7 @@ function extractDefault(mod: unknown): unknown {
   }
   // Dynamic import returns a module namespace object — 'in' narrows safely
   if ('default' in mod) {
-    return (mod as Record<string, unknown>)['default']
+    return mod.default
   }
   return undefined
 }
@@ -76,7 +76,5 @@ function isRuleBuilderLike(value: unknown): value is RuleBuilderLike {
     return false
   }
   // Structural type check: must have a 'violations' method
-  return (
-    'violations' in value && typeof (value as Record<string, unknown>)['violations'] === 'function'
-  )
+  return 'violations' in value && typeof value.violations === 'function'
 }

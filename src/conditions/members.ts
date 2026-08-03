@@ -58,6 +58,10 @@ function isPropertyReadonly(prop: TsSymbol): boolean {
   //   Readonly<{a: string}>.a → decl.isReadonly() = false, but
   //   compilerSymbol.links.checkFlags & 8 = 8 (readonly)
   //
+  // ts-archunit-exclude-start adr005/no-as-cast-module: reads ts-morph's private
+  // `compilerSymbol.links.checkFlags`, which has no public typed path — the
+  // unavoidable JS-interop boundary ADR-005 allows. Waived in place rather than by
+  // narrowing the rule's scope, which is how this went unseen for so long (bug 0049).
   const links = (prop.compilerSymbol as unknown as Record<string, unknown>).links
   if (typeof links === 'object' && links !== null) {
     const flags = (links as Record<string, unknown>)['checkFlags']
@@ -65,6 +69,7 @@ function isPropertyReadonly(prop: TsSymbol): boolean {
       return true
     }
   }
+  // ts-archunit-exclude-end adr005/no-as-cast-module
 
   // Conservative: treat as mutable if neither strategy detected readonly.
   return false

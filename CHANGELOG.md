@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.6] - 2026-08-03
+
+### Fixed
+
+- **This project's own type-assertion rule was pointed at the wrong element kind**
+  ([bug 0049](bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md)). We ship
+  `noTypeAssertions()` as a guardrail and enforce it against our own source — with a rule that
+  selected **classes**, in a codebase with 19 files containing a class and 128 containing a
+  function. Every `as` cast we shipped was in a function, so the guard never fired on any of them.
+  Not a glob-scope problem: no widening of the paths would have found it.
+
+  The bug was filed at "four casts", from a grep. The whole-file rule found **22**, in 8 files.
+
+  **18 removed, 4 waived.** Ten were one variadic-overload dispatch written five times, whose stated
+  justification was true and whose casts were still avoidable — a type-predicate filter narrows a
+  tuple-union rest parameter without one, and the five copies are now a single `splitGlobArgs`. Five
+  sat directly after the `in`/`typeof` check that made them unnecessary. Three were unvalidated CLI
+  input, including a `JSON.parse` cast that would have thrown on a malformed `package.json` during
+  `--version`. The remaining four are genuine JS-interop boundaries — ts-morph's private
+  `compilerSymbol` internals and an optional peer dependency loaded via `createRequire` — and they
+  are waived **in place**, with `// ts-archunit-exclude` directives naming the boundary, rather than
+  by narrowing the rule so the exemption becomes invisible.
+
+- **`isRecord` had two verbatim copies and a third site that cast instead of calling either.** Now
+  one owner. Consolidating caught a live drift: both copies excluded arrays, the first shared draft
+  did not, and shipping that would have widened two callers to accept an array as a record.
+
+### Internal
+
+- No behaviour change for users. `getVersion()` now returns `0.0.0-unknown` instead of throwing if
+  `package.json` is unreadable, and an unrecognised `--format` falls back to `auto` instead of being
+  asserted into the union.
+
 ## [0.45.5] - 2026-08-03
 
 Test-quality only, closing what a testing review raised after v0.45.4 was tagged.
@@ -39,7 +72,7 @@ Test-quality only. No source changes, no API changes, no behaviour changes.
   Two test files had already written the cast-free version of the same guard. All three now use one
   owner, `isDescribable` in `src/core/rule-description.ts`. Found by an architecture review asking
   about the **duplication**, not about the cast — and grepping for siblings of the pattern found four
-  more, filed as [bug 0049](bugs/0049-four-as-casts-in-shipped-source-and-a-duplicated-guard.md),
+  more, filed as [bug 0049](bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md),
   whose real question is why this project's own `noTypeAssertions()` rule does not fire on its own
   source.
 

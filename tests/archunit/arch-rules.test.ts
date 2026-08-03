@@ -14,7 +14,11 @@ import { isDeadSite } from '../../src/core/glob-evaluator.js'
 import { edgesOf } from '../../src/core/module-edges.js'
 import { pathUniverse } from '../../src/core/path-universe.js'
 import { project, modules, classes, functions, slices, call } from '../../src/index.js'
-import { noAnyProperties, noTypeAssertions } from '../../src/rules/typescript.js'
+import {
+  noAnyProperties,
+  noTypeAssertions,
+  moduleNoTypeAssertions,
+} from '../../src/rules/typescript.js'
 import {
   noEval,
   noConsoleLog,
@@ -319,6 +323,29 @@ describe('ADR-005: Type Safety', () => {
         id: 'adr005/no-any',
         because: 'any bypasses the type checker, hiding bugs that strict mode catches',
         suggestion: 'Use a specific type, unknown with narrowing, or a generic',
+        docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/005-no-any-no-type-assertions.md',
+      }),
+    ).check()
+  })
+
+  it('NO source file may use a type assertion, whatever shape it is written in', () => {
+    // The scope fix from [bug 0049](../../bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md).
+    //
+    // The rule below this one selects **classes**. This codebase has 19 files with
+    // a class and 128 with a function, so the guard covered the shape we barely
+    // use — and every `as` cast we shipped lived in a function. A hand-written
+    // grep filed the bug at "four casts"; this rule found **22**, in eight files,
+    // which is the difference between a list and a derivation.
+    //
+    // `moduleNoTypeAssertions` traverses the whole file, so it subsumes the class
+    // rule rather than sitting beside it. The class rule is kept because it names
+    // the class in its message, which is a better failure for the commonest case.
+    gate(
+      modules(p).that().satisfy(inProjectSrc()).should().satisfy(moduleNoTypeAssertions()).rule({
+        id: 'adr005/no-as-cast-module',
+        because: 'as casts bypass the type checker — refactoring silently breaks',
+        suggestion:
+          'Use a type guard (`value is T`), or narrow with `in`/`typeof` — which is usually already there, since 17 of the 22 casts this rule first found sat directly after the check that made them unnecessary. At a genuine JS-interop boundary, waive it with a `// ts-archunit-exclude adr005/no-as-cast-module: <reason>` comment naming the boundary.',
         docs: 'https://github.com/NielsPeter/ts-archunit/blob/main/adr/005-no-any-no-type-assertions.md',
       }),
     ).check()

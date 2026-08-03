@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { isRecord } from '../../core/type-guards.js'
 import path from 'node:path'
 
 /** "Floor" presets — a universal rule set scoped to your source glob. */
@@ -482,8 +483,4 @@ function hasSource(cwd: string, sourceRoot: string): boolean {
   } catch {
     return false
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }

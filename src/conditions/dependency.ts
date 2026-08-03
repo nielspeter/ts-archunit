@@ -19,6 +19,7 @@ import {
 
 export type { ImportOptions } from '../core/import-options.js'
 import type { ImportOptions } from '../core/import-options.js'
+import { splitGlobArgs } from '../core/import-options.js'
 import { rootOf } from '../core/project-relative.js'
 
 /**
@@ -169,9 +170,7 @@ export function onlyImportFrom(...globs: string[]): Condition<SourceFile>
 export function onlyImportFrom(
   ...args: [string[], ImportOptions] | string[]
 ): Condition<SourceFile> {
-  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
-  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
-  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const { globs, options } = splitGlobArgs(args)
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
@@ -246,9 +245,7 @@ export function notImportFrom(...globs: string[]): Condition<SourceFile>
 export function notImportFrom(
   ...args: [string[], ImportOptions] | string[]
 ): Condition<SourceFile> {
-  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
-  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
-  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const { globs, options } = splitGlobArgs(args)
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')
@@ -333,9 +330,7 @@ export function notImportFrom(
 export function dependOn(globs: string[], options: ImportOptions): Condition<SourceFile>
 export function dependOn(...globs: string[]): Condition<SourceFile>
 export function dependOn(...args: [string[], ImportOptions] | string[]): Condition<SourceFile> {
-  // ADR-005: as casts required — TS cannot narrow tuple union rest params after Array.isArray
-  const globs: string[] = Array.isArray(args[0]) ? args[0] : (args as string[])
-  const options = Array.isArray(args[0]) && args.length > 1 ? (args[1] as ImportOptions) : undefined
+  const { globs, options } = splitGlobArgs(args)
   const ignoreType = options?.ignoreTypeImports === true
   const matchers = globs.map((g) => picomatch(g))
   const quotedGlobs = globs.map((g) => `"${g}"`).join(', ')

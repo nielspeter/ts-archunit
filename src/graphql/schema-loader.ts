@@ -81,6 +81,12 @@ function requireGraphQL(): GraphQLPackage {
 
   try {
     const esmRequire = createRequire(import.meta.url)
+    // `createRequire` returns `any` for an optional peer dependency resolved at
+    // runtime, so there is no typed path here — the JS-interop boundary ADR-005
+    // allows. The `catch` below is the real guard: a missing or malformed
+    // `graphql` throws with an install instruction rather than failing later on a
+    // property access (bug 0049).
+    // ts-archunit-exclude adr005/no-as-cast-module: optional peer dep, no typed path
     cachedGraphQL = esmRequire('graphql') as GraphQLPackage
     return cachedGraphQL
   } catch {
