@@ -1,6 +1,6 @@
 /**
  * A dead **discovery** glob fails, wherever it is written —
- * [plan 0080](../../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md).
+ * [plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md).
  *
  * `deadSelectorFindings` skipped every position but `selector`, on the stated
  * premise that *"discovery already fails"*. That premise was **false**, and the

@@ -33,7 +33,7 @@ in v0.39.1 — filed as two flaky tests, and one of them was a **shipped defect*
 [0040](./fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)'s
 **API half** in v0.42.0 — the builder passes its own resolved layers, so
 `haveMatchingCounterpart()` needs no argument. Its silence half became
-[plan 0080](../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md), which a design review
+[plan 0080](../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md), which a design review
 measured as carrying three criticals: the gate would **replace** slice's finding rather than
 duplicate it, costing 13 tests of the bug-0009 remedy corpus.
 

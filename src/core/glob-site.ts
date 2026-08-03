@@ -48,7 +48,7 @@ export type GlobPosition = 'selector' | 'discovery' | 'condition' | 'exclusion'
  * Is a dead glob at this position a **fault**?
  *
  * One owner for a decision that was written twice, inversely, and disagreed —
- * [plan 0080](../../plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md).
+ * [plan 0080](../../plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md).
  *
  * | site | said | i.e. |
  * | --- | --- | --- |

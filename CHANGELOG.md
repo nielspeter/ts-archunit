@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.44.0] - 2026-08-03
+
+### Fixed
+
+- **A cross-layer condition over an empty layer reported nothing** ([bug 0040](bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md), silence half — [plan 0080](plans/completed/0080-admit-discovery-globs-to-the-dead-glob-gate.md)). Measured: `satisfyPairCondition` and `haveConsistentExports` both went **4 violations → 0** when a layer's glob matched no files. `haveMatchingCounterpart` was already guarded; all three now share one check, so a fourth condition cannot arrive without it.
+
+- **A dead `discovery` glob now fails the build, everywhere it is written** — `smells.*.inFolder()`, `resolvers()`, `crossLayer().layer()`. `doctor` reported these already and the check did not, because the two consulted **inverse hand-maintained position lists** that disagreed about exactly `discovery`. One shared `isFaultPosition` predicate now. Measured: a dead resolver discovery glob goes from 0 findings to 1.
+
+- The finding's message is position-aware in **both** clauses. _"This rule's selector … so it has no subjects"_ was wrong twice for a discovery glob: it is not a selector, and the rule may have plenty of subjects — nothing was discovered to compare.
+
+### Changed
+
+- Slice rules and cross-layer rules **declare** that they diagnose their own empty discovery, so the gate stays out and their more specific messages survive. Slice's discovery is not per-tree — one empty slice among populated ones is legitimate, and that remains true.
+
+### Upgrade note
+
+**A rule whose `inFolder()`, `resolvers()` or `.layer()` glob matches nothing will now fail** where it previously passed in silence. That is the fix: such a rule was checking nothing. `doctor` has reported these for several releases, so running it first will show you the list before you upgrade.
+
+No change to rules whose globs match. Slice rules are unaffected, including the case of one empty entry among populated ones.
+
 ## [0.43.3] - 2026-08-03
 
 ### Fixed

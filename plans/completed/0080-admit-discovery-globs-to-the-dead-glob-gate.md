@@ -1,13 +1,13 @@
 # Plan 0080 — Admit discovery globs to the dead-glob gate
 
-**Status:** Open, not started. Split out of
-[bug 0040](../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)
+**Status:** **DONE — shipped in v0.44.0** (2026-08-03). Split out of
+[bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)
 on 2026-08-03 when a design review measured that the bug's proposed fix carried three criticals and
 rested on an inverted premise. The bug's API half shipped in v0.42.0; this is its silence half.
 **Priority:** Medium. A real false green, at an entry point no preset uses.
 **Effort:** Medium. One line of filter change, and three criticals that each need a decision.
 **Blast radius:** A gate on published findings, shared by **four** builders. Per
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 that is the published-API row: guard
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 that is the published-API row: guard
 the guard, and treat every builder's message as a separate claim.
 
 ## Problem
@@ -173,7 +173,95 @@ sense. Each must red, and the live controls must stay green.
 
 ## Related
 
-- [Bug 0040](../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — the API half, shipped v0.42.0.
-- [Plan 0078](./0078-derive-the-configuration-finding-census.md) — keeping one producer keeps its census untouched.
-- [Bug 0009](../bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md) — the slice remedy corpus Critical 1 would destroy.
-- [Bug 0031](../bugs/fixed/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md) — the short-circuit Critical 2 says is missing on the selector path.
+- [Bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — the API half, shipped v0.42.0.
+- [Plan 0078](../0078-derive-the-configuration-finding-census.md) — keeping one producer keeps its census untouched.
+- [Bug 0009](../../bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md) — the slice remedy corpus Critical 1 would destroy.
+- [Bug 0031](../../bugs/fixed/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md) — the short-circuit Critical 2 says is missing on the selector path.
+
+## What shipped, and where the plan was wrong
+
+All five phases, and the plan's own design for Critical 1 turned out to be **unbuildable**.
+
+### Phase 1 — already done
+
+Critical 2 shipped as [bug 0048](../../bugs/fixed/0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md)
+in v0.42.1, before this work started.
+
+### Phase 2 — `isFaultPosition`, and the two lists really did disagree
+
+Verified before changing anything: `diagnose.ts` skipped `exclusion` and `condition`, so it treated
+**selector and discovery** as faults; the gate skipped everything but `selector`. Two inverse
+hand-maintained formulations, disagreeing about exactly `discovery` — which is why `doctor` reported
+a dead layer glob and the build did not. One predicate now, used by all three sites.
+
+### Phase 3 — the plan's fix could not work, and slice is the counterexample
+
+The plan said to **derive** the owner: run `collectViolations()` first and prefer any `bypassFilters`
+finding it produced. Built it, and it failed on the case Critical 3 names.
+
+For a **partially** empty `assignedFrom`, slice produces **nothing** — _deliberately_. A slice with
+no files yet is legitimate, and that guard was withdrawn before release for firing on real projects.
+So "prefer what the builder produced" reads silence as _no opinion_ when silence **is** the opinion.
+
+Replaced with a **declaration**: `ownsDiscoveryDiagnosis()`, precedent `assertsCardinality()`
+directly above it. Two builders declare it —
+
+| builder            | why                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| `SliceRuleBuilder` | discovery is not per-tree; it owns both the all-empty and partial-empty cases        |
+| `PairFinalBuilder` | all three conditions name the empty _layer_, with bug 0042's thrice-corrected remedy |
+
+Still derived in the sense that mattered: the knowledge lives with the builder that has it, never as
+a list of exceptions in the gate. That list was the unchecked claim this plan was filed to correct.
+
+**And the ownership turned out to be per-condition, not per-builder.** Admitting discovery globs made
+the gate preempt `haveMatchingCounterpart`'s empty-layer finding — better than the gate's, and bug
+0042's whole subject. But declaring builder-level ownership would have re-silenced the two sibling
+conditions, which is the bug. So `haveConsistentExports` and `satisfyPairCondition` now share one
+`emptyLayerFinding` helper with it, using the `context.layers` that v0.42.0 put there. Three
+conditions, one helper, so a fourth cannot arrive without the guard.
+
+### Phase 4 — the cause clause, not just the noun
+
+Review was right that a position-aware noun understates it. _"so it has no subjects and cannot fail"_
+is false for a discovery glob — there may be plenty of subjects; nothing was discovered to compare.
+Both clauses vary now, and a sabotage row pins the noun.
+
+### Phase 5 — measured, both confirmed
+
+- **graphql resolver:** dead discovery glob **0 findings → 1**, live control silent. The plan's
+  read-not-measured claim is now measured.
+- **smells:** the same, and `tests/smells/smell-builder.test.ts:71` **was itself a false green** —
+  `inFolder('**/nonexistent/**')` asserting `not.toThrow()` under the comment _"No files in
+  nonexistent folder, so no violations"_. The ∀-over-∅ pass written down as the expectation.
+  Rewritten against the fixture's real directory, with the dead-glob case as its own row.
+
+### Three more tests that pinned vacuous passes
+
+- `cross-layer-builder.test.ts` — _"no violations and no crash when a layer matches no files"_, whose
+  callback was named `'should not be called'`. True, and the defect.
+- `held-builder-is-immutable.test.ts` — proved no leak by asserting a dead folder glob yielded
+  **zero** findings. Now asserts on the finding's kind instead; the immutability property is unchanged.
+- `smell-builder.test.ts:71`, above.
+
+## Sabotage — 7 of 7
+
+| Revert                             | Result |
+| ---------------------------------- | ------ |
+| M1 — `discovery` not a fault       | CAUGHT |
+| M2 — every position a fault        | CAUGHT |
+| M3 — discovery never reported      | CAUGHT |
+| M4 — ownership declaration ignored | CAUGHT |
+| M5 — slice stops owning            | CAUGHT |
+| M6 — crossLayer stops owning       | CAUGHT |
+| M7 — noun always "selector"        | CAUGHT |
+
+The patch helper now **aborts on an ambiguous anchor** as well as a missing one. That is the failure
+that fooled the v0.43.2 cost measurement — two identical lines, `replace(..., 1)` hitting the wrong
+one, both arms running the same path. A count check is two lines and would have caught it.
+
+## Out of scope, unchanged
+
+The condition-side guard at `cross-layer.ts` stays: `deadSelectorFindings` returns empty when
+`getProject()` is undefined and `PairFinalBuilder`'s project is optional, so it is the no-project
+fallback. It is now also the primary path, since `PairFinalBuilder` owns discovery diagnosis.
