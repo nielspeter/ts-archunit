@@ -231,7 +231,14 @@ export class PairFinalBuilder extends TerminalBuilder {
    * before it was right (bug 0042).
    */
   protected override ownsDiscoveryDiagnosis(): boolean {
-    return OWNS_EMPTY_DISCOVERY in this.condition
+    // `=== true`, not `in`. The key being PRESENT is not the claim — the value is.
+    // `readonly [OWNS_EMPTY_DISCOVERY]?: true` permits `undefined`, so
+    // `{ [OWNS_EMPTY_DISCOVERY]: undefined }` type-checks and `in` returns true for
+    // it. Measured: such a condition got **0** configuration findings on a dead
+    // layer — the gate stood down for a condition that reports nothing, which is
+    // the silence this plan exists to prevent, reachable through a type-legal
+    // object. Found by review of the change that introduced it.
+    return this.condition[OWNS_EMPTY_DISCOVERY] === true
   }
 
   protected collectViolations() {
