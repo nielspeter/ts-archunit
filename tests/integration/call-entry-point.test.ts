@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import { calls } from '../../src/builders/call-rule-builder.js'
+import { within } from '../../src/index.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { call, property } from '../../src/helpers/matchers.js'
 import type { ArchProject } from '../../src/core/project.js'
@@ -324,5 +325,52 @@ describe('calls() entry point — end-to-end', () => {
         calls(p).that().satisfy(hasGetMethod).should().notExist().check()
       }).toThrow(ArchRuleError)
     })
+  })
+})
+
+describe('an object-literal callback keeps its name (plan 0082)', () => {
+  const p = loadTestProject()
+
+  // The gap this closes was not a false green — it was a rule an adopter would
+  // plausibly write that is **writable and selects nothing**: every callback came
+  // back anonymous, and both callbacks on one object shared the object's
+  // `argIndex`, so nothing in the shape told them apart. Expressible, plausible,
+  // and empty. It only reds at all because plan 0074 made an empty selection a
+  // finding; before that it was a silent pass.
+
+  it('VACUITY: the fixture really has several named callbacks on object literals', () => {
+    // Without this, every row below could pass over a selection of nothing.
+    const named = within(calls(p))
+      .functions()
+      .subjects()
+      .map((fn) => fn.getName())
+      .filter((n): n is string => n !== undefined)
+    expect(named).toContain('handler')
+    expect(named.length).toBeGreaterThan(2)
+  })
+
+  it('the motivating rule now selects the handler, and ONLY the handler', () => {
+    // Test inventory row 5. Populating a name proves a field; this proves the gap
+    // closed — and it composes through the existing predicate, with no new API,
+    // which was the whole argument for fixing it at this layer.
+    const handlers = within(calls(p))
+      .functions()
+      .that()
+      .haveNameMatching(/^handler$/)
+      .subjects()
+
+    expect(handlers.length).toBeGreaterThan(0)
+    expect([...new Set(handlers.map((fn) => fn.getName()))]).toEqual(['handler'])
+  })
+
+  it('two callbacks on ONE object literal are distinguishable', () => {
+    // Row 1, the case that motivated the plan: both used to be anonymous and both
+    // carried the same argIndex.
+    const names = within(calls(p))
+      .functions()
+      .subjects()
+      .map((fn) => fn.getName())
+    expect(names).toContain('handler')
+    expect(names.some((n) => n !== undefined && n !== 'handler')).toBe(true)
   })
 })

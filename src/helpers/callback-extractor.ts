@@ -1,5 +1,6 @@
 import { type CallExpression, Node, SyntaxKind } from 'ts-morph'
 import type { ArchFunction } from '../models/arch-function.js'
+import { fromObjectLiteralFunction } from '../models/arch-function.js'
 import { collectObjectLiteralFunctions } from './object-literal-functions.js'
 
 /**
@@ -58,8 +59,22 @@ function extractFromObjectLiteral(
   callSite: CallExpression,
   argIndex: number,
 ): ExtractedCallback[] {
+  // `olf.keyPath` used to be dropped here, one line from where it is produced —
+  // [plan 0082](../../plans/0082-an-object-literal-callback-keeps-its-name.md).
+  // `callbackArchFunction` routes an arrow to `fromArrowExpression`, which hardcodes
+  // `getName: () => undefined`, so both callbacks on `{ preHandler, handler }` came
+  // back anonymous AND shared an `argIndex` (the object's). Nothing in the shape
+  // told them apart, so a rule about the `handler` callback was writable and
+  // selected nothing — expressible, plausible, and empty.
+  //
+  // `fromObjectLiteralFunction` already existed, already exported, already
+  // computing the name from exactly this `keyPath`. The gap was one call.
   return collectObjectLiteralFunctions(arg).map((olf) => ({
-    fn: callbackArchFunction(olf.node),
+    // Falls back rather than dropping: `fromObjectLiteralFunction` returns
+    // `undefined` for a node shape it does not recognise, and filtering those out
+    // would turn an unnamed callback into a MISSING one — a silent under-report,
+    // which is worse than the anonymity this change removes.
+    fn: fromObjectLiteralFunction(olf.node, olf.keyPath) ?? callbackArchFunction(olf.node),
     callSite,
     argIndex,
   }))

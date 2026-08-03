@@ -1,32 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { Node, Project, SyntaxKind } from 'ts-morph'
+import { Project, SyntaxKind } from 'ts-morph'
 import { extractCallbacks } from '../../src/helpers/callback-extractor.js'
 import type { ExtractedCallback } from '../../src/helpers/callback-extractor.js'
-
-/**
- * A callback's identity: its property name, or its argument slot when anonymous.
- *
- * [Plan 0079](../../plans/completed/0079-triage-the-cardinality-only-assertions.md).
- * Four blocks below asserted `toHaveLength(2)` where the count stood in for WHICH
- * callbacks were extracted, and each carried a comment naming the two — `handler +
- * hooks.onRequest`, `Only handler, not schema` — which is the reader stating the
- * identity the assertion did not check. Extracting `schema` instead of `handler`
- * passed every one of them.
- */
-const identify = (c: ExtractedCallback): string => {
-  // `fn.getName()` is undefined for `handler: (req) => {}` — an arrow assigned to
-  // a property has no name of its own, so all three object-property blocks below
-  // collapsed to the same argument slot. The name lives on the enclosing
-  // assignment, which is also worth knowing: `ExtractedCallback` carries `fn`,
-  // `callSite` and `argIndex`, so a rule author cannot currently tell two
-  // callbacks on one object apart either. Recorded as a follow-up on the plan.
-  const parent = c.fn.getNode().getParent()
-  if (parent !== undefined) {
-    if (Node.isPropertyAssignment(parent)) return parent.getName()
-    if (Node.isMethodDeclaration(parent)) return parent.getName()
-  }
-  return c.fn.getName() ?? `arg${String(c.argIndex)}`
-}
 
 function getFirstCallExpression(code: string) {
   const project = new Project({ useInMemoryFileSystem: true })
@@ -193,7 +168,11 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      expect(callbacks.map(identify).sort()).toEqual(['handler', 'onRequest'])
+      // The DOTTED path, which is what `fromObjectLiteralFunction` produces for the
+      // same node at the other call site. Plan 0082 chose to match it rather than
+      // pin a bare `onRequest`: two surfaces disagreeing about one node's identity
+      // would make `.excluding()` patterns depend on which surface reported.
+      expect(callbacks.map((c) => c.fn.getName()).sort()).toEqual(['handler', 'hooks.onRequest'])
     })
 
     it('ignores non-function properties', () => {
@@ -205,7 +184,7 @@ describe('extractCallbacks', () => {
       `)
       const callbacks = extractCallbacks(callExpr)
       // Not `schema` — which a length-1 assertion could not tell apart.
-      expect(callbacks.map(identify)).toEqual(['handler'])
+      expect(callbacks.map((c) => c.fn.getName())).toEqual(['handler'])
     })
 
     it('respects depth limit (MAX_OBJECT_DEPTH = 3)', () => {
@@ -227,7 +206,7 @@ describe('extractCallbacks', () => {
       // This block was hidden from plan 0079's scan by an over-broad
       // element-boolean signal, and surfaced by the false-negative check a review
       // asked for. It is the only class C the correction found.
-      expect(callbacks.map(identify)).toEqual(['handler'])
+      expect(callbacks.map((c) => c.fn.getName())).toEqual(['handler'])
       expect(callbacks[0]!.fn.isAsync()).toBe(true)
     })
 
@@ -239,7 +218,7 @@ describe('extractCallbacks', () => {
         })
       `)
       const callbacks = extractCallbacks(callExpr)
-      expect(callbacks.map(identify).sort()).toEqual(['handler', 'preHandler'])
+      expect(callbacks.map((c) => c.fn.getName()).sort()).toEqual(['handler', 'preHandler'])
     })
 
     it('direct inline callbacks still work alongside object extraction', () => {
@@ -248,7 +227,11 @@ describe('extractCallbacks', () => {
       `)
       const callbacks = extractCallbacks(callExpr)
       // The slot matters: `{}` sits at index 1 and must not be extracted.
-      expect(callbacks.map(identify)).toEqual(['arg2'])
+      // A POSITIONAL callback has no name, and that is the honest answer rather
+      // than a defect — `argIndex` is its identity. Asserted so the absent case is
+      // pinned, not assumed (plan 0082, test inventory row 2).
+      expect(callbacks.map((c) => c.fn.getName())).toEqual([undefined])
+      expect(callbacks.map((c) => c.argIndex)).toEqual([2])
     })
   })
 
