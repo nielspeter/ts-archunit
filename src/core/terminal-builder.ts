@@ -478,7 +478,14 @@ export abstract class TerminalBuilder {
    * being recovered by inspecting findings downstream.
    */
   protected deadSelectorFindings(): { selector: ArchViolation[]; discovery: ArchViolation[] } {
-    const empty = { selector: [], discovery: [] }
+    // Annotated: inferred, this is `{ selector: never[]; discovery: never[] }`,
+    // and it is returned from four early-exit paths. Nothing mutates it today —
+    // but a `push` onto a `never[]` is a type error whose message points at the
+    // literal rather than at the caller that meant to add a finding.
+    const empty: { selector: ArchViolation[]; discovery: ArchViolation[] } = {
+      selector: [],
+      discovery: [],
+    }
     const project = this.getProject()
     if (project === undefined) return empty
     // A condition that asserts CARDINALITY is satisfied by having no subjects,

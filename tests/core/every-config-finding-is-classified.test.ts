@@ -29,6 +29,7 @@
  * flag. Asserted below, so a producer cannot arrive by a route the scan cannot
  * see.
  */
+import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Node, Project, SyntaxKind } from 'ts-morph'
@@ -238,6 +239,44 @@ describe('every configuration-finding producer is classified (plan 0078)', () =>
       suspicious,
       `computed writes the census cannot see:\n  ${suspicious.join('\n  ')}`,
     ).toEqual([])
+  })
+
+  it("every classification's cited test file exists", () => {
+    // The `verified` strings name test files — `behavioural:
+    // cross-layer-finding-owns-its-remedy.test.ts — fixing the .layer() glob
+    // clears it`. Nothing asserted those files existed, so a rename left the row
+    // green pointing at nothing: a hand-maintained pointer inside a census built
+    // to replace hand-maintained pointers, which is this file's own subject.
+    //
+    // All ten resolved when review checked them by hand. Checking them by hand is
+    // the problem — that is a measurement with a shelf life, and this row gives it
+    // one that does not expire.
+    const testFiles = new Set<string>()
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) walk(full)
+        else if (entry.name.endsWith('.test.ts')) testFiles.add(entry.name)
+      }
+    }
+    walk(path.join(REPO, 'tests'))
+
+    // Vacuity: the walk found tests, and the citations were actually extracted.
+    expect(testFiles.size).toBeGreaterThan(100)
+
+    const cited: { key: string; file: string }[] = []
+    for (const [key, entry] of Object.entries(CLASSIFIED)) {
+      for (const match of entry.verified.matchAll(/([\w.-]+\.test\.ts)/g)) {
+        const name = match[1]
+        if (name !== undefined) cited.push({ key, file: name })
+      }
+    }
+    expect(cited.length).toBeGreaterThan(5)
+
+    const missing = cited
+      .filter((c) => !testFiles.has(c.file))
+      .map((c) => `${c.key} cites ${c.file}, which does not exist`)
+    expect(missing, `dead test citations:\n  ${missing.join('\n  ')}`).toEqual([])
   })
 
   it('no two producers share a census key', () => {
