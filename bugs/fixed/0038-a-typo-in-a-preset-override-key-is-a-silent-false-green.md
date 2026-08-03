@@ -1,6 +1,7 @@
 # Bug 0038: a typo in a preset override key is a silent false green
 
-**Reported:** 2026-08-01 · **Verified:** 2026-08-01, independently reproduced in review
+**Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased — **both halves**
+**Verified:** independently reproduced in review, before and after
 **Found in:** v0.36.3, by the ADR-008 compliance audit
 **Severity:** High — on blast radius, not frequency. A configured escalation that silently
 does not apply, on a **published** preset API, with the suite reporting coverage it does not
@@ -74,7 +75,7 @@ the difference is purely the severity, which is the whole of the fault.
 
 ## The warning is delivered. That is not the problem
 
-Do not reach for [bug 0024](./fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md)
+Do not reach for [bug 0024](./0024-warn-terminal-is-invisible-inside-a-test-runner.md)
 here — the first draft did, and it is stale. 0024 was fixed in v0.26.0, and its fix **is**
 `writeStderr` (`src/core/stderr.ts`), the function `validateOverrides` calls at
 `shared.ts:92`. The line prints, from a passing test, on the real channel.
@@ -93,7 +94,7 @@ severity or an exit code, and no integration or CLI test passes an override at a
   `expect(warnSpy).toHaveBeenCalled()`.
 
 The second is the more dangerous one, because it self-describes as the guard for exactly this
-fault. It is [ADR-008](../adr/008-agent-first-failure-surfaces.md)'s Context table verbatim: a
+fault. It is [ADR-008](../../adr/008-agent-first-failure-surfaces.md)'s Context table verbatim: a
 spy proves the call, never the consequence.
 
 ## Fix
@@ -113,7 +114,7 @@ Three things to settle:
 2. **Keep the available-IDs list** in the remedy. The current stderr text already has it, and
    it is the one part of today's behaviour that is right.
 3. Per rule 3 the finding must state that it cannot be suppressed — see
-   [plan 0078](../plans/0078-derive-the-configuration-finding-census.md).
+   [plan 0078](../../plans/0078-derive-the-configuration-finding-census.md).
 
 ### Option zero, and it should be tried first
 
@@ -178,10 +179,64 @@ described:
 
 ## Related
 
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1 — actionable findings fail;
+- [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 1 — actionable findings fail;
   rule 6 — this is published API.
-- [Bug 0018](./fixed/0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md) — the
+- [Bug 0018](./0018-data-layer-preset-silently-enforces-nothing-for-a-file-glob.md) — the
   other "a preset silently enforces nothing" fault, fixed by `assertDiscovered`.
-- [Plan 0078](../plans/0078-derive-the-configuration-finding-census.md) — the census guards
+- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census guards
   producers that exist; it **cannot** find a missing one, so it will not catch this. Fix this
   first, then let the census pick up the new site.
+
+## Fix as shipped
+
+Both halves, in the order review recommended: the type first, because it catches the fault where
+it is cheapest, and the runtime finding for the paths a type cannot reach.
+
+### Option zero — the key is a literal union
+
+`PresetBaseOptions` became `PresetBaseOptions<TRuleId extends string = string>`, and each preset
+supplies its own ids. A misspelled key is now a **compile error in the editor**, before any run.
+The default parameter keeps anything outside this package that extends the interface compiling.
+
+The unions are **derived, never restated** — a hand-written list is a second source that drifts
+the moment a rule is added, which is this bug's own shape:
+
+| Preset                                | Source of the union                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `recommended`                         | `SPECS` is `as const satisfies readonly RuleSpec[]`, so `(typeof SPECS)[number]['meta']['id']` |
+| `boundaries`, `layered`, `data-layer` | `(typeof RULE_IDS)[number]` — those lists were already `as const`                              |
+| `agentGuardrails`                     | a template literal, because its ids are **open** by construction                               |
+
+`agentGuardrails` is the honest exception: `preset/agent/no-inline-logic/${api}` is built from the
+caller's own options, so the set is not closed and a typo in the API segment still compiles. The
+runtime finding is what covers that arm — which is the argument for having both.
+
+### The runtime finding, without breaking the API
+
+The first draft specified changing `validateOverrides` from `void` to returning rules. It is
+re-exported and documented with that signature, so review was right that this is a published API
+break for a low-frequency fault. `overrideFindings` sits **beside** it instead, returns
+`RuleBuilderLike[]`, and every preset spreads the result **first** — a wrong configuration should
+be read before any finding produced under it.
+
+The finding lists the preset's real rule ids, because the commonest cause is a near-miss nobody
+spots by staring, and it states that it cannot be suppressed.
+
+## Guard
+
+The old test called itself `'warns on an unrecognized override id (typo guard)'` and asserted
+only that a spy had fired — ADR-008's Context table verbatim, in a test named for the fault it
+failed to catch. It now asserts the **consequence**: a configuration finding exists, names the
+typo, and carries the real ids.
+
+Note what the rewrite forced: **the typo has to be built at runtime, because a literal no longer
+compiles.** The test could not be written the old way even if someone wanted to — which is the
+type doing its job, and it means the test necessarily exercises the second line of defence.
+
+Paired with a control asserting a _correct_ override produces no finding **and takes effect** —
+without which "always report an override problem" passes.
+
+## What this does not cover
+
+`agentGuardrails`' `no-inline-logic/${api}` ids, at the type level. Stated above rather than left
+for someone to discover.
