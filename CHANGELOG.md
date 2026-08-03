@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.41.0] - 2026-08-01
+
+### Fixed
+
+- **A typo in a preset override key silently did nothing** ([bug 0038](bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)). Measured: `overrides: { 'preset/recommended/no-silent-cach': 'error' }` left the rule at `warn` and the build **green** — the escalation the author asked for never happened, and the only trace was a line on stderr that never reaches the exit code. Five rules ship with a `warn` default, so turning one _off_ by a misspelled key was equally silent.
+
+### Added
+
+- **Override keys are typed.** Each preset's `overrides` map is now keyed by that preset's own rule ids as a literal union, so a misspelled key is a **compile error in the editor** — before any run, at no CI cost. The unions are derived from each preset's existing rule list rather than restated, so they cannot drift when a rule is added.
+
+  One deliberate exception: `agentGuardrails`' `preset/agent/no-inline-logic/${api}` ids are built from your own `noInlineLogic` entries, so that arm is a template literal and a typo in the API segment still compiles. The runtime finding below covers it.
+
+- **An unknown override key is now a configuration finding** that fails the build, for the paths a type cannot reach: JavaScript consumers, a dynamically-built overrides object, config read from disk. It names the preset's real rule ids, because the usual cause is a near-miss you cannot spot by staring. `validateOverrides` is **unchanged** — its published `void` signature is documented, so the new behaviour lives in a sibling rather than a breaking change.
+
+### Upgrade note
+
+**A build carrying a typo'd override key will now go red**, having previously passed. That is the bug: the override was doing nothing. Two ways it surfaces — as a compile error if you use TypeScript and a literal key, or as a configuration finding at run time otherwise.
+
+The fix is to correct the key. The finding lists the preset's valid ids; if you meant to remove the override, delete it.
+
+No other behaviour changes: rules that were being enforced are enforced identically, and baselines are unaffected.
+
 ## [0.40.0] - 2026-08-01
 
 ### Fixed
