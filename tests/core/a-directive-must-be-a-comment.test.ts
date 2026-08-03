@@ -71,10 +71,15 @@ describe('a directive must actually be a comment, and must begin it (bug 0043)',
     expect(CASES.filter(([, , n]) => n === 0).length).toBeGreaterThan(5)
   })
 
-  it('the offsets survive blanking, so reported lines stay right', () => {
-    // Literals and block comments are blanked in place rather than removed,
-    // because every line number downstream depends on it. A fix that stripped
-    // them would pass every row above and misreport every line.
+  it('newlines survive blanking, so reported lines stay right', () => {
+    // The masked-out regions keep their newlines, because the scan is line-based
+    // and reports `line`. A mask that dropped one would pass every row above and
+    // misreport every directive after it.
+    //
+    // Note what this does NOT pin: replacing the masked characters with spaces
+    // rather than deleting them. Nothing downstream reads a column, so
+    // collapsing them leaves the suite green — measured. The spaces are defence
+    // in depth, not a guarded property.
     const source = [
       'const s = "// ts-archunit-exclude probe/x: fake"',
       '/* a block\n   comment */',

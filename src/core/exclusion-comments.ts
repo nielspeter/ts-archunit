@@ -252,9 +252,16 @@ function handleSingleLine(
  * **live exclusion** that silenced a real finding — silently, because a
  * directive carrying a reason never triggers the undocumented-exclusion warning.
  *
- * Blanked rather than removed, so every offset and line number is unchanged and
- * the rest of this file needs no adjustment. Newlines are preserved for the same
- * reason.
+ * **Newlines are preserved**, and that is the load-bearing part: the scan below
+ * is line-based and reports `line` on every exclusion, so a mask that dropped a
+ * newline would misreport every directive after it.
+ *
+ * Characters are replaced with spaces rather than removed, which keeps
+ * intra-line offsets stable too — but nothing downstream consumes a column, so
+ * that half is defence in depth rather than a guarded property. Measured:
+ * collapsing the blanks to `''`, and masking one character short, both leave the
+ * suite green. Recorded rather than dressed up — a sabotage row that survives
+ * for a real reason is a different thing from a missing guard.
  *
  * ## Why a parse, and not a scan
  *
