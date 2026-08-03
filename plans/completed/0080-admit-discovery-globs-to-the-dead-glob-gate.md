@@ -174,7 +174,7 @@ sense. Each must red, and the live controls must stay green.
 ## Related
 
 - [Bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — the API half, shipped v0.42.0.
-- [Plan 0078](../0078-derive-the-configuration-finding-census.md) — keeping one producer keeps its census untouched.
+- [Plan 0078](./0078-derive-the-configuration-finding-census.md) — keeping one producer keeps its census untouched.
 - [Bug 0009](../../bugs/fixed/0009-slice-glob-conventions-diverge-and-remedy-misleads.md) — the slice remedy corpus Critical 1 would destroy.
 - [Bug 0031](../../bugs/fixed/0031-diagnose-blames-the-glob-when-the-project-loaded-nothing.md) — the short-circuit Critical 2 says is missing on the selector path.
 

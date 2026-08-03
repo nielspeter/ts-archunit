@@ -2,7 +2,7 @@
 
 **Reported:** 2026-08-01 · **Fixed:** 2026-08-01, unreleased
 **Verified:** measured through the public API before and after
-**Found in:** v0.36.3, by the review of [plan 0078](../../plans/0078-derive-the-configuration-finding-census.md)
+**Found in:** v0.36.3, by the review of [plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md)
 **Severity:** Medium. A live recurrence of
 [bug 0021](./0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) at a
 producer that bug's fix never reached — and it also ships a configuration finding with **no
@@ -65,7 +65,7 @@ universal case asserts `expect(f.suggestion).toBeTruthy()`, which is presence ra
 correctness, so it would pass on the first fault above even if it did reach this producer.
 
 That hand-written enumeration is the subject of
-[plan 0078](../../plans/0078-derive-the-configuration-finding-census.md). This bug is the live
+[plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md). This bug is the live
 instance proving the plan's premise.
 
 ## Fix
@@ -100,7 +100,7 @@ anything about its fields.
   original, and the source of the two-direction test shape.
 - [Bug 0040](./0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — a
   different defect in the same block: two sibling conditions have no empty-layer guard at all.
-- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census that would
+- [Plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md) — the census that would
   have found this, and whose Phase 2 must assert correctness rather than presence.
 
 ## Fix as shipped
@@ -194,7 +194,7 @@ confidently wrong cause instead. That is
 
 When 0040 lands — admit `discovery` sites at `terminal-builder.ts:433` and reuse
 `deadSelectorViolation` — this producer becomes redundant and should be deleted rather than
-maintained. Otherwise [plan 0078](../../plans/0078-derive-the-configuration-finding-census.md)
+maintained. Otherwise [plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md)
 inherits a thirteenth configuration-finding producer, which is what that plan exists to prevent.
 `GLOB_DOCS` and `FAULT_ADVICE` are **not** reusable here in the meantime: the first is a
 slices-specific URL, the second is keyed by a `GlobFault` this condition cannot compute without

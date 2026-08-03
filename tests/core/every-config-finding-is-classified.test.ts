@@ -73,7 +73,7 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
   'src/cli/rule-file-findings.ts::ruleFileFailure': {
     remedy: 'own',
     verified:
-      'stated-only: the remedy is \"fix the error named above\", and the error is arbitrary — no single fix to apply',
+      'stated-only: the remedy defers to the error named above it, which is arbitrary — no single fix to apply',
   },
   'src/cli/rule-file-findings.ts::ruleFileTruncated': {
     remedy: 'own',

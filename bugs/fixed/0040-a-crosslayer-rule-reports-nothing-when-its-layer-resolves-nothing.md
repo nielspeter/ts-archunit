@@ -121,7 +121,7 @@ tables, `bypassFilters`, the bug-0021 discipline of never inheriting the author'
 and the property the docstring at `:396-399` explicitly buys — that `doctor`'s pre-flight and
 the gate can never disagree. A builder-side producer re-implements all of it and becomes a
 thirteenth configuration-finding producer, which is what
-[plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) exists to stop. ADR-006
+[plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md) exists to stop. ADR-006
 and the lego-bricks principle both say reuse.
 
 Two caveats for the plan:
@@ -212,7 +212,7 @@ argument for fixing it there rather than in the builder.
   independent defect in the same `cross-layer.ts:39-53` block.
 - [Plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md) — the gate whose
   `position !== 'selector'` filter this sits outside.
-- [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — why the fix must reuse
+- [Plan 0078](../../plans/completed/0078-derive-the-configuration-finding-census.md) — why the fix must reuse
   the existing producer rather than add one.
 
 ## The API half, as shipped (v0.42.0)

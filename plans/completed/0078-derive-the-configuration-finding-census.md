@@ -1,6 +1,8 @@
 # Plan 0078 — Derive the configuration-finding census
 
-**Status:** **PARTIALLY SHIPPED.** Phase 3 (the unsuppressability sentence) landed in
+**Status:** **DONE — Phase 3 in v0.37.0, Phases 1–2 in v0.45.0** (2026-08-03).
+
+**Original status, for the record:** **PARTIALLY SHIPPED.** Phase 3 (the unsuppressability sentence) landed in
 **v0.37.0** — it was the user-facing part, and bug 0041 made its omission reachable from every
 condition family, so it could not wait behind an internal census. Phases 1 and 2 are open and
 not started. Filed 2026-08-01 from the ADR-008 compliance audit; revised the same day after
@@ -12,7 +14,7 @@ than defects.
 **Effort:** Medium. The census is a test file; the message edits are ten strings; but the key
 has to be `file:line` with a follow-through arm, which is more than the first draft assumed.
 **Blast radius:** Internal check over a corpus we control, guarding **published** messages. Per
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 the depth splits by artifact: the
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 the depth splits by artifact: the
 messages get the behavioural treatment, the census itself stops at "prove each detector fires".
 
 ## Problem
@@ -42,7 +44,7 @@ expect(f.suggestion, `${f.rule} has no remedy`).toBeTruthy()
 ```
 
 Presence, not correctness. A remedy that reads well and does not work passes it forever —
-[bug 0017](../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)
+[bug 0017](../../bugs/fixed/0017-boundaries-no-cross-boundary-message-overclaims-entry-point-enforcement.md)
 exactly.
 
 `tests/presets/shared.test.ts:118` asserts the same invariant for presets, but its fixtures make
@@ -52,7 +54,7 @@ discovery **succeed**, so `assertDiscovered` returns `[]` and `shared.ts:71` is 
 **Eleven of twelve carry a `suggestion`, not twelve.** `cross-layer.ts:52` sets
 `suggestion: context.suggestion`, which is optional, so with no `.rule({...})` the finding
 reaches the reader bare — and _with_ author metadata it carries the author's unrelated remedy.
-That is [bug 0042](../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md),
+That is [bug 0042](../../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md),
 filed separately, and it is the live proof of this plan's premise: a hand-written list cannot
 fail when the list is what went stale.
 
@@ -223,11 +225,11 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
 
 ## Out of scope
 
-- **[Bug 0038](../bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)** — a
+- **[Bug 0038](../../bugs/fixed/0038-a-typo-in-a-preset-override-key-is-a-silent-false-green.md)** — a
   site that _should_ produce a configuration finding and does not. The census guards producers
   that exist; it structurally cannot find a missing one. Fix 0038 separately, then let the census
   pick up the new site.
-- **[Bug 0042](../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)** —
+- **[Bug 0042](../../bugs/fixed/0042-cross-layers-empty-layer-finding-inherits-the-authors-remedy.md)** —
   fix it on its own terms; this plan only ensures nothing like it can hide again.
 - **The 215 count-only test assertions** from the audit. An untriaged upper bound from a
   heuristic scan with known false positives; sample before filing.
@@ -235,10 +237,10 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
 
 ## Related
 
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rules 2, 3, 5 and 6.
-- [Bug 0036](../bugs/fixed/0036-the-relative-glob-audit-is-incomplete.md) — the same fix at the
+- [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rules 2, 3, 5 and 6.
+- [Bug 0036](../../bugs/fixed/0036-the-relative-glob-audit-is-incomplete.md) — the same fix at the
   glob surface; its census is the template.
-- [Bug 0021](../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) —
+- [Bug 0021](../../bugs/fixed/0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) —
   why a configuration finding carries its own remedy, and the source of Phase 2's test shape.
 - No overlap with open plans 0047, 0048 or 0072, or with completed 0067/0069/0070 — checked.
 
@@ -260,3 +262,68 @@ Housekeeping the census makes safe to do: `src/core/execute-rule.ts:174` says "f
 - **Confirmed by review:** no producer emits the flag without the literal `bypassFilters: true`
   — 43 occurrences, all literal / type declaration / read. The text census is sound at the scan
   level.
+
+## What shipped, and three places the plan was wrong
+
+### The population drifted a THIRD time, which is the plan's own argument
+
+Filed at **12** across 8 files. Corrected to **13** mid-flight. Actually **15** across 9 files when
+built — bug 0038 added `overrideFindings` and bug 0048 added `emptyProjectViolation` while this sat
+open. A plan whose subject is "a hand-written list cannot fail when the list goes stale" had its own
+inventory go stale twice.
+
+The census now re-derives it, so the number in this document is history rather than configuration.
+
+### Keyed on the enclosing FUNCTION, not `file:line`
+
+The plan specified `file:line` because four files hold two producers each. But a line number goes
+stale on every edit above it — the same failure mode one level down, and this plan had already been
+bitten by exactly that (its own `rule-builder.ts:522` reference was wrong, and pointed at a different
+finding than the prose described).
+
+The enclosing function is derived with ts-morph, stable across edits, and is what a reader identifies
+a producer by. All 15 resolve to a named function.
+
+### Phase 2 needed no fixtures at all
+
+The plan estimated _"twelve fixtures alongside a census and ten message edits"_ and called Effort
+Medium on that basis. The invariant is **statically derivable**: every producer's object literal must
+carry a `suggestion`, and it must not read `context.suggestion` / `meta?.suggestion` /
+`_metadata?.docs` or any other author source. That is bug 0021 and bug 0042's rule, checked across
+all 15 at once instead of twelve times by fixture.
+
+Which leaves the half no static check can do — whether the remedy has been **proven to remediate**.
+That is a decision, so the census forces one per producer: `verified` must begin `behavioural:`
+naming the test, or `stated-only:` carrying why applying it is not possible. **11 of 15 are
+behavioural.** The four `stated-only` entries are arguable rather than assumed:
+
+| producer                                | why not behavioural                                                 |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| `ruleFileFailure` / `ruleFileTruncated` | the remedy defers to an arbitrary underlying error                  |
+| `unexpectedlyNonEmptyViolation`         | the remedy changes what the rule asserts rather than fixing a fault |
+| `assertDiscovered`                      | the remedy is the caller's string; one of two call sites is proven  |
+
+`stated-only` is not a free pass, and the docstring says so: bug 0017's remedy and **both** of bug
+0042's wrong remedies passed every contains-check written about them. Only applying the fix found them.
+
+## Detector proofs — 4 of 4, one per detector
+
+Rule 6's floor is _each_ detector, not one for the file.
+
+| Revert                                                     | Result |
+| ---------------------------------------------------------- | ------ |
+| D1 — a new unclassified producer                           | CAUGHT |
+| D2 — a classified producer with no remedy                  | CAUGHT |
+| D3 — a remedy reading the author's `suggestion`            | CAUGHT |
+| D4 — a stale classification for code that no longer exists | CAUGHT |
+
+Plus a standing assertion that **no producer can set the flag by a computed write** — the census
+matches one literal shape, so if a spread or a variable could introduce `bypassFilters` it would
+report full coverage while missing producers. That is the shape rule 5 forbids, and it is now checked
+rather than argued.
+
+## One process failure
+
+I read `VALIDATE=1` and committed anyway, then found it was a lint error two lines long. The commit
+was amended, but the habit is the problem: the exit code was right there and I acted past it. Same
+class as reading `head`'s status instead of `tsc`'s earlier the same day.

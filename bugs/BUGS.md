@@ -56,7 +56,7 @@ remedies, so the payload now carries `kind` instead.
 
 ### Deliberately not next
 
-- **[Plan 0078](../plans/0078-derive-the-configuration-finding-census.md) phases 1–2** sit behind
+- **[Plan 0078](../plans/completed/0078-derive-the-configuration-finding-census.md) phases 1–2** sit behind
   0038, which adds a producer the census must pick up. Its Phase 3 already shipped in v0.37.0.
 - **[Plan 0079](../plans/0079-triage-the-cardinality-only-assertions.md)** is a sampling exercise
   with a stop rule, not a defect. It waits.
@@ -77,7 +77,7 @@ Not a list of bugs — a list of the shapes they keep taking. Each is drawn from
 one entry in `fixed/`.
 
 - **A guard whose list is hand-written cannot fail when the list goes stale.** Bugs 0036
-  and 0042 are the same defect at different surfaces; [plan 0078](../plans/0078-derive-the-configuration-finding-census.md)
+  and 0042 are the same defect at different surfaces; [plan 0078](../plans/completed/0078-derive-the-configuration-finding-census.md)
   is the third instance. Derive the census from source.
 - **A test that asserts the call is not a test of the consequence.** Bugs 0038 and 0041
   both hid behind a spy or a helper that supplied the very thing under test.
