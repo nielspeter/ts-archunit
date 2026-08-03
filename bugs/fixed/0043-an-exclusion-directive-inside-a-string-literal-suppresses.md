@@ -62,8 +62,8 @@ Behavioural, over a fixture whose rule genuinely fires (the vacuity control):
 
 ## Related
 
-- [Bug 0041](./fixed/0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) — widened this
+- [Bug 0041](./0041-an-exclusion-comment-is-a-no-op-for-most-conditions.md) — widened this
   from `createViolation` conditions to all of them.
-- [Bug 0044](./0044-an-inline-exclusion-comment-has-no-feedback-channel.md) — the other half:
+- [Bug 0044](../0044-an-inline-exclusion-comment-has-no-feedback-channel.md) — the other half:
   nothing tells you when a comment matched nothing.
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1, and rule 3's corollary on markers.
+- [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 1, and rule 3's corollary on markers.

@@ -1,3 +1,5 @@
+import path from 'node:path'
+import { Project, SyntaxKind } from 'ts-morph'
 import type { ArchViolation } from './violation.js'
 
 /**
@@ -53,15 +55,30 @@ export interface ParseResult {
   warnings: ExclusionWarning[]
 }
 
-// Single-line: // ts-archunit-exclude <rule-id>[, <rule-id>]: <reason>
-// Single-line without reason: // ts-archunit-exclude <rule-id>
-const SINGLE_LINE_RE = /\/\/\s*ts-archunit-exclude\s+(.+)/
+// A directive must BEGIN its comment. The regexes are anchored at `^` and the
+// caller slices each line from its first `//`, so they see the comment and
+// nothing before it — which keeps the documented TRAILING form working
+// (`const a = 1 // <directive>`), where the comment starts mid-line. Anchoring
+// to the start of the LINE instead was the first attempt and broke exactly
+// that; the guard's trailing rows caught it.
+//
+// It used to match anywhere in the line, which made any comment *mentioning*
+// the syntax a live directive. This file's own grammar documentation was one:
+// a line reading "Single-line without reason: <the directive>" declared a
+// real, reason-less exclusion against whatever rule was being evaluated, and
+// this repo's preset fan-out test caught it the moment comments started being
+// read correctly. Every user documenting the feature in a code comment would
+// have hit the same thing.
+//
+// A trailing directive still works — `const a = 1 // <directive>` — because
+// there the comment itself begins with it.
+const SINGLE_LINE_RE = /^\/\/\s*ts-archunit-exclude\s+(.+)/
 
 // Block start: // ts-archunit-exclude-start <rule-id>[, <rule-id>]: <reason>
-const BLOCK_START_RE = /\/\/\s*ts-archunit-exclude-start\s+(.+)/
+const BLOCK_START_RE = /^\/\/\s*ts-archunit-exclude-start\s+(.+)/
 
 // Block end: // ts-archunit-exclude-end
-const BLOCK_END_RE = /\/\/\s*ts-archunit-exclude-end\b/
+const BLOCK_END_RE = /^\/\/\s*ts-archunit-exclude-end\b/
 
 /**
  * Parse rule IDs and reason from the content after the directive keyword.
@@ -226,8 +243,92 @@ function handleSingleLine(
  *   // ts-archunit-exclude-end
  *   // ts-archunit-exclude <rule-a>, <rule-b>: <reason>
  */
+/**
+ * Every string-like literal, blanked — [bug 0043](../../bugs/fixed/0043-an-exclusion-directive-inside-a-string-literal-suppresses.md).
+ *
+ * The scan below is line-based, and a line-based scan cannot tell a directive
+ * from the same characters inside a string. Measured before this existed: all
+ * three of `"…"`, `'…'` and `` `…` `` containing the directive text produced a
+ * **live exclusion** that silenced a real finding — silently, because a
+ * directive carrying a reason never triggers the undocumented-exclusion warning.
+ *
+ * Blanked rather than removed, so every offset and line number is unchanged and
+ * the rest of this file needs no adjustment. Newlines are preserved for the same
+ * reason.
+ *
+ * ## Why a parse, and not a scan
+ *
+ * The first attempt used `ts.createScanner`, which is the real lexer and fixed
+ * the three plain cases. It left two: `` `${x} // …` `` and JSX text. A bare
+ * scanner has no parser context, so it cannot know when to re-scan a template
+ * middle or JSX children, and both were classified as code — meaning the `//`
+ * inside them became a comment. Measured, not predicted.
+ *
+ * So: parse, and blank the literals. Everything remaining is code, where `//`
+ * genuinely does start a comment.
+ *
+ * A **ts-morph** project rather than the raw compiler API, per
+ * [ADR-002](../../adr/002-ts-morph-ast-engine.md), reusing one in-memory project
+ * across calls so the cost is a parse rather than a project construction. The
+ * whole scan is gated on a rule having already produced a violation in the file,
+ * so nothing is parsed for a clean run.
+ *
+ * A `TemplateExpression` is blanked **whole**, including its `${…}`
+ * substitutions. A comment is legal inside a substitution, so this can miss a
+ * real directive there — it errs toward *not* suppressing, which is the safe
+ * direction for a mechanism whose failure mode is a silent green.
+ */
+const LITERAL_KINDS = [
+  SyntaxKind.StringLiteral,
+  SyntaxKind.NoSubstitutionTemplateLiteral,
+  SyntaxKind.TemplateExpression,
+  SyntaxKind.RegularExpressionLiteral,
+  SyntaxKind.JsxText,
+] as const
+
+let scratch: Project | undefined
+
+function withoutLiterals(sourceText: string, filePath: string): string {
+  scratch ??= new Project({ useInMemoryFileSystem: true })
+  // `.tsx` so JSX parses; a `.ts` parse reads `<div>` as a type assertion and
+  // the JsxText case silently stops being covered.
+  const sourceFile = scratch.createSourceFile(`/scan/${path.basename(filePath)}.tsx`, sourceText, {
+    overwrite: true,
+  })
+
+  const out = sourceText.split('')
+  for (const kind of LITERAL_KINDS) {
+    for (const node of sourceFile.getDescendantsOfKind(kind)) {
+      for (let i = node.getStart(); i < node.getEnd(); i++) {
+        if (out[i] !== undefined && out[i] !== '\n') out[i] = ' '
+      }
+    }
+  }
+  const withoutLiteralText = out.join('')
+
+  // Block comments too, and this is not tidying — it is the difference between
+  // documenting the feature and invoking it.
+  //
+  // The grammar is `//`-only and always has been (a `/* … */` directive produced
+  // no exclusion before this fix and still produces none). But a JSDoc block
+  // that *mentions* the directive in prose puts the characters on a line, and
+  // the line scan below cannot tell prose from a directive.
+  //
+  // Found the hard way: this very file's docstring explains the bug, contains
+  // the directive text, and the moment comments started being read correctly it
+  // declared a live exclusion against `preset/boundaries/no-cross-boundary` —
+  // caught by this repo's own preset fan-out test. Any user writing a code
+  // comment about the feature would hit the same thing.
+  //
+  // Safe to do with a regex here, and only here: every string, template and
+  // regex literal has already been blanked, so a surviving `/*` is a real
+  // block-comment start.
+  return withoutLiteralText.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+}
+
 export function parseExclusionComments(sourceText: string, filePath: string): ParseResult {
-  const lines = sourceText.split('\n')
+  // A directive inside a string is not a directive (bug 0043).
+  const lines = withoutLiterals(sourceText, filePath).split('\n')
   const exclusions: ExclusionComment[] = []
   const warnings: ExclusionWarning[] = []
   // A STACK of frames, one per `-start` line, each holding that line's rule ids.
@@ -240,21 +341,28 @@ export function parseExclusionComments(sourceText: string, filePath: string): Pa
     if (line === undefined) continue
     const lineNum = i + 1
 
+    // Slice from the comment start. Literals are already blanked, so the first
+    // `//` on the line is a real comment opener — and anything before it is
+    // code, which cannot contain a directive.
+    const commentStart = line.indexOf('//')
+    if (commentStart === -1) continue
+    const comment = line.slice(commentStart)
+
     // Check block end first (before start/single so we don't match -start as single)
-    if (BLOCK_END_RE.test(line)) {
+    if (BLOCK_END_RE.test(comment)) {
       handleBlockEnd(frames, exclusions, warnings, filePath, lineNum)
       continue
     }
 
     // Check block start
-    const startMatch = BLOCK_START_RE.exec(line)
+    const startMatch = BLOCK_START_RE.exec(comment)
     if (startMatch?.[1]) {
       handleBlockStart(startMatch[1], frames, warnings, filePath, lineNum)
       continue
     }
 
     // Check single-line exclude (must not match block directives)
-    const singleMatch = SINGLE_LINE_RE.exec(line)
+    const singleMatch = SINGLE_LINE_RE.exec(comment)
     if (singleMatch?.[1]) {
       handleSingleLine(singleMatch[1], exclusions, warnings, filePath, lineNum)
     }
