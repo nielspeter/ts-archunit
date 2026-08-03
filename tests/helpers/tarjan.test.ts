@@ -33,8 +33,7 @@ describe('tarjanSCC', () => {
       [2, [0]],
     ])
     const sccs = tarjanSCC(3, edges)
-    expect(sccs).toHaveLength(1)
-    expect(sccs[0]).toHaveLength(3)
+    expect(sccs.map((c) => c.slice().sort((a, b) => a - b))).toEqual([[0, 1, 2]])
   })
 
   it('detects multiple independent cycles', () => {
@@ -46,7 +45,12 @@ describe('tarjanSCC', () => {
       [3, [2]],
     ])
     const sccs = tarjanSCC(4, edges)
-    expect(sccs).toHaveLength(2)
+    // WHICH nodes are in WHICH cycle. Two SCCs of {0,1} and {2,3} counted the
+    // same as one of {0,1,2,3} plus an empty one.
+    expect(sccs.map((c) => c.slice().sort((a, b) => a - b))).toEqual([
+      [0, 1],
+      [2, 3],
+    ])
   })
 
   it('ignores self-loops (size-1 SCC)', () => {

@@ -103,7 +103,11 @@ describe('viewsFor', () => {
   })
 
   it('gives path kinds the absolute view and the tsconfig-relative one', () => {
-    expect(viewsFor(universe, 'file-path')).toHaveLength(2)
+    // WHICH two views, not that there are two: two absolute views would have
+    // counted the same, and the claim names one of each.
+    const shapeOf = (view: string[]): string =>
+      view.every((p) => p.startsWith('/')) ? 'absolute' : 'tsconfig-relative'
+    expect(viewsFor(universe, 'file-path').map(shapeOf)).toEqual(['absolute', 'tsconfig-relative'])
     expect(viewsFor(universe, 'parent-dir')).toHaveLength(2)
   })
 })

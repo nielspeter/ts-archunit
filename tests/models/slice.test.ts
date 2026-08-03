@@ -240,7 +240,10 @@ describe('resolveByDefinition', () => {
       domain: '**/domain/**',
     })
     const domain = result[0]!
-    expect(domain.files.length).toBe(2) // entity.ts and value-object.ts
+    expect(domain.files.map((f) => f.getBaseName()).sort()).toEqual([
+      'entity.ts',
+      'value-object.ts',
+    ]) // entity.ts and value-object.ts
   })
 
   it('first match wins for overlapping globs', () => {
