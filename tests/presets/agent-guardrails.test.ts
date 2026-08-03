@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { RuleDescription } from '../../src/core/rule-description.js'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import type { ArchProject } from '../../src/core/project.js'
@@ -18,6 +19,24 @@ function loadTestProject(): ArchProject {
 
 const SRC = '**/mistakes.ts'
 
+/**
+ * `RuleBuilderLike` declares only `violations()`, so a preset builder's rule id
+ * needs narrowing to read. Same guard as `boundaries-folder-level.test.ts`, and
+ * for the same reason: the assertions below are about WHICH rules a preset
+ * produced, which is unavailable through the declared interface.
+ */
+interface Describable {
+  describeRule: () => RuleDescription
+}
+function isDescribable(rule: object): rule is Describable {
+  return 'describeRule' in rule && typeof rule.describeRule === 'function'
+}
+
+/** The rule ids a preset produced, in order. */
+function idsOf(builders: readonly object[]): (string | undefined)[] {
+  return builders.map((b) => (isDescribable(b) ? b.describeRule().id : undefined))
+}
+
 describe('agentGuardrails preset', () => {
   const p = loadTestProject()
 
@@ -32,7 +51,7 @@ describe('agentGuardrails preset', () => {
     })
     // One per enabled rule, BY ID — five builders with the same id also had
     // length 5, and "per enabled rule" is a statement about which.
-    expect(builders.map((b) => b.describeRule().id)).toEqual([
+    expect(idsOf(builders)).toEqual([
       'preset/agent/no-inline-logic/parseInt',
       'preset/agent/no-generic-errors',
       'preset/agent/no-stubs',
@@ -113,7 +132,7 @@ describe('agentGuardrails preset', () => {
     const builders = agentGuardrails(p, { src: SRC, noInlineLogic: ['parseInt', 'eval'] })
     // DISTINCT is the claim, and a count of 2 cannot see it: two builders
     // sharing one id — the bug this guards — also had length 2.
-    expect(builders.map((b) => b.describeRule().id)).toEqual([
+    expect(idsOf(builders)).toEqual([
       'preset/agent/no-inline-logic/parseInt',
       'preset/agent/no-inline-logic/eval',
     ])

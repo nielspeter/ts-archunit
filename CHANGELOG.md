@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.4] - 2026-08-03
+
+Test-quality only. No source changes, no API changes, no behaviour changes.
+
+### Internal
+
+- **45 test assertions that counted now name what they expect** ([plan 0079](plans/completed/0079-triage-the-cardinality-only-assertions.md)).
+  [ADR-008](adr/008-agent-first-failure-surfaces.md) rule 5's third corollary — _counting is the
+  shortcut; compare identities_ — was the one corollary with no guard. A scan found 143 `it()` blocks
+  asserting a non-zero count with nothing pinning which elements; a seeded sample of 30, classified
+  by reading every one, put **27% in the class where a swap passes** — one element lost and another
+  gained, assertion still green. Above the plan's ~15% stop rule, so all 45 were converted.
+
+  Six of the eight sampled cases carried a **comment naming the identity the assertion omitted** —
+  `// Only DomainError fails`, `// handler + hooks.onRequest`, `// UserService and OrderService match
+both predicates`. The reader knew; the test did not.
+
+  Two were reclassified the other way by measurement: `preset-fanout-is-one-finding.test.ts`
+  produces violations that are identical on ruleId, file, line, element and message _by design_,
+  because the claim is that alike violations are not collapsed. There is no identity to assert, so
+  the count is the value — both reverted, with the reason recorded.
+
+  Two things fell out. `matchers.test.ts` asserted two sibling matches; naming them showed the
+  matcher returns the **identifier** nodes, not the call expressions. And
+  `callback-extractor.test.ts` could not express its identity at all through the public shape —
+  filed as [plan 0082](plans/0082-an-extracted-callback-should-carry-its-name.md), since two
+  callbacks on one object literal are indistinguishable to a rule author.
+
+- **The scan that found them was itself a hand-maintained list.** Its first identity signal counted
+  `toBeTruthy`/`toThrow`/`toBeGreaterThan`, none of which survive a swap; its second missed five
+  element-boolean idioms like `.some((m) => m.includes('"offset"'))`. Refined, then checked against
+  the independently hand-read classification: 5 of 5 false positives dropped, 8 of 8 confirmed cases
+  kept. Recorded as a script rather than a remembered number.
+
 ## [0.45.3] - 2026-08-03
 
 Everything here came out of an architecture review of v0.44.0/v0.45.0. No user-facing behaviour

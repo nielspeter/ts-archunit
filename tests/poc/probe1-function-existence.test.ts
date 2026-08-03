@@ -86,8 +86,9 @@ describe('Probe 1: Function Existence — find elements by name/location', () =>
         })
         .filter((v) => pattern.test(v.getName()))
 
-      expect(fnDecls).toHaveLength(2) // parseFooOrder, parseBarOrder
-      expect(arrowFns).toHaveLength(1) // parseBazOrder
+      // The comments carried the names and the assertions counted.
+      expect(fnDecls.map((f) => f.getName()).sort()).toEqual(['parseBarOrder', 'parseFooOrder'])
+      expect(arrowFns.map((v) => v.getName())).toEqual(['parseBazOrder'])
     })
 
     it('no parseXxxOrder functions outside routes.ts', () => {
