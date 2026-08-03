@@ -1,6 +1,5 @@
 import type { SourceFile } from 'ts-morph'
 import type { ArchViolation } from './violation.js'
-import type { OWNS_EMPTY_DISCOVERY } from './owns-empty-discovery.js'
 import type { ConditionContext } from './condition.js'
 import type { LayerPair, Layer } from '../models/cross-layer.js'
 
@@ -38,13 +37,4 @@ export interface PairConditionContext extends ConditionContext {
 export interface PairCondition<A = SourceFile, B = SourceFile> {
   readonly description: string
   evaluate(pairs: LayerPair<A, B>[], context: PairConditionContext): ArchViolation[]
-  /**
-   * Set by a condition that reports an empty discovery population **itself**,
-   * better than the dead-glob gate can — see `owns-empty-discovery.ts`.
-   *
-   * Keyed by a module-private symbol, so a user condition cannot set it and
-   * silently exempt itself from the gate. Absent means "the gate covers me",
-   * which is the safe default and the reason this is opt-in.
-   */
-  readonly [OWNS_EMPTY_DISCOVERY]?: true
 }

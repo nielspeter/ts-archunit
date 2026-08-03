@@ -1,7 +1,7 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
-import { OWNS_EMPTY_DISCOVERY } from '../core/owns-empty-discovery.js'
+import { ownsEmptyDiscovery } from '../core/owns-empty-discovery.js'
 import type { PairCondition, PairConditionContext } from '../core/pair-condition.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
 import type { GlobNode } from '../core/glob-site.js'
@@ -231,14 +231,12 @@ export class PairFinalBuilder extends TerminalBuilder {
    * before it was right (bug 0042).
    */
   protected override ownsDiscoveryDiagnosis(): boolean {
-    // `=== true`, not `in`. The key being PRESENT is not the claim — the value is.
-    // `readonly [OWNS_EMPTY_DISCOVERY]?: true` permits `undefined`, so
-    // `{ [OWNS_EMPTY_DISCOVERY]: undefined }` type-checks and `in` returns true for
-    // it. Measured: such a condition got **0** configuration findings on a dead
-    // layer — the gate stood down for a condition that reports nothing, which is
-    // the silence this plan exists to prevent, reachable through a type-legal
-    // object. Found by review of the change that introduced it.
-    return this.condition[OWNS_EMPTY_DISCOVERY] === true
+    // A registry lookup, not a property read. The property form — symbol-keyed on
+    // the condition — was readable off any shipped condition via
+    // `Object.getOwnPropertySymbols` and could be copied onto a user condition that
+    // reports nothing, which measured 0 findings on a dead layer. `WeakSet`
+    // membership cannot be read off the object, so there is nothing to copy.
+    return ownsEmptyDiscovery(this.condition)
   }
 
   protected collectViolations() {

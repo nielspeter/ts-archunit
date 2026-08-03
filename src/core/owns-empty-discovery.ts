@@ -31,13 +31,40 @@
  * agent reading "this glob matched nothing" fixes the glob; silence sends it to
  * write files into a layer that will never match.
  *
- * ## Module-private, by construction
+ * ## Unreachable by construction — a registry, not a property
  *
- * Not re-exported from `src/index.ts`, and `package.json`'s `exports` map has no
- * wildcard subpath, so a consumer cannot import it to name the key. Same
- * reasoning as `ASSERTS_CARDINALITY` in `cardinality.ts`, and the same hazard it
- * closes: `PairCondition` is a public type, so a plain boolean property would be
- * a one-line silent opt-out of a gate, on any user condition, permanently and
- * invisibly (ADR-008 rule 3's corollary).
+ * The first version was a `unique symbol` keyed onto the condition object, copying
+ * `ASSERTS_CARDINALITY`. Review broke it in two lines:
+ *
+ * ```ts
+ * const stolen = Object.getOwnPropertySymbols(haveMatchingCounterpart())[0]
+ * const mine: PairCondition = { description: 'x', evaluate: () => [], [stolen]: true }
+ * ```
+ *
+ * Measured: **0 configuration findings** on a dead layer. `PairCondition` is a
+ * public type and all three condition factories are public exports, so the symbol
+ * was readable off any shipped condition — the one-line silent opt-out this file
+ * claimed could not exist, reachable through documented API.
+ *
+ * The `ASSERTS_CARDINALITY` precedent is stronger than the copy was, and that is
+ * why copying it was not enough: `defineCondition` is its *sanctioned constructor*,
+ * and a test asserts that constructor emits no own symbols. `PairCondition` has no
+ * sanctioned constructor, so there is nothing to make the analogous guarantee.
+ *
+ * A module-level `WeakSet` has no such hole. Membership is not a property of the
+ * object, so it cannot be read off one, copied, or forged — a caller would need
+ * this module's binding, and it is not exported. `WeakSet` rather than `Set` so a
+ * condition is not retained after its rule is discarded.
  */
-export const OWNS_EMPTY_DISCOVERY: unique symbol = Symbol('ts-archunit.ownsEmptyDiscovery')
+const OWNERS = new WeakSet<object>()
+
+/** Declare that this condition reports an empty discovery population itself. */
+export function marksOwnEmptyDiscovery<T extends object>(condition: T): T {
+  OWNERS.add(condition)
+  return condition
+}
+
+/** Does this condition report an empty discovery population itself? */
+export function ownsEmptyDiscovery(condition: object): boolean {
+  return OWNERS.has(condition)
+}
