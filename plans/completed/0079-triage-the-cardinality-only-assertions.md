@@ -285,6 +285,29 @@ shape tells them apart.** The tests here derive identity by walking to the enclo
 `db.query`" is currently inexpressible. Filed as
 [plan 0082](../0082-an-object-literal-callback-keeps-its-name.md) rather than left in a comment.
 
+## The residue the review left, closed in v0.45.5
+
+Five items the testing review raised were not part of the critical fix and were carried past the
+v0.45.4 tag. None was deferred:
+
+- **The ratchet was itself a cardinality-only assertion**, which is the joke this file had coming.
+  `population.length <= CEILING` passes when a new class C arrives and an unrelated block is deleted
+  in the same change — net zero, nobody told. It is now keyed on the **set of contributing files**:
+  file granularity rather than `file:line`, because line numbers shift on unrelated edits and would
+  teach the next author to update the roster without reading it. The total survives as a _band_ in
+  the vacuity row, catching a signal that collapses in either direction. Proved by adding a
+  count-only block to a file that had none while removing one elsewhere: the old form passed, the
+  new form reds and names the file.
+- `glob-declaration.test.ts` asserted `new Set(...).size === 1` — satisfied by four **empty** results,
+  so in isolation it passed on the glob machinery returning nothing. Guarded only by a neighbouring
+  assertion, which is one edit from gone. Now pins the value.
+- `call.test.ts`'s "ignores non-function arguments" claimed more than any assertion over that fixture
+  could show: the condition emits at most one violation per call, so the count cannot distinguish
+  "skipped" from "searched and found nothing". It asserts the outcome by identity now, and the
+  skipping property is covered where it actually lives.
+- The two basename projections are safe today and say why — the `shared/` fixture directory holds no
+  `entity.ts` — with the condition under which they would stop being safe.
+
 ## What this cost, and what it is worth
 
 45 conversions, no behaviour change, one library gap found and one matcher behaviour clarified.
