@@ -1,8 +1,7 @@
 import picomatch from 'picomatch'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
-import type { PairCondition } from '../core/pair-condition.js'
-import type { ConditionContext } from '../core/condition.js'
+import type { PairCondition, PairConditionContext } from '../core/pair-condition.js'
 import type { Layer, LayerPair } from '../models/cross-layer.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
@@ -67,7 +66,7 @@ function computePairs(
  *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('Route', '') === b.getBaseName().replace('Schema', ''))
  *   .forEachPair()
- *   .should(haveMatchingCounterpart(layers))
+ *   .should(haveMatchingCounterpart())
  *   .check()
  */
 export class CrossLayerBuilder {
@@ -212,12 +211,17 @@ export class PairFinalBuilder extends TerminalBuilder {
 
   protected collectViolations() {
     const layerNames = this.layers.map((l) => l.name)
-    const context: ConditionContext = {
+    const context: PairConditionContext = {
       rule: `cross-layer [${layerNames.join(', ')}] should ${this.condition.description}`,
       because: this._reason,
       ruleId: this._metadata?.id,
       suggestion: this._metadata?.suggestion,
       docs: this._metadata?.docs,
+      // The builder's OWN resolved layers (bug 0040). A condition that needs
+      // them no longer has to be handed a copy the caller assembled — which was
+      // impossible to assemble correctly, since `layers` is private here and
+      // `resolveLayer` is not exported.
+      layers: this.layers,
     }
 
     return this.condition.evaluate(this.pairs, context)
@@ -236,7 +240,7 @@ export class PairFinalBuilder extends TerminalBuilder {
  *   .layer('schemas', '**\/src/schemas/**')
  *   .mapping((a, b) => a.getBaseName().replace('-route', '') === b.getBaseName().replace('-schema', ''))
  *   .forEachPair()
- *   .should(haveMatchingCounterpart(layers))
+ *   .should(haveMatchingCounterpart())
  *   .check()
  */
 export function crossLayer(p: ArchProject): CrossLayerBuilder {

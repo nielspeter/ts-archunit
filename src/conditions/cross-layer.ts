@@ -1,5 +1,9 @@
 import type { SourceFile } from 'ts-morph'
 import type { PairCondition } from '../core/pair-condition.js'
+import type { PairConditionContext } from '../core/pair-condition.js'
+// The two siblings below still declare `ConditionContext`, deliberately: method
+// parameters are bivariant, so they satisfy `PairCondition` unchanged. That is
+// the evidence the subtype is additive for an external implementer too.
 import type { ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { LayerPair, Layer } from '../models/cross-layer.js'
@@ -19,12 +23,23 @@ import { UNSUPPRESSABLE } from '../core/unsuppressable.js'
  * mis-globbed layer that enforces nothing, so it now fails (ADR-008) rather
  * than passing vacuously.
  *
- * @param layers - The resolved layers, needed to identify unmatched left files
+ * @param explicitLayers - Optional, and kept only so existing callers compile.
+ *   The builder supplies its own resolved layers through the context, and those
+ *   win — see `PairConditionContext`.
  */
-export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
+export function haveMatchingCounterpart(explicitLayers?: Layer[]): PairCondition {
   return {
     description: 'have a matching counterpart in the paired layer',
-    evaluate(pairs: LayerPair[], context: ConditionContext): ArchViolation[] {
+    evaluate(pairs: LayerPair[], context: PairConditionContext): ArchViolation[] {
+      // The BUILDER's layers by default (bug 0040). The argument is kept, and
+      // optional, so every existing caller still compiles — but the context
+      // wins, because a hand-built array is a second copy of the builder's
+      // resolution and judging the copy is the defect.
+      //
+      // Note the silent semantic change this implies, and it is the fix rather
+      // than a side effect: a caller who deliberately passed a NARROWER array
+      // now gets the builder's. Pinned by a precedence test.
+      const layers = context.layers.length > 0 ? context.layers : (explicitLayers ?? [])
       if (layers.length < 2) return []
 
       const violations: ArchViolation[] = []
@@ -78,25 +93,26 @@ export function haveMatchingCounterpart(layers: Layer[]): PairCondition {
             // argument in this file for rule 2's behavioural corollary: a remedy
             // is a claim, and reading well is not evidence.
             //
-            // The remedy must name WHICH array to edit, and this is the second
-            // wrong version of this sentence rather than the first. "Fix the glob
-            // for layer X" reads as the `.layer()` call, and doing that does not
-            // work: measured, widening the builder's glob to `**/src/**` left the
-            // finding in place, because this condition reads the `Layer[]` the
-            // caller passed and never sees the builder's resolution (bug 0040's
-            // adjacent defect). An agent that follows the obvious reading edits
-            // the wrong line, sees no change, and improvises — which is the
-            // failure rule 2 exists to prevent, and it survived one round of
-            // fixing this very sentence.
+            // **Third** version of this sentence. Each earlier one was wrong, and
+            // each was wrong in a way worth keeping written down:
             //
-            // Pinned by a control that widens the builder glob and asserts the
-            // finding does NOT clear, so the caveat cannot quietly become false
-            // when 0040 lands — it will fail, and whoever lands it rewrites this.
+            //  1. "or remove the layer from the chain" — impossible on a
+            //     two-layer chain, which is the only shape that produces this
+            //     finding. Replaced by the computed clause below.
+            //  2. "in the `Layer[]` passed to this condition" — true only while
+            //     the condition judged a caller-supplied copy. Bug 0040 removed
+            //     that array, so the remedy came to point at something that no
+            //     longer exists.
+            //
+            // Both were bug 0017's shape, and neither was catchable by asserting
+            // the message's content: the guard checked that it named the layer,
+            // which all three versions do. Only applying the fix found them.
+            //
+            // The glob named here IS now the `.layer()` glob, so the remedy names
+            // the call the reader has to edit.
             suggestion:
-              `Fix the glob for layer "${leftLayer.name}" (currently ` +
-              `'${leftLayer.pattern}') in the Layer[] passed to this condition — it reads that ` +
-              `array, not the builder's .layer() call, so editing .layer() alone will not clear ` +
-              `this. It must match at least one file.` +
+              `Fix the .layer("${leftLayer.name}", "${leftLayer.pattern}") glob so it matches at ` +
+              `least one file.` +
               (layers.length >= 3
                 ? ` Or drop the layer: ${String(layers.length - 1)} would remain, still a valid chain.`
                 : ` Dropping the layer is not available here — a chain needs two, and this one has` +

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.42.0] - 2026-08-03
+
+### Fixed
+
+- **`haveMatchingCounterpart` required a `Layer[]` no public API could produce** ([bug 0040](bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md), API half). `PairFinalBuilder`'s layers are private at every stage and `resolveLayer` is not exported, so every caller had to hand-build the array — and the condition then judged **that copy** rather than the builder's resolution. Measured: with the builder's glob dead and a hand-built array populated, it reported two counterpart violations and no configuration finding, describing a layer set the library never resolved.
+
+  The builder now supplies its own resolved layers, so **`haveMatchingCounterpart()` takes no argument**. The optional `Layer[]` parameter is retained for compatibility and ignored when the builder provides them.
+
+- The empty-layer finding's remedy pointed at the array that this change removes. It now names the `.layer("name", "glob")` call — the line you actually edit.
+
+### Changed
+
+- `PairCondition.evaluate` receives a **`PairConditionContext`**, which extends `ConditionContext` with the resolved `layers`. Additive: a condition declaring `ConditionContext` still satisfies `PairCondition`, so `haveConsistentExports`, `satisfyPairCondition` and any condition outside this package compile unchanged.
+
+### Upgrade note
+
+**No action required, and nothing breaks at compile time.** `haveMatchingCounterpart(layers)` still compiles; you can drop the argument whenever convenient.
+
+One behaviour change worth knowing if you hand-built the array deliberately: **the builder's layers now win.** If you passed a deliberately _narrower_ set, the condition now uses what the builder resolved. That is the fix — the hand-built copy was the defect — but it is silent, so check any call site where the array was not simply mirroring your `.layer()` declarations.
+
+The remaining half of bug 0040 — two of three cross-layer conditions reporting nothing when a layer resolves to nothing — is [plan 0080](plans/0080-admit-discovery-globs-to-the-dead-glob-gate.md). A design review measured that the obvious one-line fix would make the dead-glob gate **replace** the slice builders' own findings rather than add to them, costing 13 tests of a remedy corpus whose subject is that each branch's advice is true. It is not shipping until that is solved properly.
+
 ## [0.41.0] - 2026-08-01
 
 ### Fixed

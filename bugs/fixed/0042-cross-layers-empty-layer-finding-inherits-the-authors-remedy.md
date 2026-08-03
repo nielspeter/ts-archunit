@@ -98,7 +98,7 @@ anything about its fields.
 
 - [Bug 0021](./0021-a-config-finding-prints-the-rule-authors-unrelated-remedy.md) — the
   original, and the source of the two-direction test shape.
-- [Bug 0040](../0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — a
+- [Bug 0040](./0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md) — a
   different defect in the same block: two sibling conditions have no empty-layer guard at all.
 - [Plan 0078](../../plans/0078-derive-the-configuration-finding-census.md) — the census that would
   have found this, and whose Phase 2 must assert correctness rather than presence.
@@ -128,7 +128,7 @@ because `toBeTruthy()` passes on the defect:
 - vacuity — the empty layer actually produces the finding.
 
 The fixture hand-builds `Layer[]` because `haveMatchingCounterpart` takes it as an argument
-(the adjacent defect in [bug 0040](../0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)).
+(the adjacent defect in [bug 0040](./0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)).
 Passing `[]` would switch the condition off at `if (layers.length < 2) return []` and make every
 assertion vacuous — which is exactly the trap 0040 was originally filed on.
 
@@ -187,7 +187,7 @@ experiment rather than a principle.
 This bug is **left-layer only**. The loop at `cross-layer.ts:33` inspects `layers[i]` and never
 `layers[i+1]`, so an empty **final** layer is not emptiness-checked at all and reports a
 confidently wrong cause instead. That is
-[bug 0040](../0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)'s
+[bug 0040](./0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)'s
 "missing case" section, not this one.
 
 ## Supersession

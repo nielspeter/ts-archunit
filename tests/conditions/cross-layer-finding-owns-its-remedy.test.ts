@@ -27,7 +27,7 @@ import { describe, expect, it } from 'vitest'
 import { Project } from 'ts-morph'
 import { crossLayer } from '../../src/builders/cross-layer-builder.js'
 import { haveMatchingCounterpart } from '../../src/conditions/cross-layer.js'
-import type { Layer, LayerPair } from '../../src/models/cross-layer.js'
+import type { LayerPair } from '../../src/models/cross-layer.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import type { RuleMetadata } from '../../src/core/rule-metadata.js'
@@ -48,47 +48,45 @@ const AUTHOR: RuleMetadata = {
 }
 
 /**
- * `haveMatchingCounterpart` takes the resolved layers as an argument rather than
- * reading them from the builder — a defect in its own right, filed as the
- * "adjacent defect" section of
- * [bug 0040](../../bugs/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md).
- * Here it is convenient: it lets the fixture state the empty layer directly.
+ * The empty layer now comes from a **dead builder glob**, because there is no
+ * caller-supplied array left to rig — [bug 0040](../../bugs/fixed/0040-a-crosslayer-rule-reports-nothing-when-its-layer-resolves-nothing.md)
+ * made the builder pass its own resolved layers.
  *
- * Passing `[]` would NOT work — the condition opens with
- * `if (layers.length < 2) return []`, so an empty array switches it off and every
- * assertion below would pass over nothing. That is the vacuous measurement bug
- * 0040 was originally filed on.
+ * That is why this file was rewritten rather than adjusted: every fixture used to
+ * hand-build a `Layer[]` with an empty entry, and the whole point of 0040 is that
+ * such an array is no longer consulted. A test that kept doing it would assert
+ * over a value the library ignores.
  */
-function layers(project: ArchProject, ghostIsEmpty: boolean): Layer[] {
-  const files = project.getSourceFiles().filter((f) => f.getFilePath().includes('/src/schemas/'))
-  const left = project.getSourceFiles().filter((f) => f.getFilePath().includes('/src/routes/'))
-  return [
-    { name: 'ghost', pattern: '**/src/routes/**', files: ghostIsEmpty ? [] : left },
-    { name: 'schemas', pattern: '**/src/schemas/**', files },
-  ]
-}
-
-/** A rule whose left layer resolves nothing — the configuration finding. */
 function emptyLeftLayer(meta?: RuleMetadata): ArchViolation[] {
-  const project = load()
-  const builder = crossLayer(project)
-    .layer('ghost', '**/src/routes/**')
+  const builder = crossLayer(load())
+    .layer('ghost', '**/src/nowhere-at-all/**')
     .layer('schemas', '**/src/schemas/**')
     .mapping(() => true)
     .forEachPair()
-    .should(haveMatchingCounterpart(layers(project, true)))
+    .should(haveMatchingCounterpart())
   return (meta ? builder.rule(meta) : builder).violations()
+}
+
+/** A three-layer chain whose FIRST layer is dead, for the removal clause. */
+function emptyLeftLayerOfThree(): ArchViolation[] {
+  return crossLayer(load())
+    .layer('ghost', '**/src/nowhere-at-all/**')
+    .layer('schemas', '**/src/schemas/**')
+    .layer('sdk', '**/src/sdk/**')
+    .mapping(() => true)
+    .forEachPair()
+    .should(haveMatchingCounterpart())
+    .violations()
 }
 
 /** Both layers resolve and nothing pairs — so every finding is a real violation. */
 function bothLayersResolve(meta: RuleMetadata): ArchViolation[] {
-  const project = load()
-  return crossLayer(project)
-    .layer('ghost', '**/src/routes/**')
+  return crossLayer(load())
+    .layer('routes', '**/src/routes/**')
     .layer('schemas', '**/src/schemas/**')
     .mapping(() => false)
     .forEachPair()
-    .should(haveMatchingCounterpart(layers(project, false)))
+    .should(haveMatchingCounterpart())
     .rule(meta)
     .violations()
 }
@@ -133,78 +131,72 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
     }
   })
 
-  it('the remedy remediates the clause it states, and states no clause it cannot', () => {
-    // Rule 2's behavioural corollary, on the text this fix exists to correct.
-    // The FIRST version of this remedy said "or remove the layer from the chain",
-    // which throws `RangeError` on a two-layer chain — the only shape that can
-    // produce the finding. Bug 0017 by juxtaposition, in the fix for bug 0017.
-    const two = emptyLeftLayer().filter((v) => v.bypassFilters === true)
-    expect(two.length).toBeGreaterThan(0)
-    for (const f of two) {
-      expect(f.suggestion).toContain('Dropping the layer is not available here')
-      // Names the array to edit, not just "the glob" — see the control below.
-      expect(f.suggestion).toContain('Layer[] passed to this condition')
-      expect(f.suggestion).not.toContain('Or drop the layer')
-      // It names the glob, so "fix the glob" says WHICH glob.
-      expect(f.suggestion).toContain('**/src/routes/**')
-      // Rule 3: it says there is no escape hatch.
-      expect(f.suggestion).toContain('cannot be suppressed')
-    }
+  it('the remedy remediates: fixing the .layer() glob clears the finding', () => {
+    // Rule 2's behavioural corollary, and the row that 0040 inverted. Before it,
+    // widening the builder's glob did NOT clear this finding — the condition read
+    // a caller-supplied array — and a control here asserted that, deliberately, so
+    // that landing 0040 would break it. It did. This is its replacement.
+    const before = emptyLeftLayer().filter((v) => v.bypassFilters === true)
+    expect(before).toHaveLength(1)
+    expect(before[0]?.suggestion).toContain('.layer("ghost"')
 
-    // CONTROL — the caveat is load-bearing, so it is pinned. Widening the
-    // BUILDER's glob, the obvious reading of "fix the glob", does NOT clear the
-    // finding: this condition reads the caller's Layer[] and never sees the
-    // builder's resolution. Measured. When bug 0040 makes the builder pass its
-    // own layers, this row fails and forces the remedy text to be rewritten.
-    const project = load()
-    const schemas = project
-      .getSourceFiles()
-      .filter((f) => f.getFilePath().includes('/src/schemas/'))
-    const builderWidened = crossLayer(project)
-      .layer('ghost', '**/src/**')
+    const after = crossLayer(load())
+      .layer('ghost', '**/src/routes/**') // the glob, corrected
       .layer('schemas', '**/src/schemas/**')
       .mapping(() => true)
       .forEachPair()
-      .should(
-        haveMatchingCounterpart([
-          { name: 'ghost', pattern: '**/src/**', files: [] },
-          { name: 'schemas', pattern: '**/src/schemas/**', files: schemas },
-        ]),
-      )
+      .should(haveMatchingCounterpart())
       .violations()
-    expect(builderWidened.filter((v) => v.bypassFilters === true)).toHaveLength(1)
+    expect(after.filter((v) => v.bypassFilters === true)).toHaveLength(0)
+  })
 
-    // Applying the clause the remedy actually names clears it — measured, not read.
-    const widened = crossLayer(load())
-      .layer('ghost', '**/src/routes/**')
-      .layer('schemas', '**/src/schemas/**')
-      .mapping(() => true)
-      .forEachPair()
-      .should(haveMatchingCounterpart(layers(load(), false)))
-      .violations()
-    expect(widened.filter((v) => v.bypassFilters === true)).toHaveLength(0)
+  it('the remedy names the .layer() call, not an array the caller cannot build', () => {
+    // Promoted to its own `it()` on review: it used to sit at the end of the
+    // block above, which died on an earlier assertion and never reached it. A
+    // control that cannot execute is not a control.
+    const findings = emptyLeftLayer().filter((v) => v.bypassFilters === true)
+    expect(findings).toHaveLength(1)
+    const suggestion = findings[0]?.suggestion ?? ''
+    expect(suggestion).toContain('.layer("ghost", "**/src/nowhere-at-all/**")')
+    expect(suggestion).not.toContain('Layer[] passed to this condition')
+    expect(suggestion).toContain('Dropping the layer is not available here')
+    expect(suggestion).toContain('cannot be suppressed')
   })
 
   it('a three-layer chain offers the removal clause, because there it is true', () => {
     // The other half of the computed remedy. Drop one of three and two remain,
     // which `.mapping()` accepts — so here the clause is real and is offered.
-    const project = load()
-    const three = [
-      ...layers(project, true),
-      { name: 'sdk', pattern: '**/src/sdk/**', files: [] as never[] },
-    ]
-    const findings = crossLayer(project)
-      .layer('ghost', '**/src/routes/**')
-      .layer('schemas', '**/src/schemas/**')
-      .layer('sdk', '**/src/sdk/**')
-      .mapping(() => true)
-      .forEachPair()
-      .should(haveMatchingCounterpart(three))
-      .violations()
-      .filter((v) => v.bypassFilters === true)
+    const findings = emptyLeftLayerOfThree().filter((v) => v.bypassFilters === true)
 
     expect(findings.length).toBeGreaterThan(0)
     expect(findings[0]?.suggestion).toContain('Or drop the layer: 2 would remain')
+  })
+
+  it('the context wins over an explicit argument, and that is the silent change', () => {
+    // Bug 0040's one behavioural change to an existing caller, pinned because it
+    // is silent: someone who deliberately passed a NARROWER `Layer[]` now gets
+    // the builder's instead. That is the fix — the hand-built copy was the defect
+    // — but nothing else would notice if the precedence flipped back.
+    const project = load()
+    const schemas = project
+      .getSourceFiles()
+      .filter((f) => f.getFilePath().includes('/src/schemas/'))
+    // An explicit array claiming BOTH layers are populated…
+    const explicit = [
+      { name: 'ghost', pattern: '**/src/nowhere-at-all/**', files: schemas },
+      { name: 'schemas', pattern: '**/src/schemas/**', files: schemas },
+    ]
+    // …while the builder's own `ghost` glob resolves nothing.
+    const findings = crossLayer(project)
+      .layer('ghost', '**/src/nowhere-at-all/**')
+      .layer('schemas', '**/src/schemas/**')
+      .mapping(() => true)
+      .forEachPair()
+      .should(haveMatchingCounterpart(explicit))
+      .violations()
+
+    // The builder's truth wins: the layer is empty and it is reported.
+    expect(findings.filter((v) => v.bypassFilters === true)).toHaveLength(1)
   })
 
   it('CONTROL: a real violation of the same rule still inherits all four', () => {
@@ -229,15 +221,25 @@ describe('an empty-layer finding carries its own remedy (bug 0042)', () => {
     // violation. The CONTROL above therefore tested the pipeline, not this file —
     // in the file whose subject is producer-side discipline. Call the condition
     // directly so nothing can backfill.
+    // Layers arrive through the CONTEXT now, which is the interface a builder
+    // uses — so calling the condition directly still exercises the real path
+    // rather than the argument 0040 deprecated.
     const project = load()
-    const ls = layers(project, false)
+    const routes = project.getSourceFiles().filter((f) => f.getFilePath().includes('/src/routes/'))
+    const schemas = project
+      .getSourceFiles()
+      .filter((f) => f.getFilePath().includes('/src/schemas/'))
     const pairs: LayerPair[] = []
-    const direct = haveMatchingCounterpart(ls).evaluate(pairs, {
+    const direct = haveMatchingCounterpart().evaluate(pairs, {
       rule: 'r',
       ruleId: AUTHOR.id,
       because: AUTHOR.because,
       suggestion: AUTHOR.suggestion,
       docs: AUTHOR.docs,
+      layers: [
+        { name: 'routes', pattern: '**/src/routes/**', files: routes },
+        { name: 'schemas', pattern: '**/src/schemas/**', files: schemas },
+      ],
     })
     const real = direct.filter((v) => v.bypassFilters !== true)
     expect(real.length).toBeGreaterThan(0)

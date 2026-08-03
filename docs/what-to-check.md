@@ -495,7 +495,7 @@ crossLayer(p)
   )
   .forEachPair()
   .should()
-  .should(haveMatchingCounterpart(layers))
+  .should(haveMatchingCounterpart())
   .check()
 ```
 
