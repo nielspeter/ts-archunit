@@ -11,7 +11,11 @@ export interface ImportOptions {
    * Type-only imports are erased at compile time and create no runtime dependency.
    * Useful for layer isolation rules where type-sharing is acceptable.
    *
-   * Default: false (all imports checked, for backward compatibility).
+   * Default: **per condition.** `false` — count every import — for `dependOn`,
+   * `importFrom`, `notImportFrom`, `onlyImportFrom`, `notDependOn` and
+   * `respectLayerOrder`, which ask whether the code is *coupled*. `true` for
+   * `beFreeOfCycles`, which asks whether the module is *evaluated*: an erased import
+   * cannot contribute to an initialization cycle. See `docs/slices.md`.
    */
   ignoreTypeImports?: boolean
 }

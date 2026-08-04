@@ -325,10 +325,18 @@ const COMMENT_LINE_START = String.raw`(?:^|\n)[ \t]*(?:\/\/+|\/\*+|\*+)?[ \t]*`
  * price of not matching "the todo list below", and it is the right trade for a
  * rule whose findings must fail a build.
  *
- * The phrase forms stay case-insensitive — nobody writes "NOT IMPLEMENTED" — but
- * are anchored too, because unanchored they matched `noStubComments()`'s own
- * docstring, which lists them. That is bug 0043's shape: documentation of a syntax
- * read as the syntax.
+ * The phrase forms are anchored too, because unanchored they matched
+ * `noStubComments()`'s own docstring, which lists them. That is bug 0043's shape:
+ * documentation of a syntax read as the syntax.
+ *
+ * **The phrase forms are NOT case-insensitive, and this text claimed they were until
+ * v0.49.1.** The `i` flag was dropped for the whole expression and only the initial
+ * letters are alternated (`[Nn]ot\s+[Ii]mplemented`), so `// NOT IMPLEMENTED` and
+ * `// COMING SOON` do **not** match — measured. The reasoning offered for the claim was
+ * "nobody writes NOT IMPLEMENTED", which is the one casing the marker branch would
+ * otherwise have caught. A false negative on a build-failing rule, so nothing tells the
+ * reader; filed as a bug rather than patched here, because widening the pattern is a
+ * behaviour change that needs its own tests and sabotage.
  */
 export const STUB_PATTERNS = new RegExp(
   [

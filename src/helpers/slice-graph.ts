@@ -94,12 +94,12 @@ export type ErasureQuestion = 'module-request' | 'type-bindings'
  * `ignoreTypeImports` drops the erased edges. A type-only import or re-export creates
  * no runtime dependency, so counting it invents cycles that cannot exist at runtime —
  *
- * **with one measured exception, tracked by
- * [plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md).**
- * Under `verbatimModuleSyntax: true`, `import { type X } from 's'` emits
- * `import {} from 's'` — the specifiers are erased, the module request is not — so it
- * is an eager edge that this filter currently drops. `edgesOf` cannot express the
- * difference yet: `typeOnly` conflates "erased bindings" with "erased statement".
+ * Which erasure the filter reads depends on the `question`: `'module-request'` reads
+ * `erasesModuleRequest`, `'type-bindings'` reads `typeOnly`. Those differ for two
+ * spellings under `verbatimModuleSyntax: true` — `import { type X } from 's'` emits
+ * `import {} from 's'`, so the specifiers are erased and the module request is not
+ * ([plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md),
+ * shipped in v0.49.0; this paragraph described it as unshipped until v0.49.1).
  *
  * [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md),
  * which is worth remembering for what it cost: this repo's own `arch/no-cycles` rule

@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.49.1] - 2026-08-04
+
+Everything here came out of a five-persona review of v0.47.0–v0.49.0. No behaviour changed; **14 shipped
+statements did**, because they described behaviour the last three releases replaced. Every claim below was
+reproduced by measurement before being acted on.
+
+### Fixed
+
+- **Two presets told you, inside the failing finding, that the finding was impossible.**
+  `preset/layered/no-cycles` and `preset/boundaries/no-cycles` carried, as their `because` text,
+  _"a cycle formed by `export … from` (a barrel) is not detected"_. `because` is printed as the `Why:` line
+  on every finding — so a user whose build reddened on a newly-detected barrel cycle read, attached to that
+  finding and located on the `export … from` line, that barrel cycles are not detected. v0.48.0 made that
+  false and updated `docs/` only.
+
+  A third copy sat in `beFreeOfCycles`' own docstring — the one a reader hovers when the rule fails — and it
+  argued for its own currency: _"Recorded here because this docstring is read when the rule fails, and a
+  changelog is read once."_ The changelog was updated; it was not.
+
+- **`{ ignoreTypeImports: false }` was documented as "the old graph" in five places.** It is not, from
+  v0.48.0 onward: it counts type-only edges, and re-exports are counted regardless, so type edges **plus**
+  re-export edges is a **wider** graph than v0.46 ever had. Anyone reaching for it to buy migration time got
+  _more_ findings than they started with. The docs now say what it does and point at `.asSeverity('warn')`
+  or a baseline for holding still.
+
+- **Four statements scoped `noStubComments()` to function bodies**, which v0.47.0 widened to a function's
+  leading docstring — including `docs/standard-rules.md`'s explicit _"comments above a function are not
+  checked"_. That page also recommended `/\b(TODO|FIXME)\b/i` as the way to narrow scope: the unanchored,
+  case-insensitive shape whose false positives v0.47.0 was filed to remove.
+
+- **`ImportOptions.ignoreTypeImports` claimed "Default: false"** in the JSDoc that is the IDE tooltip on the
+  shared options bag. The default is per condition, and now says so.
+
+- **A docstring claimed the stub phrase forms "stay case-insensitive".** They do not — measured,
+  `// NOT IMPLEMENTED` and `// COMING SOON` do not match. Corrected here and filed as
+  [bug 0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md) rather than patched, because widening a
+  pattern is a behaviour change that needs its own tests and migration.
+
+- **`docs/slices.md` documented cycle output that has never existed** — a per-edge listing, aspirational
+  since v0.1.0. It now shows the real output and labels the difference, because the fictional version is
+  precisely what would make a barrel cycle diagnosable and is the target of
+  [plan 0088](plans/0088-a-slice-finding-identifies-itself.md).
+
+- Smaller: `slice-graph.ts` described v0.49.0's fix as unshipped; a docstring cited
+  `tests/core/module-edges-erasure.test.ts`, which does not exist; a cross-reference used a guessed
+  VitePress slug and is now an explicit `{#id}`; a pointer said "the section below" about a section above;
+  `rules/hygiene.ts` and `docs/api-reference.md` scoped the stub rule to bodies; and the two
+  `verbatim-module-syntax` fixtures carried a comment asserting `verbatimModuleSyntax: true` in the fixture
+  whose purpose is `false` — forced by the byte-identity guard that makes the pair work, and a trap for
+  anyone who "corrects" the tsconfig to match.
+
+### Added
+
+- **`tests/presets/cycle-claims-match-behaviour.test.ts`** — nothing pinned prose against behaviour, which
+  is why a release whose entire subject was this behaviour shipped three statements contradicting it. Two
+  rows assert the presets really do detect a barrel cycle (both red when `reexport` is dropped from the edge
+  kinds, verified by sabotage); one scans `src/` for a non-detection phrase near a re-export term. The
+  proximity window is load-bearing: a bare "cannot see" scan flagged four files that say nothing about
+  re-exports, which is the unactionable-detector shape
+  [plan 0086](plans/0086-a-remedy-that-names-the-folder-it-selects.md) exists to avoid.
+
+### Internal
+
+Eight bugs and four plans filed, none of them deferred silently. The behavioural findings, all measured:
+
+- [0055](bugs/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — a cycle finding prints an SCC as a
+  path, so on a ring `a→b→c→d→a` it reports `a -> d -> c -> b -> a` at `unknown:0`. On our own source two of
+  four arrows are fabricated and the closing edge is never named.
+- [0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — reordering two imports reds CI
+  and blames a rename; and an SCC absorbs _new_ intra-component edges without changing its name, so a new
+  cycle among four of our six gated slices is silently accepted.
+- [0058](bugs/0058-workspace-applies-one-packages-compiler-flag-to-all.md) — `workspace()` applies one
+  package's `verbatimModuleSyntax` to every package, wrong in both directions, decided by a path sort.
+- [0060](bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — v0.47.0 moved every
+  baselined stub finding's hash, and the diagnostic blames the repository root.
+- [0059](bugs/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
+  [0057](bugs/0057-an-empty-options-object-reverts-a-documented-default.md),
+  [0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md),
+  [0062](bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md).
+
+Two hypotheses of mine were **refuted** by review, and the corrections are worth recording: a tag
+**cannot** publish a failing commit (`publish.yml` runs the full suite before `npm publish`, and
+`prepublishOnly` runs it again), and the edge cache is **not** stale after a compiler-option change
+(`compilerOptions.set()` triggers a reparse which fires `onModified`). The real pipeline gaps are narrower
+and are in bug 0062.
+
 ## [0.49.0] - 2026-08-04
 
 `ModuleEdge.typeOnly` was answering two questions at once, and measurement showed they are different
@@ -156,7 +242,7 @@ Four gates that could not fail, found by pointing our own library at ourselves
 - **The stub rule matched prose _about_ stubs, including its own documentation** — latent until the fix
   above let the rule read docstrings, where prose lives, at which point it fired on five places in our
   own source, none of them a stub. Markers must now begin a comment line and are **case-sensitive**;
-  the phrase forms ("not implemented yet") stay case-insensitive but are anchored the same way. Stated
+  the phrase forms ("not implemented yet") are anchored the same way. Stated
   limit: a lowercase `// todo: x` is no longer matched, which is the price of not matching "the todo
   list below". ([bug 0053](bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md))
 

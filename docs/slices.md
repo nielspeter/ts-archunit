@@ -147,7 +147,7 @@ module" is not something you do about an `import type`.
 
 ```typescript
 .beFreeOfCycles()                            // default: ignoreTypeImports: true
-.beFreeOfCycles({ ignoreTypeImports: false }) // pre-0.47 behaviour: type edges count
+.beFreeOfCycles({ ignoreTypeImports: false }) // count type-only edges too
 ```
 
 ::: tip Why this default differs from `notDependOn()` and `dependOn()`
@@ -184,8 +184,14 @@ either way, and coupling is what they measure.
 disappeared were type-only and were never runtime cycles. If you keep a baseline, note that a cycle's
 identity is its **member list** — so a cycle that merely got _narrower_ (a slice joined to it only by
 type edges is no longer a member) changes identity, and the entry stops matching rather than moving.
-Regenerate the baseline, or pass `{ ignoreTypeImports: false }` to keep the old graph while you
-migrate.
+Regenerate the baseline.
+
+::: danger `{ ignoreTypeImports: false }` is not a way back
+This page said it was, until v0.49.1. It counts type-only edges — but since v0.48.0 re-exports are
+counted as well, so type edges **plus** re-export edges is a **wider** graph than v0.46.1 ever had.
+Someone reaching for it to buy migration time gets _more_ findings than they started with. To hold
+still while you migrate, use `.asSeverity('warn')` or a baseline, not this option.
+:::
 
 ```typescript
 slices(p)
@@ -200,22 +206,34 @@ slices(p)
   .check()
 ```
 
-When a cycle is detected, the violation message shows the cycle path:
+When a cycle is detected, the finding names the slices involved:
 
 ```
 Architecture Violation [arch/no-feature-cycles]
 
   Cycle detected: billing -> notifications -> billing
-  billing imports notifications at src/features/billing/service.ts:5
-  notifications imports billing at src/features/notifications/handler.ts:12
+  src/features/billing/service.ts:5 — [billing, notifications]
 ```
+
+::: warning Read the arrows as a member list, not a path
+This page showed a per-edge listing until v0.49.1 — two extra lines naming each edge and its
+location. **That output has never existed**; it was aspirational documentation from v0.1.0.
+
+What the arrows actually contain is the strongly-connected component's **members**, not a traversal.
+For a two-slice cycle that reads correctly. For three or more it does not: the order is an artefact
+of the cycle-detection algorithm, so the arrows can name pairs that are not edges at all, and the
+reported location may be an import that is perfectly legal — or missing entirely. Treat the list as
+"these slices are mutually entangled" and find the offending edge yourself.
+
+Being fixed; the per-edge output above is what it should say.
+:::
 
 ### `respectLayerOrder(...layers)` · `respectLayerOrder(layers, options)`
 
 Asserts that dependencies between slices follow the declared order. The first layer may depend on the second, the second on the third, and so on -- but not in reverse.
 
 Takes `ImportOptions` in the two-argument form. **Type-only edges count by default** — see
-[the note under `notDependOn`](#notdependon-slice-notdependon-slices-options) for why that differs
+[the note under `notDependOn`](#notdependon-options) for why that differs
 from `beFreeOfCycles()`.
 
 ```typescript
@@ -242,7 +260,7 @@ This means:
 - `repositories` may import from `domain`
 - `domain` may not import from any of the above
 
-### `notDependOn(...slices)` · `notDependOn(slices, options)`
+### `notDependOn(...slices)` · `notDependOn(slices, options)` {#notdependon-options}
 
 Asserts that no slice depends on any of the named slices.
 
@@ -260,7 +278,7 @@ matching `dependOn()` and `notImportFrom()`.
 
 Since v0.49.0 the difference is not only the default — it is the **question**. `beFreeOfCycles()` asks
 "is the target module evaluated"; the other two ask "are the bindings type-level". Those answers differ
-for two spellings under `verbatimModuleSyntax`, and the section below has the table.
+for two spellings under `verbatimModuleSyntax`; the table is in the `beFreeOfCycles()` section above.
 
 Pass `{ ignoreTypeImports: true }` to disagree:
 

@@ -288,7 +288,14 @@ modules(p).that().resideInFolder('**/src/**').should().satisfy(noUnusedExports()
 
 ### Stub detection
 
-`noStubComments()` catches common stub markers inside function bodies: TODO, FIXME, HACK, XXX, STUB, DEFERRED, PLACEHOLDER, "not implemented", "coming soon". Pass a custom regex to narrow the scope:
+`noStubComments()` catches common stub markers in a function's body **and in its own leading docstring** (since v0.47.0): TODO, FIXME, HACK, XXX, STUB, DEFERRED, PLACEHOLDER, "not implemented", "coming soon".
+
+Two constraints on the default pattern, both deliberate and both able to surprise you:
+
+- **A marker must begin a comment line** — past any `//`, `/*` or `*`. `// TODO: x` matches; "replaced the TODO with a real rule" does not. Without this the rule fired on prose _about_ markers, including its own documentation.
+- **Markers are case-SENSITIVE.** `// TODO` matches, `// todo:` does **not**. Uppercase is the convention and the casing is what separates a marker from the English word. The phrase forms ("not implemented", "coming soon") are matched with a capitalised or lowercase initial only — `// NOT IMPLEMENTED` is currently missed, which is a known defect rather than a design choice.
+
+Pass a custom regex to narrow the scope:
 
 ```typescript
 // Default — catches all common markers
@@ -299,11 +306,19 @@ functions(p)
   .that()
   .resideInFolder('**/src/**')
   .should()
-  .satisfy(noStubComments(/\b(TODO|FIXME)\b/i))
+  .satisfy(noStubComments(/(?:^|\n)[ \t]*(?:\/\/+|\/\*+|\*+)?[ \t]*(TODO|FIXME)\b/))
   .check()
 ```
 
-Note: comments _above_ a function (leading trivia) are not checked — only comments _inside_ the function body.
+::: warning A custom pattern loses the anchoring
+The example above keeps the line-start anchor deliberately. A bare `/\b(TODO|FIXME)\b/i` — which this
+page recommended until v0.49.1 — matches prose that merely _mentions_ a marker, including your own
+documentation of the rule. That is the false positive the default pattern was rebuilt to remove.
+:::
+
+Note: since v0.47.0 a comment _above_ a function (its leading docstring) **is** checked, as well as
+comments inside the body. Before that only the body was searched, which missed both `// TODO` and
+`/** TODO */` in the two placements people actually write.
 
 ### Empty body detection
 

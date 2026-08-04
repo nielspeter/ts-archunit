@@ -171,7 +171,7 @@ export function layeredArchitecture(
       {
         id: 'preset/layered/no-cycles',
         because:
-          'layers in a cycle have no order, so the layering they are declared with means nothing. Note the cycle check sees static `import` declarations only: a cycle formed by `export … from` (a barrel) is not detected, while the layer rules in this same preset do see it.',
+          'layers in a cycle have no order, so the layering they are declared with means nothing. Since v0.48.0 a cycle formed by `export … from` (a barrel) IS detected; dynamic `import()` still is not, deliberately, because it is lazy and is usually the fix rather than the fault.',
         suggestion:
           'Break the cycle at its weakest edge: move the shared type into the inner layer, or invert one direction with an interface.',
         imperative: 'Do NOT create an import cycle between layers',

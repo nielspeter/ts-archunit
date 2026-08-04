@@ -199,7 +199,9 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * @param options - `ignoreTypeImports` defaults to **true**: a type-only import
    *   is erased at compile time and creates no runtime dependency, so counting it
    *   as a cycle edge reports cycles that cannot exist (plan 0084). Pass
-   *   `{ ignoreTypeImports: false }` for the pre-0.47 behaviour.
+   *   `{ ignoreTypeImports: false }` to count type-only edges too.
+   *   NOT a way back to the pre-0.47 graph: since v0.48.0 re-exports are counted as
+   *   well, so type edges plus re-export edges is WIDER than 0.46.1 ever was.
    */
   beFreeOfCycles(options?: ImportOptions): this {
     const next = this.copy()
