@@ -16,6 +16,7 @@ import {
   matchingGlobPattern,
 } from '../models/slice.js'
 import type { ImportOptions } from '../core/import-options.js'
+import { splitGlobArgs } from '../core/import-options.js'
 import {
   beFreeOfCycles as beFreeOfCyclesCondition,
   respectLayerOrder as respectLayerOrderCondition,
@@ -212,20 +213,48 @@ export class SliceRuleBuilder extends TerminalBuilder {
    *
    * @param layers - Ordered layer names from highest to lowest
    */
-  respectLayerOrder(...layers: string[]): this {
+  respectLayerOrder(layers: string[], options: ImportOptions): this
+  respectLayerOrder(...layers: string[]): this
+  respectLayerOrder(...args: [string[], ImportOptions] | string[]): this {
+    // Split and re-dispatch rather than spreading `args` straight through: TypeScript
+    // cannot match a tuple-union spread to an overload, and ADR-005 bars the `as` that
+    // would force it. `splitGlobArgs` exists for exactly this (it removed ten casts).
+    const { globs: layers, options } = splitGlobArgs(args)
     const next = this.copy()
-    next._conditions.push(respectLayerOrderCondition(...layers))
+    next._conditions.push(
+      options === undefined
+        ? respectLayerOrderCondition(...layers)
+        : respectLayerOrderCondition(layers, options),
+    )
     return next
   }
 
   /**
    * Assert that no slice depends on any of the listed slices.
    *
-   * @param sliceNames - Names of forbidden dependency targets
+   * **Type-only edges COUNT by default here**, unlike `beFreeOfCycles()`. It looks
+   * inconsistent and it is deliberate: a cycle is about runtime module-initialization
+   * order, so an erased edge cannot contribute to one — but isolation is about
+   * *coupling*, and a type-only dependency on `legacy` is still a dependency on
+   * `legacy` that breaks when `legacy` is deleted. This matches `dependOn` and
+   * `notImportFrom` as shipped. Pass `{ ignoreTypeImports: true }` to disagree.
+   *
+   * @param args - Forbidden slice names, or `(names[], options)`
+   *
+   * @example
+   * .should().notDependOn('legacy', 'deprecated')
+   * .should().notDependOn(['legacy'], { ignoreTypeImports: true })
    */
-  notDependOn(...sliceNames: string[]): this {
+  notDependOn(sliceNames: string[], options: ImportOptions): this
+  notDependOn(...sliceNames: string[]): this
+  notDependOn(...args: [string[], ImportOptions] | string[]): this {
+    const { globs: sliceNames, options } = splitGlobArgs(args)
     const next = this.copy()
-    next._conditions.push(notDependOnCondition(...sliceNames))
+    next._conditions.push(
+      options === undefined
+        ? notDependOnCondition(...sliceNames)
+        : notDependOnCondition(sliceNames, options),
+    )
     return next
   }
 

@@ -2,6 +2,7 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Slice } from '../models/slice.js'
 import type { ImportOptions } from '../core/import-options.js'
+import { splitGlobArgs } from '../core/import-options.js'
 import {
   buildSliceDependencyGraph,
   buildFileToSliceMap,
@@ -102,7 +103,7 @@ export function beFreeOfCycles(
         // Find one concrete file causing the cycle for the violation location
         const fromSlice = cycleNames[0] ?? ''
         const toSlice = cycleNames[1] ?? fromSlice
-        const details = findSliceDependencyDetails(slices, fromSlice, toSlice, fileToSlice)
+        const details = findSliceDependencyDetails(slices, fromSlice, toSlice, fileToSlice, options)
         const firstDetail = details[0]
 
         violations.push({
@@ -137,12 +138,15 @@ export function beFreeOfCycles(
  *   .should().respectLayerOrder('presentation', 'application', 'persistence', 'domain')
  *   .check()
  */
-export function respectLayerOrder(...layers: string[]): Condition<Slice> {
+export function respectLayerOrder(layers: string[], options: ImportOptions): Condition<Slice>
+export function respectLayerOrder(...layers: string[]): Condition<Slice>
+export function respectLayerOrder(...args: [string[], ImportOptions] | string[]): Condition<Slice> {
+  const { globs: layers, options } = splitGlobArgs(args)
   return {
     description: `respect layer order [${layers.join(' -> ')}]`,
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
       const fileToSlice = buildFileToSliceMap(slices)
-      const edges = buildSliceDependencyGraph(slices, fileToSlice)
+      const edges = buildSliceDependencyGraph(slices, fileToSlice, options)
 
       // Map layer names to their position (lower index = higher layer)
       const layerIndex = new Map(layers.map((name, i) => [name, i]))
@@ -158,7 +162,13 @@ export function respectLayerOrder(...layers: string[]): Condition<Slice> {
 
         // Violation: depending on a higher layer (lower index)
         if (toIdx < fromIdx) {
-          const details = findSliceDependencyDetails(slices, edge.from, edge.to, fileToSlice)
+          const details = findSliceDependencyDetails(
+            slices,
+            edge.from,
+            edge.to,
+            fileToSlice,
+            options,
+          )
           for (const detail of details) {
             violations.push({
               rule: context.rule,
@@ -190,19 +200,28 @@ export function respectLayerOrder(...layers: string[]): Condition<Slice> {
  *   .should().notDependOn('legacy', 'deprecated')
  *   .check()
  */
-export function notDependOn(...forbiddenSlices: string[]): Condition<Slice> {
+export function notDependOn(forbiddenSlices: string[], options: ImportOptions): Condition<Slice>
+export function notDependOn(...forbiddenSlices: string[]): Condition<Slice>
+export function notDependOn(...args: [string[], ImportOptions] | string[]): Condition<Slice> {
+  const { globs: forbiddenSlices, options } = splitGlobArgs(args)
   const forbiddenSet = new Set(forbiddenSlices)
   return {
     description: `not depend on [${forbiddenSlices.join(', ')}]`,
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
       const fileToSlice = buildFileToSliceMap(slices)
-      const edges = buildSliceDependencyGraph(slices, fileToSlice)
+      const edges = buildSliceDependencyGraph(slices, fileToSlice, options)
 
       const violations: ArchViolation[] = []
 
       for (const edge of edges) {
         if (forbiddenSet.has(edge.to)) {
-          const details = findSliceDependencyDetails(slices, edge.from, edge.to, fileToSlice)
+          const details = findSliceDependencyDetails(
+            slices,
+            edge.from,
+            edge.to,
+            fileToSlice,
+            options,
+          )
           for (const detail of details) {
             violations.push({
               rule: context.rule,

@@ -1,11 +1,12 @@
 import type { SourceFile } from 'ts-morph'
 import type { Slice } from '../models/slice.js'
 import type { ImportOptions } from '../core/import-options.js'
-import { isTypeOnlyImport } from '../core/import-options.js'
+import type { ModuleEdge, ModuleEdgeKind } from '../core/module-edges.js'
+import { edgesOf } from '../core/module-edges.js'
 
 /**
  * An edge in the slice dependency graph.
- * Represents: a file in `from` imports a file in `to`.
+ * Represents: a file in `from` depends on a file in `to`.
  */
 export interface SliceEdge {
   from: string
@@ -27,18 +28,60 @@ export function buildFileToSliceMap(slices: Slice[]): Map<string, string> {
 }
 
 /**
- * Build a directed dependency graph between slices.
+ * The edge kinds a slice graph counts: the **eager static** ones.
  *
- * For each file in each slice, resolve its imports. If an imported file
- * belongs to a different slice, add a directed edge from the importing
- * slice to the imported slice.
+ * A slice graph answers "what does this slice depend on when the program starts",
+ * which is what makes a cycle a cycle. Of `module-edges.ts`' five kinds, two qualify —
+ * and each exclusion is a decision with a reason, not an omission:
  *
- * @param slices - The resolved slices
- * @param fileToSlice - Pre-built file-to-slice map (optional, built internally if not provided)
- * @returns Unique directed edges between slices
+ * - `import` and `reexport` — **counted.** Both are eager: `export { x } from './b.js'`
+ *   emits an import of `./b.js`, so that module is evaluated whether or not anything
+ *   reads `x`. A barrel file is built out of re-exports, and `a → barrel → a` is the
+ *   cycle real codebases actually have
+ *   ([plan 0085](../../plans/0085-the-slice-graph-cannot-see-a-re-export.md)).
+ * - `dynamic` — **not counted.** `import('./b.js')` is lazy, so it cannot deadlock
+ *   module initialization, and it is most often the *deliberate* fix for a cycle.
+ *   Reporting it as one would fail the rule for applying its own remedy.
+ * - `require` — **not counted.** CJS, and this is an ESM-only package (ADR-004). Named
+ *   here rather than left implicit, so the next reader knows it was considered. The
+ *   surviving gap is `require` in an `allowJs` project: recorded, not fixed.
+ * - `type-expression` — **not counted**, and excluded by *kind* rather than by
+ *   `typeOnly`. `type X = import('./b.js').Y` is erased, so it must stay out even
+ *   under `ignoreTypeImports: false` — filtering it on the flag alone would make that
+ *   option add a class of edge this graph has never had.
  */
+const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>([
+  'import',
+  'reexport',
+])
+
 /**
- * Collect unique slice edges from a single file's imports.
+ * The edges leaving one file, as a slice graph counts them.
+ *
+ * Reads `edgesOf()` — the one definition of a module edge (plan 0071, from bug 0022,
+ * where five sites collecting `getImportDeclarations()` disagreed with the reverse
+ * graph about re-exports). The slice graph was the call site that never adopted it, so
+ * `export { x } from './banned.js'` was a dependency to `notImportFrom` and invisible
+ * to `beFreeOfCycles` **in the same run**. `edgesOf()` is cached per file and
+ * invalidated on modification, so this also replaces a per-call resolution walk.
+ *
+ * `ignoreTypeImports` drops the erased edges. A type-only import or re-export creates
+ * no runtime dependency, so counting it invents cycles that cannot exist at runtime —
+ * [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md),
+ * which is worth remembering for what it cost: this repo's own `arch/no-cycles` rule
+ * sat at `.warn()` for months with a comment saying "switch to .check() when
+ * beFreeOfCycles ignores import type", and while it could not fail it let a new cycle
+ * in overnight.
+ */
+function sliceEdgesOf(file: SourceFile, options?: ImportOptions): readonly ModuleEdge[] {
+  const ignoreTypeOnly = options?.ignoreTypeImports === true
+  return edgesOf(file).filter(
+    (edge) => EAGER_STATIC_KINDS.has(edge.kind) && !(ignoreTypeOnly && edge.typeOnly),
+  )
+}
+
+/**
+ * Collect unique slice edges from a single file's dependencies.
  */
 function collectEdgesFromFile(
   file: SourceFile,
@@ -48,22 +91,12 @@ function collectEdgesFromFile(
   edges: SliceEdge[],
   options?: ImportOptions,
 ): void {
-  for (const importDecl of file.getImportDeclarations()) {
-    // A type-only import is ERASED at compile time and creates no runtime
-    // dependency, so counting it as a graph edge invents cycles that cannot
-    // exist at runtime — [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md).
-    //
-    // That was not a hypothetical: this repo's own `arch/no-cycles` rule sat at
-    // `.warn()` for months with a comment saying "type-only imports create
-    // false-positive cycles; switch to .check() when beFreeOfCycles ignores
-    // import type" — so the feature was documented, exported, and unusable at
-    // error severity by anyone who uses `import type` for the reason it exists.
-    if (options?.ignoreTypeImports === true && isTypeOnlyImport(importDecl)) continue
+  for (const edge of sliceEdgesOf(file, options)) {
+    // A local `export { x }` with no `from` has no specifier, and a specifier the
+    // compiler could not resolve points outside the program.
+    if (edge.resolvedPath === undefined) continue
 
-    const resolved = importDecl.getModuleSpecifierSourceFile()
-    if (!resolved) continue
-
-    const targetSlice = fileToSlice.get(resolved.getFilePath())
+    const targetSlice = fileToSlice.get(edge.resolvedPath)
     if (targetSlice && targetSlice !== sliceName) {
       const edgeKey = `${sliceName}->${targetSlice}`
       if (!edgeSet.has(edgeKey)) {
@@ -74,6 +107,18 @@ function collectEdgesFromFile(
   }
 }
 
+/**
+ * Build a directed dependency graph between slices.
+ *
+ * For each file in each slice, resolve its dependencies. If the target file
+ * belongs to a different slice, add a directed edge from the depending slice
+ * to the depended-upon slice.
+ *
+ * @param slices - The resolved slices
+ * @param fileToSlice - Pre-built file-to-slice map (optional, built internally if not provided)
+ * @param options - `ignoreTypeImports` drops edges that are erased at compile time
+ * @returns Unique directed edges between slices
+ */
 export function buildSliceDependencyGraph(
   slices: Slice[],
   fileToSlice?: Map<string, string>,
@@ -98,10 +143,19 @@ export function buildSliceDependencyGraph(
  * Find which specific files cause a dependency from one slice to another.
  * Used for detailed violation messages.
  *
+ * **`options` must be the options the graph was built with**, and that is not a style
+ * preference. `respectLayerOrder` and `notDependOn` push one violation *per detail*,
+ * so a graph that counts an edge this function cannot see finds the dependency and
+ * reports **nothing** — a false green produced by two filters disagreeing rather than
+ * by either one being absent. `beFreeOfCycles` fails differently and more quietly: it
+ * still reports the cycle, at `unknown:0`, which is a finding whose remedy nobody can
+ * act on.
+ *
  * @param slices - The resolved slices
  * @param fromSliceName - Source slice name
  * @param toSliceName - Target slice name
  * @param fileToSlice - Pre-built file-to-slice map (optional, built internally if not provided)
+ * @param options - Must match the options passed to `buildSliceDependencyGraph`
  * @returns Array of { sourceFile, importPath, importLine }
  */
 export function findSliceDependencyDetails(
@@ -109,6 +163,7 @@ export function findSliceDependencyDetails(
   fromSliceName: string,
   toSliceName: string,
   fileToSlice?: Map<string, string>,
+  options?: ImportOptions,
 ): Array<{ sourceFile: SourceFile; importPath: string; importLine: number }> {
   const map = fileToSlice ?? buildFileToSliceMap(slices)
 
@@ -117,16 +172,14 @@ export function findSliceDependencyDetails(
 
   const details: Array<{ sourceFile: SourceFile; importPath: string; importLine: number }> = []
   for (const file of fromSlice.files) {
-    for (const importDecl of file.getImportDeclarations()) {
-      const resolved = importDecl.getModuleSpecifierSourceFile()
-      if (!resolved) continue
+    for (const edge of sliceEdgesOf(file, options)) {
+      if (edge.resolvedPath === undefined) continue
 
-      const targetSlice = map.get(resolved.getFilePath())
-      if (targetSlice === toSliceName) {
+      if (map.get(edge.resolvedPath) === toSliceName) {
         details.push({
           sourceFile: file,
-          importPath: resolved.getFilePath(),
-          importLine: importDecl.getStartLineNumber(),
+          importPath: edge.resolvedPath,
+          importLine: edge.line,
         })
       }
     }
