@@ -719,12 +719,14 @@ export class Baseline {
             // that diagnostic stays silent. Nothing here can tell these apart, so the honest
             // output is the candidate list, ordered, with the version-specific one first
             // because upgrading is when this happens.
-            'The identity format is unchanged, so one of its INPUTS moved. This code cannot tell which; ' +
-            'in order of likelihood: (1) you upgraded and a shipped rule description or default pattern ' +
-            'changed — check the CHANGELOG entry for the version you moved to, which says so when it ' +
-            'happens; (2) the baseline was generated against a different repository root — see the ' +
-            '`root` option on withBaseline()/generateBaseline(); (3) the rules themselves were edited. ' +
-            'If it is (1), regenerating is correct and expected.'
+            'The identity format is unchanged, so one of its INPUTS moved.\n' +
+            '  This code cannot tell which. In order of likelihood:\n' +
+            '    1. you upgraded, and a shipped rule description or default pattern changed —\n' +
+            '       check the CHANGELOG entry for the version you moved to, which says so when\n' +
+            '       it happens. If this is it, regenerating is correct and expected.\n' +
+            '    2. the baseline was generated against a different repository root — see the\n' +
+            '       `root` option on withBaseline()/generateBaseline().\n' +
+            '    3. the rules themselves were edited.'
     return {
       rule: 'ts-archunit: baseline',
       element: 'baseline',

@@ -28,6 +28,8 @@
  * be entirely correct — see the remedy in the failure message.
  */
 import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
 import { Project } from 'ts-morph'
 import { STUB_PATTERNS, comment } from '../../src/helpers/matchers.js'
 import { identifyMatches } from '../../src/conditions/match-identity.js'
@@ -59,11 +61,56 @@ const REMEDY = [
 ].join('\n')
 
 describe('a shipped default pattern has not moved unnoticed (bug 0060)', () => {
-  it('the set of shipped default patterns is what this file believes it is', () => {
-    // Non-vacuity, and the part that rots: if a second default pattern is added and not
-    // listed here, the row below passes while the new one is unguarded. Asserted by
-    // identity so adding one is a deliberate edit rather than a silent omission.
-    expect(SHIPPED_DEFAULTS.map(([name]) => name)).toEqual(['STUB_PATTERNS'])
+  it('the guarded set is DERIVED from source, not believed', () => {
+    // This row asserted `toEqual(['STUB_PATTERNS'])` — a hand-maintained belief about a
+    // hand-maintained list, which is the shape plan 0079 exists to reject: it pins what I
+    // think the population is, so a second default pattern arriving is invisible to it.
+    //
+    // Derive it instead. A "shipped default pattern" is a `RegExp`-typed parameter with a
+    // default, in a function `src/index.ts` exports — that is what makes a user's rule
+    // inherit the pattern without ever naming it, which is the whole exposure.
+    const srcRoot = path.resolve(import.meta.dirname, '../../src')
+    const files = (function walk(dir: string): string[] {
+      return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const full = path.join(dir, e.name)
+        return e.isDirectory() ? walk(full) : full.endsWith('.ts') ? [full] : []
+      })
+    })(srcRoot)
+
+    // Non-vacuity on the walk itself, before it is used to justify anything.
+    expect(files.length).toBeGreaterThan(100)
+
+    const found = new Set<string>()
+    for (const file of files) {
+      for (const match of fs
+        .readFileSync(file, 'utf-8')
+        .matchAll(/:\s*RegExp\s*=\s*([A-Z][A-Z0-9_]*)/g)) {
+        // `match[1]` is `string | undefined` under `noUncheckedIndexedAccess`, and a
+        // narrowing guard rather than a cast (ADR-005). A group that somehow did not
+        // capture would silently add `undefined` to a `Set<string>` otherwise.
+        const name = match[1]
+        if (name !== undefined) found.add(name)
+      }
+    }
+
+    // Every derived default must be guarded below. If this fails, add it to
+    // SHIPPED_DEFAULTS — do not relax the derivation.
+    expect([...found].sort()).toEqual(SHIPPED_DEFAULTS.map(([n]) => n).sort())
+  })
+
+  it('VACUITY: the derivation really finds something', () => {
+    // The row above compares two sets, so it passes when BOTH are empty — a broken regex
+    // and an empty list agree perfectly. Assert the derivation is non-empty separately, and
+    // prove the pattern matches the shape it is looking for.
+    expect(SHIPPED_DEFAULTS.length).toBeGreaterThan(0)
+    expect('export function f(pattern: RegExp = STUB_PATTERNS): void {}').toMatch(
+      /:\s*RegExp\s*=\s*([A-Z][A-Z0-9_]*)/,
+    )
+    // And that it does NOT match a non-default RegExp parameter, or every function taking
+    // one would be listed.
+    expect('export function g(pattern: RegExp): void {}').not.toMatch(
+      /:\s*RegExp\s*=\s*([A-Z][A-Z0-9_]*)/,
+    )
   })
 
   it.each(SHIPPED_DEFAULTS)('%s', (name, pattern) => {

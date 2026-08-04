@@ -167,6 +167,22 @@ review suggested — "set an identity on comment findings" — would not have wo
 where the problem already lives. That is now pinned by a test row, after my first attempt at it was a
 tautology (`` `comment matching ${p}` `` contains `p`) which I caught reviewing my own file.
 
+## Two things the post-release review of this fix found
+
+**1. The new diagnostic was a 688-character unbroken paragraph.** Correct — the string concatenation had no
+missing spaces — and unreadable, with `(1)(2)(3)` inline. The sibling diagnostic in the same file already
+uses newlines for exactly this reason. Now line-broken and indented, so the candidates are scannable.
+
+**2. The change detector's population was a hand-maintained belief.** It asserted
+`toEqual(['STUB_PATTERNS'])` — my list, checked against my list. That is the shape plan 0079 exists to
+reject: a second shipped default arriving is invisible to it.
+
+Now **derived from source**: a `RegExp`-typed parameter with a default, which is what makes a user's rule
+inherit a pattern without naming it. Verified by adding a plausible second one
+(`noTempNames(pattern: RegExp = TEMP_PATTERNS)`) — the derivation reports it and the row reds, where the
+hand-written list would have stayed green. Plus a vacuity row, because comparing two sets passes when both
+are empty, and a broken regex agrees perfectly with an empty list.
+
 ## Sabotage
 
 | Revert                                           | Result                                                |
