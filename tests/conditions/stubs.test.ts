@@ -248,9 +248,19 @@ describe('WHERE a stub marker may be, and what is merely prose (bugs 0052, 0053)
     ],
 
     // --- bug 0053: prose that mentions a marker is not a marker ---
+    // An UPPERCASE marker mid-sentence. This row is what tests the line-start
+    // anchor, and the first version of it did not: it embedded `/** TODO */` inside
+    // a JSDoc, so the inner `*/` closed the comment early and the fixture was
+    // malformed — it passed because nothing parsed, not because the anchor worked.
+    // Found by sabotage: dropping the anchor was caught by nothing.
     [
-      'PROSE: a sentence quoting a marker',
-      '/** Missed both `// TODO` and `/** TODO */` above it. */\nexport function h(): number {\n  return 1\n}',
+      'PROSE: an uppercase marker mid-sentence',
+      '/** Never write a TODO marker in prose like this. */\nexport function h(): number {\n  return 1\n}',
+      0,
+    ],
+    [
+      'PROSE: an uppercase marker mid-line in a JSDoc block',
+      '/**\n * Some text and then TODO appears mid-line.\n */\nexport function h2(): number {\n  return 1\n}',
       0,
     ],
     [

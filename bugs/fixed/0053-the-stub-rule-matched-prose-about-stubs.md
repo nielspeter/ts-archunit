@@ -74,12 +74,27 @@ Check what a fix makes _reachable_.
 
 ## Sabotage
 
-| Revert                                              | Result                                 |
-| --------------------------------------------------- | -------------------------------------- |
-| Drop the line-start anchor                          | CAUGHT — prose rows red                |
-| Restore the `i` flag on the markers                 | CAUGHT — the wrapped-`stub,` row reds  |
-| Drop the anchor from the phrase forms               | CAUGHT — the rule's own docstring reds |
-| Baseline asserted green before each, restored after | 0                                      |
+| Revert                                              | Result                                                 |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| Drop the line-start anchor on the markers           | CAUGHT — **only after the guard was fixed, see below** |
+| Restore the `i` flag on the markers                 | CAUGHT — the wrapped lowercase `stub,` row reds        |
+| Baseline asserted green before each, restored after | 0                                                      |
+
+**The anchor row was CAUGHT BY NOTHING on the first run, and the reason is the better finding.** The
+prose fixture meant to test it read:
+
+```ts
+'/** Missed both `// TODO` and `/** TODO */` above it. */'
+```
+
+The inner `*/` **closes the JSDoc early**, so the fixture was malformed and the row passed because
+nothing parsed — not because the anchor worked. And no other prose row contained an _uppercase_ marker,
+so with the markers now case-sensitive, dropping the anchor changed nothing any assertion could see.
+
+A test whose fixture does not compile to the shape it describes is the same class of defect as the bug
+it guards: it looks like coverage. Replaced with two rows that carry a real uppercase marker
+mid-sentence — one in a `//`-style JSDoc, one mid-line inside a block — and the anchor row now fails
+when the anchor is removed.
 
 ## Related
 

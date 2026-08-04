@@ -104,6 +104,26 @@ none of them a stub. That is [bug 0053](./0053-the-stub-rule-matched-prose-about
 matched prose _about_ markers, including `noStubComments()`'s own docstring. The two shipped together
 because this one cannot go green without that one.
 
+## Sabotage — and the first run of it caught nothing
+
+| Revert                                                                           | Result |
+| -------------------------------------------------------------------------------- | ------ |
+| Traversal back to the body (this bug)                                            | CAUGHT |
+| `triviaRoot` stops at the node, so arrow consts are unfixed again (the half-fix) | CAUGHT |
+| Baseline asserted green before each, restored after                              | 0      |
+
+**The first run of that matrix scored both rows CAUGHT BY NOTHING.** The fix was measured with
+throwaway probes, the numbers went into this document, and nothing permanent held them — so reverting
+either half left the suite green.
+
+That is worth more than the fix. The "Fix" section above had already asked _"what would the suite do if
+the fix were wrong? Today, nothing — which is how this shipped"_ — and then the fix shipped the same
+way, one section below the sentence diagnosing it. Measuring a behaviour and **recording** the number
+is not the same as **guarding** it; a number in a write-up is ADR-008's own "hand-typed measurement in
+a plan" row.
+
+The 16 rows in `tests/conditions/stubs.test.ts` are the permanent form.
+
 ## Out of scope
 
 - **`hygiene/no-empty-bodies`**, which is a different condition and caught its plant correctly.
