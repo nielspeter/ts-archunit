@@ -294,6 +294,42 @@ describe('the graph and the details lookup must agree (plan 0085)', () => {
     expect(violations.map((v) => v.line)).toEqual([1])
   })
 
+  it('a cycle is LOCATED at a runtime edge, never at an erased one', () => {
+    // The `beFreeOfCycles` half of the same disagreement, and it hides differently:
+    // this condition reports the cycle regardless, so an unfiltered details lookup does
+    // not change WHETHER it fires — only WHERE it points. `firstDetail` is the location,
+    // so the finding would send the reader to an `import type` line and tell them to
+    // break a dependency that is already erased.
+    //
+    // `a` reaches `b` twice, type-only on line 1 and by value on line 2. The cycle must
+    // be reported at line 2.
+    const tsm = new Project({ useInMemoryFileSystem: true })
+    tsm.createSourceFile(
+      '/src/a/index.ts',
+      "import type { Beta } from '../b/index.js'\nimport { beta } from '../b/index.js'\nexport type Alpha = { n: number }\nexport const alpha: number = beta\n",
+    )
+    tsm.createSourceFile(
+      '/src/b/index.ts',
+      "import { alpha } from '../a/index.js'\nexport type Beta = { n: number }\nexport const beta = alpha\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+
+    const found = real(
+      slices(p)
+        .assignedFrom({ a: '**/src/a/**', b: '**/src/b/**' })
+        .should()
+        .beFreeOfCycles()
+        .rule({ id: 'test/no-cycles', because: 'cycles break module init order' })
+        .violations(),
+    )
+    expect(found.map((v) => v.element)).toEqual(['[a, b]'])
+    expect(found[0]!.line).toBe(2)
+  })
+
   it('respectLayerOrder honours the option, proven where it CHANGES the answer', () => {
     // The other forwarding gap, and the reason it hid: the original row asserted the
     // same expectation for both option positions, so it could not tell whether the
