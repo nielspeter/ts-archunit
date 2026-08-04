@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.55.3] - 2026-08-04
+
+Plan 0083's Phase 0. No shipped behaviour changed — the addition is a derivation over this repository's own
+public API, and a number we had been quoting is withdrawn.
+
+### Added
+
+- **The enforceable-primitive population is derived from source, not remembered.**
+  `tests/tools/scan-enforceable-primitives.ts`, run as a test. The rule is written in the file: a function
+  exported from `src/index.ts` whose declared return type is `Condition`, `PairCondition` or `Predicate` —
+  **150 of 231 public functions.**
+
+  Four readers had produced four figures (166, 185, 187, 231) from one sentence of stated method and no
+  script. The return type is the definition rather than the folder, because the folder is what made the
+  earlier counts disagree: `buildFingerprint` and `computeSimilarity` are public, live in `src/smells/`, and
+  return `Fingerprint` and `number`.
+
+### Changed
+
+- **The 13.0% self-application figure is withdrawn, with its method.** It matched primitive _names_ against
+  call sites, and a primitive can be applied without its name appearing: `.resideInFolder(...)` in the
+  should-phase calls `conditionResideInFolder`, which `tests/archunit/arch-rules.test.ts` does twenty times
+  without ever writing that name. An honest numerator needs call-graph reachability. No ratio ships, and a
+  test pins the counter-example so the next attempt to quote one fails rather than reads well.
+
 ## [0.55.2] - 2026-08-04
 
 Two ADR-008 rules that were conventions are now enforced. No shipped behaviour changed — both guards run
