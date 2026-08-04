@@ -329,20 +329,51 @@ const COMMENT_LINE_START = String.raw`(?:^|\n)[ \t]*(?:\/\/+|\/\*+|\*+)?[ \t]*`
  * `noStubComments()`'s own docstring, which lists them. That is bug 0043's shape:
  * documentation of a syntax read as the syntax.
  *
- * **The phrase forms are NOT case-insensitive, and this text claimed they were until
- * v0.49.1.** The `i` flag was dropped for the whole expression and only the initial
- * letters are alternated (`[Nn]ot\s+[Ii]mplemented`), so `// NOT IMPLEMENTED` and
- * `// COMING SOON` do **not** match — measured. The reasoning offered for the claim was
- * "nobody writes NOT IMPLEMENTED", which is the one casing the marker branch would
- * otherwise have caught. A false negative on a build-failing rule, so nothing tells the
- * reader; filed as a bug rather than patched here, because widening the pattern is a
- * behaviour change that needs its own tests and sabotage.
+ * **The phrase forms ARE case-insensitive, since v0.55.0** — and were not between v0.47.0
+ * and then, though this text claimed otherwise for part of that window. The `i` flag was
+ * dropped for the whole expression, correctly, because the MARKERS must stay
+ * case-sensitive: that is what rejects a wrapped JSDoc line beginning `stub,`. But only
+ * the phrases' INITIAL letters were alternated, so `// NOT IMPLEMENTED` and
+ * `// COMING SOON` silently stopped matching. The reasoning offered at the time was
+ * "nobody writes NOT IMPLEMENTED", which is precisely the casing the marker branch would
+ * otherwise have caught. `anyCase` below DERIVES the alternation, so the class cannot come
+ * back one letter at a time
+ * ([bug 0061](../../bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md)).
  */
+/**
+ * A word matched case-INSENSITIVELY, letter by letter.
+ *
+ * JavaScript has no inline `(?i:…)` group and the `i` flag applies to the whole expression,
+ * which cannot be used here — the MARKER branch must stay case-sensitive. So the phrase
+ * branch alternates its own letters, and it is DERIVED rather than hand-written, because
+ * hand-writing it is what produced bug 0061: `[Nn]ot\\s+[Ii]mplemented` alternates the
+ * first letter of each word and nothing else.
+ */
+function anyCase(word: string): string {
+  return [...word]
+    .map((ch) => {
+      const lower = ch.toLowerCase()
+      const upper = ch.toUpperCase()
+      if (lower !== upper) return `[${upper}${lower}]`
+      // A character with no case is passed through ESCAPED. Measured before adding this:
+      // `anyCase('todo(x)')` produced `[Tt][Oo][Dd][Oo]([Xx])` — a capture group; `'wip.'`
+      // produced a `.` meaning any character; `'a+b'` produced "one or more a". None of
+      // them throw, so the pattern silently means something other than the phrase.
+      //
+      // No live defect — today's phrases are letters and spaces — but this function exists
+      // to be called with a new phrase, and that is when it would bite.
+      return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    })
+    .join('')
+}
+
+/** `not implemented` / `coming soon`, any casing, any run of whitespace between words. */
+const PHRASES = ['not implemented', 'coming soon']
+  .map((phrase) => phrase.split(' ').map(anyCase).join('\\s+'))
+  .join('|')
+
 export const STUB_PATTERNS = new RegExp(
-  [
-    `${COMMENT_LINE_START}(?:${MARKER})\\b`,
-    `${COMMENT_LINE_START}(?:[Nn]ot\\s+[Ii]mplemented|[Cc]oming\\s+[Ss]oon)\\b`,
-  ].join('|'),
+  [`${COMMENT_LINE_START}(?:${MARKER})\\b`, `${COMMENT_LINE_START}(?:${PHRASES})\\b`].join('|'),
 )
 
 /**

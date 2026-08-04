@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.55.0] - 2026-08-04
+
+### Fixed
+
+- **`// NOT IMPLEMENTED` and `// COMING SOON` match again.** v0.47.0 dropped the `i` flag from
+  `STUB_PATTERNS` — correctly, because the markers must stay case-sensitive to reject prose — but
+  hand-alternated only the _first letter of each phrase word_, so any other casing silently stopped
+  matching. A false negative on a rule that ships at `error` in `agentGuardrails`, so nothing told anyone.
+
+  The casing is now **derived per letter** rather than listed. Adding `[NN]OT` and `[CC]OMING` by hand would
+  have fixed the two casings someone noticed and left `// nOt ImPlEmEnTeD` — which matches now. Both of bug
+  0053's prose rejections still hold.
+  ([bug 0061](bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md))
+
+  **Baselines:** the pattern's text is part of a finding's identity, so any baseline containing
+  `noStubComments` findings must be regenerated. You may also see _new_ findings — markers that were being
+  missed.
+
+### Internal
+
+- `anyCase` now **escapes** characters with no case. An adversarial pass before tagging found that a future
+  phrase containing a metacharacter would silently mean something else — `todo(x)` becomes a capture group,
+  `wip.` matches any character, `a+b` means "one or more `a`" — and none of them throw. No live defect,
+  since today's phrases are letters and spaces, but the function exists to be called with a new phrase.
+
+- Bug 0061's report carried six _reported but unmeasured_ rows; classifying each as anchor, casing or
+  intended turned up three that are the **anchor's** doing and not the casing's — a bulleted
+  ` * - TODO: wire this up`, a `/** @todo … */`, and a mid-line `(not implemented)`. A bulleted TODO inside
+  a JSDoc list is an extremely common real marker. Those widened
+  [plan 0091](plans/0091-a-stub-marker-is-delimited-not-cased.md) rather than being fixed here, since the
+  anchor is a separate change from the delimiter rule and needs its own sabotage.
+
+- **The change detector added in v0.54.0 fired on the very next pattern change**, one release later, and
+  forced steps 2 and 3 of its own remedy — this CHANGELOG entry and the upgrading row. That is what it was
+  built for.
+
 ## [0.54.1] - 2026-08-04
 
 Two problems found by reviewing v0.54.0's own code.
@@ -354,7 +390,7 @@ on one function` asserted `2` while its own comment claimed to prove dedup is pe
   cannot be reproduced. The migration row hand-builds the comparison and therefore proves `hashViolation`
   is sensitive to `element`, not what v0.46.1 actually reported.
 - The all-caps stub misses are pinned as _current_ behaviour with a pointer to
-  [bug 0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md), not as desired behaviour.
+  [bug 0061](bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md), not as desired behaviour.
 
 ## [0.49.1] - 2026-08-04
 
@@ -391,7 +427,7 @@ reproduced by measurement before being acted on.
 
 - **A docstring claimed the stub phrase forms "stay case-insensitive".** They do not — measured,
   `// NOT IMPLEMENTED` and `// COMING SOON` do not match. Corrected here and filed as
-  [bug 0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md) rather than patched, because widening a
+  [bug 0061](bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md) rather than patched, because widening a
   pattern is a behaviour change that needs its own tests and migration.
 
 - **`docs/slices.md` documented cycle output that has never existed** — a per-edge listing, aspirational
@@ -433,7 +469,7 @@ Eight bugs and four plans filed, none of them deferred silently. The behavioural
   baselined stub finding's hash, and the diagnostic blames the repository root.
 - [0059](bugs/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
   [0057](bugs/fixed/0057-an-empty-options-object-reverts-a-documented-default.md),
-  [0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md),
+  [0061](bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md),
   [0062](bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md).
 
 Two hypotheses of mine were **refuted** by review, and the corrections are worth recording: a tag
