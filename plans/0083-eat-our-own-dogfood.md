@@ -1,19 +1,18 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** Open, not started. Filed 2026-08-04, out of the question "are we dogfooding all the new
-ADR-008 features?" — asked during the v0.46.0 review, and answered **no** by measurement within
-minutes, with two live gaps found and closed on the spot.
-**Priority:** High. Not for the count, but for what the two closed gaps demonstrate: both were
-features **we built to fix our own bugs** and then never pointed at ourselves. The next one will be
-too.
-**Effort:** Medium, and deliberately staged. Phase 1 is a triage with a stop rule; Phases 2 and 3
-only happen if Phase 1 says so.
-**Blast radius:** Mixed, and that is the reason for the staging. Phase 1 is an internal audit over a
-corpus we control. Phase 2 adds rules to our own suite — internal. **Phase 3 builds a reference
-consumer project, which is the one that touches published behaviour**, because it exercises the
-library the way an adopter does and will find things our fixtures cannot. Per
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6, Phase 3's findings get the behavioural
-treatment; Phases 1–2 stop at "prove each detector fires".
+**Status:** Open, not started. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
+features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
+broke both of its measurements and inverted its phase order** — see "What the review changed".
+**Priority:** Phase 1 high, Phase 3 high, Phase 2 medium. Not for a count: two features built to fix
+our own bugs were never aimed at us, and nothing was watching the watchers.
+**Effort:** Per phase, because "medium" across all of them was not credible: Phase 0 ~half a day,
+Phase 1 ~1 day (36 planted violations with verdict discipline), Phase 2 ~1–2 days, Phase 3 multi-day.
+**Blast radius:** Split, and that split is doing work rather than labelling. Phases 0–2 are an internal
+audit over a corpus we control — rule 6's floor. **Phase 3 exercises the shipped library as an adopter
+does, so its findings are published-behaviour findings** — rule 6's top row. One exception, stated
+because it would otherwise be silent: **if enforcing a class-B item needs a library change, it leaves
+Phase 2 and is filed as its own plan** — that is bug 0049's shape, where the honest rule required a
+module-scoped variant.
 
 ## Problem
 
@@ -62,126 +61,222 @@ plan proceeds on classification alone, with no ratio, and the absence of a clean
 recorded. A number nobody can reproduce is worse than no number: it invites exactly the coverage
 chase the rest of this plan is written to avoid.
 
-## Phase 1 — triage, with the stop rule written first
+## Phase 1 — plant the violation, over the 36 rules we already have. Run this FIRST.
 
-Classify all 166 into four classes, by reading. Same shape as 0079, including its discipline: the
-threshold is fixed **before** looking.
+Standalone, before any classification, because it depends on nothing else and because if it finds
+another bug 0049 then **class A is not a safe bucket** and the meaning of the whole triage changes.
 
-| Class                                          | Meaning                                                                         | Action                                          |
-| ---------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **A — enforced**                               | Already applied to `src/` in `tests/archunit/`                                  | None. The 41.                                   |
-| **B — a real constraint we are not enforcing** | This repo genuinely has this architectural property and no rule asserts it      | **Add the rule.** This is the actionable class. |
-| **C — not our architecture**                   | The feature needs a shape we do not have (JSX, GraphQL, layers, a DI container) | Phase 3, or recorded as fixture-only            |
-| **D — no honest rule exists here**             | Applying it would be a rule we do not believe                                   | Record the reason. Do **not** add.              |
+For each rule in `tests/archunit/arch-rules.test.ts`: introduce the violation it forbids, assert it
+reds, revert. Two reviewers independently identified this as the highest-yield item in the plan, and
+it is the operator that would have caught both bug 0011 and bug 0049.
 
-**The stop rule, fixed now:** if class **B** is under ~10% of the 166, Phase 2 is the whole of the
-remedial work and Phase 3 is judged on its own merits rather than as a coverage exercise. If B is
-larger, we have been under-enforcing our own architecture and Phase 2 grows accordingly.
+**Cheap route for a third of them:** `tests/fixtures/` is a corpus built to _violate_ these rules —
+this file's own comment records that scoping to the fixture tree "reds 13 rules on 89 hits". Dirty
+corpus versus clean corpus is real independence in rule 5's sense, and nearly free.
 
-**A second measurement, independent of the classification** (rule 5 — one reader's judgement over
-166 items is a single derivation, and its bias would be invisible in a re-read). The first draft got
-the operator backwards, which is worth recording because the error was self-flattering:
+**Verdict discipline is not optional here** (ADR-008 rule 5's verdict-mechanism corollary, which this
+repo has paid for repeatedly): an isolated `git worktree` held exclusively — two agents in one checkout
+has already poisoned one matrix this week; a green baseline asserted before each patch; each patch
+proven to apply non-trivially; the **exit code** read from an unpiped command; the failing test asserted
+to be the _expected_ one, and the violation identity asserted to name the planted element. **Report
+caught-by-nothing as a number.** "Watch it red" credits any red — a plant that trips a neighbouring
+rule, or the `BUILT.length === terminals` identity at `:940`, scores CAUGHT for the wrong reason.
 
-> ~~for each of the ~30 rules, **delete it** and confirm the suite reds. A rule that can be deleted
-> with the suite green is enforcing nothing.~~
+**Mechanics that bite:** `BUILT` fills as `it()` callbacks execute, so each row must run the **whole
+file** — a `-t`-filtered run reds `:940` on a half-filled array. 36 full runs is ~70 minutes; budget it
+or scope the matrix. And derive the population from `BUILT`, never type it: the file currently carries
+**36, 39, 41 and 43** in four separate comments for one population, in the file whose subject is
+distrusting hand-maintained claims. Fixing those four is a free side effect.
 
-**Deleting a passing check from a green suite leaves it green.** `src/` complies with all 37 rules
-today, so "delete it and the suite reds" is false by construction for nearly every one — measured:
-removing the `adr005/no-as-cast` rule entirely leaves 45 of 45 passing. The audit's answer was
-pre-determined, and its stated inference would have reclassified essentially the whole of class A as
-class B. A measurement that can only return one result is not a measurement.
+**Leave something behind.** "Revert and move on" proves firing once at a moment nobody can reproduce,
+and the record is a line in a write-up — ADR-008's own "a hand-typed measurement in a plan" row. This
+file already ships the durable form (`would report a fault if one were introduced`). Keep a permanent
+positive control **per mechanism class**, not per rule: the 14 `core must not import from X` rules share
+one mechanism and differ only by glob, so one control covers them. ~36 rules becomes ~12 controls.
 
-The one exception proves the mechanism rather than the rule: deleting `adr005/no-as-cast-module` _does_
-red, because the `orphanExclusions` check notices its two inline waivers going stale. So the deletion
-audit measures **whether some other guard happens to name the rule's id** — 1 of 37.
+## Phase 2 — the census, measured rather than read
 
-**The correct operator is the one Phase 2 already prescribes: plant the violation the rule forbids and
-watch it red.** Applied to the existing 37 that is genuinely independent of a reading-based
-classification, and it is the operator that would have caught
-[bug 0049](../bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md) — a class-A rule
-scoped to `classes` in a codebase of 19 class files and 128 function files, silent on 22 real casts.
-Deleting that rule reds nothing; planting a cast in a function finds it instantly. Bug 0049 is this
-plan's own closest precedent, and the audit as first written would have missed it.
+The first draft classified 166 items **by reading**, which inherits 0079's recorded residue: one reader
+classifying everything proves consistency, not correctness — and 0083 has no sample, so it had _less_
+protection than 0079 did.
 
-**And there is a cheap route to most of it.** `tests/fixtures/` is a corpus built to _violate_ these
-rules — `arch-rules.test.ts` records the measurement in a comment: scoping to `'**/src/**'` was chosen
-because the fixture tree "reds 13 rules on 89 hits". Point each rule at the fixture tree and assert it
-reds. Dirty corpus versus clean corpus is real independence in rule 5's sense, and it is nearly free
-for at least a third of the 37.
+**The library is its own oracle.** For each primitive, write the widest honest scope and record two
+numbers — **subjects selected** and **violations**:
 
-**Run this first, standalone, before any classification.** It depends on nothing else, it is the
-highest yield item in the plan, and if it finds another bug 0049 then **class A is not a safe bucket**
-and the meaning of the whole triage changes. That is worth knowing before spending the reading budget.
+| Measurement                | Class                    | Why it is mechanical                                                                                                       |
+| -------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| 0 subjects                 | **C**                    | "we do not have this shape" _is_ "the selector selects nothing" — which `diagnose()` and the dead-glob gate already decide |
+| subjects > 0, 0 violations | **B**                    | the repo has the property and nothing asserts it. Free rule.                                                               |
+| violations > 0             | **B-with-debt** or **D** | and now the D claim carries a reproducible price                                                                           |
 
-**Also: it is 37 rules, not "~30".** The file itself carries 36, 39, 41 and 43 in four separate
-comments — four hand-maintained counts of one population, in the file whose purpose is to distrust
-hand-maintained claims. The audit derives the number; fixing those comments is a free side effect.
+That removes judgement from the actionable class entirely, and leaves it only where it belongs: on
+belief, priced. **Class A is mechanical too** — derive it from the rule file (imported functions plus
+builder-method call sites), do not hand-list it.
 
-## Phase 2 — enforce class B
+**Class D is sharpened, because as first written it was an unfalsifiable dumping ground** — ADR-008
+rule 3's corollary: a marker an agent can stamp on anything to go green is worse than no marker.
 
-Add the rules, each with the same bar every other rule in that file meets: a real `because`, a
-verified `suggestion`, and a scope guarded against vacuity. `arch-rules.test.ts` already carries the
-non-vacuity apparatus (`BUILT`, the `edgesOf` control) — reuse it, do not invent a second one.
+- **D must name the property, not the primitive.** "`beAsync()` — this repo has no rule about which
+  functions are async" is checkable. "We do not believe it" is not.
+- **D and C must be separable by measurement.** C is "the shape does not exist here". D is "the shape
+  exists and we decline to constrain it" — which always admits _what would the rule red on today?_ If
+  the answer is zero, that is **class B with a free rule**, not D.
+- **D has a ceiling.** The first draft pre-registered a threshold only on B — the branch that can
+  _stop_ work — and none on the branch that can _excuse_ it. A result of A 41 / B 12 / C 8 / D 100 would
+  have fired "under 10%, we're fine" while 60% sat in an unfalsifiable bucket. **D above 40% triggers a
+  re-read**, and that is registered now, before looking.
 
-**Every added rule must be shown to fail.** Not "the suite is green with it" — that is the state
-this plan exists to distrust. Introduce the violation it forbids, watch it red, revert.
+**The stop rule, which the first draft did not have.** It said: under ~10%, Phase 2 is the whole of the
+remedial work; over, Phase 2 grows. Both branches say _enforce all of class B_ — it forbade nothing.
+0079's worked because one branch **deleted a phase**. So:
 
-## Phase 3 — a reference consumer, for what we cannot host
+> **If B > 25 items, Phase 2 ships only the top five by blast radius and the remainder is filed as its
+> own plan.** A census is not a licence to write sixty rules in one change.
 
-The honest answer for class C, and the part with real value beyond coverage.
+And **a second reader classifies 20 items blind**, reporting the disagreement rate. That is the number
+0079 explicitly did not produce, it is cheap here, and it is the only thing making the census auditable
+by someone who did not do it.
 
-A fixture project under `tests/reference/` shaped like an adopter's codebase — layers, a JSX
-component tree, a GraphQL schema, a slice structure — with a rule file that turns on **every preset
-we ship** plus the class-C primitives. Run it in CI. Assert on its findings **by identity**.
+## Phase 3 — the reference consumer. Promoted, and not gated on Phase 2.
 
-Two things this catches that unit fixtures cannot, and both have already bitten us:
+**Ungated.** The first draft said "Phases 2 and 3 only happen if Phase 1 says so" and then admitted
+Phase 3 "is judged on its own merits" — so the staging only delayed the one phase with user-facing
+value behind the one with none. Reviewers were unanimous: Phases 0–2 are internal confidence an adopter
+never perceives; Phase 3 is the only part they would feel. It is also cheaper to act on its findings at
+0.46 than after 1.0.
 
-- **A preset that is individually correct and collectively wrong.** Presets fan out; bug 0034's
-  shape lives here.
-- **A feature that works on a five-line fixture and not on a real file.** Every fixture in
-  `tests/fixtures/` is written to exercise one condition. None is a _codebase_.
+**Its scope is INTERACTION, not shape.** `tests/fixtures/presets/` already holds seven per-preset
+mini-projects, and `tests/integration/shape-presets-check.test.ts` already spreads two presets through
+the real `check` pipeline. The honest novelty is: **every preset, one project, one process** — plus the
+two things nothing covers, each now a hard requirement:
 
-**Explicitly not a snapshot** (ADR-008 rule 4). Snapshotting the findings would produce a file
-nobody reads that goes green on any change to it. Assert identities: which rules fire, on which
-elements.
+1. **Consume the packed tarball by package name.** All 217 test files import from `../../src/`. Nothing
+   resolves `@nielspeter/ts-archunit` through the twelve-subpath `exports` map, and nothing packs a
+   tarball. A typo there, a `.d.ts` that will not resolve under `Node16`, or a `dist/` file missing from
+   `files[]` is a day-one blocker caught by nothing — and `tests/docs/shipped-links.test.ts` exists
+   _because_ v0.25.0 shipped links that resolved to nothing from the tarball. Same shape, one layer down.
+   `npm pack` → install → import by name, or it is a bigger fixture and not a consumer.
+2. **Run the same rule array twice in one process and assert identical findings.** Bug 0034 was not
+   "presets fan out" — it was a `Set` in a matcher closure that was never reset, so `evaluate()` returned
+   2 findings then 0. A reference project that builds fresh rule objects per assertion never exercises
+   that. If bug 0034 is the justification, this is a _required_ assertion.
 
-**The honest risk, recorded now:** a reference project is a fixture that looks like a codebase, and
-it can rot into one that is written to satisfy the rules rather than to resemble a consumer. The
-guard is that it must be **derived from a real shape** — model it on the structures the docs teach
-in `docs/what-to-check.md`, so a divergence between what we document and what we can enforce shows
-up as a failure here.
+**Assert one canonical violation per rule id, not the finding set.** Every preset over a whole project
+is a snapshot in all but name — with a snapshot's churn and none of the `-u` escape hatch, so every
+genuine detection improvement reds the file and gets hand-edited. Instead: `Record<ruleId, elements>`
+where keys are asserted against the declared-id set derived from `describeRule().id` (the trick
+`orphanExclusions` already uses, and it handles `agentGuardrails`' template-literal ids), and values are
+pinned only for designated instances — each commented with which bug shape it stands for. A rule that
+stops firing then shows as a key with an empty array rather than vanishing from a shorter list.
+
+**The vacuity floor as first written is satisfied by total vacuity.** `assertDiscovered` returns a
+`bypassFilters: true, file: ''` finding when a preset's glob discovers nothing — so a reference project
+whose every glob misses produces a **non-empty** finding list, and a cardinality band accepts it. That
+is 0079's headline discovery reproduced one level up, in the plan that cites it. Three rows instead:
+configuration findings asserted `toEqual([])` by identity; the set of ruleIds producing _ordinary_
+findings asserted against the declared set; and an explicit justified-silent list, so "this rule
+reported nothing" fails closed.
+
+**Assert through the JSON/`checkAll` path, not `.check()` terminals.** `recommended` ships two
+deliberate warn-level rules, and a `.warn()` finding inside a test reaches nobody (bug 0024). Through
+`.check()` every warn-severity rule in the reference project is invisible and silently uncovered.
+
+**Identity must be machine-portable.** Do not assert `hashViolation` hashes — the rule string is the
+assembled description, so editing any preset's predicates reds the file on an unrelated refactor. And
+the smell detectors interpolate **absolute paths** into `message` and `identity`. Assert tuples of
+`(ruleId, toPortablePath(file, root), element)` and scrub message text through `normalizeIdentityText`;
+`src/core/identity-root.ts` already exists for exactly this and Phase 3 is its first consumer outside
+the baseline. Assert **sets**, not ordered arrays: source-file order is stable, but `groupByFolder`
+sorts with ICU-dependent `localeCompare` and this machine is on Node 26 while CI is on Node 24.
+
+**The anti-rot guard, mechanised.** The first draft said "model it on the structures `docs/what-to-check.md`
+teaches, so a divergence shows up as a failure" — and nothing mechanised it; no test references that
+file. The repo has already recorded what hand-transcription costs (`combinator-examples.test.ts`: "the
+transcription is the weak link"). The mechanical version: `docs/what-to-check.md` carries 31 `typescript`
+fences with concrete glob literals — extract them and assert **every one selects at least one file in
+the reference project**. Docs text versus project filesystem is a genuine second derivation, it turns
+"we teach a shape we cannot enforce" into a red, and it doubles as the vacuity floor.
+
+**Operational constraints, measured, and all three must land in the first commit** — each turns the
+build red in a step _before_ the tests run, the failure that looks like nothing in the working tree:
+
+- `strictBoundaries({ isolateTests: true })` only fires on `${dir}/**/*.test.*`, so the reference project
+  must contain such files — and vitest's `include: ['tests/**/*.test.ts']` would collect and fail them.
+  Use the existing `*.test.fixture.ts` convention (verified compatible with the preset's glob).
+- The 14 layering rules scope by `resideInFolder('**/src/core/**')` with **no** `inProjectSrc()` guard,
+  and `tsconfig.json` includes `tests`. A reference project containing `src/core/` would be enforced by
+  our own dogfood rules, and the cheap fix (`.excluding()`) weakens them. Name the directories
+  differently. Same hazard for `pathUniverse`, whose `keep` filter drops only `tests/fixtures/`: a glob
+  dead against `src/` could read as alive by matching a reference file.
+- ESLint ignores only `tests/fixtures/**` and lints with `projectService`. Excluding from tsconfig
+  without an eslint `ignores` entry produces "file not found in any project".
+- `format:check` enumerates pathspecs and has no `*.tsx` or `*.graphql`, while `npm run format`
+  rewrites both — drift with no signal.
+
+**Prove it by running `npm run validate` with the reference project present and its rule file not yet
+written.**
+
+**Cost is measured and is not the objection.** Full suite: 23.0s wall / 246s CPU. Every preset over a
+571-file program: ~2.8s wall / 4.0s CPU — about **1.5% of the suite's CPU**, against 15- and 20-minute
+workflow timeouts. **Flakiness is the real risk and it is localised**: `noCopyPaste` alone is 1984ms and
+2776 findings on 571 files, and `duplicate-bodies` is pairwise O(n²) over every function in the program.
+Under full parallelism the recorded multiplier is 10–16x, which puts a single 2.8s `it()` past the 30s
+timeout. So: split the assertions across several `it()`s in one file (the program cache is per tsconfig
+path, so that costs one load), scope `duplicateBodies` to boundary folders rather than the whole program,
+and **state a file-count ceiling** — "shaped like an adopter's codebase" has no size bound and the
+quadratic term does.
+
+**Record a wall-clock ceiling.** There is no perf test anywhere in the repo and `docs/` never tells an
+adopter what to expect. The reference project will be the only realistic-scale artifact this project
+has: assert "all presets over N files under X seconds", failing if it doubles. Without it, the first
+accidentally-quadratic condition is found on someone's repo.
 
 ## Test inventory
 
-1. Phase 1's classification is **recorded in the repo**, not in a plan write-up — a committed table,
-   the same lesson as 0079's scan, which cited a script in a scratch directory that was never
-   committed while claiming the numbers were auditable.
-2. Every class-B rule added in Phase 2 demonstrated to fail on a planted violation.
-3. The delete-each-rule audit run once, its result recorded, and any rule that survives deletion
-   either fixed or reclassified.
-4. Phase 3's reference project asserted by identity, with a vacuity floor — a reference project
-   whose rule file selects nothing is the exact false green this library is named after.
-5. A guard that the count does not silently regress: the same shape as
-   `tests/tools/scan-cardinality-assertions.test.ts`'s ratchet, keyed on **which primitives** are
-   enforced rather than how many.
+1. **Phase 0's derivation is a committed script**, not a table — and the class-A column is generated
+   from the rule file and asserted against the committed classification. One column with a free oracle.
+2. Phase 1's plant matrix, with caught-by-nothing reported as a number.
+3. ~12 permanent positive controls, one per mechanism class, surviving Phase 1.
+4. Phase 2's blind-second-reader disagreement rate on 20 items.
+5. Phase 3's three vacuity rows (configuration findings empty; ordinary-finding ruleIds versus the
+   declared set; justified-silent list), the twice-in-one-process assertion, the packed-tarball import,
+   and the docs-glob extraction.
+6. A ratchet — **renamed to what it measures.** "Which primitives are enforced" is not decidable from
+   text: bug 0011 had 17 rules present and selecting nothing, bug 0049 had one pointed at the wrong
+   element kind, and a presence-ratchet would have been green through both while its name claimed
+   enforcement was pinned. Call it `PRIMITIVES_REFERENCED`, key it on the **classification** so an
+   honest class-D retirement does not red it, and give it the probe row 0079's ratchet has — an
+   over-matching extractor is silently green forever, which is the direction nobody checks.
 
 ## Out of scope
 
-- **Raising the number for its own sake.** Stated twice on purpose. Class D exists so that "we
-  deliberately do not enforce this, and here is why" is a recordable outcome rather than a gap.
-- **Dogfooding the CLI in CI** (`doctor` as a build step). Worth doing, and a separate decision:
-  `diagnose()` — doctor's engine — is already self-applied, so this is about the command surface,
-  not the logic.
-- **The 197-of-252 export figure.** Withdrawn as meaningless; recorded here only so it is not
-  rediscovered and quoted.
+- **Raising the number.** Stated three times now on purpose.
+- **Publishing the ratio.** Withdrawn from the roadmap. As a published figure it reads as "75% of this
+  library is unproven on real code", which is false — those primitives are covered by fixtures, they are
+  _not self-applied_, a much weaker claim. What is worth publishing is the **class-C list** framed as
+  "these have no host in our own architecture, so here is how we prove them instead", and the **Phase 1
+  result** — "we planted a violation against each of our own 36 rules; N caught it" is a stronger honesty
+  signal than any ratio.
+- **Any change to `src/presets/`, `src/rules/`, or a default severity, originating from Phases 1–2.**
+  `docs/presets.md` promises adopters that new rules enter at `warn` or `off` in a minor. A dogfooding
+  sprint is the classic way to break that promise while feeling virtuous.
+- **The JSX gap**, now [bug 0051](../bugs/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md).
+  It is a fixture and a test, not a plan phase, and filing it here would have let a stop rule defer it.
+- **Compiling the `docs/` fences.** Raised by the customer review as a better use of Phase 2's budget:
+  8,813 lines of markdown, never compiled, and plan 0069 found all three `@example` blocks in one source
+  file broken. Chain _shape_ is what greps cannot see. Deserves its own plan; noted so it is not lost.
 
-## Related
+## What the review changed
 
-- [Plan 0079](./completed/0079-triage-the-cardinality-only-assertions.md) — the template for a
-  sample-and-stop-rule triage, and the source of the "do not publish a heuristic as a backlog"
-  lesson.
-- [Bug 0049](../bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md) — the closest
-  precedent: our own rule pointed at the wrong element kind, so it never fired on 22 real
-  violations. A self-check that exists is not a self-check that works.
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 — why Phase 3 is treated differently
-  from Phases 1–2.
+Five personas. The framing survived; both measurements did not.
+
+| Finding                                                                                                                                                                                                                            | Status                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| The delete-each-rule audit was **pre-determined** — deleting a passing check from a green suite leaves it green (measured: removing a rule leaves 45/45 passing). Its inference would have reclassified all of class A as class B. | Operator inverted              |
+| The population **does not reproduce**: 166 filed, 185 / 161 / 187 on re-runs. Three reviewers got three numbers.                                                                                                                   | Ratio withdrawn; Phase 0 added |
+| The stop rule **forbade nothing** — both branches said "enforce all of B".                                                                                                                                                         | Rewritten with a prohibition   |
+| Class D had **no ceiling** — only the branch that can stop work was registered, not the one that can excuse it.                                                                                                                    | 40% ceiling registered         |
+| Phase 3's vacuity floor is **satisfied by total vacuity** (`assertDiscovered` emits a finding on zero discovery).                                                                                                                  | Three identity rows            |
+| Phase 3 was **gated behind the phase with no user value**.                                                                                                                                                                         | Ungated and promoted           |
+| JSX: **zero `.tsx` files exist on disk**; the plan filed that as reassurance.                                                                                                                                                      | Bug 0051                       |
+| One premise in my own review brief was wrong: `graphql` is already a devDependency and already required by the suite.                                                                                                              | Corrected here                 |

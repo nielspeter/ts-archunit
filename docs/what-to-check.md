@@ -143,7 +143,17 @@ functions(p)
   .because('event handlers should accept exactly one Event parameter')
   .check()
 
-// TODO: placeholder — replace with a real optional-parameter rule for your project
+// Optional parameters on a public API are a versioning hazard: each one is a
+// shape callers may or may not pass, and they accumulate silently.
+functions(p)
+  .that()
+  .areExported()
+  .and()
+  .haveOptionalParameter()
+  .should()
+  .notExist()
+  .because('prefer an options object over accumulating optional parameters')
+  .check()
 ```
 
 ## Class Structure
