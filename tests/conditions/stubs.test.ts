@@ -359,14 +359,24 @@ describe('WHERE a stub marker may be, and what is merely prose (bugs 0052, 0053)
       'p@2:c1',
     ])
 
-    // **The phrase arm is NOT case-insensitive**, though this comment claimed it was
-    // until v0.49.2 and the reasoning offered was "nobody writes NOT IMPLEMENTED" — which
-    // is the one casing the marker arm would otherwise have caught. Pinned as current
-    // behaviour, NOT as desired behaviour: it is a false negative on a build-failing rule,
-    // filed as [bug 0061](../../bugs/0061-an-all-caps-stub-marker-no-longer-matches.md).
-    // When that lands this row inverts, which is the point of writing it down.
-    expect(found('// NOT IMPLEMENTED\nexport function q(): number {\n  return 1\n}')).toEqual([])
-    expect(found('// COMING SOON\nexport function r2(): number {\n  return 1\n}')).toEqual([])
+    // **The phrase arm IS case-insensitive again, since v0.55.0** — and this row is the
+    // inversion it was written to expect. It previously pinned the defect as *current*
+    // behaviour with a pointer to bug 0061 and the note "when that lands this row inverts,
+    // which is the point of writing it down". That is what happened.
+    //
+    // Derived per letter now, not hand-alternated, so the class cannot return one casing at
+    // a time — which is how it arrived: `[Nn]ot\s+[Ii]mplemented` alternates the first
+    // letter of each word and nothing else.
+    expect(found('// NOT IMPLEMENTED\nexport function q(): number {\n  return 1\n}')).toEqual([
+      'q@2:c1',
+    ])
+    expect(found('// COMING SOON\nexport function r2(): number {\n  return 1\n}')).toEqual([
+      'r2@2:c1',
+    ])
+    // Any casing, not just the two someone happened to notice.
+    expect(found('// nOt ImPlEmEnTeD\nexport function r3(): number {\n  return 1\n}')).toEqual([
+      'r3@2:c1',
+    ])
     // ...and a lowercase marker is NOT reported, which is the stated price of not
     // matching "the todo list below". Pinned so it is a decision, not a surprise.
     expect(found('// todo x\nexport function q2(): number {\n  return 1\n}')).toEqual([])

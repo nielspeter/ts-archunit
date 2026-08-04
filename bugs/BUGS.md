@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.54.1 · **Open:** 4 · **Fixed:** 60 (`fixed/`) · **Updated:** 2026-08-04
+**Version:** 0.55.0 · **Open:** 3 · **Fixed:** 61 (`fixed/`) · **Updated:** 2026-08-04
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -13,15 +13,20 @@
 
 ## Open
 
-All four came out of the five-persona review of v0.47.0–v0.49.0 (except 0054, which those releases found).
+All three came out of the five-persona review of v0.47.0–v0.49.0 (except 0054, which those releases found).
 Every claim below was reproduced by measurement before filing.
 
 | Bug                                                                                                                                            | Severity    | What                                                                                                                                                                                                                                                                                                                                                         |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md) — a cycle's identity changes when imports are reordered                  | **High**    | Same root. Reordering two imports changes `element` from `[a, c, b]` to `[a, b, c]`, reds CI, and the diagnostic blames a rename that never happened. Fail-**open** in the other direction: an SCC absorbs new intra-component edges without changing its name, so a new cycle among 4 of our 6 gated slices is silently accepted.                           |
 | [0059](./0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md) — slice and module conditions disagree about a dependency | Medium-high | `notDependOn` reports 0 and `notImportFrom` reports 1 on the same dynamic import, in the same run. The shared edge-kind set is justified by a _cycle_ argument and applied to two conditions that are not about cycles. Bug 0022's shape one layer up.                                                                                                       |
-| [0061](./0061-an-all-caps-stub-marker-no-longer-matches.md) — an all-caps stub marker no longer matches                                        | Medium      | `// NOT IMPLEMENTED` and `// COMING SOON` miss, against a docstring that claimed the phrase forms stayed case-insensitive. False-negative direction, so nothing tells the user.                                                                                                                                                                              |
 | [0062](./0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md) — the release pipeline's gates drift                 | Medium      | `shellcheck` is in `ci.yml` and not `publish.yml`; a 429 reds the docs step naming four wrong causes; that step's timeout is budgeted at 600s against a 720s worst case; the docs site deploys independently of publish success with no concurrency group. **Verified sound:** a tag cannot publish a failing commit, and no fixture leaks into the tarball. |
+
+One closed in v0.55.0:
+[0061](./fixed/0061-an-all-caps-stub-marker-no-longer-matches.md) — `// NOT IMPLEMENTED` and
+`// COMING SOON` stopped matching. Its classification of every reported row also widened
+[plan 0091](../plans/0091-a-stub-marker-is-delimited-not-cased.md) with three findings that are the
+**anchor's** doing rather than the casing's, including a bulleted `- TODO:` in a JSDoc list.
 
 One closed in v0.54.0:
 [0060](./fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — a shipped default

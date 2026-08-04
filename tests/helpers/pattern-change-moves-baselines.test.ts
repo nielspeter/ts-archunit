@@ -115,8 +115,11 @@ describe('a shipped default pattern has not moved unnoticed (bug 0060)', () => {
 
   it.each(SHIPPED_DEFAULTS)('%s', (name, pattern) => {
     // The exact source form, because that is what reaches the identity.
+    // Updated for v0.55.0 (bug 0061), following this file's own three-step remedy: the
+    // phrase branch's casing is now derived per letter rather than hand-alternated on the
+    // first. The CHANGELOG and upgrading rows are steps 2 and 3.
     const expected =
-      '/(?:^|\\n)[ \\t]*(?:\\/\\/+|\\/\\*+|\\*+)?[ \\t]*(?:TODO|FIXME|HACK|XXX|STUB|DEFERRED|PLACEHOLDER)\\b|(?:^|\\n)[ \\t]*(?:\\/\\/+|\\/\\*+|\\*+)?[ \\t]*(?:[Nn]ot\\s+[Ii]mplemented|[Cc]oming\\s+[Ss]oon)\\b/'
+      '/(?:^|\\n)[ \\t]*(?:\\/\\/+|\\/\\*+|\\*+)?[ \\t]*(?:TODO|FIXME|HACK|XXX|STUB|DEFERRED|PLACEHOLDER)\\b|(?:^|\\n)[ \\t]*(?:\\/\\/+|\\/\\*+|\\*+)?[ \\t]*(?:[Nn][Oo][Tt]\\s+[Ii][Mm][Pp][Ll][Ee][Mm][Ee][Nn][Tt][Ee][Dd]|[Cc][Oo][Mm][Ii][Nn][Gg]\\s+[Ss][Oo][Oo][Nn])\\b/'
 
     expect(String(pattern), `${name}\n\n${REMEDY}\n`).toBe(expected)
   })

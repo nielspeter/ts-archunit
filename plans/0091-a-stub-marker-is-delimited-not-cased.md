@@ -29,7 +29,7 @@ What that costs, measured:
 | `// COMING SOON`             | match    | **miss** |
 
 `// todo:` is the default spelling of VS Code's TODO Tree and of ESLint's `no-warning-comments`. And the
-all-caps phrase miss is [bug 0061](../bugs/0061-an-all-caps-stub-marker-no-longer-matches.md) — shipped
+all-caps phrase miss is [bug 0061](../bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md) — shipped
 against a docstring that claimed the opposite.
 
 Reviewers also reported these, **unverified here and to be measured before acting**, since anchoring and
@@ -60,6 +60,32 @@ which is the trade bug 0053 wanted and reached for casing to get.
 **Verify that claim first.** It is the plan's premise and it is one grep over the five prose forms in bug
 0053's table plus the corpus below. If the delimiter rule does not reject them, the plan is wrong and should
 be closed rather than adjusted.
+
+## Measured input from bug 0061, which changes this plan's scope
+
+[Bug 0061](../bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md) classified every reported row
+as anchor, casing or intended. Two results matter here:
+
+**The casing rows this plan is about** are `// Stub:`, `// Placeholder implementation`, `// hack:` and
+`// todo:` — all real stub spellings with a delimiter, all rejected only by the casing rule. That is the
+plan's premise and it holds.
+
+**But three rows are the ANCHOR's doing, not the casing's**, and this plan did not cover them:
+
+| comment                                               | why it misses                                                           |
+| ----------------------------------------------------- | ----------------------------------------------------------------------- |
+| ` * - TODO: wire this up`                             | the `-` sits between the `*` and the word, so the anchor does not reach |
+| `/** @todo implement caching */`                      | the `@` intervenes the same way                                         |
+| `// For now, return an empty array (not implemented)` | the phrase is mid-line                                                  |
+
+**A bulleted `- TODO:` inside a JSDoc list is an extremely common real marker**, and the first two are
+false negatives on a build-failing rule with nothing to tell the reader. That widens this plan: the anchor
+needs to permit list punctuation and `@` between the comment opener and the word, which is a separate
+change from the delimiter rule and should be sabotaged separately.
+
+The third is the honest hard case — a mid-line phrase is exactly what the anchor exists to reject, and
+"return an empty array (not implemented)" is exactly what it should catch. Do not fix it by dropping the
+anchor; that is bug 0053 reopened. It may have no good answer, in which case say so.
 
 ## Phase 1 — a corpus that is not just us
 
@@ -116,7 +142,7 @@ changed. Two consequences:
 
 - [Bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md) — the fix this revisits, and the
   source of the anti-regression rows.
-- [Bug 0061](../bugs/0061-an-all-caps-stub-marker-no-longer-matches.md) — the narrow fix; this is the
+- [Bug 0061](../bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md) — the narrow fix; this is the
   redesign.
 - [Bug 0060](../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — why the
   migration is worse than it looks.
