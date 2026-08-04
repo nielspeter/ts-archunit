@@ -120,6 +120,43 @@ describe('the slice graph sees re-export edges (plan 0085)', () => {
   })
 })
 
+describe('which edge KINDS the slice graph counts (plan 0085)', () => {
+  // Four kinds are decided in `EAGER_STATIC_KINDS`, and sabotage found each decision
+  // was argued only in a docstring: adding `dynamic` or `type-expression` to that set
+  // left all 3025 tests green. A decision nothing disagrees with is not guarded
+  // (ADR-008 rule 5), and "it says so in a comment" is not disagreement.
+
+  it('a DYNAMIC import is not an edge, even with ignoreTypeImports off', () => {
+    // `import('./a.js')` is lazy: it cannot deadlock module initialization, and it is
+    // most often the *deliberate* remedy for a cycle. Reporting it as a cycle would
+    // fail the rule for applying its own advice.
+    //
+    // Asserted under BOTH option positions, because `dynamic` edges are not typeOnly —
+    // so if they were counted, no type-only filter would hide them.
+    const p = twoSlices(
+      "import { beta } from '../b/index.js'",
+      "export const lazy = () => import('../a/index.js')",
+    )
+    expect(cycles(p)).toEqual([])
+    expect(cycles(p, { ignoreTypeImports: false })).toEqual([])
+  })
+
+  it('a TYPE-EXPRESSION import is not an edge, and is excluded by KIND', () => {
+    // `type X = import('../a/index.js').Alpha` is erased. It is excluded by kind rather
+    // than by its `typeOnly` flag on purpose: filtering it on the flag alone would let
+    // `ignoreTypeImports: false` add a class of edge this graph has never had, turning
+    // that option from "count erased imports" into "count type positions too".
+    //
+    // Which is exactly what the second assertion pins. The first would pass either way.
+    const p = twoSlices(
+      "import { beta } from '../b/index.js'",
+      "export type Ref = import('../a/index.js').Alpha",
+    )
+    expect(cycles(p)).toEqual([])
+    expect(cycles(p, { ignoreTypeImports: false })).toEqual([])
+  })
+})
+
 describe('notDependOn and respectLayerOrder see re-export edges too (plan 0085)', () => {
   /** `ui → data` by the given spelling, and nothing else. */
   function twoLayers(uiToData: string): ArchProject {
@@ -194,7 +231,7 @@ describe('notDependOn and respectLayerOrder see re-export edges too (plan 0085)'
     ).toEqual([])
   })
 
-  it('respectLayerOrder takes the option too', () => {
+  it('respectLayerOrder counts a value re-export under EITHER option value', () => {
     const p = twoLayersReversed()
     // Two spellings deliberately, because they are two overloads: the variadic form
     // takes no options, and `(layers[], options)` takes them. Passing `undefined` as
@@ -209,8 +246,83 @@ describe('notDependOn and respectLayerOrder see re-export edges too (plan 0085)'
       return real(asserted.violations()).map((v) => v.element)
     }
 
+    // Both positions give the same answer, and that is the CLAIM: a value re-export is
+    // not erased, so no option value can hide it. This row does NOT prove the option is
+    // forwarded — it once pretended to, and sabotage caught it: dropping the forwarding
+    // left it green. The forwarding is proven where the option changes the answer, in
+    // "respectLayerOrder honours the option" below.
     expect(run()).toEqual(['index.ts'])
-    expect(run({ ignoreTypeImports: true })).toEqual(['index.ts']) // value re-export, still an edge
+    expect(run({ ignoreTypeImports: true })).toEqual(['index.ts'])
+  })
+})
+
+describe('the graph and the details lookup must agree (plan 0085)', () => {
+  it('a type-only site is not reported when the graph was told to ignore type edges', () => {
+    // `findSliceDependencyDetails` must be given the SAME options as the graph, and
+    // sabotage showed that dropping them was caught by nothing — because an unfiltered
+    // details lookup is a SUPERSET, so a cycle is still located and nothing looks wrong.
+    //
+    // It becomes visible only where the extra details become extra VIOLATIONS: the
+    // layering conditions push one per detail. Here `ui` reaches `data` twice, once by
+    // value and once by `import type`. Under `ignoreTypeImports: true` the graph sees
+    // one edge, and exactly one site may be reported — the value one, on line 1.
+    // With the options dropped, the erased import is reported as a second site: a
+    // finding whose remedy is "remove this dependency" pointed at a line that has no
+    // runtime dependency to remove.
+    const tsm = new Project({ useInMemoryFileSystem: true })
+    tsm.createSourceFile(
+      '/src/data/index.ts',
+      'export const row = 1\nexport type Row = { n: number }\n',
+    )
+    tsm.createSourceFile(
+      '/src/ui/index.ts',
+      "import { row } from '../data/index.js'\nimport type { Row } from '../data/index.js'\nexport const use = row\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+
+    const violations = real(
+      slices(p)
+        .assignedFrom({ data: '**/src/data/**', ui: '**/src/ui/**' })
+        .should()
+        .notDependOn(['data'], { ignoreTypeImports: true })
+        .violations(),
+    )
+    expect(violations.map((v) => v.line)).toEqual([1])
+  })
+
+  it('respectLayerOrder honours the option, proven where it CHANGES the answer', () => {
+    // The other forwarding gap, and the reason it hid: the original row asserted the
+    // same expectation for both option positions, so it could not tell whether the
+    // option arrived. A row that passes under every value of the thing it tests is
+    // testing nothing.
+    //
+    // Here the only upward edge is type-only, so the option flips the answer.
+    const tsm = new Project({ useInMemoryFileSystem: true })
+    tsm.createSourceFile('/src/ui/index.ts', 'export type Widget = { n: number }\n')
+    tsm.createSourceFile(
+      '/src/data/index.ts',
+      "import type { Widget } from '../ui/index.js'\nexport const row: Widget = { n: 1 }\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+    const run = (options?: ImportOptions): string[] => {
+      const b = slices(p).assignedFrom({ ui: '**/src/ui/**', data: '**/src/data/**' })
+      const asserted =
+        options === undefined
+          ? b.should().respectLayerOrder('ui', 'data')
+          : b.should().respectLayerOrder(['ui', 'data'], options)
+      return real(asserted.violations()).map((v) => v.element)
+    }
+
+    expect(run()).toEqual(['index.ts']) // default: coupling counts, even erased
+    expect(run({ ignoreTypeImports: true })).toEqual([]) // and the caller may disagree
   })
 })
 
