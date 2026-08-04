@@ -6,7 +6,12 @@ coverage/
 .idea/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
-/.claude/
+# Local agent configuration stays local — EXCEPT the release gate, which is a project rule and has to
+# travel with the repository to be one. A directory pattern (`/.claude/`) cannot be negated from
+# inside, hence the `/*` form.
+/.claude/*
+!/.claude/settings.json
+!/.claude/hooks/
 /.serena/
 .playwright-mcp/
 
