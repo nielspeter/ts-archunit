@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.52.1] - 2026-08-04
+
+### Fixed
+
+- **A slice finding's identity collided across files sharing a basename.** v0.52.0 built it from
+  `sourceFile.getBaseName()`, copied from the dependency conditions — so two sibling feature folders each
+  with an `index.ts` re-exporting the same name from the same specifier produced **one identity for two
+  distinct violations**, and one baseline entry accepted both. That is the defect plan 0088 was written to
+  fix, in a different shape, in the release that fixed it; and the layout is the commonest there is.
+
+  Now built from the full file path. `hashViolation` normalises the repository root out of identity text,
+  so an absolute path stays portable between a laptop and CI.
+
+  **Baseline impact:** slice identities move again, one day after v0.52.0 moved them. Anyone who
+  regenerated for v0.52.0 must regenerate once more. Stated plainly because it is the cost of having got
+  it wrong, not something to fold quietly into the previous note.
+
+  Found by reviewing v0.52.0 rather than by any test, and the review also found the scheme it was copied
+  from has the same collision — filed as
+  [bug 0063](bugs/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md). The two
+  families deliberately diverge on this component until that lands, and the divergence is recorded at the
+  slice call site.
+
 ## [0.52.0] - 2026-08-04
 
 The identity batch: four filed items shipped together **so adopters pay one baseline regeneration instead

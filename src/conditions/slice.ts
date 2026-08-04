@@ -212,7 +212,21 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
 function siteIdentity(from: string, to: string, site: SliceDependencySite): string {
   return [
     `${from}->${to}`,
-    site.sourceFile.getBaseName(),
+    // The FULL PATH, not the basename — and this is a deliberate divergence from the
+    // dependency family, whose scheme this otherwise copies.
+    //
+    // `getBaseName()` collides, measured: two sibling feature folders each with an
+    // `index.ts` re-exporting the same name from the same specifier produce one identity
+    // for two distinct violations — so one baseline entry accepts both. That is the very
+    // defect plan 0088 was written to fix, in a different shape, and it is the commonest
+    // layout there is. `src/conditions/dependency.ts` has the same collision
+    // ([bug 0063](../../bugs/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)),
+    // which is how it got here: the shape was right to copy, this component was not.
+    //
+    // An absolute path is safe here — `hashViolation` normalises the repository root out of
+    // identity text (`src/core/identity-root.ts`), which is what makes a baseline portable
+    // between a laptop and CI.
+    site.sourceFile.getFilePath(),
     site.edge.kind,
     site.edge.specifier,
     [...site.edge.names].sort((a, b) => a.localeCompare(b)).join(','),
