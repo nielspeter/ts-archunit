@@ -134,7 +134,18 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
     const meta = withBaseline(file)
       .filterNew([pathFree])
       .filter((v) => v.bypassFilters === true)
+    // **It must NOT assert a single cause.** This asserted `'different repository root'`
+    // as "the likely cause" until v0.54.0, and the code had checked none of the
+    // alternatives — bug 0060, where a shipped default pattern changed, both the rule
+    // and the subject moved together so the rename detector stayed silent, and a reader
+    // spent an hour on `root` before regenerating.
+    expect(meta[0]?.message).toContain('one of its INPUTS moved')
+    expect(meta[0]?.message).toContain('This code cannot tell which')
+    // The candidate the old text omitted, and the commonest one: upgrading.
+    expect(meta[0]?.message).toContain('CHANGELOG')
+    // The root is still offered — as a candidate, not as a verdict.
     expect(meta[0]?.message).toContain('different repository root')
+    expect(meta[0]?.message).not.toContain('the likely cause is')
     expect(meta[0]?.message).not.toContain('identity format v2 and this version reads')
     // And the remedy it prints must be runnable. It named `baseline --output X`
     // with no rule files, which exits 1 with "No rule files specified" — a

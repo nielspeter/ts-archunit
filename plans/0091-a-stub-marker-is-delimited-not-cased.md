@@ -6,7 +6,7 @@ generated code — so nothing tells the user.
 **Effort:** Small-medium. One regex; the work is the corpus it is calibrated against.
 **Blast radius:** **Published API, and it ADDS findings.** Widening the pattern reds builds that are green,
 which is the same shape as plan 0085 and needs the same migration care — plus
-[bug 0060](../bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) means it moves
+[bug 0060](../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) means it moves
 every baselined stub finding's hash.
 
 ## Problem
@@ -118,6 +118,6 @@ changed. Two consequences:
   source of the anti-regression rows.
 - [Bug 0061](../bugs/0061-an-all-caps-stub-marker-no-longer-matches.md) — the narrow fix; this is the
   redesign.
-- [Bug 0060](../bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — why the
+- [Bug 0060](../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — why the
   migration is worse than it looks.
 - `src/helpers/matchers.ts`, `src/rules/hygiene.ts`.

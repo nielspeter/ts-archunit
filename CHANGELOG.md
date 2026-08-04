@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.54.0] - 2026-08-04
+
+### Fixed
+
+- **A baseline diagnostic asserted a cause it had never checked.** When no entry matched, it said _"Same
+  identity format, so the likely cause is that it was generated against a different repository root"_ —
+  one candidate among several, none of them tested. A reader who had merely upgraded spent an hour on
+  `root` and then regenerated, which is the outcome `docs/upgrading.md` exists to prevent.
+
+  It now names the candidates in order, puts **upgrading** first because that is when this happens, points
+  at the CHANGELOG, and says plainly that it cannot tell which. The `root` is still offered — as a
+  candidate, not a verdict. ([bug 0060](bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md))
+
+- **`docs/upgrading.md`'s 0.47.0 row now says to regenerate `noStubComments` baselines.** That release
+  rebuilt `STUB_PATTERNS`, and a pattern's text is part of a finding's identity — so every baselined stub
+  finding stopped matching. Measured: 0 of 4 entries. The row mentioned baselines only for cycles.
+
+### Added
+
+- **A change detector for shipped default patterns.** Changing one is a baseline migration, and the tool
+  cannot diagnose it at runtime because the rule description and the finding's subject move together. The
+  new test fails with a remedy naming all three follow-ups — update the string, add the CHANGELOG entry, add
+  the upgrading row — and was verified by changing the pattern.
+
+  It states what it is: a change detector, not a behavioural assertion. It stands in for nothing, since
+  `tests/conditions/stubs.test.ts` already asserts what the pattern _matches_ in sixteen identity-based rows.
+
+### Declined, with the reasoning recorded
+
+- **Removing the pattern from the identity.** The obvious fix, and it does not work: `identifyMatches` puts
+  the _matcher description_ into the identity, and that description **is** the pattern — so "set an identity
+  on comment findings" is a no-op, because the identity is where the problem already lives.
+
+  Every alternative trades one instability for another (hashing the description moves with it; using the
+  matcher's kind collides for two `comment()` matchers in one rule; indexing by position moves on reorder).
+  `matcherDescription` is there deliberately, and the scheme was measured 1:1 over 596 nodes in an 808-file
+  project. Changing it needs its own measurement, so it is recorded rather than guessed at.
+
 ## [0.53.0] - 2026-08-04
 
 ### Fixed
@@ -371,7 +409,7 @@ Eight bugs and four plans filed, none of them deferred silently. The behavioural
   cycle among four of our six gated slices is silently accepted.
 - [0058](bugs/fixed/0058-workspace-applies-one-packages-compiler-flag-to-all.md) — `workspace()` applies one
   package's `verbatimModuleSyntax` to every package, wrong in both directions, decided by a path sort.
-- [0060](bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — v0.47.0 moved every
+- [0060](bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — v0.47.0 moved every
   baselined stub finding's hash, and the diagnostic blames the repository root.
 - [0059](bugs/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
   [0057](bugs/fixed/0057-an-empty-options-object-reverts-a-documented-default.md),

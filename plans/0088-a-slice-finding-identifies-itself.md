@@ -63,7 +63,7 @@ finding's baseline hash changes, once.** That is the price of the three fixes an
 `HASH_VERSION` exists for exactly this — check whether this qualifies as a format change (it does not; the
 format is unchanged, an input moved) and if not, make sure the "0 of N matched" diagnostic explains _this_
 cause rather than guessing the repository root, which is
-[bug 0060](../bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md).
+[bug 0060](../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md).
 
 ## Phase 3 — spend the freedom
 
@@ -115,7 +115,7 @@ that is fail-open by construction and one that is not.
 
 - [Bug 0055](../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md),
   [0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md),
-  [0060](../bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — the three this
+  [0060](../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — the three this
   unblocks.
 - [Bug 0028](../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md) — the same
   collapse, already solved once for another family.

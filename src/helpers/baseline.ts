@@ -705,7 +705,26 @@ export class Baseline {
         ? `It was written in identity format v${String(this.hashVersion)} and this version reads v${String(HASH_VERSION)}, which is the likely cause.`
         : this.hashVersion > HASH_VERSION
           ? `It was written in identity format v${String(this.hashVersion)}, which is newer than this version reads (v${String(HASH_VERSION)}) — upgrade ts-archunit rather than regenerating.`
-          : 'Same identity format, so the likely cause is that it was generated against a different repository root — see the `root` option on withBaseline()/generateBaseline().'
+          : // **Do not assert a cause that has not been distinguished from its alternatives.**
+            //
+            // This branch used to say "Same identity format, so the likely cause is that it
+            // was generated against a different repository root". That is one cause among
+            // several and the code has checked none of them —
+            // [bug 0060](../../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md),
+            // where a shipped default pattern changed and a reader spent an hour on `root`
+            // before regenerating, which is the outcome `docs/upgrading.md` exists to prevent.
+            //
+            // The rename detector above cannot cover it either: when a pattern changes, the
+            // rule description AND the subject move together, so `hashSubject` misses and
+            // that diagnostic stays silent. Nothing here can tell these apart, so the honest
+            // output is the candidate list, ordered, with the version-specific one first
+            // because upgrading is when this happens.
+            'The identity format is unchanged, so one of its INPUTS moved. This code cannot tell which; ' +
+            'in order of likelihood: (1) you upgraded and a shipped rule description or default pattern ' +
+            'changed — check the CHANGELOG entry for the version you moved to, which says so when it ' +
+            'happens; (2) the baseline was generated against a different repository root — see the ' +
+            '`root` option on withBaseline()/generateBaseline(); (3) the rules themselves were edited. ' +
+            'If it is (1), regenerating is correct and expected.'
     return {
       rule: 'ts-archunit: baseline',
       element: 'baseline',
