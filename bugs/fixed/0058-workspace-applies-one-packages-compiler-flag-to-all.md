@@ -1,8 +1,8 @@
 # Bug 0058: `workspace()` applies one package's `verbatimModuleSyntax` to every package
 
-**Reported:** 2026-08-04 · **Fixed:** not yet
+**Reported:** 2026-08-04 · **Fixed:** 2026-08-04 (v0.50.0)
 **Found in:** v0.49.0
-([plan 0087](../plans/completed/0087-an-inline-type-import-still-requests-the-module.md)), the release
+([plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md)), the release
 that started reading the flag.
 **Severity:** **High.** Wrong in **both** directions on a published condition, silently, in the
 configuration where slice rules are most used — a monorepo. Which direction you get is decided by an
@@ -56,9 +56,9 @@ hypothesis — options changed after edges are cached — was measured and **ref
 `Project.compilerOptions.set()` triggers a reparse which fires `onModified`, so the entry is dropped.
 That invalidation is accidentally correct and worth a comment before someone "fixes" it away.)
 
-## Fix
+## Fix as shipped
 
-Resolve the flag **per file**, from the tsconfig that owns it. The machinery exists: `workspace()`
+Resolved the flag **per file**, from the tsconfig that owns it. The machinery exists: `workspace()`
 already has `resolvedPaths`, and `src/core/project-relative.ts` already keeps a per-`Project` root list
 with `rootOf(sourceFile)` answering "which root owns this file" — the same shape can carry per-root
 compiler options. This is bug 0035's shape, in the file that already fixed it for globs, whose own
@@ -87,7 +87,43 @@ line is worth keeping: this defect is two fixture lines away from having been ca
 
 ## Related
 
-- [Plan 0087](../plans/completed/0087-an-inline-type-import-still-requests-the-module.md) — added the read.
-- [Bug 0035](./fixed/0035-a-workspace-has-no-single-root.md) — same shape, same file, already solved for
+- [Plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md) — added the read.
+- [Bug 0035](./0035-a-workspace-has-no-single-root.md) — same shape, same file, already solved for
   globs.
 - `src/core/module-edges.ts`, `src/core/project.ts`, `src/core/project-relative.ts`.
+
+## Fix as shipped, in detail
+
+New `src/core/per-root-compiler-options.ts`. `workspace()` registers each resolved tsconfig's options
+against the root directory it governs — beside the `registerProjectRoots` call that already does the same
+thing for globs, one line apart, because it is the same insight one field over. Lookup reuses
+`rootOf(sourceFile)`, which already answers "which registered root contains this file, longest first" so a
+nested package wins over the repository.
+
+Two decisions worth recording:
+
+- **Each tsconfig is read through ts-morph with `skipAddingFilesFromTsConfig: true`.** Going through
+  ts-morph rather than parsing the JSON is deliberate — `extends` has to resolve, and a monorepo whose
+  packages inherit a base config is exactly where hand-rolling that gets the wrong answer (ADR-002). The
+  skip flag is what keeps it cheap: a ten-package workspace would otherwise parse every package's sources
+  ten times to answer one boolean.
+- **The fallback is the old behaviour.** A file the registry does not cover — `project()`, or an in-memory
+  test double — answers from the project-wide options exactly as before, so nothing outside `workspace()`
+  moved.
+
+## Sabotage
+
+| Revert                                                          | Result                                  |
+| --------------------------------------------------------------- | --------------------------------------- |
+| Disable the per-root lookup (revert to project-wide)            | CAUGHT — 3 rows, **in both directions** |
+| Drop `registerRootCompilerOptions` from `workspace()`           | CAUGHT — same 3                         |
+| Baseline asserted green before each, restored and byte-verified | 0                                       |
+
+The controls and the uniform-workspace row correctly stay **green** on those reverts, which is the
+discrimination that matters: the fix changes only the mixed case.
+
+**Two fixture pairs, because one pair cannot test this.** `verbatim-module-syntax` and
+`verbatim-module-syntax-off` always sort with `-off` first (`'-' < '/'`), so that pair only ever exercises
+one primary. `zz-aa-verbatim-on` / `zz-bb-verbatim-off` force the other order. A fix that read the _last_
+config instead of the first would have satisfied a single-order test — which is the same lesson as ADR-008
+rule 5's new bundled-revert corollary, arriving from the fixture side.

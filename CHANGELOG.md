@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.50.0] - 2026-08-04
+
+Two silent wrong answers, both found by the five-persona review of v0.47–v0.49 and both reproduced by
+measurement before being fixed.
+
+### Fixed
+
+- **In a `workspace()`, every package was judged by one package's `verbatimModuleSyntax`** — whichever
+  tsconfig sorted first. `workspace()` builds one ts-morph `Project` from the primary config and then only
+  _adds files_ from the rest, so `getCompilerOptions()` answered for the tie-break winner. Wrong in **both**
+  directions, measured on byte-identical fixtures:
+  - primary flag off → the flag-`true` package's **real cycle vanished**;
+  - primary flag on → the flag-`false` package got a **phantom cycle**, which reds CI with a remedy
+    ("extract shared code to a lower-level module") that cannot remediate it, because there is nothing to
+    extract. An agent handed that restructures working code.
+
+  Now resolved per file from the tsconfig that owns it, reusing the `rootOf()` machinery that already
+  answers "which package contains this file" for globs — this is
+  [bug 0035](bugs/fixed/0035-a-workspace-has-no-single-root.md)'s shape one field over, and the fix sits one
+  line from the call that fixed it then. Projects loaded through `project()` are unaffected: the fallback is
+  the previous behaviour. ([bug 0058](bugs/fixed/0058-workspace-applies-one-packages-compiler-flag-to-all.md))
+
+- **`beFreeOfCycles({})` silently reverted to the pre-0.47 graph.** The default sat on the whole object
+  while the read was per field, so any object defeated it — and `{}` typechecks, because the field is
+  optional. Measured: `()` reported no cycle and `({})` reported one, on a project whose only cross-slice
+  edge was an `import type`. Now resolved per field, once, and passed down complete so the graph and the
+  details lookup cannot disagree. `notDependOn` and `respectLayerOrder` now state their opposite default
+  (`?? false`) explicitly rather than relying on `undefined` being falsy.
+  ([bug 0057](bugs/fixed/0057-an-empty-options-object-reverts-a-documented-default.md))
+
+### Internal
+
+- New `src/core/per-root-compiler-options.ts`. Each tsconfig is read through ts-morph with
+  `skipAddingFilesFromTsConfig: true` — through ts-morph because `extends` has to resolve, and a monorepo
+  whose packages inherit a base config is exactly where hand-parsing the JSON gets it wrong; with the skip
+  flag because a ten-package workspace would otherwise parse every package's sources ten times to answer one
+  boolean.
+- Two new fixture pairs, because **one pair cannot test this**: `verbatim-module-syntax` and
+  `-off` always sort with `-off` first, so that pair only ever exercises one primary. A fix reading the
+  _last_ config instead of the first would have satisfied a single-order test — the same lesson as v0.49.2's
+  bundled-revert corollary, arriving from the fixture side.
+- One case is **recorded rather than tested**: an options object carrying an unrelated _future_
+  `ImportOptions` field is rejected by TypeScript's excess-property check, and expressing it would need an
+  `as` cast that ADR-005 bars. The type system is a second line of defence for the literal form only. The
+  test says so instead of pretending to cover it.
+
 ## [0.49.2] - 2026-08-04
 
 Guards, from the fifth review. No behaviour changed; **six things that could not fail now can.** Each was
@@ -144,12 +190,12 @@ Eight bugs and four plans filed, none of them deferred silently. The behavioural
 - [0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — reordering two imports reds CI
   and blames a rename; and an SCC absorbs _new_ intra-component edges without changing its name, so a new
   cycle among four of our six gated slices is silently accepted.
-- [0058](bugs/0058-workspace-applies-one-packages-compiler-flag-to-all.md) — `workspace()` applies one
+- [0058](bugs/fixed/0058-workspace-applies-one-packages-compiler-flag-to-all.md) — `workspace()` applies one
   package's `verbatimModuleSyntax` to every package, wrong in both directions, decided by a path sort.
 - [0060](bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — v0.47.0 moved every
   baselined stub finding's hash, and the diagnostic blames the repository root.
 - [0059](bugs/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
-  [0057](bugs/0057-an-empty-options-object-reverts-a-documented-default.md),
+  [0057](bugs/fixed/0057-an-empty-options-object-reverts-a-documented-default.md),
   [0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md),
   [0062](bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md).
 

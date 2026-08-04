@@ -234,6 +234,37 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
     expect(hashes(before)).not.toEqual(hashes(after))
   })
 
+  it('an EMPTY options object behaves as no argument at all', () => {
+    // Bug 0057. The default used to sit on the whole object while the read was per
+    // field, so any object defeated it: `beFreeOfCycles({})` typechecks — the field is
+    // optional — and silently gave the pre-0.47 graph, reporting a cycle that cannot
+    // exist at runtime. Measured before the fix: `()` -> [], `({})` -> ['[a, b]'].
+    const p = twoSlices(TYPE_B, TYPE_A)
+    expect(cycles(p, {})).toEqual([])
+    expect(cycles(p)).toEqual([])
+
+    // The pairing, so the fix is not "ignore the argument".
+    expect(cycles(p, { ignoreTypeImports: false })).toEqual(['[a, b]'])
+  })
+
+  it('an options object built elsewhere, not restating the field, keeps the default', () => {
+    // The realistic shape of bug 0057: options that came from a config object or a
+    // helper and simply do not mention the field. Before the fix this reverted a
+    // documented default; the mechanism was per-object rather than per-field.
+    const fromConfig: ImportOptions = {}
+    const spread: ImportOptions = { ...fromConfig }
+    expect(cycles(twoSlices(TYPE_B, TYPE_A), spread)).toEqual([])
+
+    // The case I could NOT write, recorded rather than faked: an object carrying an
+    // unrelated FUTURE field of `ImportOptions`. `{ someNewOption: true }` is rejected by
+    // TypeScript's excess-property check (TS2559), and expressing it would need an `as`
+    // cast, which ADR-005 bars. So the type system is a second line of defence here —
+    // worth knowing, and worth not mistaking for the guard: it protects the literal form
+    // only, and stops protecting anything the moment the second field genuinely exists.
+    // The guard for that day is the per-field resolution itself, which the rows above
+    // pin. This is the honest state, not a gap I have covered.
+  })
+
   it('VACUITY: the fixture really has two slices with files in each', () => {
     // Every row above asserts on an empty-or-not list. If the slices resolved to
     // nothing, "no cycle" would be true for the wrong reason — ∀ over ∅, which is
