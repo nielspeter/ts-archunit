@@ -22,6 +22,10 @@ jobs:
       - run: npm run format:check
       - run: npm run test
       - run: npm run build
+      # Plan 0083 Phase 3: resolve every `exports` subpath by PACKAGE NAME and assert each
+      # target ships. Twelve subpaths existed for months with nothing resolving one — the
+      # only tests naming the package treated it as a string. Must run AFTER build.
+      - run: node scripts/verify-package.mjs
 
       # The repo's shell scripts are covered by nothing else: `format:check`'s
       # pathspec list has no `*.sh`, ESLint ignores them, and `typecheck` cannot see

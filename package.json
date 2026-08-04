@@ -75,10 +75,11 @@
   },
   "author": "Niels Peter",
   "scripts": {
-    "prepublishOnly": "npm run validate && npm run build",
+    "prepublishOnly": "npm run validate && npm run build && node scripts/verify-package.mjs",
     "validate": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "fix": "npm run lint:fix && npm run format",
     "build": "tsc -p tsconfig.build.json && chmod +x dist/cli/bin.js",
+    "verify:package": "npm run build && node scripts/verify-package.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/ tests/",
