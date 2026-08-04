@@ -97,11 +97,57 @@ describe('ON DISK: the same source, two tsconfigs (plan 0087)', () => {
     expect(flag(OFF)).toBe(false)
   })
 
+  it('VACUITY: both fixtures actually LOAD their files through project()', () => {
+    // The byte-identity row above reads the files with `fs`. It never loads them, so it
+    // cannot see a fixture that compiles nothing — and `cyclesIn` filters out
+    // `bypassFilters` findings, which is where the library's own unsuppressable
+    // "loaded 0 source files" diagnostic goes.
+    //
+    // **Measured:** point the `-off` fixture's `include` at `src/**/*.tsx` and all 21
+    // rows in this file still pass. "The same source has NO cycle" becomes ∀ over ∅ —
+    // in the file whose entire argument is "identical bytes, opposite verdicts", with
+    // one of the two verdicts manufactured. The ON side was already safe only because
+    // its row asserts a NON-empty result.
+    //
+    // Both sibling files carry this row; this one did not.
+    for (const [label, root] of [
+      ['ON', ON],
+      ['OFF', OFF],
+    ] as const) {
+      const built = slices(project(path.join(root, 'tsconfig.json'))).assignedFrom({
+        a: '**/src/a/**',
+        b: '**/src/b/**',
+      })
+      const configFindings = built
+        .should()
+        .beFreeOfCycles()
+        .violations()
+        .filter((v) => v.bypassFilters === true)
+      expect(configFindings.map((v) => `${label}: ${v.message}`)).toEqual([])
+    }
+  })
+
   it('the flag ON: the cycle is REPORTED — the false negative this plan fixes', () => {
     // `a` reaches `b` only through `import { type Beta }`, and `b` imports `a` by
     // value. Under this tsconfig that emits `import {} from '../b/index.js'`, so both
     // modules are evaluated and the cycle is real.
     expect(cyclesIn(project(path.join(ON, 'tsconfig.json')))).toEqual(['[a, b]'])
+
+    // And it must be LOCATED. Changing only the DETAILS call's question to
+    // 'type-bindings' — leaving the graph correct — is caught by nothing: the graph
+    // reports the cycle, the details lookup filters the edge out as `typeOnly`, and the
+    // finding lands at `unknown:0`. Bug 0055 owns that symptom; this row guards the
+    // mechanism so it cannot return once 0055 is fixed.
+    const located = slices(project(path.join(ON, 'tsconfig.json')))
+      .assignedFrom({ a: '**/src/a/**', b: '**/src/b/**' })
+      .should()
+      .beFreeOfCycles()
+      .rule({ id: 'test/no-cycles', because: 'cycles break module init order' })
+      .violations()
+      .filter((v) => v.bypassFilters !== true)
+    expect(located).toHaveLength(1)
+    expect(located[0]!.file).toMatch(/src\/a\/index\.ts$/)
+    expect(located[0]!.line).toBeGreaterThan(0)
   })
 
   it('the flag OFF: the same source has NO cycle', () => {
@@ -229,6 +275,36 @@ describe('the erasure fields, per form (plan 0087)', () => {
       expect(streamed.length).toBeGreaterThan(5) // not vacuous
       expect(canonical(streamed)).toEqual(canonical(cached))
     }
+  })
+
+  it('the forms that erase the module request are exactly these', () => {
+    // Was `if (erases) expect(typeOnly).toBe(true)` — an implication that nothing forced
+    // to be non-empty. **Proved vacuous:** hardwire `erasesRequest` to return false for
+    // every form and both flags — the exact false-negative direction plan 0087 fixed —
+    // and that row passed alone. The v0.49.0 changelog claimed the invariant was
+    // "asserted over every form at both flag positions"; it was asserted only in the
+    // direction that cannot fail.
+    //
+    // So assert the set by identity (ADR-008 rule 4). A form silently changing sides
+    // reds HERE, not only in the FORMS table two rows down — and an implementation that
+    // erases nothing cannot satisfy a non-empty expectation.
+    const erasing = FORMS.flatMap(([decl, label]) =>
+      [false, true]
+        .filter((verbatim) => classify(verbatim, decl).erases)
+        .map((verbatim) => `${label} @ vms:${verbatim}`),
+    )
+    expect(erasing).toEqual([
+      'import type { X } @ vms:false',
+      'import type { X } @ vms:true',
+      'import { type X } @ vms:false',
+      'export type { X } from @ vms:false',
+      'export type { X } from @ vms:true',
+      'export { type X } from @ vms:false',
+      'export type * as N from @ vms:false',
+      'export type * as N from @ vms:true',
+      'type X = import(s).Y @ vms:false',
+      'type X = import(s).Y @ vms:true',
+    ])
   })
 
   it('erasesModuleRequest implies typeOnly, for every form and both flags', () => {

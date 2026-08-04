@@ -17,7 +17,7 @@
  * 0084 turned that rule on, which is what made the false negative worth paying for.
  */
 import { describe, it, expect } from 'vitest'
-import { Project } from 'ts-morph'
+import { Project, ts } from 'ts-morph'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import type { ImportOptions } from '../../src/core/import-options.js'
@@ -328,6 +328,97 @@ describe('the graph and the details lookup must agree (plan 0085)', () => {
     )
     expect(found.map((v) => v.element)).toEqual(['[a, b]'])
     expect(found[0]!.line).toBe(2)
+  })
+
+  it('respectLayerOrder asks the COUPLING question, not the cycle question', () => {
+    // **The guard that did not exist.** Plan 0087 has ONE sabotage row for two
+    // conditions — "notDependOn/respectLayerOrder ask the cycle question" — and it
+    // scored CAUGHT with all four call sites patched. The only test that fired calls
+    // `notDependOn`. Measured: flipping BOTH of `respectLayerOrder`'s question sites to
+    // 'module-request' leaves all 3055 tests passing.
+    //
+    // The methodological lesson is bigger than the gap: `notDependOn` and
+    // `respectLayerOrder` received textually identical changes, so the DIFF presented
+    // them as one thing and the natural revert row bundled them. Enumerating reverts
+    // from the diff does not protect you here — the diff is what suggested the bundle.
+    // **When a revert row names two call sites, split it into two rows.**
+    //
+    // The failure this prevents: under `verbatimModuleSyntax`, `import { type Widget }`
+    // does not erase its module request, so the cycle question keeps the edge. Asking
+    // that question here reports an upward dependency whose BINDINGS are erased —
+    // telling the reader to remove a coupling that does not exist.
+    const tsm = new Project({
+      useInMemoryFileSystem: true,
+      compilerOptions: { verbatimModuleSyntax: true, module: ts.ModuleKind.ESNext },
+    })
+    tsm.createSourceFile('/src/ui/index.ts', 'export type Widget = { n: number }\n')
+    tsm.createSourceFile(
+      '/src/data/index.ts',
+      "import { type Widget } from '../ui/index.js'\nexport const row: Widget = { n: 1 }\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+
+    // `data → ui` is upward and forbidden. The bindings are type-level, so a caller
+    // asking to ignore type imports must get nothing — whatever the emit does.
+    const violations = real(
+      slices(p)
+        .assignedFrom({ ui: '**/src/ui/**', data: '**/src/data/**' })
+        .should()
+        .respectLayerOrder(['ui', 'data'], { ignoreTypeImports: true })
+        .violations(),
+    )
+    expect(violations.map((v) => v.element)).toEqual([])
+
+    // And the pairing: counting type edges, it IS a coupling and IS reported.
+    const counted = real(
+      slices(p)
+        .assignedFrom({ ui: '**/src/ui/**', data: '**/src/data/**' })
+        .should()
+        .respectLayerOrder('ui', 'data')
+        .violations(),
+    )
+    expect(counted.map((v) => v.element)).toEqual(['index.ts'])
+  })
+
+  it('respectLayerOrder passes its options to the details lookup too', () => {
+    // C2, the mirror of the `notDependOn` row above — which was CAUGHT while this was
+    // MISSED. Same defect the `findSliceDependencyDetails` docstring warns about in
+    // bold, in the sibling that got the code and not the guard.
+    //
+    // `data → ui` twice: by value on line 1, type-only on line 2. Under
+    // `ignoreTypeImports: true` the graph sees one edge, so exactly one site may be
+    // reported — the value one. An unfiltered details lookup reports both, and the
+    // second points at an `import type` line with "remove this dependency".
+    const tsm = new Project({
+      useInMemoryFileSystem: true,
+      compilerOptions: { module: ts.ModuleKind.ESNext },
+    })
+    tsm.createSourceFile(
+      '/src/ui/index.ts',
+      'export const widget = 1\nexport type Widget = { n: number }\n',
+    )
+    tsm.createSourceFile(
+      '/src/data/index.ts',
+      "import { widget } from '../ui/index.js'\nimport type { Widget } from '../ui/index.js'\nexport const row: Widget = { n: widget }\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+
+    const violations = real(
+      slices(p)
+        .assignedFrom({ ui: '**/src/ui/**', data: '**/src/data/**' })
+        .should()
+        .respectLayerOrder(['ui', 'data'], { ignoreTypeImports: true })
+        .violations(),
+    )
+    expect(violations.map((v) => v.line)).toEqual([1])
   })
 
   it('respectLayerOrder honours the option, proven where it CHANGES the answer', () => {
