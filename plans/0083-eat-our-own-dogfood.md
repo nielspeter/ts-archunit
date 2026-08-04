@@ -1,6 +1,6 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** **Phase 1 in progress** (2026-08-04). Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
+**Status:** **Phase 1 DONE (2026-08-04). Phase 0, 2 and 3 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both now fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md) — **unreleased**, batching with bug 0051 and plan 0084 rather than taking a release each. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
 broke both of its measurements and inverted its phase order** — see "What the review changed".
 **Priority:** Phase 1 high, Phase 3 high, Phase 2 medium. Not for a count: two features built to fix
