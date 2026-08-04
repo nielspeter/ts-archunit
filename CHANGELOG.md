@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.48.0] - 2026-08-04
+
+The slice graph could not see a re-export, so the commonest cycle there is — a barrel — was invisible
+to the condition whose job is finding cycles.
+
+### Changed
+
+- **`beFreeOfCycles()`, `notDependOn()` and `respectLayerOrder()` now count re-export edges.**
+  `export { x } from './b.js'` and `export * from './b.js'` emit an import of the module, so they are
+  real runtime dependencies; the slice graph read `getImportDeclarations()` only and could not see
+  them. `export type { X } from` stays erased.
+
+  **This only ADDS findings.** A project green today can go red, and each new finding is a dependency
+  that was always there. The likeliest place is a **barrel**: `a → barrel → a` is the classic cycle
+  shape and it was undetectable before. If you keep a baseline, regenerate it — a cycle's identity is
+  its member list, so a cycle that got _wider_ is a different violation, not a moved one.
+
+  The three conditions now read `edgesOf()`, the one definition of a module edge that has handled
+  re-exports since v0.28.0 (bug 0022). This was the call site that never adopted it, which is why
+  `export { x } from './banned.js'` was a dependency to `notImportFrom` and invisible to
+  `beFreeOfCycles` **in the same run**. ([plan 0085](plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md))
+
+- **Two kinds are deliberately not counted, and now tested rather than asserted in a comment.**
+  Dynamic `import()` is lazy, cannot deadlock module initialization, and is usually the _deliberate_
+  fix for a cycle — reporting it would fail a rule for applying its own remedy. `require()` is CJS and
+  this is an ESM-only package. A type position (`type X = import('./b.js').Y`) is excluded by kind, so
+  `{ ignoreTypeImports: false }` cannot add a class of edge the graph has never had.
+
+### Added
+
+- **`notDependOn()` and `respectLayerOrder()` accept `ImportOptions`**, in the same two-overload shape
+  as `dependOn()`: `notDependOn('legacy')` or `notDependOn(['legacy'], { ignoreTypeImports: true })`.
+
+  **Their default differs from `beFreeOfCycles()` on purpose**, and it is documented next to both: a
+  cycle is about runtime initialization order, so an erased edge cannot contribute to one; isolation
+  and layering are about _coupling_, and a type-only dependency on `legacy` still breaks when `legacy`
+  is deleted. So cycles ignore type-only edges by default and these two count them, matching
+  `dependOn()` and `notImportFrom()` as shipped.
+
+### Fixed
+
+- **A cycle is now located at a runtime edge, never at an erased one.** `beFreeOfCycles()` takes its
+  file and line from the first dependency site it can resolve, and that lookup did not receive the
+  same type-only filter as the graph — so a cycle could be reported at an `import type` line, telling
+  the reader to break a dependency that is already erased. Found by sabotage, not by a failing test.
+
+- **`docs/slices.md` had lost the tail of its own title** since v0.32.0: the page read `# Slices` with
+  a stray `& Layers` rendering after the first admonition, because an earlier edit fused the closing
+  fence with the heading. Restored, and the admonition itself rewritten — it documented the re-export
+  blindness as permanent.
+
+### Internal
+
+- Filed [plan 0087](plans/0087-an-inline-type-import-still-requests-the-module.md) with the
+  measurement behind it: under `verbatimModuleSyntax: true`, `import { type X } from 's'` emits
+  `import {} from 's'`. The specifiers are erased, the module request is not, so it is an eager edge
+  the graph currently drops. Not fixed here — `ModuleEdge.typeOnly` conflates "erased bindings" with
+  "erased statement", which that measurement proves are different questions, and five conditions read
+  it. Changing shared semantics under a re-export fix is what plan 0085 refused to do.
+- 12 of 12 sabotage reverts caught. Five were caught by nothing on the first pass: two edge-kind
+  exclusions argued only in a docstring, and three forwarding gaps — including one where the test
+  asserted the same answer for both values of the option it claimed to test.
+
 ## [0.47.0] - 2026-08-04
 
 Four gates that could not fail, found by pointing our own library at ourselves
@@ -68,7 +131,7 @@ Four gates that could not fail, found by pointing our own library at ourselves
 - Two known gaps filed rather than deferred silently:
   [bug 0054](bugs/0054-within-makes-helpers-depend-on-builders.md) (the surviving cycle, waived by
   identity so any change to its shape still reds) and
-  [plan 0085](plans/0085-the-slice-graph-cannot-see-a-re-export.md) (the slice graph sees no
+  [plan 0085](plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md) (the slice graph sees no
   `export … from` edge at all — a false negative on three conditions, and the barrel cycle is the shape
   it misses).
 

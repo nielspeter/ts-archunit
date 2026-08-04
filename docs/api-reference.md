@@ -309,11 +309,11 @@ Available on all entry points via `.that()`.
 
 ## Slice Conditions
 
-| Export              | Signature                                | Description                                                                                                                                |
-| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `beFreeOfCycles`    | `beFreeOfCycles(options?)`               | No circular dependencies between slices. Ignores type-only imports by default; pass `{ ignoreTypeImports: false }` for the pre-0.47 graph. |
-| `respectLayerOrder` | `respectLayerOrder(...layers: string[])` | Dependencies follow declared layer order.                                                                                                  |
-| `notDependOn`       | `notDependOn(slice: string)`             | No slice depends on the named slice.                                                                                                       |
+| Export              | Signature                                             | Description                                                                                                                                |
+| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `beFreeOfCycles`    | `beFreeOfCycles(options?)`                            | No circular dependencies between slices. Ignores type-only imports by default; pass `{ ignoreTypeImports: false }` for the pre-0.47 graph. |
+| `respectLayerOrder` | `respectLayerOrder(...layers)` or `(layers, options)` | Dependencies follow declared layer order. Counts type-only edges by default.                                                               |
+| `notDependOn`       | `notDependOn(...slices)` or `(slices, options)`       | No slice depends on the named slices. Counts type-only edges by default; one finding per dependency site.                                  |
 
 ## Call Conditions
 

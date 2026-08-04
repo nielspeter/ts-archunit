@@ -158,35 +158,51 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
       ),
     ).toEqual([])
 
-    // The caveat, recorded because it is a real limit and not a rounding error:
-    // under `verbatimModuleSyntax: true` this form emits `import {} from '../b/index.js'`
-    // — the specifiers vanish, the MODULE REQUEST does not — so it is a runtime
-    // module-init edge and could genuinely close a cycle. `import type { Beta }` is
-    // erased outright and never can.
+    // The caveat, and it is now MEASURED rather than reasoned. Emitted through
+    // ts-morph, same source, both settings:
     //
-    // We do not read that flag here. `isTypeOnlyImport` has had these semantics since
-    // v0.28.0 and is shared with `dependOn`/`notImportFrom`, so changing it is not this
-    // plan's call to make quietly — it is carried as an open question on plan 0085,
-    // which owns the graph's edge definition. This repo does not set the flag.
+    //   verbatimModuleSyntax: false -> (nothing; fully elided)
+    //   verbatimModuleSyntax: true  -> import {} from '../b/index.js';
+    //
+    // The specifiers vanish, the MODULE REQUEST does not. So under that flag this form
+    // IS a runtime module-init edge and can close a cycle, and the assertion above is
+    // a false negative for such a project. `import type { Beta }` is erased outright
+    // under both settings and never can be.
+    //
+    // Left as-is deliberately. `ModuleEdge.typeOnly` collapses "erased specifiers" and
+    // "erased module request", which this measurement proves are different questions,
+    // and it is read by five conditions — so the fix ADDS a distinction to the shared
+    // edge model rather than changing `isTypeOnlyImport`, whose current meaning is
+    // right for the four coupling conditions. That is
+    // [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md),
+    // which owns it and will update this row. This repo does not set the flag.
   })
 
-  it('a re-export is not an edge AT ALL — the documented limit, measured', () => {
-    // Plan 0084's test inventory row 4 asked for a re-export cycle on the theory that
-    // handling `import type` but not `export type` would leave "half the feature
-    // broken". The premise is false, and measuring it is the only way to know: the
-    // slice graph reads `getImportDeclarations()` only, so NO re-export is an edge —
-    // value or type. There is no asymmetry for this fix to introduce.
+  it('a re-export IS an edge now — the marker this row was left as', () => {
+    // Inverted by [plan 0085](../../plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md),
+    // which is what it was for. Plan 0084 wrote this row asserting `[]` and said so:
+    // "it is a real false negative, and when plan 0085 fixes it this row reds and tells
+    // its successor what changed." It did exactly that — the only failure in the suite
+    // when the re-export edges landed.
     //
-    // `beFreeOfCycles`' own docstring already says so, naming the barrel re-export as
-    // *the* classic cycle it cannot see, deliberately deferred by plan 0071. This row
-    // turns that prose into a test: it is a real false negative, and when plan 0085
-    // fixes it this row reds and tells its successor what changed.
+    // Kept rather than deleted because the record is the point: the limit was known,
+    // deliberate, documented in the condition's own docstring, and deferred by plan
+    // 0071 — and a deleted row would leave no trace that it had ever been decided.
     const valueReExport = twoSlices(
       "export { beta } from '../b/index.js'",
       "export { alpha } from '../a/index.js'",
     )
-    expect(cycles(valueReExport)).toEqual([])
-    expect(cycles(valueReExport, { ignoreTypeImports: false })).toEqual([])
+    expect(cycles(valueReExport)).toEqual(['[a, b]'])
+    expect(cycles(valueReExport, { ignoreTypeImports: false })).toEqual(['[a, b]'])
+
+    // And the type-only re-export is still erased, which is the pairing that proves
+    // the new path consults `isTypeOnlyReExport` rather than counting every export.
+    const typeReExport = twoSlices(
+      "export type { Beta } from '../b/index.js'",
+      "export type { Alpha } from '../a/index.js'",
+    )
+    expect(cycles(typeReExport)).toEqual([])
+    expect(cycles(typeReExport, { ignoreTypeImports: false })).toEqual(['[a, b]'])
   })
 
   it('MIGRATION: the option changes cycle membership, so it changes baseline identity', () => {
