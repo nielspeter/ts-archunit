@@ -23,7 +23,7 @@
     "poc",
     "tests/__generated__",
     // Bug 0051: this fixture is deliberately `.tsx` and carries its OWN tsconfig
-    // with `"jsx": "react-jsx"`. The root program sets no `jsx`, so compiling it
+    // with `"jsx": "preserve"`. The root program sets no `jsx`, so compiling it
     // here fails with TS17004 — in `npm run typecheck`, before any test runs.
     // ESLint already ignores `tests/fixtures/**`, so no second exclusion is needed.
     "tests/fixtures/jsx-on-disk"

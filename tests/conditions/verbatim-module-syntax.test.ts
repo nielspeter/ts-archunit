@@ -81,9 +81,19 @@ describe('ON DISK: the same source, two tsconfigs (plan 0087)', () => {
     // The whole design of these fixtures is that the SOURCE cannot explain the
     // difference. If they drift apart, the pair below proves nothing — so this is
     // asserted first, and without using the library at all.
-    for (const rel of ['src/a/index.ts', 'src/b/index.ts']) {
-      expect(fs.readFileSync(path.join(ON, rel), 'utf-8')).toBe(
-        fs.readFileSync(path.join(OFF, rel), 'utf-8'),
+    // The file list is DERIVED, not hand-maintained. It used to be
+    // `['src/a/index.ts', 'src/b/index.ts']`, so a third file added to one fixture was
+    // invisible to the claim it is supposed to establish.
+    const listing = (root: string): string[] =>
+      fs
+        .readdirSync(path.join(root, 'src'), { recursive: true, encoding: 'utf-8' })
+        .filter((f) => f.endsWith('.ts'))
+        .sort()
+    expect(listing(ON)).toEqual(listing(OFF))
+    expect(listing(ON).length).toBeGreaterThan(1) // non-vacuous
+    for (const rel of listing(ON)) {
+      expect(fs.readFileSync(path.join(ON, 'src', rel), 'utf-8')).toBe(
+        fs.readFileSync(path.join(OFF, 'src', rel), 'utf-8'),
       )
     }
     const flag = (root: string): unknown => {
@@ -95,6 +105,24 @@ describe('ON DISK: the same source, two tsconfigs (plan 0087)', () => {
     }
     expect(flag(ON)).toBe(true)
     expect(flag(OFF)).toBe(false)
+
+    // And the flag is the ENTIRE difference, asserted rather than spot-checked. This row
+    // used to read one key out of each tsconfig, so changing `module` in one fixture was
+    // caught by nothing — while the row's whole claim is "identical bytes, opposite
+    // verdicts, and the compiler option is the only reason".
+    const optionsWithoutFlag = (root: string): unknown => {
+      const parsed: unknown = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.json'), 'utf-8'))
+      if (typeof parsed !== 'object' || parsed === null) return parsed
+      const clone: Record<string, unknown> = { ...parsed }
+      const options = clone['compilerOptions']
+      if (typeof options === 'object' && options !== null) {
+        const rest: Record<string, unknown> = { ...options }
+        delete rest['verbatimModuleSyntax']
+        clone['compilerOptions'] = rest
+      }
+      return clone
+    }
+    expect(optionsWithoutFlag(ON)).toEqual(optionsWithoutFlag(OFF))
   })
 
   it('VACUITY: both fixtures actually LOAD their files through project()', () => {
