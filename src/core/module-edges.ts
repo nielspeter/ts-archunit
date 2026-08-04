@@ -1,5 +1,5 @@
 import { Node, SyntaxKind } from 'ts-morph'
-import type { SourceFile } from 'ts-morph'
+import type { SourceFile, StringLiteral } from 'ts-morph'
 import { isTypeOnlyImport, isTypeOnlyReExport } from './import-options.js'
 import { registerCacheReset } from './cache-registry.js'
 
@@ -62,8 +62,48 @@ export interface ModuleEdge {
    * single-line test.
    */
   readonly line: number
-  /** Erased at compile time, so no runtime dependency. Per-kind; see below. */
+  /**
+   * The **bindings** crossing this edge are type-level. Per-kind; see below.
+   *
+   * This is the *coupling* question — "does this file reference that file's types" —
+   * and it is what `dependOn`, `notImportFrom`, `onlyImportFrom` and the module
+   * predicates ask. It is deliberately NOT the same question as
+   * {@link erasesModuleRequest}, and conflating them was
+   * [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md).
+   */
   readonly typeOnly: boolean
+  /**
+   * The whole statement disappears, so **no module request is emitted** and the
+   * target module is never evaluated.
+   *
+   * This is the *module-initialization* question — "will importing this file cause
+   * that file to run" — and it is what cycle detection must ask. A cycle is a
+   * deadlock in initialization order; a coupling is not.
+   *
+   * The two differ for exactly two spellings, and only under
+   * `verbatimModuleSyntax: true`. Measured through ts-morph's own emit, same source,
+   * both settings:
+   *
+   * | form                          | `vms: false` | `vms: true`                 |
+   * | ----------------------------- | ------------ | --------------------------- |
+   * | `import type { X } from 's'`  | erased       | erased                      |
+   * | `import { type X } from 's'`  | erased       | **`import {} from 's'`**    |
+   * | `import { type X, y } from`   | requests     | requests                    |
+   * | `export type { X } from 's'`  | erased       | erased                      |
+   * | `export { type X } from 's'`  | erased       | **`export {} from 's'`**    |
+   * | `export { type X, y } from`   | requests     | requests                    |
+   * | `export * from 's'`           | requests     | requests                    |
+   * | `export type * as N from 's'` | erased       | erased                      |
+   *
+   * The specifiers vanish; the module request does not. So under that flag those two
+   * forms are eager edges that can close a cycle, and treating them as erased is a
+   * false negative — which is what `beFreeOfCycles` did until v0.49.0.
+   *
+   * `erasesModuleRequest` implies `typeOnly`: a statement cannot vanish while still
+   * binding a runtime value. `tests/core/module-edges-erasure.test.ts` asserts that
+   * invariant over every form rather than leaving it as a claim.
+   */
+  readonly erasesModuleRequest: boolean
   /**
    * Named bindings crossing the edge.
    *
@@ -193,6 +233,9 @@ function clearModuleEdgeCache(): void {
 registerCacheReset(clearModuleEdgeCache)
 
 function buildEdges(sourceFile: SourceFile): readonly ModuleEdge[] {
+  // Once per file, not once per literal. Measured: 0.1ms across this repo's 574
+  // files, so hoisting is for clarity rather than cost.
+  const verbatim = usesVerbatimModuleSyntax(sourceFile)
   const edges: (ModuleEdge & { pos: number })[] = []
   for (const literal of sourceFile.getImportStringLiterals()) {
     const parent = literal.getParent()
@@ -203,16 +246,7 @@ function buildEdges(sourceFile: SourceFile): readonly ModuleEdge[] {
       // The literal's absolute position, so the sort below is genuine source
       // order. It is dropped from the public shape by the `map` at the end.
       pos: literal.getPos(),
-      kind,
-      // NOT narrowed: see the module docstring. (`getLiteralValue()` would also
-      // work — measured, both accessors return the same cooked text for both
-      // literal kinds. The hazard is the narrowing, not the accessor; an earlier
-      // version of this comment forbade the sibling accessor on no evidence.)
-      specifier: literal.getLiteralText(),
-      resolvedPath: resolve(literal),
-      line: statementLine(literal),
-      typeOnly: isErased(kind, parent),
-      names: namesOf(kind, parent),
+      ...makeEdge(literal, parent, kind, verbatim),
       // Sorted by the literal's absolute position so the result is source-ordered
       // and deterministic. The binder's `imports` array puts declaration forms
       // first and expression forms after, regardless of where they appear — so
@@ -339,6 +373,76 @@ function isErased(kind: ModuleEdgeKind, parent: Node): boolean {
     case 'require':
       return false
   }
+}
+
+/**
+ * Whether the statement vanishes entirely, emitting no module request.
+ *
+ * `typeOnly` is passed in rather than recomputed: the two answers must agree on the
+ * same node, and `isErased` is not free (it walks specifiers).
+ *
+ * Under `verbatimModuleSyntax` TypeScript preserves the statement unless the `type`
+ * modifier is on the **declaration** — `import type { X }` goes, `import { type X }`
+ * stays as `import {} from 's'`. Without the flag, elision is by binding usage and
+ * every type-only form disappears.
+ */
+function erasesRequest(
+  kind: ModuleEdgeKind,
+  parent: Node,
+  typeOnly: boolean,
+  verbatimModuleSyntax: boolean,
+): boolean {
+  // A statement that binds a runtime value is always emitted.
+  if (!typeOnly) return false
+  if (!verbatimModuleSyntax) return true
+  switch (kind) {
+    case 'import':
+      return Node.isImportDeclaration(parent) ? parent.isTypeOnly() : true
+    case 'reexport':
+      return Node.isExportDeclaration(parent) ? parent.isTypeOnly() : true
+    case 'type-expression':
+      // `type X = import('s').Y` is a type position: never emitted under any flag.
+      return true
+    case 'dynamic':
+    case 'require':
+      // Unreachable — neither is ever `typeOnly` — but stated rather than defaulted,
+      // for the same reason the sibling switches in this file are exhaustive.
+      return false
+  }
+}
+
+/**
+ * One edge, built in one place.
+ *
+ * `buildEdges` and `edgeStream` each used to spell out the same field list, which is
+ * a shape that drifts silently: `edgeStream`'s only consumer reads `typeOnly`, so a
+ * field missing there would never surface until something else looked.
+ */
+function makeEdge(
+  literal: StringLiteral,
+  parent: Node,
+  kind: ModuleEdgeKind,
+  verbatimModuleSyntax: boolean,
+): ModuleEdge {
+  const typeOnly = isErased(kind, parent)
+  return {
+    kind,
+    // `getLiteralText()`, NOT `getText().slice(1, -1)` and NOT a narrowing — see the
+    // module docstring. The declared element type of `getImportStringLiterals()` is
+    // what this parameter takes, so the accessor is available without narrowing a
+    // node that may really be a NoSubstitutionTemplateLiteral.
+    specifier: literal.getLiteralText(),
+    resolvedPath: resolve(literal),
+    line: statementLine(literal),
+    typeOnly,
+    erasesModuleRequest: erasesRequest(kind, parent, typeOnly, verbatimModuleSyntax),
+    names: namesOf(kind, parent),
+  }
+}
+
+/** `verbatimModuleSyntax`, defaulting to off when the option is absent. */
+function usesVerbatimModuleSyntax(sourceFile: SourceFile): boolean {
+  return sourceFile.getProject().getCompilerOptions().verbatimModuleSyntax === true
 }
 
 /** The names crossing the edge. See {@link ModuleEdge.names} for which name. */
@@ -536,6 +640,7 @@ export function* edgeStream(sourceFile: SourceFile): Generator<ModuleEdge> {
     yield* hit
     return
   }
+  const verbatim = usesVerbatimModuleSyntax(sourceFile)
   // Cold: stream, and deliberately do NOT populate the cache. Filling it here
   // would resolve every literal in the file to answer a question the first one
   // may settle, which is the cost this generator exists to avoid
@@ -545,14 +650,7 @@ export function* edgeStream(sourceFile: SourceFile): Generator<ModuleEdge> {
     if (parent === undefined) continue
     const kind = kindOf(parent)
     if (kind === undefined) continue
-    yield {
-      kind,
-      specifier: literal.getLiteralText(),
-      resolvedPath: resolve(literal),
-      line: statementLine(literal),
-      typeOnly: isErased(kind, parent),
-      names: namesOf(kind, parent),
-    }
+    yield makeEdge(literal, parent, kind, verbatim)
   }
 }
 

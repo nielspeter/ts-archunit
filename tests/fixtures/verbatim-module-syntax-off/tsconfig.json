@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}
