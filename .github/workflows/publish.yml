@@ -32,8 +32,16 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
+      # Bug 0062: this was in ci.yml and NOT here, so CI's verdict on the release scripts
+      # was concurrent with the publish run and gated nothing. One of them holds a secret
+      # in the release path.
+      - run: shellcheck -x .github/scripts/*.sh scripts/*.sh
       - run: npm run test
       - run: npm run build
+      # Plan 0083 Phase 3: resolve every `exports` subpath by PACKAGE NAME and assert each
+      # target ships. Twelve subpaths existed for months with nothing resolving one — the
+      # only tests naming the package treated it as a string. Must run AFTER build.
+      - run: node scripts/verify-package.mjs
 
       # Verify the version in package.json matches the tag
       - name: Verify version matches tag
