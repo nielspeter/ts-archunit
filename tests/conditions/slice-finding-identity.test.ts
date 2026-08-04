@@ -89,11 +89,58 @@ describe('a barrel’s dependency sites are distinct findings (plan 0088)', () =
     // reason, and this follows that scheme rather than inventing a second one.
     const found = forbidden(barrelProject())
     expect(found.map((v) => v.identity)).toEqual([
-      'barrel->legacy::index.ts::reexport::../legacy/index.js::a',
-      'barrel->legacy::index.ts::reexport::../legacy/index.js::b',
-      'barrel->legacy::index.ts::reexport::../legacy/index.js::c',
+      'barrel->legacy::/src/barrel/index.ts::reexport::../legacy/index.js::a',
+      'barrel->legacy::/src/barrel/index.ts::reexport::../legacy/index.js::b',
+      'barrel->legacy::/src/barrel/index.ts::reexport::../legacy/index.js::c',
     ])
     for (const v of found) expect(v.identity).not.toMatch(/\d+$/)
+  })
+
+  it('two files sharing a BASENAME are distinct findings', () => {
+    // The collision my first version shipped, found by reviewing it rather than by any
+    // test. The identity used `getBaseName()` — copied from the dependency family — so two
+    // sibling feature folders each with an `index.ts` re-exporting the same name from the
+    // same specifier produced ONE identity for TWO violations, and one baseline entry
+    // accepted both.
+    //
+    // That is plan 0088's own defect in a different shape, in the release that fixed it,
+    // and the layout is the commonest there is. The dependency family still has it —
+    // [bug 0063](../../bugs/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md).
+    const tsm = new Project({
+      useInMemoryFileSystem: true,
+      compilerOptions: { module: ts.ModuleKind.ESNext },
+    })
+    tsm.createSourceFile('/src/legacy/index.ts', 'export const x = 1\n')
+    tsm.createSourceFile(
+      '/src/features/alpha/index.ts',
+      "export { x } from '../../legacy/index.js'\n",
+    )
+    tsm.createSourceFile(
+      '/src/features/beta/index.ts',
+      "export { x } from '../../legacy/index.js'\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+
+    const found = slices(p)
+      .assignedFrom({ features: '**/src/features/**', legacy: '**/src/legacy/**' })
+      .should()
+      .notDependOn('legacy')
+      .rule({ id: 'test/no-legacy', because: 'legacy is being retired' })
+      .violations()
+      .filter((v) => v.bypassFilters !== true)
+
+    // Same basename, same specifier, same names, same slice pair — everything the old
+    // identity looked at was equal.
+    expect(found.map((v) => v.file)).toEqual([
+      '/src/features/alpha/index.ts',
+      '/src/features/beta/index.ts',
+    ])
+    const hashes = found.map((v) => hashViolation(v))
+    expect(hashes).toEqual([...new Set(hashes)])
   })
 
   it('inserting a line above the sites does NOT change their identities', () => {
