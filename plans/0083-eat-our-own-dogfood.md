@@ -1,8 +1,8 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** **Phase 1 DONE (2026-08-04), shipped in v0.47.0. Phase 0 and 2 not started. Phase 3 not started, and now the priority — see the re-verification below.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
+**Status:** **Phase 1 DONE (v0.47.0). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 and 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
 
-**Phase 3's central claim re-verified 2026-08-04 at v0.49.2, and it is worse than "uncovered".** `package.json` declares **12 `exports` subpaths and not one of them is ever resolved by anything.** The only two test files that mention `@nielspeter/ts-archunit` treat it as a _string_: `tests/cli/init.test.ts` asserts that the scaffolded rule file **contains the text** `import { recommended } from '@nielspeter/ts-archunit/presets'`, which is the opposite of resolving it. Were that subpath missing from the map, the test still passes and every scaffolded project fails on its first run. Nothing packs a tarball. **Four releases shipped on 2026-08-04 across that gap**, and `npm pack --dry-run` confirming the file list is not the same evidence as resolving the map. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
+**Phase 3's central claim, as it stood at v0.49.2 — now fixed, kept because it is the measurement that justified the work.** `package.json` declares **12 `exports` subpaths and not one of them is ever resolved by anything.** The only two test files that mention `@nielspeter/ts-archunit` treat it as a _string_: `tests/cli/init.test.ts` asserts that the scaffolded rule file **contains the text** `import { recommended } from '@nielspeter/ts-archunit/presets'`, which is the opposite of resolving it. Were that subpath missing from the map, the test still passes and every scaffolded project fails on its first run. Nothing packs a tarball. **Four releases shipped on 2026-08-04 across that gap**, and `npm pack --dry-run` confirming the file list is not the same evidence as resolving the map. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
 broke both of its measurements and inverted its phase order** — see "What the review changed".
 **Priority:** Phase 1 high, Phase 3 high, Phase 2 medium. Not for a count: two features built to fix
@@ -171,7 +171,63 @@ And **a second reader classifies 20 items blind**, reporting the disagreement ra
 0079 explicitly did not produce, it is cheap here, and it is the only thing making the census auditable
 by someone who did not do it.
 
-## Phase 3 — the reference consumer. Promoted, and not gated on Phase 2.
+## Phase 3 — DONE for both hard requirements (v0.51.0), and split
+
+**Both hard requirements shipped; the "reference consumer" wrapper did not, deliberately.** Phase 3 as
+written bundled three things, and only two were the requirements:
+
+|                                                                 | Needed the reference consumer?                        |
+| --------------------------------------------------------------- | ----------------------------------------------------- |
+| Resolve the package by name through the `exports` map           | **No** — `scripts/verify-package.mjs`                 |
+| Same rule array twice in one process                            | **No** — `tests/presets/rules-are-idempotent.test.ts` |
+| Every preset, one project, one process, per-rule-id finding map | That _is_ it — see below                              |
+
+### Requirement 1 shipped by a cheaper method than this plan proposed
+
+The plan said `npm pack` → install → import. **Node self-references a package by its own name when it
+declares `exports`**, so the real map resolves through the real algorithm with no install and no network.
+Three checks, because sabotage killed the first two:
+
+1. every subpath resolves _and exports something_ — a subpath resolving to an empty module is a subpath
+   nobody can use;
+2. every declared target appears in `npm pack --dry-run --json` — the failure self-referencing cannot see,
+   a target that resolves locally and is absent from the tarball;
+3. **every specifier the repo itself writes is IN the map**, derived from `src/` and `docs/`. Checks 1 and
+   2 both pass when a subpath is _removed_ — the rest still resolve and still ship. Deleting `./presets`
+   now names `src/cli/commands/init.ts` as the file that would break, which is the file that scaffolds it
+   into every new project.
+
+**It is a script, not a test**, because all three need `dist/` and `npm run validate` runs the suite
+_before_ `npm run build`. A vitest row that skipped on a missing `dist/` would be a check that cannot fail.
+Wired into `ci.yml`, `publish.yml` and `prepublishOnly`; `publish.yml` also gained the `shellcheck` step it
+was missing (part of [bug 0062](../bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md)).
+
+### Requirement 2 shipped, and the first version could not see the bug it cites
+
+`tests/presets/rules-are-idempotent.test.ts` builds each preset's array **once** and evaluates it twice —
+no reference project, no snapshot, nothing to hand-edit when detection improves.
+
+Two rounds were needed, and both are the point:
+
+- **The first version was blind to bug 0034.** Its `agentGuardrails` options set only `noInlineLogic`, so
+  the preset never constructed the stub rule, `comment()` was never reached, and reintroducing bug 0034's
+  exact mechanism — a `Set` in that matcher's closure, never reset — left all six rows green. Fixed by
+  enabling every guardrail option, chosen to reach the code the bug lived in. _A test that cites a bug it
+  cannot see is worse than no test._
+- **Declaration order turned out to be part of the derivation.** Leaked state is module-level, so it
+  survives between `it()` blocks: with the union row last, the rows above had already warmed the leak and
+  its own first run saw the degraded answer. Only the row that runs **first** sees cold state, so exactly
+  one row can catch a module-level leak. The union row is declared first now, and the comment says so.
+
+### What was NOT built, and why
+
+The reference consumer proper — every preset over one project with a `Record<ruleId, elements>` map — is
+re-filed as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). It does not gate either
+requirement, it is the expensive part, and this plan already warns it is "a snapshot in all but name".
+Shipping the two cheap guards first was the right order; whether the third earns its keep is a separate
+decision and should be made on its own.
+
+## Phase 3 — the original text, for the record
 
 **Ungated.** The first draft said "Phases 2 and 3 only happen if Phase 1 says so" and then admitted
 Phase 3 "is judged on its own merits" — so the staging only delayed the one phase with user-facing

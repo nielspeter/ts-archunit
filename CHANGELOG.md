@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.51.0] - 2026-08-04
+
+Plan 0083 Phase 3's two hard requirements. No shipped behaviour changed; two classes of day-one breakage
+are now guarded, and one of them had been unguarded across six releases.
+
+### Added
+
+- **`npm run verify:package`** — every `exports` subpath resolves **by package name**, every declared
+  target ships in the tarball, and every specifier the repo itself writes maps to a subpath.
+
+  `package.json` declared **12 subpaths and nothing had ever resolved one.** The only two test files
+  mentioning `@nielspeter/ts-archunit` treat it as a _string_: `tests/cli/init.test.ts` asserts the
+  scaffolded rule file **contains the text** of an import of `@nielspeter/ts-archunit/presets`, which is the
+  opposite of resolving it — so a subpath missing from the map left that test green while every scaffolded
+  project failed on its first run.
+
+  Cheaper than packing and installing: Node **self-references** a package by its own name when it declares
+  `exports`, so the real map resolves through the real algorithm with no install and no network. The
+  tarball half is read from `npm pack --dry-run --json`. The third check exists because sabotage showed the
+  first two both pass when a subpath is _removed_ — the rest still resolve and still ship. Deleting
+  `./presets` now names `src/cli/commands/init.ts` as the file that would break.
+
+  Wired into `ci.yml`, `publish.yml` and `prepublishOnly`. It is a script rather than a test because all
+  three checks need `dist/` and `validate` runs the suite _before_ `build` — a vitest row that skipped on a
+  missing `dist/` would be a check that cannot fail.
+
+- **`tests/presets/rules-are-idempotent.test.ts`** — each shipped preset's rule array is built **once** and
+  evaluated three times, compared by identity. Bug 0034 was not "presets fan out"; it was a `Set` in a
+  matcher closure that was never reset, so `evaluate()` returned 2 findings and then 0 — while 2767 tests
+  passed, because every test built a fresh matcher.
+
+  Two rounds were needed and both are worth recording. **The first version was blind to the bug it cites:**
+  its `agentGuardrails` options never constructed the stub rule, so `comment()` was never reached and
+  reintroducing bug 0034's exact mechanism left all six rows green. And **declaration order turned out to be
+  part of the derivation** — leaked state is module-level, so only the row that runs _first_ sees it cold,
+  and exactly one row can catch a module-level leak.
+
+### Fixed
+
+- **`publish.yml` gained the `shellcheck` step it was missing.** It was in `ci.yml` only, and since `main`
+  is unprotected and none of the day's releases went through a PR, CI's verdict on the release scripts was
+  _concurrent_ with the publish run and gated nothing — one of those scripts holds a secret in the release
+  path. Part of [bug 0062](bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md).
+
+### Internal
+
+- Plan 0083 Phase 3's reference-consumer wrapper is **deliberately not built**, and re-filed as
+  [plan 0093](plans/0093-a-reference-consumer-for-the-presets.md) whose first task is to justify itself: of
+  six candidate defects it might catch, five are already covered and the sixth needs no reference project.
+  0083's own text warns the artifact is "a snapshot in all but name", so the plan says to consider closing
+  it rather than building it.
+
 ## [0.50.0] - 2026-08-04
 
 Two silent wrong answers, both found by the five-persona review of v0.47–v0.49 and both reproduced by
