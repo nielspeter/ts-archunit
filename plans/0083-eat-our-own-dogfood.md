@@ -292,7 +292,7 @@ accidentally-quadratic condition is found on someone's repo.
 - **Any change to `src/presets/`, `src/rules/`, or a default severity, originating from Phases 1–2.**
   `docs/presets.md` promises adopters that new rules enter at `warn` or `off` in a minor. A dogfooding
   sprint is the classic way to break that promise while feeling virtuous.
-- **The JSX gap**, now [bug 0051](../bugs/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md).
+- **The JSX gap**, now [bug 0051](../bugs/fixed/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md).
   It is a fixture and a test, not a plan phase, and filing it here would have let a stop rule defer it.
 - **Compiling the `docs/` fences.** Raised by the customer review as a better use of Phase 2's budget:
   8,813 lines of markdown, never compiled, and plan 0069 found all three `@example` blocks in one source

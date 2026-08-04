@@ -1,7 +1,7 @@
 /**
  * `jsxElements()` against `.tsx` files **on disk**, through a real tsconfig.
  *
- * [Bug 0051](../../bugs/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md):
+ * [Bug 0051](../../bugs/fixed/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md):
  * before this file there was not one `.tsx` or `.jsx` file anywhere in the
  * repository. Every JSX test built its sources in memory —
  * `useInMemoryFileSystem: true` then `createSourceFile('test.tsx', code)` — and set
