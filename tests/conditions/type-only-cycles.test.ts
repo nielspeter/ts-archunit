@@ -23,7 +23,7 @@ import { Project } from 'ts-morph'
 import type { ArchProject } from '../../src/core/project.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import type { ImportOptions } from '../../src/core/import-options.js'
-import type { ArchViolation } from '../../src/core/types.js'
+import type { ArchViolation } from '../../src/core/violation.js'
 import { hashViolation } from '../../src/helpers/baseline.js'
 
 /** Two slices, `a/` and `b/`, with the import spellings under test. */

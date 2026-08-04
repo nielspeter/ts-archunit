@@ -90,9 +90,38 @@ function readdirRecursive(dir: string): string[] {
 
 const BUILT: DiagnosableRule[] = []
 
-function gate<T extends DiagnosableRule>(rule: T): T {
+/** A rule that can be run at error severity. `warn` is deliberately absent. */
+interface Checkable {
+  check: () => void
+}
+
+/**
+ * Record the rule for `diagnose()`, and hand back **only `.check()`**.
+ *
+ * The narrowing is the point. `gate()` used to return the rule unchanged, so
+ * `.warn()` stayed reachable on all 37 of them — and plan 0084 exists because
+ * `arch/no-cycles` sat at `.warn()` for months, could not fail, and let a new
+ * cycle in overnight. Sabotage confirmed the obvious gap: reverting that one
+ * `.check()` to `.warn()` was **caught by nothing**. The plan removed the
+ * instance and left the mechanism, which is ADR-008 rule 5 — the fix is not
+ * guarded until something disagrees with it.
+ *
+ * Now `.warn()` on a gated rule fails twice: `npm run typecheck` (the property
+ * does not exist) and the test run itself (nor does it at runtime). Two
+ * derivations, because typecheck is a separate command and `vitest run` alone
+ * would not have noticed.
+ *
+ * If a rule here ever *should* warn — ADR-008 rule 1 allows it for a finding the
+ * reader must judge — add an explicit `gateAdvisory()` beside this that says so
+ * in its name and carries the reason. Do not widen this one.
+ */
+function gate<T extends DiagnosableRule & Checkable>(rule: T): Checkable {
   BUILT.push(rule)
-  return rule
+  return {
+    check: () => {
+      rule.check()
+    },
+  }
 }
 
 const SRC_PREFIX = path.dirname(path.resolve('tsconfig.json')).replaceAll('\\', '/') + '/src/'
