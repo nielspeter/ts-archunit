@@ -2,6 +2,7 @@ import { Node, SyntaxKind } from 'ts-morph'
 import type { SourceFile, StringLiteral } from 'ts-morph'
 import { isTypeOnlyImport, isTypeOnlyReExport } from './import-options.js'
 import { registerCacheReset } from './cache-registry.js'
+import { verbatimModuleSyntaxFor } from './per-root-compiler-options.js'
 
 /**
  * One definition of "a module edge", for every condition that needs one.
@@ -440,9 +441,16 @@ function makeEdge(
   }
 }
 
-/** `verbatimModuleSyntax`, defaulting to off when the option is absent. */
+/**
+ * `verbatimModuleSyntax` for the package that owns this file, off when absent.
+ *
+ * Delegated rather than read from the project, because inside a `workspace()` the project
+ * carries the alphabetically-first tsconfig's options and every other package would be
+ * judged by them — wrong in both directions, measured
+ * ([bug 0058](../../bugs/fixed/0058-workspace-applies-one-packages-compiler-flag-to-all.md)).
+ */
 function usesVerbatimModuleSyntax(sourceFile: SourceFile): boolean {
-  return sourceFile.getProject().getCompilerOptions().verbatimModuleSyntax === true
+  return verbatimModuleSyntaxFor(sourceFile)
 }
 
 /** The names crossing the edge. See {@link ModuleEdge.names} for which name. */

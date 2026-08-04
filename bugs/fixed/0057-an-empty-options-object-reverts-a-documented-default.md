@@ -1,8 +1,8 @@
 # Bug 0057: an empty options object reverts `beFreeOfCycles`' documented default
 
-**Reported:** 2026-08-04 · **Fixed:** not yet
+**Reported:** 2026-08-04 · **Fixed:** 2026-08-04 (v0.50.0)
 **Found in:** v0.47.0, where the default was introduced
-([plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md)).
+([plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md)).
 **Severity:** Medium now, High later. Only `{}` reaches it today; the moment `ImportOptions` gains a
 second field, any caller passing that field silently reverts a documented default.
 
@@ -45,9 +45,10 @@ caller's intent was unrelated.
 The same shape reaches users through a variable: `beFreeOfCycles(opts)` where `opts` came from config and
 happens not to set the field.
 
-## Fix
+## Fix as shipped
 
-Resolve per field, not per object:
+Resolved per field, **once, in the condition**, and passed down as a complete object — so the graph and
+the details lookup cannot disagree about what the default was:
 
 ```ts
 export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
@@ -74,6 +75,20 @@ explicit so a future default change is a one-line edit rather than an audit.
 
 ## Related
 
-- [Plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) — introduced the
+- [Plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) — introduced the
   default, and its own test rows all pass an explicit field, which is why none of them caught this.
 - `src/conditions/slice.ts`, `src/helpers/slice-graph.ts`.
+
+## Sabotage
+
+| Revert                                                            | Result                                   |
+| ----------------------------------------------------------------- | ---------------------------------------- |
+| Back to a whole-object default on `beFreeOfCycles`                | CAUGHT — the `{}` row and the spread row |
+| `?? true` becomes `?? false` on cycles                            | CAUGHT — the no-argument row             |
+| `?? false` becomes `?? true` on `notDependOn`/`respectLayerOrder` | CAUGHT — the coupling-default rows       |
+
+**One case is recorded rather than tested, and the reason is worth keeping.** An options object carrying an
+unrelated _future_ field of `ImportOptions` is rejected by TypeScript's excess-property check (TS2559), and
+expressing it would need an `as` cast, which ADR-005 bars. So the type system is a second line of defence
+for the literal form — and stops being one the moment a second field genuinely exists. The guard for that
+day is the per-field resolution itself. The test says so in place of pretending to cover it.

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { clearRegisteredCaches } from './cache-registry.js'
 import fs from 'node:fs'
 import { registerProjectRoots } from './project-relative.js'
+import { registerRootCompilerOptions } from './per-root-compiler-options.js'
 
 /**
  * A loaded TypeScript project. Returned by `project()`.
@@ -160,6 +161,12 @@ export function workspace(tsConfigPaths: string[]): ArchProject {
   // package that contains the file, so `'src/api/**'` means each package's
   // `src/api` rather than the alphabetically-first one's (bug 0035).
   registerProjectRoots(tsMorphProject, resolvedPaths)
+
+  // Same argument, one field over: compiler options are per package too, and
+  // `addSourceFilesFromTsConfig` above adds files WITHOUT adding options — so
+  // `getCompilerOptions()` answers for the primary config whatever package a file is in.
+  // Bug 0058, measured wrong in both directions before this line existed.
+  registerRootCompilerOptions(tsMorphProject, resolvedPaths)
 
   const archProject: ArchProject = {
     tsConfigPath: primaryConfig,
