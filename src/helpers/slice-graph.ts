@@ -67,6 +67,14 @@ const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>(
  *
  * `ignoreTypeImports` drops the erased edges. A type-only import or re-export creates
  * no runtime dependency, so counting it invents cycles that cannot exist at runtime —
+ *
+ * **with one measured exception, tracked by
+ * [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md).**
+ * Under `verbatimModuleSyntax: true`, `import { type X } from 's'` emits
+ * `import {} from 's'` — the specifiers are erased, the module request is not — so it
+ * is an eager edge that this filter currently drops. `edgesOf` cannot express the
+ * difference yet: `typeOnly` conflates "erased bindings" with "erased statement".
+ *
  * [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md),
  * which is worth remembering for what it cost: this repo's own `arch/no-cycles` rule
  * sat at `.warn()` for months with a comment saying "switch to .check() when

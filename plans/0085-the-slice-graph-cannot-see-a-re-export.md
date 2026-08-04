@@ -96,23 +96,34 @@ it looks like an inconsistency and is not:
 Put that paragraph in the docs. A reader who notices the difference must find the reason next to it, or
 they will file it as a bug — and a future maintainer will "fix" it.
 
-## Phase 3 — the open question this plan owns
+## Phase 3 — the open question, decided
 
-**Does `import { type Alpha } from './a.js'` create a runtime edge?** `isTypeOnlyImport` says no. Under
-`verbatimModuleSyntax: true` the answer is **yes**: TypeScript emits `import {} from './a.js'`, dropping
-the specifiers and keeping the module request, so the module is still evaluated and can still close a
-cycle. Without the flag the import is elided and there is no edge.
+**Decided by measurement: the concern is real, and the fix is not this plan's.**
 
-So the correct answer depends on a compiler option we do not read. Recorded, with a test pinning
-current behaviour, in `tests/conditions/type-only-cycles.test.ts`. Not changed in 0084 because
-`isTypeOnlyImport` is shared with `dependOn`/`notImportFrom` and has had these semantics since v0.28.0
-— changing it quietly under a cycle fix would be a behaviour change to four conditions smuggled in
-under a fifth.
+`import { type Alpha } from './a.js'` — emitted through ts-morph, same source, both settings:
 
-Deciding it needs: what `ts-morph` exposes for the effective `verbatimModuleSyntax`, whether the answer
-should differ per condition (it plausibly should — see Phase 2's split), and a fixture project with the
-flag on. If the conclusion is "leave it", say so in the docstring with the reason; a documented limit is
-fine, an undocumented one is the thing this library is against.
+| `verbatimModuleSyntax` | Emitted                    |
+| ---------------------- | -------------------------- |
+| `false`                | _(nothing — fully elided)_ |
+| `true`                 | `import {} from './a.js';` |
+
+The specifiers vanish, the **module request does not**, so under that flag the form is an eager edge
+that can close a cycle and our graph drops it. The option is readable —
+`project.getCompilerOptions().verbatimModuleSyntax` returned the right value in the same measurement —
+so nothing is blocked on discovery.
+
+What blocks it is the edge model: `ModuleEdge.typeOnly` conflates _erased bindings_ with _erased
+statement_, and those are now known to be different questions. The fix **adds** a distinction rather
+than changing `isTypeOnlyImport`, whose present meaning is correct for the four coupling conditions
+that read it. Doing that here would be a semantic change to five conditions smuggled in under a
+re-export fix — the thing this plan refused to do in Phase 2.
+
+Filed as [plan 0087](./0087-an-inline-type-import-still-requests-the-module.md), which also has to
+measure whether `export { type X } from 's'` shares the defect (**not** measured — export emit rules
+differ from import emit rules, so it must not be assumed).
+
+The caveat row in `tests/conditions/type-only-cycles.test.ts` now carries the measurement and names
+0087 as its owner.
 
 ## Test inventory
 
