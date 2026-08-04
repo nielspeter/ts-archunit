@@ -1,7 +1,7 @@
 # Plan 0087 — under `verbatimModuleSyntax`, an inline type import still requests the module
 
 **Status:** Open, not started. Filed 2026-08-04 from
-[plan 0085](./0085-the-slice-graph-cannot-see-a-re-export.md) Phase 3, which was to _decide_ this
+[plan 0085](./completed/0085-the-slice-graph-cannot-see-a-re-export.md) Phase 3, which was to _decide_ this
 question and did — by measuring it and concluding the fix does not belong in that plan.
 **Priority:** Medium-high. A false negative in cycle detection on a compiler setting that modern
 TypeScript setups increasingly turn on, and `tsc --init` recommends.
@@ -70,7 +70,7 @@ eager module-initialization dependencies. The four dependency conditions keep as
 That split is the whole point and it should be stated in one place both sides link to: **cycles are
 about whether the module is evaluated; layering is about whether the code is coupled.** They are
 already documented as differing in their _defaults_
-([plan 0085](./0085-the-slice-graph-cannot-see-a-re-export.md) Phase 2) — this makes them differ in the
+([plan 0085](./completed/0085-the-slice-graph-cannot-see-a-re-export.md) Phase 2) — this makes them differ in the
 _question_, which is a stronger claim and needs the same care.
 
 ## Phase 3 — decide whether a re-export has the same problem
@@ -107,7 +107,7 @@ assuming it matches, because the emit rules for export declarations are not the 
 
 ## Related
 
-- [Plan 0085](./0085-the-slice-graph-cannot-see-a-re-export.md) Phase 3 — asked the question, measured
+- [Plan 0085](./completed/0085-the-slice-graph-cannot-see-a-re-export.md) Phase 3 — asked the question, measured
   the answer, and scoped the fix out with the reason.
 - [Plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md) — introduced
   `ignoreTypeImports` on cycles, where the wrong answer here becomes visible.

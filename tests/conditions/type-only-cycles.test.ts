@@ -179,7 +179,7 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
   })
 
   it('a re-export IS an edge now — the marker this row was left as', () => {
-    // Inverted by [plan 0085](../../plans/0085-the-slice-graph-cannot-see-a-re-export.md),
+    // Inverted by [plan 0085](../../plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md),
     // which is what it was for. Plan 0084 wrote this row asserting `[]` and said so:
     // "it is a real false negative, and when plan 0085 fixes it this row reds and tells
     // its successor what changed." It did exactly that — the only failure in the suite

@@ -38,7 +38,7 @@ export function buildFileToSliceMap(slices: Slice[]): Map<string, string> {
  *   emits an import of `./b.js`, so that module is evaluated whether or not anything
  *   reads `x`. A barrel file is built out of re-exports, and `a → barrel → a` is the
  *   cycle real codebases actually have
- *   ([plan 0085](../../plans/0085-the-slice-graph-cannot-see-a-re-export.md)).
+ *   ([plan 0085](../../plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md)).
  * - `dynamic` — **not counted.** `import('./b.js')` is lazy, so it cannot deadlock
  *   module initialization, and it is most often the *deliberate* fix for a cycle.
  *   Reporting it as one would fail the rule for applying its own remedy.

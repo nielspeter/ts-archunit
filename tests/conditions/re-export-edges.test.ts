@@ -1,6 +1,6 @@
 /**
  * The slice graph and `export … from` —
- * [plan 0085](../../plans/0085-the-slice-graph-cannot-see-a-re-export.md).
+ * [plan 0085](../../plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md).
  *
  * `collectEdgesFromFile` read `getImportDeclarations()` and nothing else, so a
  * **value** re-export — a real runtime dependency, emitted as an import — was not an

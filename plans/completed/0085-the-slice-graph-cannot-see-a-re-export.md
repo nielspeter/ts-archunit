@@ -1,7 +1,9 @@
 # Plan 0085 — the slice graph cannot see a re-export
 
-**Status:** Open, not started. Filed 2026-08-04 from
-[plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md), whose test-inventory row 4
+**Status:** **DONE** — shipped 2026-08-04 in v0.48.0. All three phases resolved: 1 and 2 implemented,
+3 decided by measurement and filed as
+[plan 0087](../0087-an-inline-type-import-still-requests-the-module.md). Filed 2026-08-04 from
+[plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md), whose test-inventory row 4
 assumed re-exports were edges and found they are not.
 **Priority:** Medium-high. A false negative on three published conditions, and the shape it misses is
 the single most common real-world cycle.
@@ -9,7 +11,7 @@ the single most common real-world cycle.
 work is the second call site, the migration note, and deciding one genuinely open semantic question.
 **Blast radius:** **Published API, and this one only ADDS findings.** Three exported conditions —
 `beFreeOfCycles`, `respectLayerOrder`, `notDependOn` — will report violations they have never reported,
-on codebases that are green today. That is the top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md)
+on codebases that are green today. That is the top row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md)
 rule 6, and it is a harder migration than 0084's: 0084 removed findings, this adds them.
 
 ## Problem
@@ -118,12 +120,88 @@ than changing `isTypeOnlyImport`, whose present meaning is correct for the four 
 that read it. Doing that here would be a semantic change to five conditions smuggled in under a
 re-export fix — the thing this plan refused to do in Phase 2.
 
-Filed as [plan 0087](./0087-an-inline-type-import-still-requests-the-module.md), which also has to
+Filed as [plan 0087](../0087-an-inline-type-import-still-requests-the-module.md), which also has to
 measure whether `export { type X } from 's'` shares the defect (**not** measured — export emit rules
 differ from import emit rules, so it must not be assumed).
 
 The caveat row in `tests/conditions/type-only-cycles.test.ts` now carries the measurement and names
 0087 as its owner.
+
+## Result
+
+All three slice conditions now read `edgesOf()` — the definition plan 0071 wrote and this call site
+never adopted. `import` and `reexport` count; `dynamic`, `require` and `type-expression` do not, each
+for a stated reason.
+
+`findSliceDependencyDetails` was fixed in the same change, and the plan was right that this mattered:
+`respectLayerOrder` and `notDependOn` push one violation _per detail_, so a fixed graph with an unfixed
+lookup would have found every re-export dependency and reported **nothing**. The plan flagged that
+claim as read-off-the-code rather than measured — it held.
+
+`notDependOn` and `respectLayerOrder` gained `ImportOptions` in the same two-overload shape as
+`dependOn`, with the _opposite_ default to `beFreeOfCycles` and the reason documented beside both.
+
+### Inventory row 8 was vacuous for us, which is the more useful finding
+
+Row 8 said "our own suite is the end-to-end proof and may well surface new cycles in `src/`". It
+surfaced none — and **not because the fix is inert**. Our three in-slice re-exports are all
+_intra_-slice (`core → core`, `predicates → predicates`) and the graph skips same-slice edges by
+design, so `arch/no-cycles` staying green says nothing about the new path in either direction.
+
+The proof had to come from somewhere real, so it comes from `src/index.ts`: **90 re-exports, zero plain
+imports**, meaning before this plan it had no edges at all and no slice rule could see it. It also
+sits in none of `arch-rules.test.ts`' slices, which is why turning the rule on in plan 0084 could not
+have caught this. A control row reads the file and asserts the zero-plain-imports property still holds,
+because a single ordinary `import` would quietly route that proof back through the old code path.
+
+### Sabotage
+
+12 reverts enumerated from `git diff main...HEAD`, isolated worktree, asserted-green baseline, exit code
+read unpiped. **12 of 12 caught — after five were caught by nothing on the first pass.**
+
+| Revert                                               | First pass       | Now          |
+| ---------------------------------------------------- | ---------------- | ------------ |
+| Re-export edges dropped — only `import` counts       | CAUGHT (11 rows) | CAUGHT       |
+| `dynamic` added to the counted kinds                 | **nothing**      | CAUGHT       |
+| `type-expression` added to the counted kinds         | **nothing**      | CAUGHT       |
+| Type-only filter no longer applied                   | CAUGHT           | CAUGHT       |
+| Type-only filter made unconditional                  | CAUGHT           | CAUGHT       |
+| Details lookup reads imports only again              | CAUGHT           | CAUGHT       |
+| Details lookup stops receiving the graph's options   | **nothing**      | CAUGHT       |
+| `notDependOn` stops passing options to the graph     | CAUGHT           | CAUGHT       |
+| Builder drops options forwarding `notDependOn`       | CAUGHT           | CAUGHT       |
+| Builder drops options forwarding `respectLayerOrder` | **nothing**      | CAUGHT       |
+| `resolvedPath === undefined` guard removed           | **nothing**      | CAUGHT (tsc) |
+| Same-slice edges no longer skipped                   | CAUGHT           | CAUGHT       |
+
+What the five gaps had in common: **each was a decision recorded only in prose.**
+
+- The two edge-kind exclusions were argued at length in a docstring. Adding `dynamic` or
+  `type-expression` to the set left all 3025 tests green, so the argument was decoration.
+- The details-lookup options gap hid because an _unfiltered_ lookup is a **superset**: the cycle is
+  still located and nothing looks wrong. It only becomes visible where extra details become extra
+  _violations_ (`notDependOn` reports per site) or where the extra detail is _first_ (the cycle's
+  reported line moves to an erased import). Both are now rows; the second is filed as a Fixed entry
+  because a finding pointing at an `import type` line asks the reader to delete a dependency that is
+  not there.
+- The `respectLayerOrder` option row asserted **the same expectation for both values of the option**,
+  so it passed with the forwarding removed. A row that passes under every value of the thing it tests
+  is testing nothing. Retitled to what it actually proves, with the real guard added beside it.
+- The `resolvedPath` guard is caught by `tsc`, not by a test — a legitimate second derivation, since
+  `typecheck` is its own step in `validate`. The harness reported it as unguarded because **it only ran
+  vitest**. Fixed there too: it now runs both, and scores `CAUGHT (tsc)` distinctly.
+
+### And the harness lied twice more
+
+Both worth recording, because 0084 ended with the same lesson and it still was not enough:
+
+1. **The summary counter used `not verdict.startswith("CAUGHT")`** — and `"CAUGHT BY NOTHING"` starts
+   with `"CAUGHT"`. It printed **"NOT CAUGHT: 0 of 12"** directly beneath a row reading
+   `CAUGHT BY NOTHING`. An aggregate that cannot express failure reports success, which is this
+   project's subject applied to its own tooling for the third time in two plans.
+2. A row crashed the run mid-matrix with `UnicodeDecodeError`: vitest's captured output split a
+   multi-byte character. Rows after it never ran, and without the traceback that would have read as a
+   short matrix rather than an aborted one.
 
 ## Test inventory
 
@@ -157,9 +235,9 @@ The caveat row in `tests/conditions/type-only-cycles.test.ts` now carries the me
 
 ## Related
 
-- [Plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on and found
+- [Plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on and found
   this; its test row 4 rested on the false premise that re-exports were edges.
-- [Plan 0071](./completed/0071-one-definition-of-a-module-edge.md) — deferred this deliberately, and
+- [Plan 0071](./0071-one-definition-of-a-module-edge.md) — deferred this deliberately, and
   named the principle the fix should follow.
 - `src/core/module-edges.ts` — the definition that already handles re-exports.
 - `src/helpers/slice-graph.ts` — the two functions that do not.

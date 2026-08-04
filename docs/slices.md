@@ -1,17 +1,23 @@
-# Slices
+# Slices & Layers
 
-::: warning The slice graph sees static imports only
-`beFreeOfCycles()`, `notDependOn()` and `respectLayerOrder()` build their dependency
-graph from static `import` declarations. Since v0.28.0 that is **narrower** than the
-module conditions: `export { x } from './b.js'` is a dependency to `notImportFrom`
-and invisible here.
+::: tip What counts as a dependency here
+`beFreeOfCycles()`, `notDependOn()` and `respectLayerOrder()` build their graph from the
+**eager static** dependencies of each file — `import` declarations _and_ re-exports.
+Since v0.48.0 that includes `export { x } from './b.js'` and `export * from './b.js'`,
+which emit an import of the module and so are real runtime dependencies. Before v0.48.0
+re-exports were invisible here, which meant a **barrel cycle** — `a → barrel → a`, the
+commonest cycle there is — could not be detected.
 
-A barrel re-export is _the_ classic cycle shape, so `a → barrel → a` is exactly what
-the cycle check cannot see — and the asymmetry shows up inside one `strictBoundaries`
-run, which will report a barrel re-export as a cross-boundary violation and the cycle
-it creates as absent. Deliberate; a cycle finding is the hardest class to remedy and
-belongs to its own release.
-::: & Layers
+Two kinds are deliberately **not** counted:
+
+- **Dynamic `import('./b.js')`** — it is lazy, so it cannot deadlock module
+  initialization, and it is usually the _deliberate_ fix for a cycle. Reporting it would
+  fail a rule for applying its own remedy.
+- **`require()`** — CommonJS, and this is an ESM-only package.
+
+Type-only forms are erased at compile time and handled by `ignoreTypeImports`; the
+default differs per condition, and the reason is under `beFreeOfCycles()` below.
+:::
 
 ::: tip Rule file or test file?
 Snippets on this page end in `.check()` (the **test-file** form). In a [CLI rule file](/cli) (`arch.rules.ts`), **drop `.check()`** and spread the bare builder into `export default [...]` — a `.check()` inside a rule-file array is [silently skipped](/running-in-tests#converting-between-the-two-forms). Use `.asSeverity('warn')` for warnings.
@@ -181,9 +187,13 @@ Architecture Violation [arch/no-feature-cycles]
   notifications imports billing at src/features/notifications/handler.ts:12
 ```
 
-### `respectLayerOrder(...layers)`
+### `respectLayerOrder(...layers)` · `respectLayerOrder(layers, options)`
 
 Asserts that dependencies between slices follow the declared order. The first layer may depend on the second, the second on the third, and so on -- but not in reverse.
+
+Takes `ImportOptions` in the two-argument form. **Type-only edges count by default** — see
+[the note under `notDependOn`](#notdependon-slice-notdependon-slices-options) for why that differs
+from `beFreeOfCycles()`.
 
 ```typescript
 slices(p)
@@ -209,9 +219,34 @@ This means:
 - `repositories` may import from `domain`
 - `domain` may not import from any of the above
 
-### `notDependOn(slice)`
+### `notDependOn(...slices)` · `notDependOn(slices, options)`
 
-Asserts that no slice depends on the named slice.
+Asserts that no slice depends on any of the named slices.
+
+::: tip Why type-only edges count here but not in `beFreeOfCycles()`
+It looks like an inconsistency and it is deliberate.
+
+A **cycle** is about runtime module-initialization order, so an edge that is erased at compile time
+cannot contribute to one — and "extract the shared code to a lower-level module" is not something you
+do about an `import type`. `beFreeOfCycles()` therefore ignores type-only edges by default.
+
+**Isolation and layering** are about _coupling_. A type-only dependency on `legacy` is still a
+dependency on `legacy`: it breaks when `legacy` is deleted, and "this layer may not reach into that
+one" is a design statement rather than a runtime one. So these two count type-only edges by default,
+matching `dependOn()` and `notImportFrom()`.
+
+Pass `{ ignoreTypeImports: true }` to disagree:
+
+```typescript
+.should().notDependOn('legacy', 'deprecated')                      // type edges count
+.should().notDependOn(['legacy'], { ignoreTypeImports: true })     // runtime edges only
+```
+
+:::
+
+One violation is reported **per dependency site**, not per slice pair, so a barrel that re-exports
+thirty things from a forbidden slice reports thirty findings — each with its own line, each separately
+fixable.
 
 ```typescript
 slices(p)
