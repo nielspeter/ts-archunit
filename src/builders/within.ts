@@ -1,5 +1,5 @@
-import type { CallRuleBuilder } from '../builders/call-rule-builder.js'
-import { ScopedFunctionRuleBuilder } from '../builders/scoped-function-rule-builder.js'
+import type { CallRuleBuilder } from './call-rule-builder.js'
+import { ScopedFunctionRuleBuilder } from './scoped-function-rule-builder.js'
 
 /**
  * A scoped context that restricts entry points to elements found

@@ -327,8 +327,8 @@ export {
 } from './conditions/call.js'
 
 // Scoped rules --- within() (plan 0015)
-export { within } from './helpers/within.js'
-export type { ScopedContext } from './helpers/within.js'
+export { within } from './builders/within.js'
+export type { ScopedContext } from './builders/within.js'
 export { ScopedFunctionRuleBuilder } from './builders/scoped-function-rule-builder.js'
 
 // Callback extraction (plan 0015)

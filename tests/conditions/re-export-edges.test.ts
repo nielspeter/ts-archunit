@@ -537,10 +537,15 @@ describe('ON DISK: our own barrel, through a real tsconfig (plan 0085)', () => {
     // (an ordinary import, and a legitimate direction) is reported as well. Asserted
     // rather than filtered away, because that scope is easy to misread when writing a
     // real rule and it is the kind of thing this row should teach.
+    // The message now names the edge KIND — `re-exports` rather than the generic
+    // `depends on` — which plan 0088 freed by giving these findings their own `identity`.
+    // Until then the message text WAS the baseline hash, so improving it invalidated every
+    // entry; `edgeVerb()` had returned 're-exports' since v0.28.0 with no slice condition
+    // able to use it.
     expect([...new Set(violations.map((v) => v.message))].sort()).toEqual([
-      'Slice "barrel" depends on forbidden slice "core"',
-      'Slice "barrel" depends on forbidden slice "helpers"',
-      'Slice "helpers" depends on forbidden slice "core"',
+      'Slice "barrel" re-exports forbidden slice "core"',
+      'Slice "barrel" re-exports forbidden slice "helpers"',
+      'Slice "helpers" imports forbidden slice "core"',
     ])
 
     const fromBarrel = violations.filter((v) => v.message.startsWith('Slice "barrel"'))
@@ -600,19 +605,33 @@ describe('what the new edges do to identity and to vacuity (plan 0085)', () => {
 
     // `b → c` is the re-export; `c → a` and `a → b` are imports. All three are in one
     // SCC only because the re-export is now an edge.
-    // `[a, c, b]`: `canonicalizeCycle` rotates the SCC so the lexicographically
-    // smallest member leads, and does not sort. Measured — and it matters precisely
-    // here, because that string is the baseline identity being compared below.
-    expect(found.map((v) => v.element)).toEqual(['[a, c, b]'])
+    // **`['[a, b, c]']`, sorted — changed from `['[a, c, b]']` by bug 0056.**
+    //
+    // This row used to pin `canonicalizeCycle`'s ROTATION, and the v0.49.2 review flagged
+    // it precisely: pinning DFS-pop order as the baseline identity certifies the unstable
+    // thing, and *"when 0056 is fixed, both rows must change, and they are the two an agent
+    // is most likely to 'correct' to green"*. So this is that change, made on purpose:
+    // membership is sorted now, because an SCC is a set and its stored order was a
+    // traversal artefact that reddened CI when two imports were reordered.
+    expect(found.map((v) => v.element)).toEqual(['[a, b, c]'])
 
-    // Which is a different identity from the two-slice cycle the same source reported
-    // before this plan — stated as a hash comparison rather than as prose.
-    const narrower: ArchViolation = {
-      ...found[0]!,
-      element: '[a, b]',
-      message: 'Cycle detected: a -> b -> a',
-    }
+    // A narrower cycle is a different finding — and since plan 0088 the thing that decides
+    // that is `identity`, not `element`/`message`.
+    //
+    // This row used to build `narrower` by overriding `element` and `message`, which was
+    // already weak (the v0.49.2 review: it proves `hashViolation` is sensitive to `element`,
+    // not what v0.46.1 reported) and is now simply **wrong** — the hash ignores both fields
+    // when an identity is present, so the old assertion compared a value to itself and
+    // passed for that reason. Overriding the identity is the honest form.
+    const narrower: ArchViolation = { ...found[0]!, identity: 'cycle::a,b' }
     expect(hashViolation(found[0]!)).not.toBe(hashViolation(narrower))
+
+    // **The limit, stated rather than papered over.** What this does NOT measure is what
+    // v0.46.1 actually reported, and it cannot: no option turns re-export edges off, so the
+    // pre-0.48 graph is not reproducible through the shipped API. The v0.48.0 claim that "a
+    // cycle that got wider is a different violation, not a moved one" is therefore
+    // unmeasurable by construction. This row shows the mechanism that makes it true; it is
+    // not evidence of the historical comparison.
   })
 
   it('a re-export-only cycle is reported at a real file and line, not unknown:0', () => {

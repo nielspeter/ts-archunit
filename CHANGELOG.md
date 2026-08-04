@@ -5,6 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.52.0] - 2026-08-04
+
+The identity batch: four filed items shipped together **so adopters pay one baseline regeneration instead
+of three.** Each change moves what a slice finding is called, and doing them separately would have charged
+for the same migration repeatedly.
+
+### Changed
+
+- **Slice findings now carry their own `identity`.** No slice condition set it, so `hashViolation` fell
+  back to `element::message` — and that one fact caused three defects. The scheme follows the dependency
+  conditions **exactly**: `basename::kind::specifier::sorted-names`, prefixed with the slice pair, and
+  deliberately **no line number**, because a line is precisely what `ArchViolation.identity` exists to
+  survive. (That corrects plan 0088's own sketch, which proposed `from→to@relpath:line`.)
+
+  **Baseline impact: every slice finding's hash moves, once.** Regenerate. In exchange, two things stop
+  being broken — see below — and the message becomes editable for the first time.
+  ([plan 0088](plans/0088-a-slice-finding-identifies-itself.md))
+
+- **A barrel's dependency sites are distinct findings.** `notDependOn`/`respectLayerOrder` push one
+  violation per site, and all of them previously shared one hash — so **one baseline entry accepted all of
+  them.** Measured: three re-exports into one forbidden slice were three findings at lines 1, 2 and 3 with
+  **one** hash; now three. This is bug 0028's shape in the family that never got the fix, and v0.48.0 is
+  what made barrels slice-dependency-bearing.
+
+- **The cycle message no longer asserts arrows it cannot substantiate.** It printed a strongly-connected
+  _component_ as if it were a path: on a true ring `a→b→c→d→a` it said
+  `Cycle detected: a -> d -> c -> b -> a`, every arrow reversed, and on this repository's own source two of
+  four arrows named edges that did not exist. It now reads:
+
+  ```
+  Cycle detected between: a, b, c, d (e.g. a imports b at index.ts:1)
+  ```
+
+  The guarantee is structural — the message contains no arrow notation, so it cannot render a wrong path.
+  The edge kind comes from `edgeVerb()`, which had returned `'re-exports'` since v0.28.0 with no slice
+  condition able to use it. **Residual, stated:** the example is _an_ edge, not the _closing_ edge; naming
+  that needs a real-path implementation. ([bug 0055](bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md))
+
+- **A cycle finding is located on an edge that exists.** It asked for details on `members[0] → members[1]`
+  — the first two members of a _set_, which need not be an edge. On a 4-ring that was `unknown:0`; when the
+  pair happened to be an edge, the location was a perfectly legal import.
+
+- **A cycle's element is the SORTED member set.** Reordering two imports used to move it from `[a, c, b]`
+  to `[a, b, c]`, reddening CI on the edit "organize imports" performs and printing "it may be stale after
+  a rename" about a rename that never happened. `.excluding()` matches element/file/message, which is why
+  sorting the element is the fix. `canonicalizeCycle` is deleted — sorting subsumes rotation for a set.
+  ([bug 0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md), fail-red half)
+
+### Fixed
+
+- **`within()` moved from `helpers/` to `builders/`**, which is what it always was — it starts a rule
+  chain. The public export path is unchanged. **Both waivers on it are deleted**, so all 46 of our own
+  architecture rules now pass with **no exclusions at all**; the offending edge was reintroduced to prove
+  they still fire. ([bug 0054](bugs/fixed/0054-within-makes-helpers-depend-on-builders.md))
+
+### Known limits, stated rather than implied
+
+- **Bug 0056's fail-OPEN half is not fixed.** `beFreeOfCycles` emits one violation per SCC, so a new edge
+  between two slices _already_ in a component leaves the member set byte-identical and an existing
+  exclusion or baseline entry silences it. Sorting cannot fix that; waiver granularity can (plan 0088
+  Phase 4). Pinned as a known-limit test row that will _invert_ when it lands. The blast radius shrank in
+  this release, since our own four-slice waiver is gone.
+
+### Internal
+
+Two existing guards caught mistakes in this work, which is worth recording: bug 0010's portability test
+found the example edge was chosen with `.find()` and therefore depended on the file-walk order — a reversed
+walk turned "a imports b" into "c imports a" — and plan 0079's cardinality scanner flagged the new test
+file for count-only assertions.
+
 ## [0.51.0] - 2026-08-04
 
 Plan 0083 Phase 3's two hard requirements. No shipped behaviour changed; two classes of day-one breakage
@@ -236,7 +306,7 @@ reproduced by measurement before being acted on.
 
 Eight bugs and four plans filed, none of them deferred silently. The behavioural findings, all measured:
 
-- [0055](bugs/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — a cycle finding prints an SCC as a
+- [0055](bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — a cycle finding prints an SCC as a
   path, so on a ring `a→b→c→d→a` it reports `a -> d -> c -> b -> a` at `unknown:0`. On our own source two of
   four arrows are fabricated and the closing edge is never named.
 - [0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — reordering two imports reds CI
@@ -433,7 +503,7 @@ Four gates that could not fail, found by pointing our own library at ourselves
 - `object-literal-functions.ts` moved from `helpers/` to `core/`, breaking the one-day-old cycle. It is
   re-exported from the package root unchanged, so no import path changes for consumers.
 - Two known gaps filed rather than deferred silently:
-  [bug 0054](bugs/0054-within-makes-helpers-depend-on-builders.md) (the surviving cycle, waived by
+  [bug 0054](bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) (the surviving cycle, waived by
   identity so any change to its shape still reds) and
   [plan 0085](plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md) (the slice graph sees no
   `export … from` edge at all — a false negative on three conditions, and the barrel cycle is the shape

@@ -1,8 +1,8 @@
 # Bug 0054: `within()` makes `helpers/` depend on `builders/`, closing a real cycle
 
-**Reported:** 2026-08-04 · **Fixed:** not yet — **excluded by identity and enforced**, see below
+**Reported:** 2026-08-04 · **Fixed:** 2026-08-04 (v0.52.0)
 **Found in:** every version since `within()` shipped (plan 0015), by
-[plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) turning our own
+[plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) turning our own
 `arch/no-cycles` rule on for the first time.
 **Severity:** Low as a runtime defect — nothing misbehaves; ESM handles this cycle. Medium as
 architecture: it is the one cycle in our source, and it inverts a layering direction we enforce
@@ -91,11 +91,42 @@ Same for `arch/helpers-no-builders`' `.excluding('within.ts')`, which is the oth
 Both go in the commit that fixes this, and the test inventory below is where that is recorded rather than
 remembered.
 
-Found by the v0.47–0.49 review; the general form is [plan 0090](../plans/0090-a-warn-that-expires.md).
+Found by the v0.47–0.49 review; the general form is [plan 0090](../../plans/0090-a-warn-that-expires.md).
 
 ## Related
 
-- [Plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on,
+- [Plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on,
   and found this by doing so.
 - `src/core/object-literal-functions.ts` — the other cycle found at the same time, fixed rather than
   waived because it was one day old and self-inflicted.
+
+## Fix as shipped
+
+`within()` moved from `src/helpers/` to `src/builders/`, which is what it always was: it starts a rule
+chain, exactly as `functions(p)` does, and every other entry point lives there. Its two imports became
+siblings; `src/index.ts` re-exports it from the new path and the public name is unchanged.
+
+**Both waivers deleted in the same commit**, which this report insisted on:
+
+- `arch/helpers-no-builders`' `.excluding('within.ts')`, waived since plan 0015;
+- `arch/no-cycles`' `.excluding('[builders, conditions, helpers, predicates]')`.
+
+All 46 architecture rules pass with **no exclusions** — our source is genuinely cycle-free.
+
+And because a rule with nothing to exclude and nothing to find looks exactly like a broken one, the edge
+was reintroduced to prove the rules still fire. Both red:
+
+```
+× helpers must not import from builders
+× no cycles between source modules
+  Cycle detected between: builders, conditions, helpers, predicates
+    (e.g. builders imports conditions at call-rule-builder.ts:24)
+```
+
+## The claim in this report that was wrong
+
+It said _"any other cycle now fails the build"_ and the suite called the exclusion _"the fail-closed
+direction"_. [Bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md) disproved both:
+an SCC absorbs new intra-component edges without changing its name, so a new cycle among those four
+slices was silently accepted. Deleting the waiver removes the instance; the mechanism is 0056's
+fail-open half and remains open.

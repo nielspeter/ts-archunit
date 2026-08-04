@@ -1,6 +1,6 @@
 # Bug 0056: a cycle's identity changes when imports are reordered
 
-**Reported:** 2026-08-04 · **Fixed:** not yet
+**Reported:** 2026-08-04 · **Fixed:** **half** — the fail-red half shipped in v0.52.0; the fail-open half is still open, see below
 **Found in:** every version since `beFreeOfCycles` shipped — latent until
 [plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) put
 `arch/no-cycles` at `.check()` and told users to baseline cycle findings.
@@ -37,7 +37,7 @@ component: adding a brand-new cycle between two slices _already in_ it leaves th
 byte-identical, so an existing exclusion silences it.
 
 Our own waiver covers `[builders, conditions, helpers, predicates]` — **4 of the 6 gated slices** — so
-any new cycle confined to those four is now invisible. [Bug 0054](./0054-within-makes-helpers-depend-on-builders.md)
+any new cycle confined to those four is now invisible. [Bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md)
 claims _"any other cycle now fails the build"_ and `tests/archunit/arch-rules.test.ts` claims the
 exclusion is _"the fail-closed direction"_. Both are false, and both need correcting when this is fixed.
 
@@ -55,7 +55,7 @@ case. Rotation cannot canonicalise a **set** whose stored order is a DFS artifac
 ## Fix
 
 **Sort the member list.** For an SCC the order carries no information — see
-[bug 0055](./0055-a-cycle-finding-names-edges-that-do-not-exist.md), where printing it as a path is the
+[bug 0055](./fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md), where printing it as a path is the
 bug — so sorting loses nothing and makes the identity a function of membership alone.
 
 That deliberately reverses `canonicalizeCycle`'s stated reason for preserving direction. That reason is
@@ -81,7 +81,31 @@ lands with plan 0088.
 
 ## Related
 
-- [Bug 0055](./0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause.
+- [Bug 0055](./fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause.
 - [Plan 0088](../plans/0088-a-slice-finding-identifies-itself.md) — per-edge identity, which retires the
   whole-component waiver.
-- [Bug 0054](./0054-within-makes-helpers-depend-on-builders.md) — its fail-closed claim is disproven here.
+- [Bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md) — its fail-closed claim is disproven here.
+
+## Half shipped in v0.52.0
+
+**The fail-RED half is fixed.** The SCC member list is now **sorted** rather than rotated, so the element
+is a function of membership alone. Reordering two imports no longer changes it, no longer reds CI, and no
+longer prints "it may be stale after a rename" about a rename that never happened. `canonicalizeCycle` was
+deleted — sorting subsumes rotation for a set — and its reasoning is preserved at the site, including why
+its "direction is information" premise was false for any component of three or more.
+
+**The fail-OPEN half is NOT fixed, and sorting cannot fix it.** It is not an ordering problem:
+`beFreeOfCycles` emits **one violation per SCC**, so a new edge between two slices already in a component
+leaves the member set byte-identical and any existing `.excluding()` or baseline entry silences it.
+
+That is pinned as a **known limit** in `tests/conditions/cycle-message-and-identity.test.ts` — a row that
+builds a ring, then the same ring plus a genuinely new `b↔c` cycle, and asserts the two produce the same
+identity. It is written as a limit rather than a fix so the row _inverts_ when granularity lands.
+
+The blast radius shrank in the same release: [bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md)
+was fixed and our own four-slice waiver deleted, so nothing in this repository is currently absorbed. The
+mechanism remains for any adopter who waives a component.
+
+**The remaining fix is waiver granularity** — one finding per offending _edge_, or an exclusion that can
+name an edge — which is [plan 0088](../plans/0088-a-slice-finding-identifies-itself.md) Phase 4. This bug
+stays open until that lands.

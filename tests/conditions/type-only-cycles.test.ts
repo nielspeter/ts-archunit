@@ -222,11 +222,15 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
     const before = threeSliceCycles(p, { ignoreTypeImports: false })
     const after = threeSliceCycles(p)
 
-    // `[a, c, b]`, not `[a, b, c]`: `canonicalizeCycle` ROTATES the SCC so the
-    // lexicographically smallest member leads, and does not sort. Measured, not
-    // guessed — I wrote `[a, b, c]` first and this row corrected me. It matters here
-    // of all places, because that string IS the baseline identity.
-    expect(before.map((v) => v.element)).toEqual(['[a, c, b]'])
+    // **`['[a, b, c]']`, sorted — changed from `['[a, c, b]']` by bug 0056.**
+    //
+    // This row used to pin `canonicalizeCycle`'s ROTATION, and the v0.49.2 review flagged
+    // it precisely: pinning DFS-pop order as the baseline identity certifies the unstable
+    // thing, and *"when 0056 is fixed, both rows must change, and they are the two an agent
+    // is most likely to 'correct' to green"*. So this is that change, made on purpose:
+    // membership is sorted now, because an SCC is a set and its stored order was a
+    // traversal artefact that reddened CI when two imports were reordered.
+    expect(before.map((v) => v.element)).toEqual(['[a, b, c]'])
     expect(after.map((v) => v.element)).toEqual(['[a, b]'])
 
     // The upgrade note's actual claim, as a measurement.
