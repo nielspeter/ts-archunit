@@ -80,6 +80,19 @@ unnoticed.
 So the rule is on, this one cycle is waived with its reason recorded here, and any _other_ cycle now
 fails the build.
 
+## When this is fixed, delete the exclusion in the same commit
+
+`tests/archunit/arch-rules.test.ts` carries `.excluding('[builders, conditions, helpers, predicates]')`.
+Once `within()` moves and the cycle is gone, that exclusion matches nothing — and the only signal is a
+`writeStderr` "Unused exclusion" line: **a warning, on a green build, for a finding whose remedy (delete the
+line) is not optional.** So it will sit there.
+
+Same for `arch/helpers-no-builders`' `.excluding('within.ts')`, which is the other waiver on the same file.
+Both go in the commit that fixes this, and the test inventory below is where that is recorded rather than
+remembered.
+
+Found by the v0.47–0.49 review; the general form is [plan 0090](../plans/0090-a-warn-that-expires.md).
+
 ## Related
 
 - [Plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on,
