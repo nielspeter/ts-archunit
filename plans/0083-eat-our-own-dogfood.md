@@ -1,6 +1,6 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** **Phase 1 DONE and now RATCHETED (v0.47.0; guard added 2026-08-04). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 and 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
+**Status:** **Phase 1 DONE and now RATCHETED (v0.47.0; guard added 2026-08-04). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 DONE (v0.55.3). Phase 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md).
 
 **Phase 3's central claim, as it stood at v0.49.2 — now fixed, kept because it is the measurement that justified the work.** `package.json` declares **12 `exports` subpaths and not one of them is ever resolved by anything.** The only two test files that mention `@nielspeter/ts-archunit` treat it as a _string_: `tests/cli/init.test.ts` asserts that the scaffolded rule file **contains the text** `import { recommended } from '@nielspeter/ts-archunit/presets'`, which is the opposite of resolving it. Were that subpath missing from the map, the test still passes and every scaffolded project fails on its first run. Nothing packs a tarball. **Four releases shipped on 2026-08-04 across that gap**, and `npm pack --dry-run` confirming the file list is not the same evidence as resolving the map. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
@@ -52,7 +52,38 @@ the same category error this plan rejects for `TerminalBuilder` and `STANDARD_HT
 survives is the qualitative finding, which needs no denominator: two features built to fix our own
 bugs were never aimed at us, and nothing was watching the watchers.
 
-### Phase 0 — a committed derivation, or no number at all
+### Phase 0 — DONE 2026-08-04. A committed derivation, or no number at all
+
+> **Shipped: `tests/tools/scan-enforceable-primitives.ts`, run as a test, run in CI by `npm run test`.**
+>
+> **The rule is the deliverable, not the number:** an enforceable primitive is a function exported from
+> `src/index.ts` whose declared return type is `Condition`, `PairCondition` or `Predicate`. Measured
+> 2026-08-04: **150 of 231 public functions** — 66 in `src/conditions/`, 51 in `src/predicates/`, 28 in
+> `src/rules/`, 5 in `src/core/`.
+>
+> The **return type** is the definition rather than the folder, because the folder is what made every
+> earlier count wrong. The first draft counted `src/smells/`'s `buildFingerprint` and `computeSimilarity`;
+> they return `Fingerprint` and `number`. A return type of `Condition` is not a naming convention — it is
+> the type the rule engine consumes, so it is exactly the set of things you can point at code. Both halves
+> of the rule exclude a real member, and the test names one of each: `buildFingerprint` (public, not a
+> primitive) and the internal composition helpers (primitives, not public).
+>
+> **The ratio is now withdrawn for a second and stronger reason than "it does not reproduce": it is not
+> derivable by the method that produced it.** The 13.0% matched primitive _names_ against call sites in
+> `tests/archunit/`. But a primitive can be applied without its name ever appearing —
+> `.resideInFolder(...)` in the should-phase calls `conditionResideInFolder`
+> (`src/builders/class-rule-builder.ts:131`), and `arch-rules.test.ts` writes `.resideInFolder(` **twenty
+> times and `conditionResideInFolder` zero times**. Most of the 51 predicates are reached the same way,
+> through a builder method of the same name. An honest numerator needs call-graph reachability, which is
+> Phase 2's problem and stays parked — and the test pins this counter-example, so the next attempt to
+> divide two numbers here has to argue with a failing assertion rather than with a comment.
+>
+> **Sabotage: 8 rows enumerated from the diff, 8 caught, 0 gaps.** One row is worth recording. With
+> `PRIMITIVE_KINDS` emptied — the total collapse this phase exists to catch — **three of the six rows
+> still passed**: "excludes the helpers, entry points and matchers" and "the checker's verdict is
+> corroborated" are both ∀-over-∅, and an empty population is precisely when they are most wrong. The
+> vacuity row is what fails, which is why it is written first and why it asserts a floor on **both**
+> the public surface and the population.
 
 **A fourth reader produced a fourth number on 2026-08-04: 13.0%** — 231 public exported functions, 30 of
 them called anywhere in `tests/archunit/`. It disagrees with 166, 185 and 187 for a mundane reason: it
@@ -436,8 +467,13 @@ accidentally-quadratic condition is found on someone's repo.
 
 ## Test inventory
 
-1. **Phase 0's derivation is a committed script**, not a table — and the class-A column is generated
-   from the rule file and asserted against the committed classification. One column with a free oracle.
+1. ~~**Phase 0's derivation is a committed script**, not a table.~~ **Done 2026-08-04** —
+   `tests/tools/scan-enforceable-primitives.test.ts`, six rows: a two-sided vacuity floor, membership by
+   name from each kind and each folder, non-membership by name for each reason the rule excludes things,
+   the excluded return kinds proven still present (so exclusion is doing work rather than the names having
+   vanished), the checker's verdict corroborated against the declaration text, and the no-ratio
+   counter-example. The class-A column named here belongs to Phase 2's classification and is not part of
+   this deliverable.
 2. Phase 1's plant matrix, with caught-by-nothing reported as a number.
 3. ~12 permanent positive controls, one per mechanism class, surviving Phase 1.
 4. Phase 2's blind-second-reader disagreement rate on 20 items.
