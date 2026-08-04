@@ -105,7 +105,7 @@ describe('a barrel’s dependency sites are distinct findings (plan 0088)', () =
     //
     // That is plan 0088's own defect in a different shape, in the release that fixed it,
     // and the layout is the commonest there is. The dependency family still has it —
-    // [bug 0063](../../bugs/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md).
+    // [bug 0063](../../bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md).
     const tsm = new Project({
       useInMemoryFileSystem: true,
       compilerOptions: { module: ts.ModuleKind.ESNext },
