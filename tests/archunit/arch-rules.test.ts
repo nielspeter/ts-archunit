@@ -514,10 +514,6 @@ describe('Architecture', () => {
         .resideInFolder('**/src/helpers/**')
         .should()
         .notImportFromCondition('**/src/builders/**')
-        // within() starts a rule chain, so it constructs a builder. Waived here since
-        // plan 0015 — and arch/no-cycles independently reds on the SAME file from the
-        // other direction. Two rules, two waivers, one misplaced file: bugs/0054.
-        .excluding('within.ts')
         .rule({
           id: 'arch/helpers-no-builders',
           because:
@@ -712,18 +708,6 @@ describe('Architecture', () => {
         })
         .should()
         .beFreeOfCycles()
-        // The one cycle that survives, and the edge that closes it:
-        // `helpers/within.ts` imports `ScopedFunctionRuleBuilder` as a VALUE, so a
-        // helper constructs a builder. Pre-existing since plan 0015, and a design
-        // question — `within()` may simply belong in `builders/` — so it is
-        // [bug 0054](../../bugs/0054-within-makes-helpers-depend-on-builders.md)
-        // rather than a change smuggled into this one.
-        //
-        // Excluded BY IDENTITY, not by lowering the severity. If the cycle's shape
-        // changes — a slice joining or leaving — this pattern stops matching and the
-        // rule reds on the new shape, which is the fail-closed direction. That is
-        // the difference between an exclusion and a `.warn()`.
-        .excluding('[builders, conditions, helpers, predicates]')
         .rule({
           id: 'arch/no-cycles',
           because:

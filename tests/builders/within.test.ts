@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
-import { within } from '../../src/helpers/within.js'
+import { within } from '../../src/builders/within.js'
 import { calls } from '../../src/builders/call-rule-builder.js'
 import { call } from '../../src/helpers/matchers.js'
 import { ArchRuleError } from '../../src/core/errors.js'

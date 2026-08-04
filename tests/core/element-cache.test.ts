@@ -41,7 +41,7 @@ import { functions } from '../../src/builders/function-rule-builder.js'
 import { types } from '../../src/builders/type-rule-builder.js'
 import { jsxElements } from '../../src/builders/jsx-rule-builder.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
-import { within } from '../../src/helpers/within.js'
+import { within } from '../../src/builders/within.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 /**

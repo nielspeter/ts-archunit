@@ -1,6 +1,6 @@
 # Plan 0088 — a slice finding identifies itself
 
-**Status:** Open, not started. Filed 2026-08-04 from the five-persona review of v0.47.0–v0.49.0, where
+**Status:** **Phases 1–3 DONE (v0.52.0). Phase 4 (waiver granularity) not started** — it is bug 0056's remaining fail-open half. Filed 2026-08-04, Filed 2026-08-04 from the five-persona review of v0.47.0–v0.49.0, where
 three reviewers reached the same conclusion from different directions.
 **Priority:** High. It is the keystone: three filed bugs cannot be fixed properly until it lands, and one
 of them is a live false green.
@@ -29,7 +29,7 @@ the warning now applies to a family that has no `identity` and no warning.
 
 **2. The cycle message cannot be improved.** The message text is _in_ the hash, so rewording
 `Cycle detected: a -> b -> a` invalidates every cycle baseline. That blocks
-[bug 0055](../bugs/0055-a-cycle-finding-names-edges-that-do-not-exist.md), whose whole fix is a better
+[bug 0055](../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md), whose whole fix is a better
 message — and it means the message we shipped by accident is the message we are stuck with.
 
 **3. The cycle identity carries traversal order.** `element` is the SCC member list in DFS-pop order, so it
@@ -82,7 +82,7 @@ src/barrel.ts:3)`. `edgeVerb()` already returns `'re-exports'` and no slice cond
 `beFreeOfCycles` emits one violation per SCC, so `.excluding()` can only waive a **whole component**. Ours
 covers 4 of 6 gated slices, which means a new cycle among those four is silently accepted
 (bug 0056's fail-open half). Once a cycle finding names its closing edge, an exclusion can name that edge
-instead — which is what [bug 0054](../bugs/0054-within-makes-helpers-depend-on-builders.md)'s waiver
+instead — which is what [bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md)'s waiver
 actually wants and cannot express.
 
 Decide deliberately whether this is in scope here or its own plan; it is the difference between a waiver
@@ -113,7 +113,7 @@ that is fail-open by construction and one that is not.
 
 ## Related
 
-- [Bug 0055](../bugs/0055-a-cycle-finding-names-edges-that-do-not-exist.md),
+- [Bug 0055](../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md),
   [0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md),
   [0060](../bugs/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — the three this
   unblocks.

@@ -1,10 +1,10 @@
 # Bug 0055: a cycle finding names edges that do not exist, and cannot locate itself
 
-**Reported:** 2026-08-04 · **Fixed:** not yet
+**Reported:** 2026-08-04 · **Fixed:** 2026-08-04 (v0.52.0), with one residual stated below
 **Found in:** every version since `beFreeOfCycles` shipped (plan 0012) — but **latent** until
-[plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) moved
+[plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) moved
 `arch/no-cycles` to `.check()` and
-[plan 0085](../plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md) made multi-member
+[plan 0085](../../plans/completed/0085-the-slice-graph-cannot-see-a-re-export.md) made multi-member
 cycles the normal case.
 **Severity:** **High.** A finding that fails a build, whose message asserts dependencies that are not
 in the source and whose location is either a legal import or nothing at all. Three of four reviewers
@@ -90,14 +90,14 @@ cycle per SCC. Then locate the finding on an edge that exists — ideally the on
 
 Minimum viable, if the above is deferred: stop asserting arrows. `Cycle detected between: builders,
 conditions, helpers, predicates` is honest about being a member list, and a sorted list also fixes
-[bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md).
+[bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md).
 
 **Do not** fix the location by widening the details lookup to "any pair in the component" — that
 returns a legal import for most components and reintroduces defect 2 in a form that looks correct.
 
 The message improvement is blocked on identity: today the message text _is_ part of the baseline hash,
 so rewording it invalidates every cycle baseline. See
-[plan 0088](../plans/0088-a-slice-finding-identifies-itself.md), which unblocks it and is the reason
+[plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md), which unblocks it and is the reason
 this bug is filed separately from the plan.
 
 ## Test inventory
@@ -114,10 +114,56 @@ this bug is filed separately from the plan.
 
 ## Related
 
-- [Bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md) — same root, different
+- [Bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md) — same root, different
   symptom: the member order is a DFS artifact, so the identity is unstable.
-- [Plan 0088](../plans/0088-a-slice-finding-identifies-itself.md) — unblocks the message rewrite.
+- [Plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md) — unblocks the message rewrite.
 - [Bug 0054](./0054-within-makes-helpers-depend-on-builders.md) — the real closing edge in our own
   component, which this message fails to name.
 - `src/conditions/slice.ts` — `beFreeOfCycles`, `canonicalizeCycle`.
 - `src/helpers/tarjan.ts` — returns membership, not paths.
+
+## Fix as shipped
+
+Both filed defects are fixed, by the minimum-viable route this report described rather than by recovering
+a real path.
+
+**1. The message stops asserting arrows.** It now names the member set and one example edge that exists:
+
+```
+Cycle detected between: a, b, c, d (e.g. a imports b at index.ts:1)
+```
+
+The guarantee is structural rather than a spot check — the message contains no arrow notation at all, so
+it _cannot_ render a wrong path. The edge kind comes from `edgeVerb()`, which had returned `'re-exports'`
+since v0.28.0 with no slice condition able to use it.
+
+**2. The finding is located on an edge that exists**, found by searching the component for a real edge
+instead of assuming `members[0] -> members[1]` is one. On a 4-ring that was `unknown:0`; when the pair
+happened to be an edge it was a legal import.
+
+Both were only possible because [plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md) gave the
+finding an `identity` in the same release: until then the message text _was_ the baseline hash, so
+improving the sentence invalidated every entry.
+
+**Found while fixing it:** the example edge was initially picked with `.find()`, which made the message
+depend on the file-walk order — a reversed walk turned "a imports b" into "c imports a". Bug 0010's
+portability test caught it. Both the edge and the site within it are now chosen by a total order.
+
+## The residual, stated
+
+The message names an example edge, **not the closing edge** — the one whose removal would break the
+cycle. This report's Fix section asked for that ("ideally the one that closes it") and it needs the
+fuller change: recover a real cycle from the DFS rather than search the component. `e.g.` is honest about
+being an example, so nothing claims otherwise, but a reader still has to find the edge to delete.
+
+That belongs with a real-path implementation. Not filed separately — it is this paragraph plus the Fix
+section above, and whoever takes it should re-read both.
+
+## Sabotage
+
+| Revert                                                    | Result                                         |
+| --------------------------------------------------------- | ---------------------------------------------- |
+| Back to `[...members, members[0]].join(' -> ')`           | CAUGHT — the no-arrow and message rows         |
+| Location back to `members[0] -> members[1]`               | CAUGHT — the 4-ring location row (`unknown:0`) |
+| Example edge chosen by `.find()` instead of a total order | CAUGHT — the determinism row, and bug 0010's   |
+| Members rotated instead of sorted                         | CAUGHT — bug 0056's rows                       |

@@ -62,7 +62,7 @@ a release correcting.
 
 `tests/archunit/arch-rules.test.ts`' `.excluding('[builders, conditions, helpers, predicates]')` is
 fail-closed if the cycle's _shape_ changes, as claimed. But when
-[bug 0054](../bugs/0054-within-makes-helpers-depend-on-builders.md) is **fixed**, the exclusion goes stale
+[bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) is **fixed**, the exclusion goes stale
 and the only signal is a `writeStderr` "Unused exclusion" line: a warning, green build, for a finding whose
 remedy — delete the line — is not optional.
 
@@ -101,5 +101,5 @@ these are worth doing at all.
 
 - [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 5 — the bundled-revert corollary this review
   produced, and rule 6, which is why these are one small plan rather than eight bugs.
-- [Bug 0054](../bugs/0054-within-makes-helpers-depend-on-builders.md) — item 5 belongs to its inventory.
+- [Bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) — item 5 belongs to its inventory.
 - [Plan 0090](./0090-a-warn-that-expires.md) — item 5's general form.

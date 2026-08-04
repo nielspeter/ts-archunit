@@ -99,10 +99,10 @@ and `arch/no-cycles` runs at `.check()` for the first time.
 
 Turning it on found **two** cycles, and the difference between them is the whole argument for rule 1:
 
-| Cycle                                         | Age       | Resolution                                                                                           |
-| --------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------- |
-| `helpers → models` (value)                    | **1 day** | **Fixed.** Moved `object-literal-functions.ts` to `core/`, which owes nothing to either.             |
-| `[builders, conditions, helpers, predicates]` | plan 0015 | Waived by identity, filed as [bug 0054](../../bugs/0054-within-makes-helpers-depend-on-builders.md). |
+| Cycle                                         | Age       | Resolution                                                                                                 |
+| --------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
+| `helpers → models` (value)                    | **1 day** | **Fixed.** Moved `object-literal-functions.ts` to `core/`, which owes nothing to either.                   |
+| `[builders, conditions, helpers, predicates]` | plan 0015 | Waived by identity, filed as [bug 0054](../../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md). |
 
 The one-day-old cycle is the finding. Plan 0082's fix added the value edge that closed it the day
 before, and nothing failed, because nothing could — verified at v0.45.6, where no file in `helpers/`
