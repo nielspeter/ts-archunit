@@ -96,9 +96,13 @@ reason is the sanctioned escape hatch; a blanket `.warn()` is not.
    zero findings. The motivating case.
 2. **A runtime cycle still is.** Same two slices with a value import → one finding, asserted by
    identity (which slices, not how many).
-3. **A mixed cycle is a cycle.** A → B by value, B → A by type: still a runtime cycle in one
-   direction, and the finding must name it. This is the row that a naive "filter all type edges"
-   implementation gets wrong.
+3. ~~**A mixed cycle is a cycle.** A → B by value, B → A by type: still a runtime cycle in one
+   direction, and the finding must name it.~~ **This row was wrong and the implementation was
+   right.** "A runtime cycle in one direction" is not a thing — a cycle needs both directions, and
+   with `B → A` erased, `B` depends on nothing. Measured: no finding, correctly. What the row was
+   groping for is covered by the _partially_ type-only case: `import { type X, y }` keeps a runtime
+   binding for `y`, so it IS an edge, and `isTypeOnlyImport` requires **every** named specifier to be
+   type-only. That is now its own test.
 4. **A re-export cycle**, since `isTypeOnlyReExport` exists separately — `export type { X } from` is
    erased too, and if the fix handles `import type` but not that, half the feature is still broken.
 5. **`ignoreTypeImports: false` still reports the type-only cycle**, so the option is proven to do

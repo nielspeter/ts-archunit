@@ -10,7 +10,7 @@ import {
   Scope,
   SyntaxKind,
 } from 'ts-morph'
-import { collectObjectLiteralFunctions } from '../helpers/object-literal-functions.js'
+import { collectObjectLiteralFunctions } from '../core/object-literal-functions.js'
 
 /**
  * Unified representation of a TypeScript function.

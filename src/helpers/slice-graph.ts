@@ -1,5 +1,7 @@
 import type { SourceFile } from 'ts-morph'
 import type { Slice } from '../models/slice.js'
+import type { ImportOptions } from '../core/import-options.js'
+import { isTypeOnlyImport } from '../core/import-options.js'
 
 /**
  * An edge in the slice dependency graph.
@@ -44,8 +46,20 @@ function collectEdgesFromFile(
   fileToSlice: Map<string, string>,
   edgeSet: Set<string>,
   edges: SliceEdge[],
+  options?: ImportOptions,
 ): void {
   for (const importDecl of file.getImportDeclarations()) {
+    // A type-only import is ERASED at compile time and creates no runtime
+    // dependency, so counting it as a graph edge invents cycles that cannot
+    // exist at runtime — [plan 0084](../../plans/0084-cycle-detection-that-ignores-type-only-imports.md).
+    //
+    // That was not a hypothetical: this repo's own `arch/no-cycles` rule sat at
+    // `.warn()` for months with a comment saying "type-only imports create
+    // false-positive cycles; switch to .check() when beFreeOfCycles ignores
+    // import type" — so the feature was documented, exported, and unusable at
+    // error severity by anyone who uses `import type` for the reason it exists.
+    if (options?.ignoreTypeImports === true && isTypeOnlyImport(importDecl)) continue
+
     const resolved = importDecl.getModuleSpecifierSourceFile()
     if (!resolved) continue
 
@@ -63,6 +77,7 @@ function collectEdgesFromFile(
 export function buildSliceDependencyGraph(
   slices: Slice[],
   fileToSlice?: Map<string, string>,
+  options?: ImportOptions,
 ): SliceEdge[] {
   const map = fileToSlice ?? buildFileToSliceMap(slices)
 
@@ -72,7 +87,7 @@ export function buildSliceDependencyGraph(
 
   for (const slice of slices) {
     for (const file of slice.files) {
-      collectEdgesFromFile(file, slice.name, map, edgeSet, edges)
+      collectEdgesFromFile(file, slice.name, map, edgeSet, edges, options)
     }
   }
 

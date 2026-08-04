@@ -1,3 +1,23 @@
+/**
+ * Object-literal function traversal. **In `core/` because it was the wrong way up.**
+ *
+ * It lived in `helpers/` and was imported by `models/arch-function.ts` — a
+ * `models → helpers` edge, which is backwards: helpers may depend on models, not
+ * the reverse. That edge sat harmlessly until
+ * [plan 0082](../../plans/completed/0082-an-object-literal-callback-keeps-its-name.md)
+ * added `helpers/callback-extractor.ts → models/arch-function.ts` as a **value**
+ * import, closing a runtime cycle.
+ *
+ * Measured: at v0.45.6 no file in `helpers/` had a value import from `models/` —
+ * only `import type`. So the cycle was one day old when
+ * [plan 0084](../../plans/0084-cycle-detection-that-ignores-type-only-imports.md)
+ * found it, and the rule that exists to catch exactly this was pinned at `.warn()`
+ * with a comment explaining why. A rule that cannot fail let a cycle in overnight.
+ *
+ * This module imports nothing but ts-morph, so `core/` costs it no dependency and
+ * both `models → core` and `helpers → core` are permitted directions.
+ */
+
 import { Node } from 'ts-morph'
 import type { PropertyAssignment, MethodDeclaration } from 'ts-morph'
 
