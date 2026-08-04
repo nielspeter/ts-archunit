@@ -56,10 +56,21 @@ bugs were never aimed at us, and nothing was watching the watchers.
 
 > **Shipped: `tests/tools/scan-enforceable-primitives.ts`, run as a test, run in CI by `npm run test`.**
 >
-> **The rule is the deliverable, not the number:** an enforceable primitive is a function exported from
-> `src/index.ts` whose declared return type is `Condition`, `PairCondition` or `Predicate`. Measured
-> 2026-08-04: **150 of 231 public functions** — 66 in `src/conditions/`, 51 in `src/predicates/`, 28 in
-> `src/rules/`, 5 in `src/core/`.
+> **The rule is the deliverable, not the number:** an enforceable primitive is a function reachable from
+> one of `package.json`'s declared `exports` subpaths, whose declared return type is `Condition`,
+> `PairCondition` or `Predicate`. Measured 2026-08-04: **181 of 274 public functions**, across **12**
+> entry points and 39 declaring files.
+>
+> **The first committed version said 150, and that was a fifth wrong number** — the point of this phase
+> arriving inside the phase itself. It read only `src/index.ts`, while the manifest declares twelve
+> subpaths: **31 primitives are published only through the other eleven** — every metric rule, every
+> `typescript` rule, the `naming`, `dependencies` and `code-quality` families, and all eight GraphQL
+> primitives. The docstring justified the restriction with "a user cannot apply what they cannot import",
+> which was false for all 31; three of them (`noAnyProperties`, `noTypeAssertions`,
+> `moduleNoTypeAssertions`) are already applied in `arch-rules.test.ts`, so the denominator excluded
+> members the numerator contains. Two reviewers measured it independently within the hour, and both got
+> the same 31. Reading the manifest is also the better derivation: the manifest and the barrel are
+> maintained by different edits, so they can disagree, and the disagreement is the finding.
 >
 > The **return type** is the definition rather than the folder, because the folder is what made every
 > earlier count wrong. The first draft counted `src/smells/`'s `buildFingerprint` and `computeSimilarity`;
@@ -69,21 +80,32 @@ bugs were never aimed at us, and nothing was watching the watchers.
 > primitive) and the internal composition helpers (primitives, not public).
 >
 > **The ratio is now withdrawn for a second and stronger reason than "it does not reproduce": it is not
-> derivable by the method that produced it.** The 13.0% matched primitive _names_ against call sites in
-> `tests/archunit/`. But a primitive can be applied without its name ever appearing —
-> `.resideInFolder(...)` in the should-phase calls `conditionResideInFolder`
-> (`src/builders/class-rule-builder.ts:131`), and `arch-rules.test.ts` writes `.resideInFolder(` **twenty
-> times and `conditionResideInFolder` zero times**. Most of the 51 predicates are reached the same way,
-> through a builder method of the same name. An honest numerator needs call-graph reachability, which is
-> Phase 2's problem and stays parked — and the test pins this counter-example, so the next attempt to
-> divide two numbers here has to argue with a failing assertion rather than with a comment.
+> derivable by the method that produced it, in both directions.** The 13.0% matched primitive _names_
+> against call sites in `tests/archunit/`. But a primitive can be applied without its name ever appearing
+> — `.resideInFolder(...)` in the should-phase calls `conditionResideInFolder`
+> (`src/builders/class-rule-builder.ts:131`), and `arch-rules.test.ts` writes `.resideInFolder(`
+> **eighteen times and `conditionResideInFolder` zero times** — and a name can appear without being
+> applied, in an import list or a comment. An honest numerator needs call-graph reachability, which is
+> Phase 2's problem and stays parked. The test **documents** the counter-example executably; it cannot
+> stop anyone quoting a ratio in a markdown file, and the first version of this text claimed it could.
 >
-> **Sabotage: 8 rows enumerated from the diff, 8 caught, 0 gaps.** One row is worth recording. With
-> `PRIMITIVE_KINDS` emptied — the total collapse this phase exists to catch — **three of the six rows
-> still passed**: "excludes the helpers, entry points and matchers" and "the checker's verdict is
-> corroborated" are both ∀-over-∅, and an empty population is precisely when they are most wrong. The
-> vacuity row is what fails, which is why it is written first and why it asserts a floor on **both**
-> the public surface and the population.
+> _"Twenty times" was 18._ Hand-typed, in three files, inside the change whose entire subject is
+> hand-typed counts. Caught by review, not by the assertion — which reads `> 5`, so it can never red.
+>
+> **Sabotage, two rounds.** Round 1: 8 rows from the diff, 8 caught — and then two reviewers measured
+> **five holes the matrix had not thought to revert**, every one the same shape, a guard one tier coarser
+> than the thing it guards: a count plus a four-element folder set where the precedent pins a file set;
+> a whole extra return kind admitted invisibly; each `MUST_EXCLUDE` name going vacuous the moment it left
+> the API; corroboration at file granularity certifying "something in here returns this kind"; and
+> membership following the **order** of two interchangeable overload signatures. Round 2, after the fix:
+> 9 rows, **8 caught, 1 green-and-correct**, plus one row written to _stay_ green that went red and found
+> a real coupling defect in the fix itself (the corroborated text came from a different declaration than
+> the classified kind). One reviewer finding also **dissolved on measurement**: deleting a barrel
+> re-export is no longer a loss, because that family has its own declared subpath.
+>
+> Worth recording from round 1: with `PRIMITIVE_KINDS` emptied, **three of the six rows still passed** —
+> ∀-over-∅ is at its most wrong exactly when the population is empty. That is why the vacuity row is
+> written first and floors **both** the public surface and the population.
 
 **A fourth reader produced a fourth number on 2026-08-04: 13.0%** — 231 public exported functions, 30 of
 them called anywhere in `tests/archunit/`. It disagrees with 166, 185 and 187 for a mundane reason: it

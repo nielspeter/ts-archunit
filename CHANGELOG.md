@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 Plan 0083's Phase 0. No shipped behaviour changed — the addition is a derivation over this repository's own
 public API, and a number we had been quoting is withdrawn.
 
+> **Corrected after release, same day.** The figures below — "150 of 231 public functions", scoped to
+> `src/index.ts` — are **wrong**, and the correction is in `main` rather than in a new version because no
+> published file changes. The derivation read only the root entry point, while `package.json` declares
+> **twelve** `exports` subpaths: **31 primitives are published only through the other eleven** (all of
+> `./rules/metrics`, `./rules/typescript`, `./rules/naming`, `./rules/dependencies`,
+> `./rules/code-quality` and `./graphql`). The real population is **181 of 274**. Two reviewers measured
+> it independently and got the same 31. Also wrong below: "twenty times" is **eighteen**.
+
 ### Added
 
 - **The enforceable-primitive population is derived from source, not remembered.**
