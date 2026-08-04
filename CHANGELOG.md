@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.55.1] - 2026-08-04
+
+### Fixed
+
+- **`anyCase` could build a pattern that did not match its own input.** v0.55.0's pre-tag review escaped
+  regex metacharacters and left the _cased_ branch with the identical hazard: a case mapping is not
+  one-to-one, `'ß'.toUpperCase()` is `'SS'`, and a character class of three single characters cannot match
+  a two-character form. `anyCase('straße')` produced a pattern that failed on its own uppercase spelling,
+  without throwing.
+
+  Now an alternation where either mapping is multi-character, and a character class while both are single.
+  **No behaviour change and no migration for anyone**: today's phrases are ASCII, so the pattern's text is
+  byte-identical to v0.55.0's.
+
+  That last part is the interesting bit. The first attempt used an alternation for _every_ letter, which
+  moves `STUB_PATTERNS`' text — and therefore every baselined finding's identity — while `[Nn]` and
+  `(?:N|n)` match identically. The change detector added in v0.54.0 fired on it, and going quiet once the
+  class was kept is what proved the refinement free. A guard reporting an unintended **cost** rather than a
+  bug.
+
+### Added
+
+- A **round-trip property** guard on `anyCase`: whatever the input, the pattern it builds must match that
+  input in every casing. Both of its silent-wrongness traps fail that property; neither failed anything
+  before. Plus a discrimination row, since a function returning `.*` would satisfy a round trip.
+
 ## [0.55.0] - 2026-08-04
 
 ### Fixed

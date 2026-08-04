@@ -349,12 +349,32 @@ const COMMENT_LINE_START = String.raw`(?:^|\n)[ \t]*(?:\/\/+|\/\*+|\*+)?[ \t]*`
  * hand-writing it is what produced bug 0061: `[Nn]ot\\s+[Ii]mplemented` alternates the
  * first letter of each word and nothing else.
  */
-function anyCase(word: string): string {
+export function anyCase(word: string): string {
+  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return [...word]
     .map((ch) => {
       const lower = ch.toLowerCase()
       const upper = ch.toUpperCase()
-      if (lower !== upper) return `[${upper}${lower}]`
+      // A character CLASS while both mappings are single characters, and an ALTERNATION
+      // when either is not.
+      //
+      // The alternation is the correctness half: a case mapping is not one-to-one.
+      // Measured, `'ß'.toUpperCase()` is `'SS'` — two characters — so `[SSß]` is a class of
+      // three single characters matching `S` or `ß` and **not** `SS`, and
+      // `anyCase('straße')` produced a pattern that did not match its own uppercase form
+      // without throwing. Same silent-wrongness as an unescaped metacharacter; the first
+      // version of this function fixed only that half.
+      //
+      // Keeping the class for the single-character case is the *cost* half, and it is not
+      // cosmetic. `[Nn]` and `(?:N|n)` match identically, so switching every letter to an
+      // alternation would move `STUB_PATTERNS`' text — and therefore every baselined
+      // finding's identity — while changing no behaviour at all. That is a migration
+      // charged to every adopter for nothing. Found by the change detector firing on it.
+      if (lower !== upper) {
+        return upper.length === 1 && lower.length === 1
+          ? `[${escape(upper)}${escape(lower)}]`
+          : `(?:${escape(upper)}|${escape(lower)})`
+      }
       // A character with no case is passed through ESCAPED. Measured before adding this:
       // `anyCase('todo(x)')` produced `[Tt][Oo][Dd][Oo]([Xx])` — a capture group; `'wip.'`
       // produced a `.` meaning any character; `'a+b'` produced "one or more a". None of
@@ -362,7 +382,7 @@ function anyCase(word: string): string {
       //
       // No live defect — today's phrases are letters and spaces — but this function exists
       // to be called with a new phrase, and that is when it would bite.
-      return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return escape(ch)
     })
     .join('')
 }

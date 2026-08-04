@@ -139,6 +139,31 @@ shape a defect can take in a rule that gates a build. No live defect — today's
 spaces — but the function exists precisely to be called with a _new_ phrase, and that is when it would
 bite. Now escaped, with the measurement recorded at the site.
 
+## A second review, after shipping v0.55.0 — the escaping fix was half a fix
+
+The pre-tag pass fixed `anyCase`'s no-case branch and left the **cased** branch with the identical hazard.
+A case mapping is not one-to-one:
+
+```
+'ß'.toUpperCase() === 'SS'      // two characters
+anyCase('ß')      === '[SSß]'   // a class of THREE single characters
+```
+
+So `anyCase('straße')` built a pattern that **did not match its own uppercase form**, and did not throw —
+the same silent-wrongness, one branch over, in the fix for it.
+
+Now an **alternation** when either mapping is multi-character, and a character class while both are single.
+That split is not cosmetic, and the change detector is what established it: switching _every_ letter to an
+alternation moves `STUB_PATTERNS`' text — and therefore every baselined finding's identity — while
+`[Nn]` and `(?:N|n)` match identically. A migration charged to every adopter for no behavioural change.
+The detector fired on that, went quiet once the class was kept for the ASCII case, and that is the guard
+doing its real job: reporting a cost I had not intended rather than a bug.
+
+`anyCase` is now exported (from `matchers.ts`, deliberately **not** from `src/index.ts`, so not public API)
+and guarded by a **round-trip property** over metacharacters and multi-character mappings: whatever the
+input, the pattern must match it in every casing. Both traps fail that property; neither failed anything
+before.
+
 ## Sabotage
 
 | Revert                                              | Result                                                    |

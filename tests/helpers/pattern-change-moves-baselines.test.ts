@@ -31,7 +31,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Project } from 'ts-morph'
-import { STUB_PATTERNS, comment } from '../../src/helpers/matchers.js'
+import { STUB_PATTERNS, comment, anyCase } from '../../src/helpers/matchers.js'
 import { identifyMatches } from '../../src/conditions/match-identity.js'
 
 /**
@@ -59,6 +59,61 @@ const REMEDY = [
   '  2. add a CHANGELOG entry saying baselines for the affected rules must be regenerated;',
   '  3. add the row to docs/upgrading.md, scoped by the rules a user would recognise.',
 ].join('\n')
+
+describe('anyCase builds a pattern that matches the word it was built from', () => {
+  // `anyCase` exists because the `i` flag cannot be used — the MARKER branch must stay
+  // case-sensitive — so the phrase branch alternates its own letters. Exported for this
+  // test only; it is deliberately absent from `src/index.ts`, so it is not public API.
+  //
+  // Two silent-wrongness traps were found in it, one release apart, and BOTH by review
+  // rather than by any failing test:
+  //
+  //  1. metacharacters were unescaped, so `todo(x)` became a capture group;
+  //  2. a case mapping is not one-to-one — `'ß'.toUpperCase()` is `'SS'` — so a character
+  //     CLASS silently could not match its own uppercase form.
+  //
+  // Neither threw. The property that catches both is the round trip: whatever the input,
+  // the pattern must match that input in every casing.
+  const WORDS = [
+    'not',
+    'implemented',
+    'coming',
+    'soon',
+    // regex metacharacters
+    'todo(x)',
+    'wip.',
+    'a+b',
+    'c[d]',
+    'e|f',
+    // multi-character case mappings
+    'straße',
+    'ß',
+    'ﬁ',
+  ]
+
+  it.each(WORDS)('%s round-trips in every casing', (word) => {
+    const re = new RegExp(`^(?:${anyCase(word)})$`)
+    expect(re.test(word)).toBe(true)
+    expect(re.test(word.toLowerCase())).toBe(true)
+    expect(re.test(word.toUpperCase())).toBe(true)
+  })
+
+  it('and does NOT match a different word — the discrimination', () => {
+    // Without this, `anyCase` returning `.*` would satisfy every row above.
+    const re = new RegExp(`^(?:${anyCase('not')})$`)
+    expect(re.test('nut')).toBe(false)
+    expect(re.test('no')).toBe(false)
+    expect(re.test('nott')).toBe(false)
+  })
+
+  it('a metacharacter is matched LITERALLY, not interpreted', () => {
+    // The specific failure: `todo(x)` as a capture group would match `todox`.
+    const re = new RegExp(`^(?:${anyCase('todo(x)')})$`)
+    expect(re.test('todo(x)')).toBe(true)
+    expect(re.test('TODO(X)')).toBe(true)
+    expect(re.test('todox')).toBe(false)
+  })
+})
 
 describe('a shipped default pattern has not moved unnoticed (bug 0060)', () => {
   it('the guarded set is DERIVED from source, not believed', () => {
