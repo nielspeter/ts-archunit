@@ -33,6 +33,36 @@ export default tseslint.config(
     },
   },
   {
+    // `scripts/*.mjs` runs in the RELEASE path and was linted by nothing — prettier only.
+    // Type-checked rules cannot apply (the files are not in any tsconfig project, which is
+    // what `projectService` reported when pointed at them), so this block turns those off
+    // and keeps the base rules, which is strictly better than the previous zero.
+    //
+    // `no-console` is off here on purpose: a release script's entire output channel is the
+    // console, and the rule exists to keep it out of the LIBRARY.
+    files: ['scripts/**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      // `projectService: false` for this block: it is set globally above, and
+      // `disableTypeChecked` turns off the type-aware RULES without stopping the PARSER
+      // from demanding the file belong to a tsconfig project. These do not, by design.
+      parserOptions: { projectService: false, project: null },
+      // Declared explicitly rather than adding the `globals` package for five names. A
+      // dependency for this would be more surface than the problem.
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+      },
+    },
+    rules: {
+      ...tseslint.configs.disableTypeChecked.rules,
+      'no-console': 'off',
+    },
+  },
+  {
     files: ['src/**/*.ts', 'tests/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
