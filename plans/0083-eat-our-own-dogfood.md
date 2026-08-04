@@ -94,6 +94,38 @@ file already ships the durable form (`would report a fault if one were introduce
 positive control **per mechanism class**, not per rule: the 14 `core must not import from X` rules share
 one mechanism and differ only by glob, so one control covers them. ~36 rules becomes ~12 controls.
 
+### Phase 1 result — 36 rows, 34 caught, **2 caught by nothing**
+
+Run 2026-08-04 in an isolated `git worktree`, green baseline asserted before every row, each plant
+proven to apply, exit codes read unpiped, and each row checked that the **expected** test failed rather
+than crediting any red. Tree restored green after. 1.63s per run, so the whole matrix cost about a
+minute — the plan's ~70-minute estimate was for `-t`-filtered runs it then forbade.
+
+Population **derived** from `BUILT`: **37 rules, 37 distinct ids.** All four hand-typed counts in
+`arch-rules.test.ts` (36, 39, 41, 43) are wrong.
+
+|                          |                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Rows                     | 36 (the 37th, `api/no-single-glob-predicates`, needs an in-place edit rather than a planted file — deferred) |
+| Expected test red        | **34**                                                                                                       |
+| Red for the wrong reason | **0**                                                                                                        |
+| **Caught by nothing**    | **2**                                                                                                        |
+
+Both misses became filings, and **neither would have been found by the deletion audit this plan
+originally specified**:
+
+- **`hygiene/no-stubs`** — a `TODO` planted in `src/` did not red.
+  [Bug 0052](../bugs/0052-nostubcomments-cannot-see-a-functions-own-docstring.md): the condition
+  searches function _bodies_, so a marker in the function's own docstring is invisible.
+- **`arch/no-cycles`** — a planted cycle did not red, and neither does the **real one already in our
+  source**. The rule is `.warn()` by a documented decision whose stated blocker is type-only imports.
+  [Plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md).
+
+The result also answers the question the plan raised about class A: **A is not a safe bucket.** Two of
+37 rules in it were enforcing nothing, which is the same finding as bugs 0011 and 0049 and now the
+third instance. Phase 2's classification must treat "already enforced" as a claim to test, not a state
+to record.
+
 ## Phase 2 — the census, measured rather than read
 
 The first draft classified 166 items **by reading**, which inherits 0079's recorded residue: one reader
