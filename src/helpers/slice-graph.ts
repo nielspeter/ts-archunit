@@ -200,6 +200,26 @@ export function buildSliceDependencyGraph(
  * @param options - Must match the options passed to `buildSliceDependencyGraph`
  * @returns Array of { sourceFile, importPath, importLine }
  */
+export interface SliceDependencySite {
+  readonly sourceFile: SourceFile
+  readonly importPath: string
+  readonly importLine: number
+  /**
+   * The edge itself, so a caller can build an identity and a message from what the
+   * dependency *is* rather than from where it sits.
+   *
+   * Added by [plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md): the
+   * dependency conditions identify a finding by `basename::kind::specifier::names` and
+   * deliberately **not** by line, because a line moves when anything above it is edited
+   * (see `ArchViolation.identity`). The slice conditions could not follow that scheme
+   * while this function returned only a line number.
+   *
+   * It also unblocks naming the offending edge's KIND in the message — `edgeVerb()` has
+   * returned `'re-exports'` since v0.28.0 and no slice condition could use it.
+   */
+  readonly edge: ModuleEdge
+}
+
 export function findSliceDependencyDetails(
   slices: Slice[],
   fromSliceName: string,
@@ -207,13 +227,13 @@ export function findSliceDependencyDetails(
   fileToSlice: Map<string, string> | undefined,
   options: ImportOptions | undefined,
   question: ErasureQuestion,
-): Array<{ sourceFile: SourceFile; importPath: string; importLine: number }> {
+): SliceDependencySite[] {
   const map = fileToSlice ?? buildFileToSliceMap(slices)
 
   const fromSlice = slices.find((s) => s.name === fromSliceName)
   if (!fromSlice) return []
 
-  const details: Array<{ sourceFile: SourceFile; importPath: string; importLine: number }> = []
+  const details: SliceDependencySite[] = []
   for (const file of fromSlice.files) {
     for (const edge of sliceEdgesOf(file, options, question)) {
       if (edge.resolvedPath === undefined) continue
@@ -223,6 +243,7 @@ export function findSliceDependencyDetails(
           sourceFile: file,
           importPath: edge.resolvedPath,
           importLine: edge.line,
+          edge,
         })
       }
     }

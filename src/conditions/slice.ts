@@ -3,6 +3,8 @@ import type { ArchViolation } from '../core/violation.js'
 import type { Slice } from '../models/slice.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { splitGlobArgs } from '../core/import-options.js'
+import type { SliceDependencySite } from '../helpers/slice-graph.js'
+import { edgeVerb } from '../core/module-edges.js'
 import {
   buildSliceDependencyGraph,
   buildFileToSliceMap,
@@ -24,29 +26,29 @@ import { tarjanSCC, type AdjacencyList } from '../helpers/tarjan.js'
  *   .check()
  */
 /**
- * Rotate a cycle to start at its lexicographically smallest member.
+ * `canonicalizeCycle` lived here, and sorting replaced it — bug 0056.
  *
- * Tarjan emits an SCC in traversal order, and traversal order follows the
- * source-file walk — a filesystem property. So the same cycle is reported as
- * `c -> b -> a -> c` on one machine and `b -> a -> c -> b` on another, giving
- * one cycle two identities and breaking any baseline that accepted it
- * (bug 0010). Measured: reversing the file walk rotates it.
+ * It rotated an SCC to start at its lexicographically smallest member, for a real reason:
+ * Tarjan emits membership in traversal order, traversal follows the file walk, and the same
+ * cycle therefore had two identities on two machines. That is the concern
+ * [bug 0010](../../bugs/fixed/0010-violation-identity-embeds-absolute-paths.md) introduced
+ * the `identity` field for — the original docstring cited it here, a little loosely, since
+ * 0010 itself is about absolute paths rather than about cycles.
  *
- * Rotation only. Direction is NOT normalized, because `a -> b -> c -> a` and
- * `a -> c -> b -> a` traverse different edges and are genuinely different
- * cycles.
+ * Rotation was necessary and **not sufficient**, and the reason is in its own docstring's
+ * final claim — *"Direction is NOT normalized, because `a -> b -> c -> a` and
+ * `a -> c -> b -> a` traverse different edges and are genuinely different cycles"*. That
+ * premise requires the array to be an edge-ordered PATH. It is not, for any component of
+ * three or more: measured, a real ring `a→b→c→d→a` came out as `a -> d -> c -> b -> a`,
+ * every arrow reversed. So the preserved "direction" was information about the traversal,
+ * not about the graph — and reordering two imports moved the element from `[a, c, b]` to
+ * `[a, b, c]`, reddening CI on a cosmetic edit.
+ *
+ * Sorting subsumes rotation for a set and adds the missing half. If a future change
+ * recovers a REAL path (bug 0055's fuller fix), direction becomes genuine information
+ * again — and then the right shape is a sorted member set for the identity with the path
+ * carried in the message, not a return to rotation.
  */
-function canonicalizeCycle(names: readonly (string | undefined)[]): string[] {
-  const present = names.filter((n): n is string => n !== undefined)
-  if (present.length < 2) return present
-  let start = 0
-  for (let i = 1; i < present.length; i++) {
-    const candidate = present[i]
-    const current = present[start]
-    if (candidate !== undefined && current !== undefined && candidate < current) start = i
-  }
-  return [...present.slice(start), ...present.slice(0, start)]
-}
 
 /**
  * Every slice must be free of dependency cycles.
@@ -119,28 +121,69 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
 
       const violations: ArchViolation[] = []
       for (const scc of sccs) {
-        const cycleNames = canonicalizeCycle(scc.map((i) => sliceNames[i]))
-        const cyclePath = [...cycleNames, cycleNames[0]].join(' -> ')
-
-        // Find one concrete file causing the cycle for the violation location
-        const fromSlice = cycleNames[0] ?? ''
-        const toSlice = cycleNames[1] ?? fromSlice
-        const details = findSliceDependencyDetails(
-          slices,
-          fromSlice,
-          toSlice,
-          fileToSlice,
-          resolved,
-          'module-request',
+        // **SORTED, not rotated** — bug 0056. `tarjanSCC` returns MEMBERSHIP in DFS-pop
+        // order, so the sequence is an artefact of traversal: reordering two imports moved
+        // the element from `[a, c, b]` to `[a, b, c]`, which reddened CI on a cosmetic edit
+        // and printed "it may be stale after a rename" about a rename that never happened.
+        // `.excluding()` matches element/file/message, so sorting the ELEMENT is what fixes
+        // that — `canonicalizeCycle`'s rotation could not, because both spellings were
+        // already rotated to start at `a`.
+        const members = [...new Set(scc.map((i) => sliceNames[i] ?? ''))].sort((a, b) =>
+          a.localeCompare(b),
         )
-        const firstDetail = details[0]
+
+        // **Locate the finding on an edge that EXISTS** — bug 0055. This used to ask for
+        // details on `members[0] -> members[1]`, the first two members of a SET, which need
+        // not be an edge at all: on a 4-ring it reported `unknown:0`, and when the pair
+        // happened to be an edge the location was a perfectly legal import. Search the
+        // component for a real edge instead.
+        const inCycle = new Set(members)
+        // SORTED, not `.find()`. `edges` is built by walking the file list, so taking the
+        // first match made the example edge — and therefore the message — depend on
+        // filesystem order: measured, a reversed walk turned "a imports b" into
+        // "c imports a". Bug 0010's portability test caught it, which is the test that
+        // exists because machine-dependent output gives one finding two identities.
+        const realEdge = edges
+          .filter((e) => inCycle.has(e.from) && inCycle.has(e.to))
+          .sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))[0]
+        const details =
+          realEdge === undefined
+            ? []
+            : findSliceDependencyDetails(
+                slices,
+                realEdge.from,
+                realEdge.to,
+                fileToSlice,
+                resolved,
+                'module-request',
+              )
+        // Same reason, one level down: `details` follows the slice's file order.
+        const site = [...details].sort(
+          (a, b) =>
+            a.sourceFile.getFilePath().localeCompare(b.sourceFile.getFilePath()) ||
+            a.importLine - b.importLine,
+        )[0]
+
+        // **A member list, not a path** — bug 0055's other half. The old message joined the
+        // members with ` -> ` and appended the first again, presenting a SET as a traversal:
+        // on a real ring `a→b→c→d→a` it printed `a -> d -> c -> b -> a`, every arrow
+        // reversed, and on this repo's own source two of four arrows did not exist. Naming
+        // the members and one real edge asserts only what can be substantiated.
+        const closing =
+          site === undefined
+            ? ''
+            : ` (e.g. ${realEdge?.from} ${edgeVerb(site.edge.kind)} ${realEdge?.to} at ${site.sourceFile.getBaseName()}:${site.importLine})`
 
         violations.push({
           rule: context.rule,
-          element: `[${cycleNames.join(', ')}]`,
-          file: firstDetail ? firstDetail.sourceFile.getFilePath() : 'unknown',
-          line: firstDetail ? firstDetail.importLine : 0,
-          message: `Cycle detected: ${cyclePath}`,
+          element: `[${members.join(', ')}]`,
+          file: site ? site.sourceFile.getFilePath() : 'unknown',
+          line: site ? site.importLine : 0,
+          // The sorted member SET, so the identity is a function of membership alone —
+          // independent of traversal order (bug 0056) and of the message text, which is what
+          // frees the message above to be rewritten at all (plan 0088).
+          identity: `cycle::${members.join(',')}`,
+          message: `Cycle detected between: ${members.join(', ')}${closing}`,
           because: context.because,
         })
       }
@@ -148,6 +191,32 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
       return violations
     },
   }
+}
+
+/**
+ * A dependency site's identity, following the scheme the dependency conditions already use.
+ *
+ * `basename::kind::specifier::sorted-names`, prefixed with the slice pair — and
+ * **deliberately no line number**, which is the correction plan 0088's own sketch needed.
+ * `ArchViolation.identity` exists precisely to survive "a coordinate — `at line 12` moves
+ * when anything above it is edited", and `src/conditions/dependency.ts` omits the line for
+ * that reason. Copying the scheme rather than inventing a second one is the point: these
+ * two families report the same underlying edges.
+ *
+ * Why this distinguishes what a count could not: a barrel with thirty re-exports into one
+ * forbidden slice previously produced thirty findings sharing ONE hash, because `element`
+ * was the basename and the message named only the slice pair — so one baseline entry
+ * accepted all thirty. Each edge carries different `names`, so each site is now its own
+ * finding. (Measured before the fix: 3 sites, 3 lines, 1 hash.)
+ */
+function siteIdentity(from: string, to: string, site: SliceDependencySite): string {
+  return [
+    `${from}->${to}`,
+    site.sourceFile.getBaseName(),
+    site.edge.kind,
+    site.edge.specifier,
+    [...site.edge.names].sort((a, b) => a.localeCompare(b)).join(','),
+  ].join('::')
 }
 
 /**
@@ -212,7 +281,8 @@ export function respectLayerOrder(...args: [string[], ImportOptions] | string[])
               element: detail.sourceFile.getBaseName(),
               file: detail.sourceFile.getFilePath(),
               line: detail.importLine,
-              message: `Layer "${edge.from}" depends on higher layer "${edge.to}" (allowed: ${layers.slice(fromIdx + 1).join(', ') || 'none'})`,
+              identity: siteIdentity(edge.from, edge.to, detail),
+              message: `Layer "${edge.from}" ${edgeVerb(detail.edge.kind)} higher layer "${edge.to}" (allowed: ${layers.slice(fromIdx + 1).join(', ') || 'none'})`,
               because: context.because,
             })
           }
@@ -271,7 +341,8 @@ export function notDependOn(...args: [string[], ImportOptions] | string[]): Cond
               element: detail.sourceFile.getBaseName(),
               file: detail.sourceFile.getFilePath(),
               line: detail.importLine,
-              message: `Slice "${edge.from}" depends on forbidden slice "${edge.to}"`,
+              identity: siteIdentity(edge.from, edge.to, detail),
+              message: `Slice "${edge.from}" ${edgeVerb(detail.edge.kind)} forbidden slice "${edge.to}"`,
               because: context.because,
             })
           }
