@@ -73,7 +73,11 @@ export function beFreeOfCycles(
     description: 'be free of cycles',
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
       const fileToSlice = buildFileToSliceMap(slices)
-      const edges = buildSliceDependencyGraph(slices, fileToSlice, options)
+      // 'module-request': a cycle is a deadlock in module-initialization order, so
+      // what matters is whether the target is EVALUATED, not whether the bindings are
+      // type-level. Under `verbatimModuleSyntax`, `import { type X } from 's'` emits
+      // `import {} from 's'` and can close a cycle (plan 0087).
+      const edges = buildSliceDependencyGraph(slices, fileToSlice, options, 'module-request')
 
       // Map slice names to indices for Tarjan's
       const sliceNames = slices.map((s) => s.name)
@@ -103,7 +107,14 @@ export function beFreeOfCycles(
         // Find one concrete file causing the cycle for the violation location
         const fromSlice = cycleNames[0] ?? ''
         const toSlice = cycleNames[1] ?? fromSlice
-        const details = findSliceDependencyDetails(slices, fromSlice, toSlice, fileToSlice, options)
+        const details = findSliceDependencyDetails(
+          slices,
+          fromSlice,
+          toSlice,
+          fileToSlice,
+          options,
+          'module-request',
+        )
         const firstDetail = details[0]
 
         violations.push({
@@ -146,7 +157,10 @@ export function respectLayerOrder(...args: [string[], ImportOptions] | string[])
     description: `respect layer order [${layers.join(' -> ')}]`,
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
       const fileToSlice = buildFileToSliceMap(slices)
-      const edges = buildSliceDependencyGraph(slices, fileToSlice, options)
+      // 'type-bindings': layering and isolation are about COUPLING, so
+      // `ignoreTypeImports` here means what it means on `dependOn`/`notImportFrom` —
+      // ignore type-level references. Deliberately NOT the cycle question (plan 0087).
+      const edges = buildSliceDependencyGraph(slices, fileToSlice, options, 'type-bindings')
 
       // Map layer names to their position (lower index = higher layer)
       const layerIndex = new Map(layers.map((name, i) => [name, i]))
@@ -168,6 +182,7 @@ export function respectLayerOrder(...args: [string[], ImportOptions] | string[])
             edge.to,
             fileToSlice,
             options,
+            'type-bindings',
           )
           for (const detail of details) {
             violations.push({
@@ -209,7 +224,10 @@ export function notDependOn(...args: [string[], ImportOptions] | string[]): Cond
     description: `not depend on [${forbiddenSlices.join(', ')}]`,
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
       const fileToSlice = buildFileToSliceMap(slices)
-      const edges = buildSliceDependencyGraph(slices, fileToSlice, options)
+      // 'type-bindings': layering and isolation are about COUPLING, so
+      // `ignoreTypeImports` here means what it means on `dependOn`/`notImportFrom` —
+      // ignore type-level references. Deliberately NOT the cycle question (plan 0087).
+      const edges = buildSliceDependencyGraph(slices, fileToSlice, options, 'type-bindings')
 
       const violations: ArchViolation[] = []
 
@@ -221,6 +239,7 @@ export function notDependOn(...args: [string[], ImportOptions] | string[]): Cond
             edge.to,
             fileToSlice,
             options,
+            'type-bindings',
           )
           for (const detail of details) {
             violations.push({

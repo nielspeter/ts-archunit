@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.49.0] - 2026-08-04
+
+`ModuleEdge.typeOnly` was answering two questions at once, and measurement showed they are different
+questions.
+
+### Changed
+
+- **`beFreeOfCycles()` now reads `verbatimModuleSyntax` from your tsconfig.** Under that flag,
+  `import { type X } from './b.js'` emits `import {} from './b.js'` — the specifiers are erased, the
+  **module request is not** — so `./b.js` is evaluated and the import _can_ close a cycle.
+  `export { type X } from './b.js'` behaves identically (`export {} from './b.js'`). Both were treated
+  as erased and reported nothing.
+
+  Measured through ts-morph's own emit, same source, both settings. Exactly **two** spellings are
+  flag-dependent; the other six are the same either way:
+
+  | form                         | `vms: false` | `vms: true`              |
+  | ---------------------------- | ------------ | ------------------------ |
+  | `import type { X } from 's'` | erased       | erased                   |
+  | `import { type X } from 's'` | erased       | **`import {} from 's'`** |
+  | `export type { X } from 's'` | erased       | erased                   |
+  | `export { type X } from 's'` | erased       | **`export {} from 's'`** |
+
+  **If you have `verbatimModuleSyntax: true`, expect cycles you have not seen before.** They are real,
+  and the fix is also the diagnosis: move the modifier to the declaration — `import type { X }` — and
+  both the module request and the cycle go away. Projects without the flag are unaffected; an absent
+  option counts as off.
+
+  `notDependOn()` and `respectLayerOrder()` are deliberately **not** affected by the flag. The bindings
+  are type-level either way, and coupling is what they measure — so under the flag one edge can
+  correctly be a cycle _and_ correctly not be a type-import dependency.
+  ([plan 0087](plans/completed/0087-an-inline-type-import-still-requests-the-module.md))
+
+### Added
+
+- **`ModuleEdge.erasesModuleRequest`**, beside `typeOnly`, whose meaning is unchanged. `typeOnly` is the
+  coupling question ("are the bindings type-level"); the new field is the initialization question ("is
+  the target evaluated"). `erasesModuleRequest` implies `typeOnly`, and that invariant is asserted over
+  every import and re-export form at both flag positions.
+
+### Internal
+
+- The slice graph's two entry points take a required `ErasureQuestion` — `'module-request'` for cycles,
+  `'type-bindings'` for layering and isolation. Required rather than defaulted, because no default is
+  right for both callers and a wrong one is invisible.
+- `buildEdges` and `edgeStream` now build edges through a single `makeEdge()`. They each spelled out the
+  same field list, and `edgeStream`'s only consumer reads `typeOnly` — so a field wrong on the cold path
+  would not have surfaced. Sabotage confirmed it: building that path at the wrong flag was caught by
+  nothing until the two builders were compared field-by-field.
+- 14 of 14 sabotage reverts caught. The two initial gaps were both decisions whose only witness was a
+  comment — a type-position exclusion that the slice graph cannot observe, and the cold edge path above.
+
 ## [0.48.0] - 2026-08-04
 
 The slice graph could not see a re-export, so the commonest cycle there is — a barrel — was invisible
@@ -58,7 +110,7 @@ to the condition whose job is finding cycles.
 
 ### Internal
 
-- Filed [plan 0087](plans/0087-an-inline-type-import-still-requests-the-module.md) with the
+- Filed [plan 0087](plans/completed/0087-an-inline-type-import-still-requests-the-module.md) with the
   measurement behind it: under `verbatimModuleSyntax: true`, `import { type X } from 's'` emits
   `import {} from 's'`. The specifiers are erased, the module request is not, so it is an eager edge
   the graph currently drops. Not fixed here — `ModuleEdge.typeOnly` conflates "erased bindings" with

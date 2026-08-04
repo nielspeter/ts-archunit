@@ -157,6 +157,29 @@ type-only dependency on `legacy` is still a dependency on `legacy`, and it still
 is deleted. So the cycle check ignores type edges by default and the dependency conditions count them.
 :::
 
+::: warning `verbatimModuleSyntax` changes what counts as a cycle
+Under `verbatimModuleSyntax: true`, TypeScript keeps the module request even when every
+specifier is erased. Measured, same source, both settings:
+
+| form                         | `verbatimModuleSyntax: false` | `verbatimModuleSyntax: true` |
+| ---------------------------- | ----------------------------- | ---------------------------- |
+| `import type { X } from 's'` | erased                        | erased                       |
+| `import { type X } from 's'` | erased                        | **`import {} from 's'`**     |
+| `export type { X } from 's'` | erased                        | erased                       |
+| `export { type X } from 's'` | erased                        | **`export {} from 's'`**     |
+
+So under that flag `import { type X } from './b.js'` **does** cause `./b.js` to be evaluated, and it
+**can** close a cycle. Since v0.49.0 `beFreeOfCycles()` reads your tsconfig and counts those two forms
+accordingly; before that it reported nothing for them.
+
+If you have the flag on, expect cycles you have not seen before. They are real: write
+`import type { X }` — with the modifier on the declaration — and the module request goes away along
+with the cycle. That is also the fix.
+
+`notDependOn()` and `respectLayerOrder()` are **unaffected** by the flag: the bindings are type-level
+either way, and coupling is what they measure.
+:::
+
 **Upgrading from 0.46 or earlier.** If a project reports fewer cycles after upgrading, the ones that
 disappeared were type-only and were never runtime cycles. If you keep a baseline, note that a cycle's
 identity is its **member list** — so a cycle that merely got _narrower_ (a slice joined to it only by
@@ -234,6 +257,10 @@ do about an `import type`. `beFreeOfCycles()` therefore ignores type-only edges 
 dependency on `legacy`: it breaks when `legacy` is deleted, and "this layer may not reach into that
 one" is a design statement rather than a runtime one. So these two count type-only edges by default,
 matching `dependOn()` and `notImportFrom()`.
+
+Since v0.49.0 the difference is not only the default — it is the **question**. `beFreeOfCycles()` asks
+"is the target module evaluated"; the other two ask "are the bindings type-level". Those answers differ
+for two spellings under `verbatimModuleSyntax`, and the section below has the table.
 
 Pass `{ ignoreTypeImports: true }` to disagree:
 

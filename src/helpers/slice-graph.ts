@@ -56,6 +56,32 @@ const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>(
 ])
 
 /**
+ * Which erasure question a condition is asking.
+ *
+ * Both live on this graph and they are **not the same question**, which only became
+ * visible when `ModuleEdge` learned to tell them apart
+ * ([plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md)):
+ *
+ * - `'module-request'` — will importing this file cause the target to be *evaluated*?
+ *   That is what a **cycle** is: a deadlock in module-initialization order. Used by
+ *   `beFreeOfCycles`.
+ * - `'type-bindings'` — does this file *reference* the target's types? That is
+ *   **coupling**, which is what `notDependOn` and `respectLayerOrder` are about, and
+ *   it matches what `dependOn`/`notImportFrom` have always meant by
+ *   `ignoreTypeImports`.
+ *
+ * They diverge for exactly two spellings, and only under `verbatimModuleSyntax: true`:
+ * `import { type X } from 's'` and `export { type X } from 's'` emit `import {} from 's'`
+ * / `export {} from 's'`. Those are eager edges — so a cycle question must count them —
+ * while the bindings crossing them are still purely type-level, so a coupling question
+ * told to ignore type imports must not.
+ *
+ * Getting this backwards is a false positive on one side and a false negative on the
+ * other, in the same release.
+ */
+export type ErasureQuestion = 'module-request' | 'type-bindings'
+
+/**
  * The edges leaving one file, as a slice graph counts them.
  *
  * Reads `edgesOf()` — the one definition of a module edge (plan 0071, from bug 0022,
@@ -69,7 +95,7 @@ const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>(
  * no runtime dependency, so counting it invents cycles that cannot exist at runtime —
  *
  * **with one measured exception, tracked by
- * [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md).**
+ * [plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md).**
  * Under `verbatimModuleSyntax: true`, `import { type X } from 's'` emits
  * `import {} from 's'` — the specifiers are erased, the module request is not — so it
  * is an eager edge that this filter currently drops. `edgesOf` cannot express the
@@ -81,10 +107,16 @@ const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>(
  * beFreeOfCycles ignores import type", and while it could not fail it let a new cycle
  * in overnight.
  */
-function sliceEdgesOf(file: SourceFile, options?: ImportOptions): readonly ModuleEdge[] {
-  const ignoreTypeOnly = options?.ignoreTypeImports === true
+function sliceEdgesOf(
+  file: SourceFile,
+  options: ImportOptions | undefined,
+  question: ErasureQuestion,
+): readonly ModuleEdge[] {
+  const ignoreErased = options?.ignoreTypeImports === true
+  const erased = (edge: ModuleEdge): boolean =>
+    question === 'module-request' ? edge.erasesModuleRequest : edge.typeOnly
   return edgesOf(file).filter(
-    (edge) => EAGER_STATIC_KINDS.has(edge.kind) && !(ignoreTypeOnly && edge.typeOnly),
+    (edge) => EAGER_STATIC_KINDS.has(edge.kind) && !(ignoreErased && erased(edge)),
   )
 }
 
@@ -97,9 +129,10 @@ function collectEdgesFromFile(
   fileToSlice: Map<string, string>,
   edgeSet: Set<string>,
   edges: SliceEdge[],
-  options?: ImportOptions,
+  options: ImportOptions | undefined,
+  question: ErasureQuestion,
 ): void {
-  for (const edge of sliceEdgesOf(file, options)) {
+  for (const edge of sliceEdgesOf(file, options, question)) {
     // A local `export { x }` with no `from` has no specifier, and a specifier the
     // compiler could not resolve points outside the program.
     if (edge.resolvedPath === undefined) continue
@@ -129,8 +162,9 @@ function collectEdgesFromFile(
  */
 export function buildSliceDependencyGraph(
   slices: Slice[],
-  fileToSlice?: Map<string, string>,
-  options?: ImportOptions,
+  fileToSlice: Map<string, string> | undefined,
+  options: ImportOptions | undefined,
+  question: ErasureQuestion,
 ): SliceEdge[] {
   const map = fileToSlice ?? buildFileToSliceMap(slices)
 
@@ -140,7 +174,7 @@ export function buildSliceDependencyGraph(
 
   for (const slice of slices) {
     for (const file of slice.files) {
-      collectEdgesFromFile(file, slice.name, map, edgeSet, edges, options)
+      collectEdgesFromFile(file, slice.name, map, edgeSet, edges, options, question)
     }
   }
 
@@ -170,8 +204,9 @@ export function findSliceDependencyDetails(
   slices: Slice[],
   fromSliceName: string,
   toSliceName: string,
-  fileToSlice?: Map<string, string>,
-  options?: ImportOptions,
+  fileToSlice: Map<string, string> | undefined,
+  options: ImportOptions | undefined,
+  question: ErasureQuestion,
 ): Array<{ sourceFile: SourceFile; importPath: string; importLine: number }> {
   const map = fileToSlice ?? buildFileToSliceMap(slices)
 
@@ -180,7 +215,7 @@ export function findSliceDependencyDetails(
 
   const details: Array<{ sourceFile: SourceFile; importPath: string; importLine: number }> = []
   for (const file of fromSlice.files) {
-    for (const edge of sliceEdgesOf(file, options)) {
+    for (const edge of sliceEdgesOf(file, options, question)) {
       if (edge.resolvedPath === undefined) continue
 
       if (map.get(edge.resolvedPath) === toSliceName) {
