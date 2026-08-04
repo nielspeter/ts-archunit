@@ -421,6 +421,56 @@ describe('the graph and the details lookup must agree (plan 0085)', () => {
     expect(violations.map((v) => v.line)).toEqual([1])
   })
 
+  it('the DETAILS question alone is observable, given a value edge to find the pair', () => {
+    // Splitting the bundled revert (see the row above) showed my own fix reproducing the
+    // shape it fixed: both halves together are caught, neither half alone is. Working out
+    // why is the useful part.
+    //
+    // `respectLayerOrder` pushes one violation PER DETAIL, and details are only fetched
+    // for a pair the GRAPH found. So the output is an intersection:
+    //
+    //  - graph too permissive  -> edge found, correct details drop it, 0 violations.
+    //    Identical to the correct answer. **Structurally unobservable**, not unguarded —
+    //    the same category as an unreachable branch, and it should be recorded as an
+    //    equivalence rather than chased.
+    //  - details too permissive -> only reachable if the graph found the pair ANYWAY,
+    //    which needs a second, non-erased edge between the same slices. Then the wrong
+    //    question returns an EXTRA site. **Observable**, and this row is that fixture.
+    //
+    // `data → ui` twice under `verbatimModuleSyntax: true`: a value import on line 1
+    // (found by either question) and `import { type Widget }` on line 2, which is
+    // typeOnly but does NOT erase its module request. Under `ignoreTypeImports: true`
+    // exactly one site may be reported.
+    const tsm = new Project({
+      useInMemoryFileSystem: true,
+      compilerOptions: { verbatimModuleSyntax: true, module: ts.ModuleKind.ESNext },
+    })
+    tsm.createSourceFile(
+      '/src/ui/index.ts',
+      'export const widget = 1\nexport type Widget = { n: number }\n',
+    )
+    tsm.createSourceFile(
+      '/src/data/index.ts',
+      "import { widget } from '../ui/index.js'\nimport { type Widget } from '../ui/index.js'\nexport const row: Widget = { n: widget }\n",
+    )
+    const p: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+
+    const violations = real(
+      slices(p)
+        .assignedFrom({ ui: '**/src/ui/**', data: '**/src/data/**' })
+        .should()
+        .respectLayerOrder(['ui', 'data'], { ignoreTypeImports: true })
+        .violations(),
+    )
+    // Line 1 only. With the details question flipped, line 2 is reported too — a finding
+    // telling the reader to remove an upward dependency whose bindings are type-level.
+    expect(violations.map((v) => v.line)).toEqual([1])
+  })
+
   it('respectLayerOrder honours the option, proven where it CHANGES the answer', () => {
     // The other forwarding gap, and the reason it hid: the original row asserted the
     // same expectation for both option positions, so it could not tell whether the
