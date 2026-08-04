@@ -21,7 +21,9 @@ import { Project } from 'ts-morph'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 import type { ImportOptions } from '../../src/core/import-options.js'
+import fs from 'node:fs'
 import { slices } from '../../src/builders/slice-rule-builder.js'
+import { project } from '../../src/core/project.js'
 import { hashViolation } from '../../src/helpers/baseline.js'
 
 /** Two slices, `a/` and `b/`, carrying the edge spellings under test. */
@@ -209,6 +211,67 @@ describe('notDependOn and respectLayerOrder see re-export edges too (plan 0085)'
 
     expect(run()).toEqual(['index.ts'])
     expect(run({ ignoreTypeImports: true })).toEqual(['index.ts']) // value re-export, still an edge
+  })
+})
+
+describe('ON DISK: our own barrel, through a real tsconfig (plan 0085)', () => {
+  // The end-to-end row, and it exists because inventory row 8 turned out to be
+  // VACUOUS FOR US. Row 8 said "our own suite is the end-to-end proof and may well
+  // surface new cycles in src/" — it surfaced none, and the reason is not that the
+  // fix is inert: our three in-slice re-exports are all intra-slice (core→core,
+  // predicates→predicates), and the graph skips same-slice edges by design. So
+  // `arch/no-cycles` staying green says nothing about the new path either way.
+  //
+  // `src/index.ts` is the one place it can be proved on real files: **90 re-exports
+  // and zero plain imports**, so before this plan it had no edges AT ALL and no slice
+  // rule could see it. It also sits in none of `arch-rules.test.ts`' slices, which is
+  // why turning the rule on in plan 0084 could not have caught this.
+  it('the root barrel has re-export edges into the folders it re-exports', () => {
+    const p = project('tsconfig.json')
+    const built = slices(p).assignedFrom({
+      barrel: '**/src/index.ts',
+      core: '**/src/core/**',
+      helpers: '**/src/helpers/**',
+    })
+
+    // `notDependOn` rather than reading the graph helper directly: the point is that a
+    // user's rule now sees this, not that an internal function returns a tuple.
+    const violations = real(built.should().notDependOn('core', 'helpers').violations())
+
+    // `notDependOn` reports one violation PER SITE, not per edge — pre-existing
+    // behaviour, and each site is separately actionable, so it is the right shape.
+    // The volume simply grows now that re-export sites count: this barrel produces
+    // dozens. So assert IDENTITIES (ADR-008 rule 4) and never the total, which would
+    // change every time someone adds an export to the barrel.
+    // All three, including one that has nothing to do with re-exports: `notDependOn`
+    // is a rule over EVERY slice, not only the interesting one, so `helpers → core`
+    // (an ordinary import, and a legitimate direction) is reported as well. Asserted
+    // rather than filtered away, because that scope is easy to misread when writing a
+    // real rule and it is the kind of thing this row should teach.
+    expect([...new Set(violations.map((v) => v.message))].sort()).toEqual([
+      'Slice "barrel" depends on forbidden slice "core"',
+      'Slice "barrel" depends on forbidden slice "helpers"',
+      'Slice "helpers" depends on forbidden slice "core"',
+    ])
+
+    const fromBarrel = violations.filter((v) => v.message.startsWith('Slice "barrel"'))
+    expect([...new Set(fromBarrel.map((v) => v.element))]).toEqual(['index.ts'])
+
+    // One finding per distinct site, each carrying a usable location. Before this plan
+    // there were zero of these, so `toBeGreaterThan(1)` is the claim that matters and
+    // the exact number is deliberately not pinned.
+    const lines = fromBarrel.map((v) => v.line)
+    expect(new Set(lines).size).toBe(lines.length)
+    expect(lines.every((l) => l > 0)).toBe(true)
+  })
+
+  it('and every one of those edges is a re-export, not an import', () => {
+    // The control for the row above: if `src/index.ts` ever grows a plain `import`,
+    // that row would pass through the OLD code path and stop proving anything. Read
+    // off the file rather than assumed, because that is the assumption that rots.
+    const source = fs.readFileSync('src/index.ts', 'utf-8')
+    expect(source.match(/^import /gm)).toBeNull()
+    expect((source.match(/^export .*from '/gm) ?? []).length).toBeGreaterThan(50)
   })
 })
 
