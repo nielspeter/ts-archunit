@@ -1,6 +1,6 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** **Phase 1 in progress** (2026-08-04). Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
+**Status:** **Phase 1 DONE (2026-08-04). Phase 0, 2 and 3 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both now fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md) — **unreleased**, batching with bug 0051 and plan 0084 rather than taking a release each. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
 broke both of its measurements and inverted its phase order** — see "What the review changed".
 **Priority:** Phase 1 high, Phase 3 high, Phase 2 medium. Not for a count: two features built to fix
@@ -115,11 +115,11 @@ Both misses became filings, and **neither would have been found by the deletion 
 originally specified**:
 
 - **`hygiene/no-stubs`** — a `TODO` planted in `src/` did not red.
-  [Bug 0052](../bugs/0052-nostubcomments-cannot-see-a-functions-own-docstring.md): the condition
+  [Bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md): the condition
   searches function _bodies_, so a marker in the function's own docstring is invisible.
 - **`arch/no-cycles`** — a planted cycle did not red, and neither does the **real one already in our
   source**. The rule is `.warn()` by a documented decision whose stated blocker is type-only imports.
-  [Plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md).
+  [Plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md).
 
 The result also answers the question the plan raised about class A: **A is not a safe bucket.** Two of
 37 rules in it were enforcing nothing, which is the same finding as bugs 0011 and 0049 and now the
@@ -292,7 +292,7 @@ accidentally-quadratic condition is found on someone's repo.
 - **Any change to `src/presets/`, `src/rules/`, or a default severity, originating from Phases 1–2.**
   `docs/presets.md` promises adopters that new rules enter at `warn` or `off` in a minor. A dogfooding
   sprint is the classic way to break that promise while feeling virtuous.
-- **The JSX gap**, now [bug 0051](../bugs/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md).
+- **The JSX gap**, now [bug 0051](../bugs/fixed/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md).
   It is a fixture and a test, not a plan phase, and filing it here would have let a stop rule defer it.
 - **Compiling the `docs/` fences.** Raised by the customer review as a better use of Phase 2's budget:
   8,813 lines of markdown, never compiled, and plan 0069 found all three `@example` blocks in one source

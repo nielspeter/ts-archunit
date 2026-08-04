@@ -90,9 +90,38 @@ function readdirRecursive(dir: string): string[] {
 
 const BUILT: DiagnosableRule[] = []
 
-function gate<T extends DiagnosableRule>(rule: T): T {
+/** A rule that can be run at error severity. `warn` is deliberately absent. */
+interface Checkable {
+  check: () => void
+}
+
+/**
+ * Record the rule for `diagnose()`, and hand back **only `.check()`**.
+ *
+ * The narrowing is the point. `gate()` used to return the rule unchanged, so
+ * `.warn()` stayed reachable on all 37 of them — and plan 0084 exists because
+ * `arch/no-cycles` sat at `.warn()` for months, could not fail, and let a new
+ * cycle in overnight. Sabotage confirmed the obvious gap: reverting that one
+ * `.check()` to `.warn()` was **caught by nothing**. The plan removed the
+ * instance and left the mechanism, which is ADR-008 rule 5 — the fix is not
+ * guarded until something disagrees with it.
+ *
+ * Now `.warn()` on a gated rule fails twice: `npm run typecheck` (the property
+ * does not exist) and the test run itself (nor does it at runtime). Two
+ * derivations, because typecheck is a separate command and `vitest run` alone
+ * would not have noticed.
+ *
+ * If a rule here ever *should* warn — ADR-008 rule 1 allows it for a finding the
+ * reader must judge — add an explicit `gateAdvisory()` beside this that says so
+ * in its name and carries the reason. Do not widen this one.
+ */
+function gate<T extends DiagnosableRule & Checkable>(rule: T): Checkable {
   BUILT.push(rule)
-  return rule
+  return {
+    check: () => {
+      rule.check()
+    },
+  }
 }
 
 const SRC_PREFIX = path.dirname(path.resolve('tsconfig.json')).replaceAll('\\', '/') + '/src/'
@@ -485,12 +514,18 @@ describe('Architecture', () => {
         .resideInFolder('**/src/helpers/**')
         .should()
         .notImportFromCondition('**/src/builders/**')
-        .excluding('within.ts') // within() intentionally creates scoped builders
+        // within() starts a rule chain, so it constructs a builder. Waived here since
+        // plan 0015 — and arch/no-cycles independently reds on the SAME file from the
+        // other direction. Two rules, two waivers, one misplaced file: bugs/0054.
+        .excluding('within.ts')
         .rule({
           id: 'arch/helpers-no-builders',
           because:
             'Helpers are lower-level primitives — builders depend on helpers, not the reverse',
-          suggestion: 'Move the shared logic to src/helpers/ or src/core/',
+          // NOT "move it to src/helpers/" — the violating file is already there, so
+          // that remedy is a no-op. ADR-008 rule 2: verified to remediate.
+          suggestion:
+            'Move the shared logic down to src/core/, or — if the helper starts a rule chain — move the file itself to src/builders/ (see bugs/0054)',
         }),
     ).check()
   })
@@ -677,13 +712,30 @@ describe('Architecture', () => {
         })
         .should()
         .beFreeOfCycles()
+        // The one cycle that survives, and the edge that closes it:
+        // `helpers/within.ts` imports `ScopedFunctionRuleBuilder` as a VALUE, so a
+        // helper constructs a builder. Pre-existing since plan 0015, and a design
+        // question — `within()` may simply belong in `builders/` — so it is
+        // [bug 0054](../../bugs/0054-within-makes-helpers-depend-on-builders.md)
+        // rather than a change smuggled into this one.
+        //
+        // Excluded BY IDENTITY, not by lowering the severity. If the cycle's shape
+        // changes — a slice joining or leaving — this pattern stops matching and the
+        // rule reds on the new shape, which is the fail-closed direction. That is
+        // the difference between an exclusion and a `.warn()`.
+        .excluding('[builders, conditions, helpers, predicates]')
         .rule({
           id: 'arch/no-cycles',
           because:
             'Circular dependencies between modules prevent independent testing and reasoning',
           suggestion: 'Extract shared code to a lower-level module (core or helpers)',
         }),
-    ).warn() // type-only imports create false-positive cycles; switch to .check() when beFreeOfCycles ignores import type
+      // `.check()` at last — plan 0084. This sat at `.warn()` with a comment saying
+      // "switch to .check() when beFreeOfCycles ignores import type", and while it
+      // sat there it let a cycle in overnight: plan 0082's fix added a value edge
+      // `helpers → models` that closed one, and nothing failed. A rule that cannot
+      // fail is not a rule.
+    ).check()
   })
 })
 

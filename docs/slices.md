@@ -130,9 +130,33 @@ slices(p)
 
 ## Conditions
 
-### `beFreeOfCycles()`
+### `beFreeOfCycles(options?)`
 
 Detects circular dependencies between slices using Tarjan's strongly connected components algorithm.
+
+**Type-only imports are ignored by default** since v0.47.0. `import type { X } from './b.js'` is
+erased at compile time and creates no runtime dependency, so counting it as an edge reports cycles
+that cannot exist when the code runs — and a remedy like "extract the shared code to a lower-level
+module" is not something you do about an `import type`.
+
+```typescript
+.beFreeOfCycles()                            // default: ignoreTypeImports: true
+.beFreeOfCycles({ ignoreTypeImports: false }) // pre-0.47 behaviour: type edges count
+```
+
+::: tip Why this default differs from `notDependOn()` and `dependOn()`
+It looks inconsistent and it is deliberate. **Cycles** are about runtime module-initialization order,
+and an erased edge cannot contribute to one. **Layering and isolation** are about coupling — a
+type-only dependency on `legacy` is still a dependency on `legacy`, and it still breaks when `legacy`
+is deleted. So the cycle check ignores type edges by default and the dependency conditions count them.
+:::
+
+**Upgrading from 0.46 or earlier.** If a project reports fewer cycles after upgrading, the ones that
+disappeared were type-only and were never runtime cycles. If you keep a baseline, note that a cycle's
+identity is its **member list** — so a cycle that merely got _narrower_ (a slice joined to it only by
+type edges is no longer a member) changes identity, and the entry stops matching rather than moving.
+Regenerate the baseline, or pass `{ ignoreTypeImports: false }` to keep the old graph while you
+migrate.
 
 ```typescript
 slices(p)

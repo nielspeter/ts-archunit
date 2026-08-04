@@ -15,6 +15,7 @@ import {
   matchingGlobPrefix,
   matchingGlobPattern,
 } from '../models/slice.js'
+import type { ImportOptions } from '../core/import-options.js'
 import {
   beFreeOfCycles as beFreeOfCyclesCondition,
   respectLayerOrder as respectLayerOrderCondition,
@@ -193,9 +194,15 @@ export class SliceRuleBuilder extends TerminalBuilder {
   /**
    * Assert that no circular dependencies exist between slices.
    */
-  beFreeOfCycles(): this {
+  /**
+   * @param options - `ignoreTypeImports` defaults to **true**: a type-only import
+   *   is erased at compile time and creates no runtime dependency, so counting it
+   *   as a cycle edge reports cycles that cannot exist (plan 0084). Pass
+   *   `{ ignoreTypeImports: false }` for the pre-0.47 behaviour.
+   */
+  beFreeOfCycles(options?: ImportOptions): this {
     const next = this.copy()
-    next._conditions.push(beFreeOfCyclesCondition())
+    next._conditions.push(beFreeOfCyclesCondition(options))
     return next
   }
 

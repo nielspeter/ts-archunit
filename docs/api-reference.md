@@ -309,11 +309,11 @@ Available on all entry points via `.that()`.
 
 ## Slice Conditions
 
-| Export              | Signature                                | Description                               |
-| ------------------- | ---------------------------------------- | ----------------------------------------- |
-| `beFreeOfCycles`    | `beFreeOfCycles()`                       | No circular dependencies between slices.  |
-| `respectLayerOrder` | `respectLayerOrder(...layers: string[])` | Dependencies follow declared layer order. |
-| `notDependOn`       | `notDependOn(slice: string)`             | No slice depends on the named slice.      |
+| Export              | Signature                                | Description                                                                                                                                |
+| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `beFreeOfCycles`    | `beFreeOfCycles(options?)`               | No circular dependencies between slices. Ignores type-only imports by default; pass `{ ignoreTypeImports: false }` for the pre-0.47 graph. |
+| `respectLayerOrder` | `respectLayerOrder(...layers: string[])` | Dependencies follow declared layer order.                                                                                                  |
+| `notDependOn`       | `notDependOn(slice: string)`             | No slice depends on the named slice.                                                                                                       |
 
 ## Call Conditions
 

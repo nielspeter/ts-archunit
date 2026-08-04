@@ -1,4 +1,10 @@
-import { type Node, type ClassDeclaration, type SourceFile, Node as NodeUtils } from 'ts-morph'
+import {
+  type Node,
+  type ClassDeclaration,
+  type SourceFile,
+  Node as NodeUtils,
+  SyntaxKind,
+} from 'ts-morph'
 import type { ExpressionMatcher } from './matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import { allDescendants, descendantsOfKind } from '../core/descendant-cache.js'
@@ -204,6 +210,27 @@ export function searchClassBody(cls: ClassDeclaration, matcher: ExpressionMatche
 }
 
 /**
+ * The node a function's own docstring is attached to.
+ *
+ * For a `function` declaration that is the declaration itself. For an arrow or
+ * function expression assigned to a `const`, `ArchFunction.getNode()` returns the
+ * **VariableDeclaration**, and the comment attaches two levels up on the
+ * `VariableStatement` — measured: `nodeLeading: 0`, `parentLeading: 0`,
+ * `grandparentLeading: 1`. So the first version of bug 0052's fix repaired
+ * `function f()` and left `const f = () => …` broken, which is half the codebases
+ * that would use the rule.
+ *
+ * `getFirstAncestorByKind` finds the NEAREST enclosing statement, so a nested
+ * arrow inside a function does not reach out to the outer function's docstring —
+ * pinned by a control, because that over-reach is the obvious way to fix this
+ * wrongly.
+ */
+function triviaRoot(node: Node): Node {
+  if (!NodeUtils.isVariableDeclaration(node)) return node
+  return node.getFirstAncestorByKind(SyntaxKind.VariableStatement) ?? node
+}
+
+/**
  * Search a function body for matches.
  *
  * Uses ArchFunction.getBody() which returns the function/arrow body.
@@ -211,6 +238,30 @@ export function searchClassBody(cls: ClassDeclaration, matcher: ExpressionMatche
  * still works — it walks the expression subtree.
  */
 export function searchFunctionBody(fn: ArchFunction, matcher: ExpressionMatcher): MatchResult {
+  // A TRIVIA matcher searches from the DECLARATION; everything else from the body.
+  //
+  // [Bug 0052](../../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md):
+  // a function's own leading comment attaches to the declaration, not to anything
+  // inside the body — so `noStubComments()` saw a `TODO` inside a body and trailing
+  // a function, and missed both `// TODO` and `/** TODO */` **above** it, which are
+  // the two placements anyone actually writes. Measured 1/1/0/0 across those four.
+  // `comment()` reads leading ranges perfectly well; the traversal never offered it
+  // the declaration.
+  //
+  // Searching from the declaration rather than *also* searching it: `triviaMatches`
+  // visits `[node, ...allDescendants(node)]` and deduplicates by comment position,
+  // so the body is still covered and no comment can be reported twice. Testing the
+  // declaration separately would have needed its own dedup against the body's.
+  //
+  // Only for trivia matchers, and that discrimination is the point rather than a
+  // shortcut: `functionNotContain` is general-purpose, and handing the declaration
+  // node to `expression(/…/)` would match the function's entire source text —
+  // turning every body-analysis rule into a whole-declaration one. A matcher that
+  // reads trivia is exactly the set that needs the attachment point.
+  if (matcher.matchedTriviaPositions !== undefined) {
+    return toResult(findMatchesInNode(triviaRoot(fn.getNode()), matcher))
+  }
+
   const body = fn.getBody()
   if (!body) {
     return toResult([])

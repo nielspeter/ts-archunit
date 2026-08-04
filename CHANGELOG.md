@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.47.0] - 2026-08-04
+
+Four gates that could not fail, found by pointing our own library at ourselves
+([plan 0083](plans/0083-eat-our-own-dogfood.md) Phase 1) and by sabotaging the fixes afterwards.
+
+### Changed
+
+- **`beFreeOfCycles()` ignores type-only imports by default** — `beFreeOfCycles(options?: ImportOptions)`,
+  defaulting to `{ ignoreTypeImports: true }`. An `import type { X }` is erased at compile time and
+  creates no runtime dependency, so counting it as a graph edge reported cycles that cannot exist when
+  the code runs. Pass `{ ignoreTypeImports: false }` for the previous graph.
+
+  **This can change baseline entries.** A cycle's identity is its member list, so a cycle that got
+  _narrower_ — a slice joined to it only by type edges is no longer a member — changes identity and its
+  baseline entry stops matching rather than moving. Regenerate, or pass `false` while migrating. Why
+  this default differs from `notDependOn()`/`dependOn()`, which still count type edges, is documented
+  in `docs/slices.md`: cycles are about runtime initialization order, layering is about coupling.
+
+  The condition was documented, exported, and unusable at error severity by anyone using `import type`
+  for the reason it exists — including us. Our own `arch/no-cycles` rule sat at `.warn()` for months
+  with a comment saying to switch it on once this was fixed. While it could not fail it let a **new**
+  cycle in overnight: the previous release's fix added a value edge `helpers → models`, and nothing
+  reported it. ([plan 0084](plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md))
+
+### Fixed
+
+- **`noStubComments()` could not see a function's own docstring** — the condition caught a stub marker
+  inside a body and trailing a declaration, and missed it _leading_ the declaration: both `// TODO` and
+  `/** TODO */`, the two placements anyone actually writes. A trivia matcher now searches from the
+  declaration node, walking a `VariableDeclaration` up to its `VariableStatement` so the leading comment
+  is in range. Shipped in `agentGuardrails`, the preset aimed at AI-generated code.
+  ([bug 0052](bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md))
+
+- **The stub rule matched prose _about_ stubs, including its own documentation** — latent until the fix
+  above let the rule read docstrings, where prose lives, at which point it fired on five places in our
+  own source, none of them a stub. Markers must now begin a comment line and are **case-sensitive**;
+  the phrase forms ("not implemented yet") stay case-insensitive but are anchored the same way. Stated
+  limit: a lowercase `// todo: x` is no longer matched, which is the price of not matching "the todo
+  list below". ([bug 0053](bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md))
+
+- **The JSX entry point had never run against a file on disk** — no `.tsx` or `.jsx` file existed
+  anywhere in the repository; every JSX test built its sources in memory and set `jsx` itself, so the
+  path an adopter takes — a real tsconfig, real files, `.tsx` _discovery_ — had never executed under
+  257 lines of documentation. No wrong answer was found; a whole configuration was untested. Now a
+  fixture project on disk with its own tsconfig. ([bug 0051](bugs/fixed/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md))
+
+- **A rule's remedy told the reader to move code where it already was** — `arch/helpers-no-builders`
+  suggested "Move the shared logic to src/helpers/ or src/core/" for a file _in_ `src/helpers/`. Half
+  the remedy was a provable no-op. An internal rule, so no user-visible behaviour changed; recorded
+  because ADR-008 rule 2 asks that remedies be verified to remediate, and nothing enforced it. Now
+  filed as [plan 0086](plans/0086-a-remedy-that-names-the-folder-it-selects.md).
+
+### Internal
+
+- `arch/no-cycles` runs at `.check()` for the first time, and `gate()` in our architecture suite now
+  hands back only `{ check }` — `.warn()` on a gated rule is a typecheck error _and_ a runtime error.
+  Sabotage found that plan 0084 had removed the offending `.warn()` and left the mechanism, so the exact
+  regression it exists to prevent could return in one character with the suite still green.
+- `object-literal-functions.ts` moved from `helpers/` to `core/`, breaking the one-day-old cycle. It is
+  re-exported from the package root unchanged, so no import path changes for consumers.
+- Two known gaps filed rather than deferred silently:
+  [bug 0054](bugs/0054-within-makes-helpers-depend-on-builders.md) (the surviving cycle, waived by
+  identity so any change to its shape still reds) and
+  [plan 0085](plans/0085-the-slice-graph-cannot-see-a-re-export.md) (the slice graph sees no
+  `export … from` edge at all — a false negative on three conditions, and the barrel cycle is the shape
+  it misses).
+
 ## [0.46.1] - 2026-08-04
 
 Everything here came out of two reviews of v0.46.0. One finding is a **real hole in a gate**, present

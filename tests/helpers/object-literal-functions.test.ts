@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Project, SyntaxKind, type Node } from 'ts-morph'
-import { collectObjectLiteralFunctions } from '../../src/helpers/object-literal-functions.js'
+import { collectObjectLiteralFunctions } from '../../src/core/object-literal-functions.js'
 
 function firstObjectLiteral(code: string): Node {
   const project = new Project({ useInMemoryFileSystem: true })

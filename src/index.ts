@@ -143,8 +143,8 @@ export {
 } from './models/arch-function.js'
 export type { FunctionCollectionOptions } from './models/arch-function.js'
 // Shared object-literal function traversal (proposal 016 / F3)
-export { collectObjectLiteralFunctions } from './helpers/object-literal-functions.js'
-export type { ObjectLiteralFunction } from './helpers/object-literal-functions.js'
+export { collectObjectLiteralFunctions } from './core/object-literal-functions.js'
+export type { ObjectLiteralFunction } from './core/object-literal-functions.js'
 
 // Function predicates
 export {

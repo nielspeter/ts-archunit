@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.46.1 · **Open:** 2 · **Fixed:** 50 (`fixed/`) · **Updated:** 2026-08-04
+**Version:** 0.47.0 · **Open:** 1 · **Fixed:** 54 (`fixed/`) · **Updated:** 2026-08-04
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -13,10 +13,15 @@
 
 ## Open
 
-| Bug                                                                                                                                   | State                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [0052](./0052-nostubcomments-cannot-see-a-functions-own-docstring.md) — `noStubComments()` cannot see a function's own docstring      | **OPEN, medium-high.** Measured: the condition catches a stub marker inside a body and trailing a function, and misses it **leading** the function — both `// TODO` and `/** TODO */`, the two placements anyone actually writes. It searches the body, so the declaration's own comment ranges are never offered to a matcher that can read them. Shipped in `agentGuardrails`, the preset aimed at AI-generated code. Found by plan 0083 Phase 1. |
-| [0051](./0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md) — the JSX entry point has never run against a file on disk | **OPEN, high.** Zero `.tsx`/`.jsx` files exist in the repo; every JSX test builds sources in memory. `docs/jsx.md` teaches 257 lines standing on a path — real tsconfig, real files, `.tsx` discovery — that has never executed. Found by two reviewers independently. Not a wrong answer: a configuration nobody has run, and it is the one every adopter of the feature starts in.                                                                |
+| Bug                                                                                                           | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [0054](./0054-within-makes-helpers-depend-on-builders.md) — `within()` makes `helpers/` depend on `builders/` | **OPEN, low as a defect / medium as architecture.** `src/helpers/within.ts` imports `ScopedFunctionRuleBuilder` as a value, closing the one cycle in our source. Nothing misbehaves. Found when [plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) ran `arch/no-cycles` at `.check()` for the first time — and it was **already waived from the other direction**: `arch/helpers-no-builders` has excluded this file since plan 0015. Two rules, two waivers, one misplaced file. **Enforced meanwhile:** the cycle is excluded by identity, so any change to its shape reds the build. |
+
+Three bugs closed 2026-08-04 and shipped together in v0.47.0 rather than taking a release each:
+[0051](./fixed/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md) (JSX had never run
+against a file on disk), [0052](./fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md)
+and [0053](./fixed/0053-the-stub-rule-matched-prose-about-stubs.md), alongside
+[plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md).
 
 Known gaps that are **not** defects live in plans, with their reasoning recorded:
 

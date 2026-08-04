@@ -1,6 +1,7 @@
 import type { Condition, ConditionContext } from '../core/condition.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Slice } from '../models/slice.js'
+import type { ImportOptions } from '../core/import-options.js'
 import {
   buildSliceDependencyGraph,
   buildFileToSliceMap,
@@ -64,12 +65,14 @@ function canonicalizeCycle(names: readonly (string | undefined)[]): string[] {
  * hardest class to remedy and belongs to its own upgrade story. Recorded here
  * because this docstring is read when the rule fails, and a changelog is read once.
  */
-export function beFreeOfCycles(): Condition<Slice> {
+export function beFreeOfCycles(
+  options: ImportOptions = { ignoreTypeImports: true },
+): Condition<Slice> {
   return {
     description: 'be free of cycles',
     evaluate(slices: Slice[], context: ConditionContext): ArchViolation[] {
       const fileToSlice = buildFileToSliceMap(slices)
-      const edges = buildSliceDependencyGraph(slices, fileToSlice)
+      const edges = buildSliceDependencyGraph(slices, fileToSlice, options)
 
       // Map slice names to indices for Tarjan's
       const sliceNames = slices.map((s) => s.name)

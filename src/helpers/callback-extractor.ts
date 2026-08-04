@@ -1,7 +1,7 @@
 import { type CallExpression, Node, SyntaxKind } from 'ts-morph'
 import type { ArchFunction } from '../models/arch-function.js'
 import { fromObjectLiteralFunction } from '../models/arch-function.js'
-import { collectObjectLiteralFunctions } from './object-literal-functions.js'
+import { collectObjectLiteralFunctions } from '../core/object-literal-functions.js'
 
 /**
  * Represents a callback function extracted from a call expression argument.
