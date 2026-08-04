@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.54.1] - 2026-08-04
+
+Two problems found by reviewing v0.54.0's own code.
+
+### Fixed
+
+- **The new baseline diagnostic was a 688-character unbroken paragraph.** Correct, and unreadable — the
+  candidates ran together inline. Now line-broken and indented, matching the sibling diagnostic in the same
+  file that already did this.
+
+- **The change detector's population was a hand-maintained list checked against itself.** It asserted the
+  set of shipped default patterns equalled `['STUB_PATTERNS']` — my belief, verified against my belief — so
+  a _second_ default pattern arriving would have been invisible to it, which is the exact shape plan 0079
+  exists to reject.
+
+  It is now **derived from source**: a `RegExp`-typed parameter with a default, which is what makes a
+  user's rule inherit a pattern without naming it. Verified by adding a plausible second one — the
+  derivation reports it and the guard reds, where the list stayed green. A vacuity row was added too, since
+  comparing two sets passes when both are empty and a broken regex agrees perfectly with an empty list.
+
 ## [0.54.0] - 2026-08-04
 
 ### Fixed
