@@ -1,6 +1,6 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** Open, not started. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
+**Status:** **Phase 1 in progress** (2026-08-04). Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
 broke both of its measurements and inverted its phase order** — see "What the review changed".
 **Priority:** Phase 1 high, Phase 3 high, Phase 2 medium. Not for a count: two features built to fix
