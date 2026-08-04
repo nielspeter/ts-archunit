@@ -1015,6 +1015,105 @@ describe('the rules in this file can all enforce something', () => {
 // in `afterAll` rather than a trailing `it` so it cannot be reordered into
 // passing on a half-filled set — a check whose correctness depends on test
 // order is the kind of green this file exists to distrust.
+/**
+ * Every gated rule has been PLANTED against — plan 0083 Phase 1, made a guard.
+ *
+ * Phase 1 planted a deliberate violation in each rule and checked it was caught: **34 of
+ * 36 caught, 2 caught by nothing**, which became bugs 0052 and 0053. It was a one-off
+ * manual exercise, and by 2026-08-04 the population had grown to **44** — so eight rules
+ * had never been planted against, while the plan still read "34 of 36 caught". A number
+ * that was true when measured and never re-derived reads as coverage.
+ *
+ * This converts the exercise into a ratchet. The list is hand-maintained — planting is a
+ * human act and no test can do it — but it is **compared against a derived population**,
+ * so adding a rule reds this until someone plants against it and records the id. That is
+ * plan 0079's shape: the artifact that rots is guarded by the thing that cannot.
+ *
+ * To add a rule: plant a violation in it, confirm THIS FILE reds, revert the violation,
+ * then add the id below. If planting does not red, the rule is the defect, not this list.
+ */
+const PLANTED: ReadonlySet<string> = new Set([
+  'adr002/no-raw-ts',
+  'adr004/no-require',
+  'adr004/no-require-fn',
+  'adr005/no-any',
+  'adr005/no-as-cast',
+  'adr005/no-as-cast-module',
+  'arch/conditions-no-builders',
+  'arch/core-no-builders',
+  'arch/core-no-cli',
+  'arch/core-no-conditions',
+  'arch/core-no-graphql',
+  'arch/core-no-helpers',
+  'arch/core-no-predicates',
+  'arch/core-no-rules',
+  'arch/core-no-smells',
+  'arch/helpers-no-builders',
+  'arch/models-no-builders',
+  'arch/no-cycles',
+  'arch/predicates-independent',
+  'arch/presets-no-cli',
+  'arch/presets-no-graphql',
+  'arch/rules-no-builders',
+  'hygiene/no-empty-bodies',
+  'hygiene/no-stubs',
+  'quality/builders-exported',
+  'quality/entry-points-exported',
+  'quality/no-aliased-imports',
+  'quality/no-console-log',
+  'quality/no-console-log-fn',
+  'quality/no-default-exports',
+  'quality/typed-errors',
+  'quality/typed-errors-fn',
+  'security/no-eval',
+  'security/no-eval-fn',
+  'security/no-eval-module',
+  'security/no-json-parse',
+])
+
+/**
+ * Gated rules deliberately NOT planted against, each with its reason.
+ *
+ * A deferral is an escape hatch, so under ADR-008 rule 3 it is stated here rather than
+ * being an absence. The ratchet below asserts the unplanted set equals this one **exactly**,
+ * so a new rule cannot hide inside the deferral and this set cannot grow silently.
+ */
+const PLANT_DEFERRED: ReadonlyMap<string, string> = new Map([
+  [
+    'api/no-single-glob-predicates',
+    'Phase 1 deferred it by name: it cannot be planted by ADDING a file, only by editing a ' +
+      'glob in place, so it needs a different harness. Its own guard is the `no glob written ' +
+      'in this file can ever match` row above, which reverts it directly.',
+  ],
+])
+
+afterAll(() => {
+  // **The eight-rule gap, closed as a ratchet rather than re-measured once.**
+  const declared = BUILT.map((r) => r.describeRule?.().id).filter(
+    (id): id is string => typeof id === 'string' && id.length > 0,
+  )
+
+  // Non-vacuity before the comparison: an empty `declared` makes the diff trivially
+  // empty, which is the shape this file exists to distrust.
+  expect(declared.length).toBeGreaterThan(10)
+
+  const unplanted = [...new Set(declared)].filter((id) => !PLANTED.has(id)).sort()
+  // EXACTLY the deferred set — not "a subset of", which would let a new rule hide inside
+  // the deferral, and not `[]`, which would deny the deferral exists.
+  expect(
+    unplanted,
+    `unplanted rules must equal the stated deferrals (plan 0083 Phase 1).\n` +
+      `  unplanted: ${unplanted.join(', ')}\n` +
+      `  deferred:  ${[...PLANT_DEFERRED.keys()].join(', ')}\n\n` +
+      `Plant a violation in the rule, confirm THIS FILE reds, revert, then add the id to PLANTED.`,
+  ).toEqual([...PLANT_DEFERRED.keys()].sort())
+
+  // And the other direction: an id in PLANTED that no rule declares is a stale entry, which
+  // would let a deleted rule's coverage claim outlive it.
+  const stale = [...PLANTED].filter((id) => !declared.includes(id)).sort()
+  expect(stale, `PLANTED names rules that no longer exist:\n  ${stale.join('\n  ')}`).toEqual([])
+})
+
 afterAll(() => {
   // **Dogfooding the fix for our own bug.**
   // [Bug 0044](../../bugs/fixed/0044-an-inline-exclusion-comment-has-no-feedback-channel.md):

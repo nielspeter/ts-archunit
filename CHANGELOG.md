@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.55.2] - 2026-08-04
+
+Two ADR-008 rules that were conventions are now enforced. No shipped behaviour changed — both guards run
+over this repository's own plans and rules.
+
+### Added
+
+- **Rule 6 is enforced, not conventional.** Every plan numbered ≥ 0078 must carry a `Blast radius` header
+  line; 0078 is the first plan filed after rule 6 landed on 2026-07-31, so earlier ones are grandfathered.
+  It is green on arrival — 16 of 16 in scope already comply — and that is the point: a convention cannot
+  stop the next plan being filed without one **silently**.
+
+  The grandfather clause is an escape hatch, so under rule 3 it is guarded from both sides: at least one
+  plan below the boundary must **lack** the line, and the boundary must not exceed the highest plan number.
+  Without those, setting the constant to 9999 would pass every row while enforcing nothing. Verified by
+  sabotage in all three directions.
+
+- **Plan 0083 Phase 1 is ratcheted.** It planted a deliberate violation in each gated rule once, as a manual
+  exercise; the count then sat in a document. `arch-rules.test.ts` now carries the 36 planted rule ids and a
+  map naming the single deferred one **with its reason**, and asserts the unplanted set equals the deferred
+  set exactly — so a new rule cannot arrive unplanted, cannot hide inside the deferral, and a stale entry
+  cannot outlive the rule it named.
+
+### Internal — a false alarm worth recording
+
+I claimed Phase 1 was stale: "36 rules measured, 44 now, eight never planted". **Wrong**, by the exact
+mistake that phase's own result warns about — I counted `gate()` call sites and `it()` blocks instead of
+deriving distinct rule ids. Measured from git: **37 distinct ids at v0.47.0 and 37 now**, none added, none
+removed; seven rules are simply gated in more than one place. The claim reached this plan and the ROADMAP
+before being caught, which is the argument for the ratchet rather than a number.
+
+The sabotage that verified the ratchet also failed first: the assertions live in `afterAll`, so a failure
+produces **no `×` row**, and reading the reporter reported 0 of 3 caught. Read the exit code — rule 5's own
+corollary, re-learned for the third time today.
+
 ## [0.55.1] - 2026-08-04
 
 ### Fixed

@@ -1,6 +1,6 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** **Phase 1 PARTIAL — it measured 36 rules and there are 44 (v0.47.0). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 and 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
+**Status:** **Phase 1 DONE and now RATCHETED (v0.47.0; guard added 2026-08-04). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 and 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
 
 **Phase 3's central claim, as it stood at v0.49.2 — now fixed, kept because it is the measurement that justified the work.** `package.json` declares **12 `exports` subpaths and not one of them is ever resolved by anything.** The only two test files that mention `@nielspeter/ts-archunit` treat it as a _string_: `tests/cli/init.test.ts` asserts that the scaffolded rule file **contains the text** `import { recommended } from '@nielspeter/ts-archunit/presets'`, which is the opposite of resolving it. Were that subpath missing from the map, the test still passes and every scaffolded project fails on its first run. Nothing packs a tarball. **Four releases shipped on 2026-08-04 across that gap**, and `npm pack --dry-run` confirming the file list is not the same evidence as resolving the map. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
@@ -83,11 +83,26 @@ chase the rest of this plan is written to avoid.
 
 ## Phase 1 — plant the violation, over the rules we already have. Run this FIRST.
 
-> **PARTIAL, not done.** It ran over **36** gated rules; there are **44**. The eight added since have
-> never been planted against, so "34 of 36 caught" describes a population that no longer exists. A number
-> that was true when measured and is not re-derived is the shape rule 5 is about — it reads as coverage.
-> **Re-run over the current population and record the delta**, and prefer deriving the population from
-> `BUILT` at runtime over counting `it()` blocks, so this cannot go stale a third time.
+> **DONE, and now ratcheted — after a false alarm worth recording.**
+>
+> On 2026-08-04 I claimed this phase was stale: "it measured 36 rules and there are 44, so eight have never
+> been planted against". **That was wrong**, and wrong by the exact mistake this phase's own result warns
+> about — I counted `gate(` calls and `it()` blocks instead of deriving distinct ids. Measured from git:
+> **37 distinct ids at v0.47.0 and 37 now, none added, none removed.** The 44 is `gate()` call sites; seven
+> rules are gated in more than one place.
+>
+> So the real state was always what the result table says: **36 planted, 1 deferred by name.** The claim
+> survived long enough to reach this plan and the ROADMAP, which is precisely why the phase now has a
+> guard instead of a number.
+>
+> **The ratchet:** `arch-rules.test.ts` carries a `PLANTED` set of the 36 ids and a `PLANT_DEFERRED` map
+> naming the one exception with its reason, and asserts the unplanted set equals the deferred set
+> **exactly** — so a new rule cannot arrive unplanted, cannot hide inside the deferral, and a stale entry
+> for a deleted rule cannot outlive it. Verified all three by sabotage.
+>
+> Two things that verification taught, both already ADR-008 corollaries and both re-learned here: the
+> assertions live in `afterAll`, so a failure produces **no `×` row** and my first sabotage run reported
+> 0 of 3 caught — the verdict channel could not express the failure. Read the exit code.
 
 Standalone, before any classification, because it depends on nothing else and because if it finds
 another bug 0049 then **class A is not a safe bucket** and the meaning of the whole triage changes.
@@ -232,6 +247,38 @@ first attempt at its one mechanically-checkable slice.
 Rule 6's is the cheapest thing on this list: a test asserting every file in `plans/` carries a
 **Blast radius** line. It is a convention today, which means a plan filed without one simply does not have
 one and nothing says so.
+
+### Phase 4 deliverables, in cost order
+
+Enforcement, not inventory. Each row is a rule that fails a build, or it does not count.
+
+1. ~~**Rule 6 — a test that every plan carries a `Blast radius` line.**~~ **Done 2026-08-04** —
+   `tests/docs/every-plan-declares-its-blast-radius.test.ts`. Verified by sabotage in all three directions:
+   a plan filed without the line, the boundary raised past every plan, and the boundary lowered to 0.
+
+   Original text: The population is derivable and the
+   boundary is real: rule 6 landed 2026-07-31 and plan **0078** is the first filed after it, so plans
+   numbered ≥ 0078 are in scope and earlier ones are grandfathered. Measured now: **16 of 16 in scope carry
+   it**, so this guard is green on arrival — which is the point. It stops the eighty-ninth plan from being
+   filed without one silently.
+
+   The boundary must itself be guarded: assert that at least one plan _below_ it lacks the header, or the
+   constant could be raised to infinity and the test would still pass.
+
+2. ~~**Re-plant the eight unguarded rules.**~~ **There were none** — the claim was a miscount, see Phase 1
+   above. Replaced by the ratchet that makes the question unaskable: the unplanted set must equal the stated
+   deferrals, derived from `BUILT` at runtime. **Done 2026-08-04.**
+
+3. **Rule 2 — [plan 0086](./0086-a-remedy-that-names-the-folder-it-selects.md).** The largest gap and the
+   only one needing design: a remedy must not name a location the rule's own selecting predicate matches.
+   Not a same-session task; it has a real false-positive question to settle first.
+
+4. **Rule 1 outward — [plan 0090](./0090-a-warn-that-expires.md).** New API surface, so it is last.
+
+**What is deliberately NOT here:** rule 5. It has no machinery and should not get any. It produced nearly
+every real finding of 2026-08-04 _as a practice_, and the thing a machine could check — "was a sabotage
+matrix run" — is not the thing that matters, which is whether the reverts were the right ones. A guard
+there would measure compliance and miss the content.
 
 **Why this belongs here rather than in its own plan:** it is the plan's own question, asked of the ADR
 instead of the API, and answering it took an afternoon. Splitting it out would repeat the mistake Phase 3
