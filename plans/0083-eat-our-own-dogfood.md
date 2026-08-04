@@ -31,31 +31,36 @@ fix our own bug, then never aimed at us:
 Both are now checked, and both checks were proven to fire. That is not the finding. **The finding is
 that nothing was watching the watchers**, and the same audit that found two will find more.
 
-### The number, and why it is not a work list
+### The number does not reproduce, and that is the first finding
 
-Derived from source — every exported function in `src/conditions/`, `src/predicates/`, `src/rules/`
-and `src/smells/`, which is the enforceable surface, the primitives you point at code:
+The first draft of this plan said **166** enforceable primitives, "derived from source — every
+exported function in `src/conditions/`, `src/predicates/`, `src/rules/` and `src/smells/`". A product
+review re-ran exactly that and got **185**. Re-running it again got **187**.
 
-|                                                |                                                          |
-| ---------------------------------------------- | -------------------------------------------------------- |
-| Enforceable primitives                         | **166**                                                  |
-| Applied to our own `src/` in `tests/archunit/` | **41** (25%)                                             |
-| Not applied                                    | **125** — of which only **8** are JSX- or GraphQL-shaped |
+Three numbers, one stated derivation, **no committed script.** So it is not a derivation; it is a
+recollection with a method attached. This plan cites
+[plan 0079](./completed/0079-triage-the-cardinality-only-assertions.md)'s lesson — _the filed number
+came with no script, so it could not be reproduced or audited_ — and then repeated it one level up,
+applying the discipline to the numerator's work list and not to the denominator.
 
-**Do not treat 125 as a backlog.** [Plan 0079](./completed/0079-triage-the-cardinality-only-assertions.md)
-paid for exactly that mistake: a heuristic upper bound published as work. An earlier cut of this
-audit said "197 of 252 public exports unused", which was worse — it counted `TerminalBuilder`,
-`RuleBuilder` and `STANDARD_HTML_TAGS`, none of which is a thing you apply to source.
+Worse, the definition was already wrong on its own terms: the `src/smells/` entries it counted are
+`buildFingerprint` and `computeSimilarity`, internal helpers, not primitives you point at code —
+the same category error this plan rejects for `TerminalBuilder` and `STANDARD_HTML_TAGS`.
 
-The real obstacle is not effort. It is that **most of the 125 would be dishonest rules here.**
-`beAsync()` applied to our source is not an architectural constraint we believe in; it is a rule
-written to make a coverage number move. A rule nobody believes in is its own kind of lie — it gets
-`.excluding()`d at the first inconvenience, and then it is a dead check counted as coverage, which
-is the thing ADR-008 exists to prevent. **Adding rules to raise this number would be the failure
-mode, not the fix.**
+**The ratio is withdrawn**, including from `plans/ROADMAP.md`, and it is not to be requoted. What
+survives is the qualitative finding, which needs no denominator: two features built to fix our own
+bugs were never aimed at us, and nothing was watching the watchers.
 
-So the question this plan has to answer first is not "how do we apply 125 primitives" but **"what
-does dogfooding mean for a feature whose architecture we do not have?"**
+### Phase 0 — a committed derivation, or no number at all
+
+Before any triage: a script in the repo that produces the population, with the same standing as
+`tests/tools/scan-cardinality-assertions.ts`. It must exclude internal helpers, and its output is the
+input to Phase 1.
+
+**If a defensible definition of "enforceable primitive" cannot be written, that is the answer** — the
+plan proceeds on classification alone, with no ratio, and the absence of a clean definition is itself
+recorded. A number nobody can reproduce is worse than no number: it invites exactly the coverage
+chase the rest of this plan is written to avoid.
 
 ## Phase 1 — triage, with the stop rule written first
 
@@ -73,11 +78,44 @@ threshold is fixed **before** looking.
 remedial work and Phase 3 is judged on its own merits rather than as a coverage exercise. If B is
 larger, we have been under-enforcing our own architecture and Phase 2 grows accordingly.
 
-**A second measurement, independent of the classification** (rule 5 — my own reading of 166 items is
-one derivation, and its bias would be invisible in a re-read): for each of the ~30 rules in
-`tests/archunit/arch-rules.test.ts`, delete it and confirm the suite reds. A rule that can be
-deleted with the suite green is enforcing nothing, and that is a class-A entry that is really class
-B. This is cheap and it audits the 41 rather than the 125 — the direction nobody looks.
+**A second measurement, independent of the classification** (rule 5 — one reader's judgement over
+166 items is a single derivation, and its bias would be invisible in a re-read). The first draft got
+the operator backwards, which is worth recording because the error was self-flattering:
+
+> ~~for each of the ~30 rules, **delete it** and confirm the suite reds. A rule that can be deleted
+> with the suite green is enforcing nothing.~~
+
+**Deleting a passing check from a green suite leaves it green.** `src/` complies with all 37 rules
+today, so "delete it and the suite reds" is false by construction for nearly every one — measured:
+removing the `adr005/no-as-cast` rule entirely leaves 45 of 45 passing. The audit's answer was
+pre-determined, and its stated inference would have reclassified essentially the whole of class A as
+class B. A measurement that can only return one result is not a measurement.
+
+The one exception proves the mechanism rather than the rule: deleting `adr005/no-as-cast-module` _does_
+red, because the `orphanExclusions` check notices its two inline waivers going stale. So the deletion
+audit measures **whether some other guard happens to name the rule's id** — 1 of 37.
+
+**The correct operator is the one Phase 2 already prescribes: plant the violation the rule forbids and
+watch it red.** Applied to the existing 37 that is genuinely independent of a reading-based
+classification, and it is the operator that would have caught
+[bug 0049](../bugs/fixed/0049-the-type-assertion-self-check-selected-classes.md) — a class-A rule
+scoped to `classes` in a codebase of 19 class files and 128 function files, silent on 22 real casts.
+Deleting that rule reds nothing; planting a cast in a function finds it instantly. Bug 0049 is this
+plan's own closest precedent, and the audit as first written would have missed it.
+
+**And there is a cheap route to most of it.** `tests/fixtures/` is a corpus built to _violate_ these
+rules — `arch-rules.test.ts` records the measurement in a comment: scoping to `'**/src/**'` was chosen
+because the fixture tree "reds 13 rules on 89 hits". Point each rule at the fixture tree and assert it
+reds. Dirty corpus versus clean corpus is real independence in rule 5's sense, and it is nearly free
+for at least a third of the 37.
+
+**Run this first, standalone, before any classification.** It depends on nothing else, it is the
+highest yield item in the plan, and if it finds another bug 0049 then **class A is not a safe bucket**
+and the meaning of the whole triage changes. That is worth knowing before spending the reading budget.
+
+**Also: it is 37 rules, not "~30".** The file itself carries 36, 39, 41 and 43 in four separate
+comments — four hand-maintained counts of one population, in the file whose purpose is to distrust
+hand-maintained claims. The audit derives the number; fixing those comments is a free side effect.
 
 ## Phase 2 — enforce class B
 
