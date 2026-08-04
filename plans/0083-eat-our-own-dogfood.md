@@ -119,7 +119,7 @@ originally specified**:
   searches function _bodies_, so a marker in the function's own docstring is invisible.
 - **`arch/no-cycles`** — a planted cycle did not red, and neither does the **real one already in our
   source**. The rule is `.warn()` by a documented decision whose stated blocker is type-only imports.
-  [Plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md).
+  [Plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md).
 
 The result also answers the question the plan raised about class A: **A is not a safe bucket.** Two of
 37 rules in it were enforcing nothing, which is the same finding as bugs 0011 and 0049 and now the

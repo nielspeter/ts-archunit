@@ -1,6 +1,6 @@
 # Bug 0051: the JSX entry point has never run against a file on disk
 
-**Reported:** 2026-08-04 · **Fixed:** 2026-08-04 (unreleased — batching with 0052/0053 and plan 0084)
+**Reported:** 2026-08-04 · **Fixed:** 2026-08-04 (v0.47.0)
 **Found in:** every version since `jsxElements()` shipped, by two independent reviewers of
 [plan 0083](../../plans/0083-eat-our-own-dogfood.md) — a product review and a customer review reached it
 separately from different starting points.

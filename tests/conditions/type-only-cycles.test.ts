@@ -1,6 +1,6 @@
 /**
  * `beFreeOfCycles()` and type-only imports —
- * [plan 0084](../../plans/0084-cycle-detection-that-ignores-type-only-imports.md).
+ * [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md).
  *
  * A `import type { X }` is **erased at compile time** and creates no runtime
  * dependency, so counting it as a graph edge invents cycles that cannot exist at

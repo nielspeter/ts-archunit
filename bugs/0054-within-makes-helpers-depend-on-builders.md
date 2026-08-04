@@ -2,7 +2,7 @@
 
 **Reported:** 2026-08-04 · **Fixed:** not yet — **excluded by identity and enforced**, see below
 **Found in:** every version since `within()` shipped (plan 0015), by
-[plan 0084](../plans/0084-cycle-detection-that-ignores-type-only-imports.md) turning our own
+[plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) turning our own
 `arch/no-cycles` rule on for the first time.
 **Severity:** Low as a runtime defect — nothing misbehaves; ESM handles this cycle. Medium as
 architecture: it is the one cycle in our source, and it inverts a layering direction we enforce
@@ -82,7 +82,7 @@ fails the build.
 
 ## Related
 
-- [Plan 0084](../plans/0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on,
+- [Plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) — turned the rule on,
   and found this by doing so.
 - `src/core/object-literal-functions.ts` — the other cycle found at the same time, fixed rather than
   waived because it was one day old and self-inflicted.

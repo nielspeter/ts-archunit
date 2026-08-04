@@ -51,7 +51,7 @@ function collectEdgesFromFile(
   for (const importDecl of file.getImportDeclarations()) {
     // A type-only import is ERASED at compile time and creates no runtime
     // dependency, so counting it as a graph edge invents cycles that cannot
-    // exist at runtime — [plan 0084](../../plans/0084-cycle-detection-that-ignores-type-only-imports.md).
+    // exist at runtime — [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md).
     //
     // That was not a hypothetical: this repo's own `arch/no-cycles` rule sat at
     // `.warn()` for months with a comment saying "type-only imports create

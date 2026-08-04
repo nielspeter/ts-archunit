@@ -10,7 +10,7 @@
  *
  * Measured: at v0.45.6 no file in `helpers/` had a value import from `models/` —
  * only `import type`. So the cycle was one day old when
- * [plan 0084](../../plans/0084-cycle-detection-that-ignores-type-only-imports.md)
+ * [plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md)
  * found it, and the rule that exists to catch exactly this was pinned at `.warn()`
  * with a comment explaining why. A rule that cannot fail let a cycle in overnight.
  *
