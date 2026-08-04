@@ -69,7 +69,12 @@ for (const sub of subpaths) {
 
 // ── Check 2: every declared target ships in the tarball ──
 const packed = JSON.parse(
-  execFileSync('npm', ['pack', '--dry-run', '--json'], { encoding: 'utf-8' }),
+  // `npm.cmd` on Windows: `execFileSync` does not go through a shell, so the bare name
+  // fails with ENOENT there. CI is ubuntu, but a contributor running `npm run
+  // verify:package` locally should not get a confusing spawn error.
+  execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['pack', '--dry-run', '--json'], {
+    encoding: 'utf-8',
+  }),
 )
 const shipped = new Set((packed[0]?.files ?? []).map((f) => f.path.replaceAll('\\', '/')))
 if (shipped.size === 0) failures.push('`npm pack --dry-run --json` listed no files')
@@ -111,6 +116,19 @@ for (const binTarget of Object.values(
 // Derived from the source and the docs, not hand-listed — a hand-listed set is the
 // artifact that goes stale, and the scaffolder is the reason this matters.
 const SPECIFIER = new RegExp(`${pkg.name.replace('/', '\\/')}(\\/[a-z0-9/-]+)?`, 'g')
+// The stated escape hatch (ADR-008 rule 3: an escape hatch that is not documented is a
+// trap, and one an agent can stamp anywhere is worse than none).
+//
+// Check 3 reds on any specifier the repo writes that is not a subpath — which is right
+// almost always, and wrong for prose that MENTIONS a path deliberately: documenting a
+// removed subpath in an upgrade note, say. Measured: adding an illustrative
+// `…/rules/hypothetical` to `docs/index.md` fails the release.
+//
+// So a line may opt out by carrying `ts-archunit-allow-specifier`, which is narrow on
+// purpose: per LINE, not per file, so it cannot silence a whole document, and greppable so
+// every use is visible at once.
+const ALLOW = 'ts-archunit-allow-specifier'
+
 const searched = ['src', 'docs', 'README.md']
 const referenced = new Map()
 
@@ -127,12 +145,14 @@ const walk = (target) => {
   }
   if (!/\.(ts|tsx|mjs|js|md)$/.test(target)) return
   const text = readFileSync(abs, 'utf-8')
-  for (const [spec] of text.matchAll(SPECIFIER)) {
-    if (!referenced.has(spec)) referenced.set(spec, target)
+  for (const line of text.split('\n')) {
+    if (line.includes(ALLOW)) continue
+    for (const [spec] of line.matchAll(SPECIFIER)) {
+      if (!referenced.has(spec)) referenced.set(spec, target)
+    }
   }
 }
 for (const target of searched) walk(target)
-
 const declared = new Set(subpaths.map(specifierFor))
 if (referenced.size < 2)
   failures.push(`only ${referenced.size} specifier(s) found in ${searched} — the scan is broken`)

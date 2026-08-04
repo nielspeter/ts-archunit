@@ -47,13 +47,21 @@ function projectFor(fixture: string): ArchProject {
   }
 }
 
-/** `ruleId | element | line | message` per finding, sorted — an identity, not a total. */
+/**
+ * `ruleId | element | line | message` per finding, **in report order** — an identity, not
+ * a total, and deliberately NOT sorted.
+ *
+ * Sorting was the first version and it is strictly weaker: the claim being tested is that
+ * two runs are *identical*, and source order is a stated contract elsewhere in this
+ * library, so a leak that reorders findings without changing the set is exactly the kind
+ * of thing this file should catch. Sorting hides it and buys nothing — there is no
+ * legitimate nondeterminism here to paper over.
+ */
 function fingerprint(rules: RuleBuilderLike[]): string[] {
   return rules
     .flatMap((r) => ('violations' in r && typeof r.violations === 'function' ? r.violations() : []))
     .filter((v) => v !== undefined)
     .map((v) => `${v.rule}|${v.element}|${v.line}|${v.message}`)
-    .sort()
 }
 
 /** Every shipped preset, built against the fixture that trips it. */
