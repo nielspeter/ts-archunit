@@ -34,7 +34,8 @@ import fs from 'node:fs'
 import type { ArchProject } from '../../src/core/project.js'
 import { project } from '../../src/core/project.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
-import { edgesOf } from '../../src/core/module-edges.js'
+import { edgesOf, edgeStream } from '../../src/core/module-edges.js'
+import type { ModuleEdge } from '../../src/core/module-edges.js'
 
 const FIXTURES = path.resolve(import.meta.dirname, '../fixtures')
 const ON = path.join(FIXTURES, 'verbatim-module-syntax')
@@ -164,6 +165,11 @@ describe('the erasure fields, per form (plan 0087)', () => {
     ["export { alpha } from './a.js'", 'export { y } from', false, false, false],
     ["export * from './a.js'", 'export * from', false, false, false],
     ["export type * as NS from './a.js'", 'export type * as N from', true, true, true],
+    // A type POSITION, not a declaration: `type X = import('s').Y`. Never emitted under
+    // any flag, and it was missing from this table — sabotage flipping it to
+    // "not erased" was caught by nothing, because the slice graph excludes the kind
+    // outright so the field is unobservable there.
+    ["export type Ref = import('./a.js').Alpha", 'type X = import(s).Y', true, true, true],
   ]
 
   it.each(FORMS)(
@@ -173,6 +179,57 @@ describe('the erasure fields, per form (plan 0087)', () => {
       expect(classify(true, decl)).toEqual({ typeOnly, erases: erasesOn })
     },
   )
+
+  it('edgeStream and edgesOf agree on EVERY field, at both flag positions', () => {
+    // `makeEdge` was extracted so the cached builder and the lazy one cannot drift.
+    // Nothing proved it: `edgeStream`'s only consumer (`dependOn`) reads `typeOnly`, so
+    // sabotage that built its edges at the wrong flag was caught by NOTHING — the cold
+    // path would have carried a silently wrong `erasesModuleRequest` until some future
+    // reader trusted it.
+    //
+    // Asserted over every form, both flags, comparing the whole shape rather than the
+    // one field, so a field added later is covered without editing this row.
+    for (const verbatim of [false, true]) {
+      const tsm = new Project({
+        useInMemoryFileSystem: true,
+        compilerOptions: {
+          verbatimModuleSyntax: verbatim,
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ESNext,
+        },
+      })
+      tsm.createSourceFile('/a.ts', 'export type Alpha = { n: number }\nexport const alpha = 1\n')
+      const f = tsm.createSourceFile('/b.ts', FORMS.map(([decl]) => decl).join('\n') + '\n')
+
+      const cached = edgesOf(f)
+      // `edgeStream` reads the cache when warm, so a fresh project is needed to
+      // exercise the cold path this row exists for. `edgesOf` above warmed it, so
+      // build a second identical project for the stream.
+      const tsm2 = new Project({
+        useInMemoryFileSystem: true,
+        compilerOptions: {
+          verbatimModuleSyntax: verbatim,
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ESNext,
+        },
+      })
+      tsm2.createSourceFile('/a.ts', 'export type Alpha = { n: number }\nexport const alpha = 1\n')
+      const f2 = tsm2.createSourceFile('/b.ts', FORMS.map(([decl]) => decl).join('\n') + '\n')
+      const streamed = [...edgeStream(f2)]
+
+      // Compared as a canonical multiset, NOT in yield order. `edgesOf` sorts by source
+      // position and `edgeStream` yields in the binder's order — declaration forms
+      // before expression forms, regardless of where they appear — which this file
+      // documents as a deliberate difference. Comparing sequences would red on a
+      // reordering of FORMS, which is not what this row is about.
+      const canonical = (edges: readonly ModuleEdge[]): string[] =>
+        edges.map((e) => JSON.stringify(e)).sort()
+
+      expect(streamed).toHaveLength(cached.length)
+      expect(streamed.length).toBeGreaterThan(5) // not vacuous
+      expect(canonical(streamed)).toEqual(canonical(cached))
+    }
+  })
 
   it('erasesModuleRequest implies typeOnly, for every form and both flags', () => {
     // An invariant rather than a row-by-row claim: a statement cannot vanish while
