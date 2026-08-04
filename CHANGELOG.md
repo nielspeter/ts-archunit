@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.49.2] - 2026-08-04
+
+Guards, from the fifth review. No behaviour changed; **six things that could not fail now can.** Each was
+verified by measurement before being fixed, and each fix was verified to catch the sabotage it exists for.
+
+### Fixed
+
+- **`respectLayerOrder` had the code and not the guard, in three of three positions.** Flipping both of
+  its erasure-question call sites to the cycle question left all 3055 tests passing. Under
+  `verbatimModuleSyntax`, that reports an upward dependency whose bindings are type-level — a false
+  positive, in the release built to remove a false negative. Same for its options forwarding to the
+  details lookup: caught for `notDependOn`, caught by nothing for `respectLayerOrder`.
+
+  **The methodological cause is the durable finding, and it is now a corollary in
+  [ADR-008](adr/008-agent-first-failure-surfaces.md) rule 5.** The two conditions received textually
+  identical edits, so `git diff` presented them as one change and the natural sabotage row bundled all
+  four call sites. That bundled row scored CAUGHT and was credited to both conditions. **Enumerating
+  reverts from the diff does not protect you here — the diff is what suggested the bundle.** The rule is
+  mechanical: if a revert row touches more than one call site, it is at least two rows.
+
+  Splitting also turned up something worth recording rather than chasing: the graph-side flip alone is
+  _structurally unobservable_, because violations are pushed per resolved detail and the detail lookup is
+  the stricter filter. That is an equivalence, not a gap. The details-side flip **is** observable, given a
+  second non-erased edge so the graph finds the pair anyway — and is now guarded.
+
+- **A fixture could load zero files and the pair still read as proof.** Pointing the `-off` fixture's
+  `include` at `*.tsx` left all 21 rows green: `cyclesIn` filters out `bypassFilters` findings, which is
+  where the library's own unsuppressable "loaded 0 source files" diagnostic goes — so "the same source has
+  NO cycle" passed as ∀ over ∅, in the file whose entire argument is "identical bytes, opposite verdicts".
+  Both sibling files already had this row.
+
+- **`erasesModuleRequest implies typeOnly` was vacuous.** `if (erases) expect(typeOnly).toBe(true)` passes
+  with zero assertions executed when nothing erases — proved by hardwiring the field to `false`, the exact
+  false-negative direction v0.49.0 fixed. The v0.49.0 changelog claimed the invariant was "asserted over
+  every form at both flag positions"; it was asserted only in the direction that cannot fail. Now asserts
+  the _set_ of erasing forms by identity.
+
+- **The fixture pair's "differ only in the flag" claim was one spot-check and a hand-written file list.**
+  Changing `module` in one fixture, or adding a third file to one side, was caught by nothing. Both are now
+  derived: the file listing comes from `readdirSync` on both roots, and the whole tsconfig is compared with
+  the flag deleted.
+
+- **20 count assertions became identities**, and one was genuinely ambiguous: `CONTROL two distinct markers
+on one function` asserted `2` while its own comment claimed to prove dedup is per-comment rather than
+  per-function. Measured, the two findings share `element` **and** `line`, so a regression reporting the
+  same comment twice also gives `2` — bug 0016's count coincidence, in the row written to prevent it.
+
+- **`STUB_PATTERNS` could lose its word boundary with nothing failing**, so `// STUBBORN flag here` and
+  `// TODOS remain` would be reported as stub markers. The _anchor_ half is guarded in both arms; the
+  boundary half was not. Two prose rows added, verified to red when `\b` is dropped.
+
+- **A docstring contradicted its own file's assertion**: `jsx-on-disk.test.ts` claimed the fixture carries
+  `"jsx": "react-jsx"` while the same file explains why it is `preserve` and asserts `preserve`. The root
+  `tsconfig.json` repeated the wrong value.
+
+### Known limits now written down rather than implied
+
+- The two rows pinning `['[a, c, b]']` certify DFS-pop order **as the baseline identity** — which is
+  exactly what [bug 0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) says is
+  unstable. Pinning it is correct today and both rows must change when 0056 lands; they are the two an
+  agent is most likely to "correct" to green.
+- v0.48.0's claim that _"a cycle that got wider is a different violation, not a moved one"_ is
+  **unmeasurable through the shipped API**: no option turns re-export edges off, so the pre-0.48 graph
+  cannot be reproduced. The migration row hand-builds the comparison and therefore proves `hashViolation`
+  is sensitive to `element`, not what v0.46.1 actually reported.
+- The all-caps stub misses are pinned as _current_ behaviour with a pointer to
+  [bug 0061](bugs/0061-an-all-caps-stub-marker-no-longer-matches.md), not as desired behaviour.
+
 ## [0.49.1] - 2026-08-04
 
 Everything here came out of a five-persona review of v0.47.0–v0.49.0. No behaviour changed; **14 shipped

@@ -138,6 +138,23 @@ Corollaries:
   So: **when a bug report or plan names a case in prose and the work claims to have fixed it, add
   that sentence to the matrix as its own row.** It will never arrive from the diff. Cheap, and it is
   the only corollary here that catches what was left out rather than what was got wrong.
+- **A bundled revert row hides a gap the diff cannot show you — split any row that names two call
+  sites.** This is the corollary a diff-derived list actively _causes_ rather than merely omits, and it
+  is the one to reach for last, because the other two make you feel covered. Measured, over three
+  releases: `notDependOn` and `respectLayerOrder` received **textually identical** edits, so `git diff`
+  presented them as one change and the natural revert row bundled all four call sites. That bundled row
+  scored CAUGHT. Split, the `notDependOn` halves were CAUGHT and both `respectLayerOrder` halves were
+  **caught by nothing** — the single test that fired calls `notDependOn` and nothing else, and one row
+  had been credited to two conditions. A false positive on a published condition shipped behind a green
+  matrix.
+  So: **if a revert row touches more than one call site, it is at least two rows.** The rule is
+  mechanical, needs no judgement, and would have caught this. Note also what it turns up: a split row
+  can be _structurally unobservable_ rather than unguarded — here the graph-side flip cannot change any
+  output, because violations are pushed per resolved detail and the detail lookup is the stricter filter.
+  That is an equivalence, and the honest response is to record it as one, not to invent a guard for it.
+  The plan's own prose had already named the surface — _"what `dependOn`, `notImportFrom`, `notDependOn`
+  and `respectLayerOrder` ask"_ — which under the corollary above should have become four rows. That
+  corollary was being applied to bug reports and not to the plan's own sentences.
 - **The verdict mechanism is part of the derivation.** Same evidence, one layer down: a reviewer's first pass over that 65-revert matrix decided each verdict by grepping the test reporter's output, ANSI escape codes defeated the pattern, and it reported _every_ revert as caught-by-nothing. A sabotage run that reads its own result through a fragile channel has the same defect as the guards it is auditing. Read the exit code. And **prove the exit code means something before trusting it**, because the channel has failed three further ways since, every one of them in the reassuring direction — a matrix that cannot return MISSED reads as a matrix that found nothing wrong:
   - an unquoted `$SUITE` does not word-split in zsh, so vitest received one nonexistent filter, found no files and exited 1 on **every** row;
   - `tests/core/diagnose.test.ts` failed for an environmental reason in a `git worktree`, scoring all twelve rows of a matrix CAUGHT until the reviewer baselined;

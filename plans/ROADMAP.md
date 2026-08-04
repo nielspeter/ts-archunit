@@ -1,6 +1,6 @@
 # ts-archunit Roadmap
 
-**Version:** 0.49.1 · **Tests:** 3055 across 222 files · **Updated:** 2026-08-04
+**Version:** 0.49.2 · **Tests:** 3062 across 222 files · **Updated:** 2026-08-04
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
 **Plans:** 77 completed (`completed/`) · 9 open (files in `plans/`) · proposals in `../proposals/` ·
 open defects and their priority order in [`../bugs/BUGS.md`](../bugs/BUGS.md)

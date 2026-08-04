@@ -18,7 +18,7 @@
  *
  * ## What is deliberately NOT in memory here
  *
- * Everything. The fixture carries its own `tsconfig.json` with `"jsx": "react-jsx"`,
+ * Everything. The fixture carries its own `tsconfig.json` with `"jsx": "preserve"`,
  * and the root `tsconfig.json` **excludes** it — because the root program sets no
  * `jsx` and would fail `npm run typecheck` with TS17004 before any test ran. That
  * exclusion, and the `*.tsx` pathspec added to `format:check`, are part of this fix:
