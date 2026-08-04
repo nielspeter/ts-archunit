@@ -2,7 +2,7 @@
 
 **Status:** **DONE** — shipped 2026-08-04 in v0.48.0. All three phases resolved: 1 and 2 implemented,
 3 decided by measurement and filed as
-[plan 0087](../0087-an-inline-type-import-still-requests-the-module.md). Filed 2026-08-04 from
+[plan 0087](./0087-an-inline-type-import-still-requests-the-module.md). Filed 2026-08-04 from
 [plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md), whose test-inventory row 4
 assumed re-exports were edges and found they are not.
 **Priority:** Medium-high. A false negative on three published conditions, and the shape it misses is
@@ -120,7 +120,7 @@ than changing `isTypeOnlyImport`, whose present meaning is correct for the four 
 that read it. Doing that here would be a semantic change to five conditions smuggled in under a
 re-export fix — the thing this plan refused to do in Phase 2.
 
-Filed as [plan 0087](../0087-an-inline-type-import-still-requests-the-module.md), which also has to
+Filed as [plan 0087](./0087-an-inline-type-import-still-requests-the-module.md), which also has to
 measure whether `export { type X } from 's'` shares the defect (**not** measured — export emit rules
 differ from import emit rules, so it must not be assumed).
 

@@ -174,7 +174,7 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
     // and it is read by five conditions — so the fix ADDS a distinction to the shared
     // edge model rather than changing `isTypeOnlyImport`, whose current meaning is
     // right for the four coupling conditions. That is
-    // [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md),
+    // [plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md),
     // which owns it and will update this row. This repo does not set the flag.
   })
 

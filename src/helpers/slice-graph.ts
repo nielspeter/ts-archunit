@@ -60,7 +60,7 @@ const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>(
  *
  * Both live on this graph and they are **not the same question**, which only became
  * visible when `ModuleEdge` learned to tell them apart
- * ([plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md)):
+ * ([plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md)):
  *
  * - `'module-request'` — will importing this file cause the target to be *evaluated*?
  *   That is what a **cycle** is: a deadlock in module-initialization order. Used by
@@ -95,7 +95,7 @@ export type ErasureQuestion = 'module-request' | 'type-bindings'
  * no runtime dependency, so counting it invents cycles that cannot exist at runtime —
  *
  * **with one measured exception, tracked by
- * [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md).**
+ * [plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md).**
  * Under `verbatimModuleSyntax: true`, `import { type X } from 's'` emits
  * `import {} from 's'` — the specifiers are erased, the module request is not — so it
  * is an eager edge that this filter currently drops. `edgesOf` cannot express the

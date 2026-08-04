@@ -69,7 +69,7 @@ export interface ModuleEdge {
    * and it is what `dependOn`, `notImportFrom`, `onlyImportFrom` and the module
    * predicates ask. It is deliberately NOT the same question as
    * {@link erasesModuleRequest}, and conflating them was
-   * [plan 0087](../../plans/0087-an-inline-type-import-still-requests-the-module.md).
+   * [plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md).
    */
   readonly typeOnly: boolean
   /**
