@@ -1,6 +1,6 @@
 # Plan 0083 — eat our own dogfood
 
-**Status:** **Phase 1 DONE (v0.47.0). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 and 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
+**Status:** **Phase 1 PARTIAL — it measured 36 rules and there are 44 (v0.47.0). Phase 3's two hard requirements DONE (v0.51.0); its reference-consumer wrapper split out as [plan 0093](./0093-a-reference-consumer-for-the-presets.md). Phase 0 and 2 not started.** Phase 1's result is recorded below: 34 of 36 rows caught, 2 caught by nothing, both fixed as [bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md) and [bug 0053](../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md). The gated population is **44** rules now, not the 36 Phase 1 measured; a re-run would need to cover the eight added since.
 
 **Phase 3's central claim, as it stood at v0.49.2 — now fixed, kept because it is the measurement that justified the work.** `package.json` declares **12 `exports` subpaths and not one of them is ever resolved by anything.** The only two test files that mention `@nielspeter/ts-archunit` treat it as a _string_: `tests/cli/init.test.ts` asserts that the scaffolded rule file **contains the text** `import { recommended } from '@nielspeter/ts-archunit/presets'`, which is the opposite of resolving it. Were that subpath missing from the map, the test still passes and every scaffolded project fails on its first run. Nothing packs a tarball. **Four releases shipped on 2026-08-04 across that gap**, and `npm pack --dry-run` confirming the file list is not the same evidence as resolving the map. Filed 2026-08-04 out of the question "are we dogfooding all the ADR-008
 features?", answered **no** by measurement. **Restructured 2026-08-04 after a five-persona review
@@ -54,6 +54,24 @@ bugs were never aimed at us, and nothing was watching the watchers.
 
 ### Phase 0 — a committed derivation, or no number at all
 
+**A fourth reader produced a fourth number on 2026-08-04: 13.0%** — 231 public exported functions, 30 of
+them called anywhere in `tests/archunit/`. It disagrees with 166, 185 and 187 for a mundane reason: it
+defines the population as _public exported functions matched by call site_, and the earlier three did not
+state their definition at all.
+
+That is the argument for this phase, not a replacement for it. **A script whose definition is not written
+down is a fourth opinion.** So Phase 0's deliverable is not a number: it is a committed script whose
+population rule is explicit in the file, run in CI, exactly as
+[plan 0079](./completed/0079-triage-the-cardinality-only-assertions.md) did for cardinality assertions —
+which is the precedent, one day older, and the scan that has since caught two real regressions in tests
+written _by the person who committed it_.
+
+Note also what the 13% cannot support: the unapplied list begins `areComponents`, `areHtmlElements`,
+`arrayOf`, `byArg` — predicates for shapes this repository does not contain. Under Phase 2's own rule those
+are **class C** (0 subjects = "we do not have this shape"), so the raw ratio is not a finding. That is why
+this plan says "not for a count" in its priority line, and it is why Phase 0 alone is worth shipping while
+Phase 2 waits.
+
 Before any triage: a script in the repo that produces the population, with the same standing as
 `tests/tools/scan-cardinality-assertions.ts`. It must exclude internal helpers, and its output is the
 input to Phase 1.
@@ -63,7 +81,13 @@ plan proceeds on classification alone, with no ratio, and the absence of a clean
 recorded. A number nobody can reproduce is worse than no number: it invites exactly the coverage
 chase the rest of this plan is written to avoid.
 
-## Phase 1 — plant the violation, over the 36 rules we already have. Run this FIRST.
+## Phase 1 — plant the violation, over the rules we already have. Run this FIRST.
+
+> **PARTIAL, not done.** It ran over **36** gated rules; there are **44**. The eight added since have
+> never been planted against, so "34 of 36 caught" describes a population that no longer exists. A number
+> that was true when measured and is not re-derived is the shape rule 5 is about — it reads as coverage.
+> **Re-run over the current population and record the delta**, and prefer deriving the population from
+> `BUILT` at runtime over counting `it()` blocks, so this cannot go stale a third time.
 
 Standalone, before any classification, because it depends on nothing else and because if it finds
 another bug 0049 then **class A is not a safe bucket** and the meaning of the whole triage changes.
@@ -130,6 +154,17 @@ to record.
 
 ## Phase 2 — the census, measured rather than read
 
+> **Priority lowered 2026-08-04, on evidence rather than taste.** On the same day this plan was filed, a
+> five-persona review of three releases found **nine** defects in _shipped behaviour_ — a cycle message
+> naming edges that do not exist, `workspace()` applying one package's compiler flag to all, three separate
+> baseline-identity collisions — none of which a census of unapplied primitives would have surfaced. The
+> census answers "which of our primitives do we point at ourselves"; the review answered "where is the
+> shipped library wrong". The second question was worth more per hour, measurably.
+>
+> Phase 2 is still sound and its stop rule is still pre-registered. It is simply not next. What displaces
+> it is Phase 4 below, which is the same question asked one level up and was missing from this plan
+> entirely.
+
 The first draft classified 166 items **by reading**, which inherits 0079's recorded residue: one reader
 classifying everything proves consistency, not correctness — and 0083 has no sample, so it had _less_
 protection than 0079 did.
@@ -170,6 +205,37 @@ remedial work; over, Phase 2 grows. Both branches say _enforce all of class B_ �
 And **a second reader classifies 20 items blind**, reporting the disagreement rate. That is the number
 0079 explicitly did not produce, it is cheap here, and it is the only thing making the census auditable
 by someone who did not do it.
+
+## Phase 4 — do we enforce our own ADR? (NEW, and it should have been Phase 1)
+
+This plan asked _"are we dogfooding all the ADR-008 features?"_ and then scoped itself to **library
+primitives** — Phase 2's census — which is one reading of the question. The other reading is more direct
+and was never in the plan: **ADR-008 has six rules; how many does this repository enforce on itself?**
+
+Audited 2026-08-04, by grep and by reading the enforcement sites:
+
+| Rule                                          | Enforced by                                                                                 | State                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1 — actionable findings fail                  | config findings cannot be downgraded; `gate()` makes `.warn()` unrepresentable in our suite | **inward only.** Nothing for an adopter — [plan 0090](./0090-a-warn-that-expires.md) |
+| 2 — every failure carries a _verified_ remedy | _nothing_                                                                                   | **zero machinery.** Cited in 21 test files, checked in none                          |
+| 3 — state escape hatches                      | `orphanExclusions()`, `commentSuppressions()`, two unforgeable `WeakSet` registries         | **enforced**                                                                         |
+| 4 — identities, never totals                  | `tests/tools/scan-cardinality-assertions.ts`, run as a test                                 | **enforced**                                                                         |
+| 5 — differently-derived disagreement          | per-change sabotage matrices                                                                | **practice, no machinery** — and it produced nearly every real finding               |
+| 6 — depth ∝ blast radius                      | a header line on plans                                                                      | **convention, no test.** Present on 17 of 88 plans; on all 10 filed 2026-08-04       |
+
+**Two findings, and rule 2's is the sharp one.** Every sibling rule that has machinery got it from a
+dedicated plan — 0069, 0070, 0078, 0079, over 07-25 → 08-03. Rule 2 never had one, so its gap is not "not
+yet got to": four siblings were each given a plan and this one was skipped, for nineteen days, while being
+the most-cited rule in the suite. [Plan 0086](./0086-a-remedy-that-names-the-folder-it-selects.md) is the
+first attempt at its one mechanically-checkable slice.
+
+Rule 6's is the cheapest thing on this list: a test asserting every file in `plans/` carries a
+**Blast radius** line. It is a convention today, which means a plan filed without one simply does not have
+one and nothing says so.
+
+**Why this belongs here rather than in its own plan:** it is the plan's own question, asked of the ADR
+instead of the API, and answering it took an afternoon. Splitting it out would repeat the mistake Phase 3
+made — deferring the half an adopter can feel behind the half only we can.
 
 ## Phase 3 — DONE for both hard requirements (v0.51.0), and split
 
