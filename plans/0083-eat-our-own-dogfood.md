@@ -115,7 +115,7 @@ Both misses became filings, and **neither would have been found by the deletion 
 originally specified**:
 
 - **`hygiene/no-stubs`** — a `TODO` planted in `src/` did not red.
-  [Bug 0052](../bugs/0052-nostubcomments-cannot-see-a-functions-own-docstring.md): the condition
+  [Bug 0052](../bugs/fixed/0052-nostubcomments-cannot-see-a-functions-own-docstring.md): the condition
   searches function _bodies_, so a marker in the function's own docstring is invisible.
 - **`arch/no-cycles`** — a planted cycle did not red, and neither does the **real one already in our
   source**. The rule is `.warn()` by a documented decision whose stated blocker is type-only imports.

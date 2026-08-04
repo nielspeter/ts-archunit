@@ -300,8 +300,42 @@ export function property(
  * Exported as a constant for use with `comment()`. Users can pass
  * their own RegExp to `comment()` for narrower matching.
  */
-export const STUB_PATTERNS =
-  /\b(TODO|FIXME|HACK|XXX|STUB|DEFERRED|PLACEHOLDER)\b|\bnot\s+implemented\b|\bcoming\s+soon\b/i
+const MARKER = 'TODO|FIXME|HACK|XXX|STUB|DEFERRED|PLACEHOLDER'
+
+/** Start of a comment, or of a line inside one, past any `//`, `/*` or `*`. */
+const COMMENT_LINE_START = String.raw`(?:^|\n)[ \t]*(?:\/\/+|\/\*+|\*+)?[ \t]*`
+
+/**
+ * A stub marker: an **UPPERCASE** marker word opening a comment line, or either
+ * of two phrases.
+ *
+ * Both halves of that are load-bearing, and each was found by a prose false
+ * positive in this repo's own source
+ * ([bug 0053](../../bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md)).
+ *
+ * **Anchored to a line start**, because unanchored it matched every sentence that
+ * mentions a marker — including the docstring of the fix for bug 0052, which says
+ * the word TODO three times.
+ *
+ * **Case-sensitive for the markers**, because anchoring alone was not enough: a
+ * wrapped JSDoc sentence put the lowercase word "stub," at the start of a
+ * continuation line. Uppercase is the convention (`// TODO:`, `// FIXME`) and the
+ * casing is what separates a marker from the English word. Known limit, stated
+ * rather than discovered: a lowercase `// todo: x` is not matched. That is the
+ * price of not matching "the todo list below", and it is the right trade for a
+ * rule whose findings must fail a build.
+ *
+ * The phrase forms stay case-insensitive — nobody writes "NOT IMPLEMENTED" — but
+ * are anchored too, because unanchored they matched `noStubComments()`'s own
+ * docstring, which lists them. That is bug 0043's shape: documentation of a syntax
+ * read as the syntax.
+ */
+export const STUB_PATTERNS = new RegExp(
+  [
+    `${COMMENT_LINE_START}(?:${MARKER})\\b`,
+    `${COMMENT_LINE_START}(?:[Nn]ot\\s+[Ii]mplemented|[Cc]oming\\s+[Ss]oon)\\b`,
+  ].join('|'),
+)
 
 /**
  * Match comments attached to AST nodes.
