@@ -13,7 +13,7 @@ import { tarjanSCC, type AdjacencyList } from '../helpers/tarjan.js'
 /**
  * Assert that no circular dependencies exist between slices.
  *
- * Builds a directed dependency graph from import declarations,
+ * Builds a directed dependency graph from imports and re-exports,
  * then runs Tarjan's SCC algorithm to detect cycles.
  * Each cycle produces a violation listing the cycle path.
  *
@@ -51,20 +51,28 @@ function canonicalizeCycle(names: readonly (string | undefined)[]): string[] {
 /**
  * Every slice must be free of dependency cycles.
  *
- * **The slice graph sees static `import` declarations only**, and since v0.28.0
- * that is narrower than the module conditions beside it. `export { x } from
- * './b.js'` is a dependency to `notImportFrom` and invisible here.
+ * **The graph counts eager static dependencies: `import` declarations AND
+ * re-exports.** Since v0.48.0 `export { x } from './b.js'` and `export * from
+ * './b.js'` are edges — they emit an import of the module, so it is evaluated — which
+ * means a **barrel cycle** (`a → barrel → a`) is detected. It was not before v0.48.0,
+ * and that was the commonest cycle shape there is.
  *
- * That matters most for the shape it misses: **a barrel re-export is *the* classic
- * cycle**, so `a → barrel → a` through `export … from` is exactly what this
- * condition cannot see. And the asymmetry is visible inside a single run —
- * `strictBoundaries` will report a barrel re-export as a cross-boundary violation
- * from `no-cross-boundary` and report the cycle it creates as absent from
- * `no-cycles`.
+ * Not counted, each for a reason: **dynamic `import()`** (lazy, so it cannot deadlock
+ * initialization, and it is usually the deliberate *fix* for a cycle), **`require()`**
+ * (CJS; this is an ESM-only package), and **type positions** like
+ * `type X = import('./b.js').Y` (erased).
  *
- * Deliberate, not an oversight (plan 0071, Out of scope): a cycle finding is the
- * hardest class to remedy and belongs to its own upgrade story. Recorded here
- * because this docstring is read when the rule fails, and a changelog is read once.
+ * Type-only imports and re-exports are dropped by default — see `ignoreTypeImports`
+ * below, and note the default differs from `notDependOn`/`respectLayerOrder` on
+ * purpose: a cycle asks whether the module is *evaluated*, those ask whether the code
+ * is *coupled*.
+ *
+ * **This docstring said the opposite until v0.49.1.** It described the re-export
+ * blindness as permanent, and it argued for its own importance on the ground that "this
+ * docstring is read when the rule fails, and a changelog is read once" — then v0.48.0
+ * updated the changelog and left this text standing, along with the same claim in two
+ * shipped preset `because` strings that are **printed inside every finding**. Found by
+ * review, not by the suite; nothing pins prose against behaviour.
  */
 export function beFreeOfCycles(
   options: ImportOptions = { ignoreTypeImports: true },

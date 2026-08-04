@@ -100,7 +100,7 @@ export interface ModuleEdge {
    * false negative — which is what `beFreeOfCycles` did until v0.49.0.
    *
    * `erasesModuleRequest` implies `typeOnly`: a statement cannot vanish while still
-   * binding a runtime value. `tests/core/module-edges-erasure.test.ts` asserts that
+   * binding a runtime value. `tests/conditions/verbatim-module-syntax.test.ts` asserts that
    * invariant over every form rather than leaving it as a claim.
    */
   readonly erasesModuleRequest: boolean

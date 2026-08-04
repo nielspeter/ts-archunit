@@ -309,11 +309,11 @@ Available on all entry points via `.that()`.
 
 ## Slice Conditions
 
-| Export              | Signature                                             | Description                                                                                                                                |
-| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `beFreeOfCycles`    | `beFreeOfCycles(options?)`                            | No circular dependencies between slices. Ignores type-only imports by default; pass `{ ignoreTypeImports: false }` for the pre-0.47 graph. |
-| `respectLayerOrder` | `respectLayerOrder(...layers)` or `(layers, options)` | Dependencies follow declared layer order. Counts type-only edges by default.                                                               |
-| `notDependOn`       | `notDependOn(...slices)` or `(slices, options)`       | No slice depends on the named slices. Counts type-only edges by default; one finding per dependency site.                                  |
+| Export              | Signature                                             | Description                                                                                                                                                                                                                                |
+| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `beFreeOfCycles`    | `beFreeOfCycles(options?)`                            | No circular dependencies between slices. Ignores type-only imports by default; pass `{ ignoreTypeImports: false }` to count type-only edges too — note that is not the pre-0.47 graph, since re-exports are counted as well since v0.48.0. |
+| `respectLayerOrder` | `respectLayerOrder(...layers)` or `(layers, options)` | Dependencies follow declared layer order. Counts type-only edges by default.                                                                                                                                                               |
+| `notDependOn`       | `notDependOn(...slices)` or `(slices, options)`       | No slice depends on the named slices. Counts type-only edges by default; one finding per dependency site.                                                                                                                                  |
 
 ## Call Conditions
 
@@ -741,12 +741,12 @@ See [Architecture Presets](/presets) for full configuration options.
 
 ### `ts-archunit/rules/hygiene`
 
-| Export                     | Target    | Description                                            |
-| -------------------------- | --------- | ------------------------------------------------------ |
-| `noDeadModules()`          | modules   | Module must be imported by at least one other file.    |
-| `noUnusedExports()`        | modules   | Every named export must be referenced by another file. |
-| `noStubComments(pattern?)` | functions | No TODO/FIXME/HACK/STUB comments in function body.     |
-| `noEmptyBodies()`          | functions | Functions must have at least one statement.            |
+| Export                     | Target    | Description                                                                                                                           |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `noDeadModules()`          | modules   | Module must be imported by at least one other file.                                                                                   |
+| `noUnusedExports()`        | modules   | Every named export must be referenced by another file.                                                                                |
+| `noStubComments(pattern?)` | functions | No TODO/FIXME/HACK/STUB comments in a function's body or its own docstring. Markers are case-sensitive and must begin a comment line. |
+| `noEmptyBodies()`          | functions | Functions must have at least one statement.                                                                                           |
 
 ### `ts-archunit/rules/metrics`
 

@@ -40,7 +40,7 @@ export function noUnusedExports(): Condition<SourceFile> {
 }
 
 /**
- * No stub or deferred-work comments in function bodies.
+ * No stub or deferred-work comments in a function's body OR its own leading docstring.
  * Catches common markers (see STUB_PATTERNS) and phrases like
  * "not implemented" or "coming soon".
  *

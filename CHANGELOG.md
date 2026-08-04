@@ -156,7 +156,7 @@ Four gates that could not fail, found by pointing our own library at ourselves
 - **The stub rule matched prose _about_ stubs, including its own documentation** — latent until the fix
   above let the rule read docstrings, where prose lives, at which point it fired on five places in our
   own source, none of them a stub. Markers must now begin a comment line and are **case-sensitive**;
-  the phrase forms ("not implemented yet") stay case-insensitive but are anchored the same way. Stated
+  the phrase forms ("not implemented yet") are anchored the same way. Stated
   limit: a lowercase `// todo: x` is no longer matched, which is the price of not matching "the todo
   list below". ([bug 0053](bugs/fixed/0053-the-stub-rule-matched-prose-about-stubs.md))
 
