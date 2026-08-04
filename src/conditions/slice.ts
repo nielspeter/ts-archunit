@@ -220,7 +220,7 @@ function siteIdentity(from: string, to: string, site: SliceDependencySite): stri
     // for two distinct violations — so one baseline entry accepts both. That is the very
     // defect plan 0088 was written to fix, in a different shape, and it is the commonest
     // layout there is. `src/conditions/dependency.ts` has the same collision
-    // ([bug 0063](../../bugs/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)),
+    // ([bug 0063](../../bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)),
     // which is how it got here: the shape was right to copy, this component was not.
     //
     // An absolute path is safe here — `hashViolation` normalises the repository root out of

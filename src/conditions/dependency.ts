@@ -124,7 +124,20 @@ function edgeViolation(
     // OUTWARD name and aliases therefore differ. Measured: 26 colliding groups on this
     // repo's barrel go to 0, and the aliased-import pair is what remains.
     identity: [
-      sourceFile.getBaseName(),
+      // The FULL PATH, not the basename — [bug 0063](../../bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md).
+      //
+      // Every other component here is a property of the EDGE, so the basename was the only
+      // thing identifying the file, and it does not: two sibling folders each with an
+      // `index.ts` importing the same target produced ONE identity for TWO violations, and
+      // one baseline entry accepted both. Measured `findings=2 distinctHashes=1`, on the
+      // commonest layout there is. `ArchViolation.identity` requires uniqueness per finding
+      // within a rule, in those words.
+      //
+      // An absolute path is not a new bet: `edgeCandidates(...)[0]` below is already the
+      // resolved absolute path of the TARGET, and `hashViolation` normalises the repository
+      // root out of identity text (`src/core/identity-root.ts`) with a root that defaults to
+      // `discoverIdentityRoot`.
+      sourceFile.getFilePath(),
       edge.kind,
       // No root here: `[0]` is the primary candidate either way, and this string
       // is a baseline identity — feeding it anything new would rewrite every
@@ -143,12 +156,28 @@ function importViolation(
   importDecl: ImportDeclaration,
   message: string,
   context: ConditionContext,
+  /**
+   * What distinguishes this finding from a sibling, WITHOUT the file — the caller knows,
+   * this function adds the path.
+   *
+   * [Bug 0063](../../bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)'s
+   * third mechanism, and the one my own corrected scope got wrong twice. This constructor
+   * set no identity, so findings fell back to `element::message` — and for
+   * `notHaveAliasedImports` the message is `"<basename> aliases \"x\" as \"y\""`, identical
+   * for two sibling files aliasing the same import. I had asserted it was unaffected on the
+   * ground that the message "names the specifier"; it names the *alias*, which is equally
+   * shared. The control row written to pin the scope disproved it instead.
+   */
+  subject: string,
 ): ArchViolation {
   return {
     rule: context.rule,
     element: sourceFile.getBaseName(),
     file: sourceFile.getFilePath(),
     line: importDecl.getStartLineNumber(),
+    // The path, then what the caller says distinguishes it. Not the message: a message is
+    // prose and may be reworded, which is the whole reason `identity` exists.
+    identity: `${sourceFile.getFilePath()}::${subject}`,
     message,
     because: context.because,
   }
@@ -388,6 +417,17 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
             element: sf.getBaseName(),
             file: sf.getFilePath(),
             line: 1,
+            // An identity, ADDED rather than corrected — bug 0063's worse half. This finding
+            // had none, so it fell back to `element::message`; the element is a basename and
+            // the message never names the file, so two sibling folders each with an
+            // `index.ts` were one finding to the baseline. Measured
+            // `findings=2 distinct=1`, with nothing in the identity to blame because there
+            // was no identity.
+            //
+            // The globs are part of it because this finding is about a REQUIREMENT not met,
+            // not about an edge: the same file failing two different `dependOn` rules is two
+            // findings, and `rule` alone would not separate them if one rule carried both.
+            identity: `${sf.getFilePath()}::depends-on::${[...globs].sort((a, b) => a.localeCompare(b)).join(',')}`,
             message: `${sf.getBaseName()} does not import from any path matching [${globs.join(', ')}]`,
             because: context.because,
           })
@@ -429,6 +469,9 @@ export function notHaveAliasedImports(): Condition<SourceFile> {
                   decl,
                   `${sf.getBaseName()} aliases "${specifier.getName()}" as "${alias.getText()}"`,
                   context,
+                  // The aliased name and the alias — the two things that make one aliased
+                  // specifier different from another in the same file.
+                  `aliased::${specifier.getName()}::${alias.getText()}`,
                 ),
               )
             }

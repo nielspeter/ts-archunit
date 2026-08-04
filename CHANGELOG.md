@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.53.0] - 2026-08-04
+
+### Fixed
+
+- **A dependency finding's identity collided across files sharing a basename, in three places.** Two
+  distinct violations shared one baseline entry, so **accepting either accepted both**, silently — the exact
+  requirement `ArchViolation.identity` states in its own docstring. Measured `findings=2, distinctHashes=1`
+  on the commonest layout there is: sibling folders each with an `index.ts`.
+  - `notImportFrom`, `onlyImportFrom` and the type-only check identified the file by **basename**, while
+    every other component of the identity was a property of the edge. Now the full path.
+  - `dependOn` set **no identity at all**, so it fell back to `element::message` — a basename plus a message
+    that never names the file. An identity was **added**, including the globs, because this finding is about
+    a _requirement_ not met rather than an edge.
+  - `notHaveAliasedImports` had the same absence, and its message names the _alias_ — shared by both files.
+    Its identity now carries the path plus the aliased name and alias.
+
+  **Baseline impact:** findings from those four conditions move once. Regenerate.
+  ([bug 0063](bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md))
+
+### How this one was found, which is the part worth reading
+
+The slice conditions copied this scheme in v0.52.0 and inherited the collision; fixing it there (v0.52.1)
+is what exposed the original. Then **the bug report was wrong about its own scope three times**, and each
+correction came from a different discipline:
+
+1. as filed it claimed "every dependency finding" — too broad;
+2. **reviewing the report before implementing it** found `dependOn` collides _harder_, with no identity at
+   all — too narrow;
+3. **a control row written to rule out a third mechanism found one instead**, after the first two were
+   already fixed.
+
+All 3095 tests passed while all three collisions were live. And plan 0079's cardinality scanner flagged the
+new test file for count-only assertions — the second time in one day.
+
 ## [0.52.1] - 2026-08-04
 
 ### Fixed
@@ -24,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
   Found by reviewing v0.52.0 rather than by any test, and the review also found the scheme it was copied
   from has the same collision — filed as
-  [bug 0063](bugs/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md). The two
+  [bug 0063](bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md). The two
   families deliberately diverge on this component until that lands, and the divergence is recorded at the
   slice call site.
 
