@@ -561,7 +561,7 @@ Eight bugs and four plans filed, none of them deferred silently. The behavioural
   package's `verbatimModuleSyntax` to every package, wrong in both directions, decided by a path sort.
 - [0060](bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — v0.47.0 moved every
   baselined stub finding's hash, and the diagnostic blames the repository root.
-- [0059](bugs/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
+- [0059](bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
   [0057](bugs/fixed/0057-an-empty-options-object-reverts-a-documented-default.md),
   [0061](bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md),
   [0062](bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md).
