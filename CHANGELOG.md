@@ -33,24 +33,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   findings that were previously invisible — but they are new output, and a baselined suite will report
   them as new. See `docs/upgrading.md`.
 
-  Existing findings do **not** move: the message carries a per-kind verb (`dynamically imports`,
-  `references the type from`), so a new dynamic finding is its own identity rather than an alteration of
-  an existing `imports` entry for the same module.
+  Existing findings do **not** move — see the entry below, which states the guarantee precisely and
+  names what it was measured against. A new dynamic finding arrives as its own entry rather than as an
+  alteration of an existing `imports` entry for the same module, because `kind` is part of a slice
+  finding's `identity`. (The per-kind verb in the message — `dynamically imports`, `references the type
+from` — makes the output readable, but the message is _not_ what the baseline hashes when a finding
+  sets `identity`, and an earlier draft of this entry said otherwise.)
 
-- **Two lazy imports of the same module from one file are now two baseline entries, not one.**
-  A finding's identity is built from `kind::specifier::names`, and `names` is **empty** for `dynamic`,
-  `require` and `type-expression` — so two `import('../legacy/index.js')` calls in one file produced two
-  findings sharing **one** hash. One accepted entry then silently pre-accepted the next one anyone added.
-  Measured 2 findings / 1 hash, against 2/2 for two named imports.
+- **A second lazy import of the same module from one file is now its own baseline entry.**
+  A finding's identity is built from `kind::specifier::names`, and `names` is **empty** whenever no name
+  crosses the edge — so two `import('../legacy/index.js')` calls in one file produced two findings
+  sharing **one** hash, and one accepted entry silently pre-accepted the next one anyone added. Measured
+  2 findings / 1 hash, against 2/2 for two named imports.
 
-  `ModuleEdge` now carries an `ordinal` (the nth edge of that kind to that specifier, in source order),
-  and the identity uses names **or** the ordinal. A source-order ordinal rather than a line number,
-  because `identity` exists to survive edits elsewhere in the file.
+  This was never limited to `dynamic`/`require`/`type-expression`. `names` is empty for four ordinary
+  spellings too — `import D from`, `import * as NS from`, a bare `import './x.js'`, and `export * from`
+  (the barrel) — and the same 2/1 collision was live there, in **both** families. (`export * as NS from`
+  is not among them: it carries one statically-known name.)
 
-  **Migration:** `notImportFrom()`, `onlyImportFrom()` and `dependOn()` have always reported `dynamic`
-  and `type-expression` edges, so **baselined findings of those two kinds move** and must be regenerated.
-  `import` and `reexport` identities are byte-identical — the discriminator is "names or ordinal", not
-  "names and ordinal", precisely so the common kinds do not move.
+  `ModuleEdge` now carries an `ordinal` — the nth edge of that kind to that specifier, in source order.
+  A source-order ordinal rather than a line number, because `identity` exists to survive edits elsewhere
+  in the file.
+
+  **No migration. No baseline entry moves.** The first edge of each group emits the same empty
+  discriminator the previous formula produced, so every single-occurrence finding keeps a byte-identical
+  identity; only the _second and later_ sibling gains a `#n` suffix, and those groups are exactly the
+  ones that had two findings and one hash before — a baseline entry that was already wrong. Verified by
+  replaying all seven `import`/`reexport` spellings plus `dynamic` and `type-expression` against v0.55.3
+  and diffing the identity strings: zero difference. `tests/conditions/identity-does-not-move.test.ts`
+  pins that comparison, and reverting the fix fails 9 of its 14 rows.
 
 - **`require()` is counted by no _forward_ condition, and the limit is now stated** in `docs/slices.md`.
   This is an ESM-only package (ADR-004), so under `allowJs` a `require()` crossing a forbidden boundary

@@ -223,9 +223,16 @@ function siteIdentity(from: string, to: string, site: SliceDependencySite): stri
     site.sourceFile.getFilePath(),
     site.edge.kind,
     site.edge.specifier,
-    // Names when the kind has them, the source-order ordinal when it does not — see
-    // `edgeDiscriminator`. Before bug 0059 this family only ever saw `import` and
-    // `reexport`, both of which carry names, so the gap was unreachable here.
+    // Names when the edge carries them, the source-order ordinal when it does not — see
+    // `edgeDiscriminator`.
+    //
+    // This comment used to say the gap was unreachable here, on the reasoning that before
+    // bug 0059 the family only saw `import` and `reexport`, "both of which carry names".
+    // That was false: it is the SPELLING that carries names, not the kind. Measured on
+    // `main` through `notDependOn`, two default imports of one module from one file gave
+    // two findings and ONE identity, as did two bare side-effect imports. The collision
+    // was live in this family, not merely reachable — which is why the fix is in
+    // `edgeDiscriminator` where both families read it, rather than in either caller.
     edgeDiscriminator(site.edge),
   ].join('::')
 }

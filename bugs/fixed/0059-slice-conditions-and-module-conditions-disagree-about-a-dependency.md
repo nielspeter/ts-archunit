@@ -2,16 +2,32 @@
 
 **Reported:** 2026-08-04 · **Fixed:** 2026-08-05, unreleased at time of writing
 
-> **Fixed as filed.** `kindsFor(question)` in `src/helpers/slice-graph.ts`: `'module-request'`
-> keeps the eager static set, `'type-bindings'` reads `FORWARD_EDGE_KINDS` — the same constant
-> `notImportFrom` and `dependOn` read, so the two families agree by construction rather than by two
-> lists. Tests in `tests/conditions/slice-and-module-agree.test.ts`, 16 rows.
+> **Fixed as filed, and then twice more.** The `QUESTIONS` table in `src/helpers/slice-graph.ts`:
+> `'module-request'` keeps the eager static set, `'type-bindings'` reads `FORWARD_EDGE_KINDS` — the same
+> constant `notImportFrom` and `dependOn` read, so the two families agree by construction rather than by
+> two lists. Tests in `tests/conditions/slice-and-module-agree.test.ts`.
 >
 > One thing the report did not anticipate, found while writing the tests: the slice conditions were
 > **already** per-kind on the message side. `Slice "feature" dynamically imports forbidden slice
 "legacy"` comes from `edgeVerb(kind)`, which has carried a distinct verb for `dynamic` and
-> `type-expression` since plan 0071. Only the graph's kind filter was holding those edges back, so the
-> fix is one function and the findings arrive with correct, per-kind identities already.
+> `type-expression` since plan 0071. Only the graph's kind filter was holding those edges back.
+>
+> **But "the fix is one function" was wrong, and this note claimed it for a day.** Making those kinds
+> reportable made an existing fail-open reachable: a finding's identity is `kind::specifier::names`, and
+> `names` is empty wherever no name crosses the edge, so two lazy imports of one module from one file
+> gave **2 findings and 1 hash**. `ModuleEdge.ordinal` closed that — and the first form of _that_ fix
+> moved the identity of four ordinary `import`/`reexport` spellings (`import D from`,
+> `import * as NS from`, bare `import './x.js'`, `export * from`) while three shipped sentences promised
+> it had not, because `names` is empty for the SPELLING and not only for the KIND. The same 2/1 collision
+> turned out to have been live in the **slice** family too, which this note previously said was
+> unreachable there. Both closed by emitting an empty discriminator for the first edge of each group, so
+> no baseline entry moves at all; `tests/conditions/identity-does-not-move.test.ts` enumerates all seven
+> spellings against the identities v0.55.3 actually produces, and reverting the fix fails 9 of its 14 rows.
+>
+> The lesson is in the sequence, not the defect: three rounds, each fix guarded by a row that exercised
+> only the case where its claim held. What broke the loop was enumerating from the **diff** and asserting
+> against a **differently derived** value. Residual items are
+> [plan 0094](../../plans/0094-the-residual-findings-from-the-v0-56-0-review.md).
 >
 > The `require` gap is **decided rather than left open**: no condition in either family counts it,
 > which is consistent, and the limit is now stated in `docs/slices.md` where a user reads it rather
