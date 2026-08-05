@@ -119,11 +119,16 @@ initialization and is often the deliberate _fix_ for a cycle, so reporting it th
 rule for applying its own remedy. If you see a dynamic import in a cycle finding, that is a bug —
 please report it.
 
-A second, rarer source of new red in the same release: if one file reaches one module **twice the
-same way** (two `import('./x.js')` calls, say), those two findings used to share a single baseline
-entry, so accepting one silently accepted the other. They are now separate entries and the hidden
-one is reported — in `notImportFrom()`/`onlyImportFrom()`/`dependOn()` as well as the slice
+A second, rarer source of new red in the same release: if one file reaches one module **twice by the
+same specifier** (two `import('./x.js')` calls, say), those two findings used to share a single
+baseline entry, so accepting one silently accepted the other. They are now separate entries and the
+hidden one is reported — in `notImportFrom()`/`onlyImportFrom()`/`dependOn()` as well as the slice
 conditions.
+
+**By the same specifier, deliberately narrow.** Two _different_ spellings that resolve to the same
+file — a `paths` alias beside a relative path — still share one entry. That is a separate,
+pre-existing defect (bug 0064), not fixed in this release, so if that is your layout your exposure is
+unchanged.
 
 **What to do:** triage them, or hold the rule at `.asSeverity('warn')` and ratchet down. Do **not**
 regenerate the baseline to absorb them — see [Upgrading](/upgrading) for why that is the one action

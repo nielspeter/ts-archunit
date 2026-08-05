@@ -41,7 +41,7 @@ from`) makes the output readable, but it is **not** what the baseline hashes: a 
   `identity` is hashed on that field alone, and which producers set it is listed in the 0.46.0 row of
   `docs/upgrading.md`.
 
-- **A second lazy import of the same module from one file is now its own baseline entry.**
+- **A second lazy import written the same way, in one file, is now its own baseline entry.**
   A finding's identity is built from `kind::specifier::names`, and `names` is **empty** whenever no name
   crosses the edge — so two `import('../legacy/index.js')` calls in one file produced two findings
   sharing **one** hash, and one accepted entry silently pre-accepted the next one anyone added. Measured
