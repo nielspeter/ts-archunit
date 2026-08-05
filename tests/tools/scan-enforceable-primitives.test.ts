@@ -19,7 +19,7 @@
  *
  *  - The population was pinned by a **count plus a four-element folder set**, so deleting one
  *    `export … from './rules/hygiene.js'` line — four public primitives, `noStubComments` among them —
- *    left all six rows green. The precedent (`scan-cardinality-assertions.test.ts`) pins a 47-element
+ *    left all six rows green. The precedent (`scan-cardinality-assertions.test.ts`) pins a 46-element
  *    **file** set for exactly this reason. Fixed by `CONTRIBUTING_FILES` below.
  *
  *    One correction to that finding, measured while proving the fix: under the manifest rule the same
