@@ -9,7 +9,7 @@ construction it collides in has not changed in this release.
 [0064](./0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md) and
 [0065](./0065-reverse-dependency-findings-carry-no-identity.md) — in the family none of those three
 touched. Blast radius is the baseline identity string on disk, top row of
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6.
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6.
 
 ## What happens
 
@@ -190,7 +190,7 @@ Candidates, none measured:
   literal in one function, which is not legal TypeScript for a plain literal — so it may be total.
 - **An ordinal among same-endpoint functions** (`#errorResponseBuilder#2`), in declaration order. Stable
   under edits elsewhere in the file, unstable under reordering the literals themselves — the shape
-  [bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md) is about. Do not ship this
+  [bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md) is about. Do not ship this
   without reading 0056 first.
 
 Whichever is chosen, it moves identities for the affected findings, so it carries a migration row. Per

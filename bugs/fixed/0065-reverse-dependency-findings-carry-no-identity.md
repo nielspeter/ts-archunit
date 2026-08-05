@@ -4,9 +4,9 @@
 **Found in:** pre-existing. Surfaced while settling whether `require()` identities move in v0.56.0 — they
 do not, and the reason is this defect.
 **Severity:** High. The same class as [bug 0063](./0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)
-and [plan 0088](../plans/0088-a-slice-finding-identifies-itself.md), both of which were fixed for their
+and [plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md), both of which were fixed for their
 own families and neither of which reached this one. Blast radius is the baseline identity string on disk
-— the top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6.
+— the top row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6.
 
 ## What happens
 

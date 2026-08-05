@@ -5,7 +5,7 @@
 branch, and **not** caused by it.
 **Severity:** High. A baseline fail-open on a published surface — one accepted entry silently
 pre-accepts a second, genuinely different dependency edge. Blast radius is the baseline identity string
-adopters store on disk, which is the top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md)
+adopters store on disk, which is the top row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md)
 rule 6. (An earlier draft of this line also argued the trigger was "the common monorepo layout". That is a
 **frequency** argument, and `BUGS.md`'s convention says in terms that severity is not about frequency —
 the blast-radius sentence carries the rating on its own. Removed rather than rephrased.)
@@ -32,7 +32,7 @@ NAMED import, two spellings
                 "…::import::/src/legacy/index.ts::old"]
 ```
 
-This is [bug 0028](./fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md)'s shape.
+This is [bug 0028](./0028-two-findings-in-one-file-can-share-a-baseline-identity.md)'s shape.
 
 **`paths` is not required**, and saying so was too narrow in one direction while being too broad in
 another. Any two spellings resolving to one file will do — a workspace package name beside a relative
