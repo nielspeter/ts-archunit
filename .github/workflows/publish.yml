@@ -102,41 +102,6 @@ jobs:
   # that asks. As a step with `continue-on-error`, the second constraint lost
   # silently: v0.23.0's run printed `Success: false / Status: 405` and the run
   # summary said green, which is the exact false green v0.23.0 exists to remove,
-  # The release path's docs deploy — the other half of bug 0062 gap 4.
-  #
-  # `docs.yml` gates on "is this tree's version on npm", so a release merge (which lands
-  # `docs/**` and a bumped `package.json` together) SKIPS there and lands here instead,
-  # after the artifact exists. Without this job a release would deploy no docs at all,
-  # which is a worse failure than the skew it replaces.
-  #
-  # `needs: publish` is the whole point: docs describing vX cannot go live before npm
-  # serves vX. Measured before this existed — 32m54s of skew on v0.56.0, docs 12 minutes
-  # ahead no matter how promptly the tag was pushed.
-  #
-  # It shares the `pages` concurrency group with `docs.yml` by name, so a docs-only push
-  # racing a release cannot start two `deploy-pages` calls against one environment.
-  deploy-docs:
-    needs: publish
-    runs-on: ubuntu-latest
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    permissions:
-      pages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run docs:build
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: docs/.vitepress/dist
-      - uses: actions/deploy-pages@v5
-
   # in the pipeline that shipped it. Splitting the job satisfies both — `publish`
   # stays green and keeps its release, `docs-index` reds on its own, and the run
   # is red so somebody acts.
