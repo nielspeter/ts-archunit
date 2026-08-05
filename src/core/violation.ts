@@ -269,16 +269,62 @@ export function createViolation(
 }
 
 /**
- * The subject `hashViolation` keys a baseline entry on.
+ * Unicode codepoint order — the only comparator admissible anywhere a baseline identity, an
+ * `element`, or a reported location is derived from a sort.
  *
- * **Duplicated deliberately from `src/helpers/baseline.ts` rather than imported**, because
- * `core/` must not depend on `helpers/`. The two must stay byte-identical: this function
- * decides which findings are *considered* the same, and `hashViolation` decides which ones
- * *are* the same. `tests/core/identity-uniqueness.test.ts` asserts they agree, so a change to
- * either without the other is a red rather than a silent divergence.
+ * `String.prototype.localeCompare` without an explicit locale reads the **host** locale from
+ * `LANG`/`LC_ALL`, so a value sorted with it differs between a developer's machine and CI.
+ * Measured on plain ASCII: `['zebra','aardvark']` sorts to `aardvark,zebra` under `en-US` and
+ * to `zebra,aardvark` under `da-DK`, because Danish collates `aa` as `å`, after `z`. One
+ * finding, two baseline hashes, diverging only in the place hardest to debug.
+ *
+ * The codebase already knew: `module-edges.ts` wrote *"`localeCompare` is ICU/locale sensitive
+ * — exactly the machine-dependent ordering `conditions/slice.ts` goes out of its way to
+ * eliminate, because a value that differs per machine gives one finding two identities"* — 60
+ * lines above a `localeCompare` in the identity discriminator, while `conditions/slice.ts`
+ * eliminated its own machine-dependence *using `localeCompare`*. Four sites in all.
+ *
+ * `tests/tools/scan-locale-ordering.test.ts` is what keeps that from recurring: a runtime row
+ * cannot catch it, because on an `en-US` machine both comparators agree — a guard written for
+ * this defect passed 16/16 with the defect reinstated.
  */
-function subjectOf(violation: ArchViolation): string {
+export function byCodepoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
+ * The subject `hashViolation` keys a baseline entry on: `identity`, or `element::message`.
+ *
+ * **Exported and consumed by `hashViolation`/`hashSubject`** rather than duplicated. An earlier
+ * draft kept a private copy here on the reasoning that `core/` must not depend on `helpers/` —
+ * true, but backwards: `helpers/baseline.ts` already imports from `core/`, which is the
+ * permitted direction, and `core/identity-root.ts` records the same move for the same reason.
+ * A copy plus a test asserting the copies agree is strictly worse than one definition: the
+ * test can only compare the formulas over fixtures it happens to build, and the first draft's
+ * fixture shared every field, so it agreed under any formula.
+ */
+export function subjectOf(violation: ArchViolation): string {
   return violation.identity ?? `${violation.element}::${violation.message}`
+}
+
+/**
+ * The full key `hashViolation` hashes — `rule::subject` — and therefore the unit
+ * {@link disambiguateIdentities} must group on.
+ *
+ * **Grouping on the subject alone was a defect**, measured: `hashViolation` includes `rule`, so
+ * two findings carrying the same `element::message` under *different* rule descriptions already
+ * hash apart and were never ambiguous. Suffixing the second moved a baseline entry that had no
+ * collision — the precise failure this mechanism exists to avoid, committed by the mechanism.
+ *
+ * Not live at the time it was found (instrumenting the whole suite showed one batch carrying
+ * more than one rule string and zero over-suffixed findings), but reachable by construction:
+ * several builders mix `metadata?.id ?? description` with a bare `description` inside one batch
+ * — `slice-rule-builder.ts`, `correspondence-builder.ts`, `tsconfig-builder.ts`,
+ * `inconsistent-siblings.ts`, `schema-rule-builder.ts` all do. Any of them emitting a colliding
+ * subject across their two rule strings would have moved a published entry.
+ */
+function groupKeyOf(violation: ArchViolation): string {
+  return `${violation.rule}::${subjectOf(violation)}`
 }
 
 /**
@@ -307,11 +353,37 @@ function subjectOf(violation: ArchViolation): string {
  * Groups that collide were, by definition, one baseline entry standing for two findings: an
  * entry that was already wrong. Those are the only ones that move.
  *
- * **Ordering.** The suffix follows the order the rule produced its findings — source order for
- * the edge families, file-walk order for the reverse family. Inserting a sibling above the
- * first of a colliding group therefore shifts which finding owns the bare subject. That is the
- * residual of any positional tiebreaker and it is documented on `ModuleEdge.ordinal`; it is not
- * a fail-open, because the group still yields as many distinct identities as it has findings.
+ * **Ordering — a limitation, not a guarantee.** The suffix follows the order the rule produced
+ * its findings, so a baseline entry accepts *a position in a group*, not *a finding*. An earlier
+ * draft of this paragraph said the residual "is not a fail-open, because the group still yields
+ * as many distinct identities as it has findings", and cited `ModuleEdge.ordinal` as its source.
+ * The premise is true and the conclusion does not follow — and that source, which measured the
+ * identical residual one layer down, concludes the opposite. Its table, reproduced because it
+ * applies verbatim here:
+ *
+ * | edit to an accepted colliding group       | new reds reported |
+ * | ----------------------------------------- | ----------------- |
+ * | add a sibling                             | 1 — correct       |
+ * | insert a sibling **above** the first        | 1 — correct count |
+ * | **delete one, add a different one**       | **0 — silent**    |
+ *
+ * So the equal-count swap is a **fail-open**: a violation that did not exist when the baseline
+ * was written arrives pre-accepted. Strictly better than before this mechanism — where *any*
+ * number of added siblings was pre-accepted, not only an equal-count swap — and still a hole.
+ *
+ * The middle row is right about the number and wrong about the name: the finding reported may
+ * be a **sibling nobody touched**, while the newly-added one takes the bare subject and matches
+ * the existing entry. For ADR-008's stated primary consumer — an agent that acts on the message
+ * — pointing at the wrong file is worse than a miss.
+ *
+ * Sharper still where an entry carries state: a `measured` metric entry holds an accepted
+ * ceiling, so a swap can hand the survivor a ceiling belonging to a different element and
+ * silently accept a regression. That is bug 0028's shape recreated inside bug 0012's fix.
+ *
+ * The durable answer is a real per-finding identity — a `binding` field for the edge family,
+ * qualified names for the metric family — tracked in
+ * [plan 0094](../../plans/0094-the-residual-findings-from-the-v0-56-0-review.md). This is the
+ * floor: a collision can no longer be silent *at scale*. It is not the ceiling.
  *
  * **Why here and not per condition.** `applyFilters` is the one path every terminal shares, and
  * its own contract is that identity is complete before any filter reads it. Running before the
@@ -321,8 +393,8 @@ function subjectOf(violation: ArchViolation): string {
 export function disambiguateIdentities(violations: ArchViolation[]): ArchViolation[] {
   const counts = new Map<string, number>()
   for (const violation of violations) {
-    const subject = subjectOf(violation)
-    counts.set(subject, (counts.get(subject) ?? 0) + 1)
+    const key = groupKeyOf(violation)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
   }
   // Nothing collides: return the input untouched rather than rebuilding it, so the
   // overwhelmingly common case costs one pass and no allocation.
@@ -335,28 +407,34 @@ export function disambiguateIdentities(violations: ArchViolation[]): ArchViolati
   }
   if (!anyDuplicate) return violations
 
-  // Every subject present before suffixing, so a generated `#n` can never land on a subject a
-  // producer already emits. Without this, a rule holding both `X` twice and a literal `X#1`
-  // would close one collision by opening another.
+  // Every key present before suffixing, so a generated `#n` can never land on one a producer
+  // already emits. Without it, a rule holding `X` twice plus a literal `X#1` closes one
+  // collision by opening another — and `taken.add` below is what keeps that true for the
+  // THIRD member: without it, `[X, X, X, X#1]` yields `X, X#2, X#2, X#1`, reintroducing the
+  // collision this function exists to remove. Measured; it takes a group of three to reach,
+  // which is why the guard for it carries three.
   const taken = new Set(counts.keys())
   const seen = new Map<string, number>()
 
   return violations.map((violation) => {
-    const subject = subjectOf(violation)
-    if ((counts.get(subject) ?? 0) < 2) return violation
+    const key = groupKeyOf(violation)
+    if ((counts.get(key) ?? 0) < 2) return violation
 
-    const occurrence = (seen.get(subject) ?? 0) + 1
-    seen.set(subject, occurrence)
+    const occurrence = (seen.get(key) ?? 0) + 1
+    seen.set(key, occurrence)
     // The first keeps its subject verbatim — this is what makes the migration empty.
     if (occurrence === 1) return violation
 
+    // The suffix goes on the SUBJECT, because that is what `identity` is; the reservation is
+    // checked on the group key, because that is what collides.
+    const subject = subjectOf(violation)
     let suffix = occurrence - 1
     let candidate = `${subject}#${String(suffix)}`
-    while (taken.has(candidate)) {
+    while (taken.has(`${violation.rule}::${candidate}`)) {
       suffix += 1
       candidate = `${subject}#${String(suffix)}`
     }
-    taken.add(candidate)
+    taken.add(`${violation.rule}::${candidate}`)
     return { ...violation, identity: candidate }
   })
 }

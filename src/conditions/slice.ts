@@ -7,6 +7,7 @@ import type { SliceDependencySite } from '../helpers/slice-graph.js'
 import { edgeDiscriminator, edgeVerb } from '../core/module-edges.js'
 import { sliceGraph, buildFileToSliceMap } from '../helpers/slice-graph.js'
 import { tarjanSCC, type AdjacencyList } from '../helpers/tarjan.js'
+import { byCodepoint } from '../core/violation.js'
 
 /**
  * Assert that no circular dependencies exist between slices.
@@ -125,9 +126,7 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
         // `.excluding()` matches element/file/message, so sorting the ELEMENT is what fixes
         // that — `canonicalizeCycle`'s rotation could not, because both spellings were
         // already rotated to start at `a`.
-        const members = [...new Set(scc.map((i) => sliceNames[i] ?? ''))].sort((a, b) =>
-          a.localeCompare(b),
-        )
+        const members = [...new Set(scc.map((i) => sliceNames[i] ?? ''))].sort(byCodepoint)
 
         // **Locate the finding on an edge that EXISTS** — bug 0055. This used to ask for
         // details on `members[0] -> members[1]`, the first two members of a SET, which need
@@ -142,7 +141,7 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
         // exists because machine-dependent output gives one finding two identities.
         const realEdge = edges
           .filter((e) => inCycle.has(e.from) && inCycle.has(e.to))
-          .sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))[0]
+          .sort((a, b) => byCodepoint(a.from, b.from) || byCodepoint(a.to, b.to))[0]
         const details =
           realEdge === undefined
             ? []
@@ -154,7 +153,7 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
         // Same reason, one level down: `details` follows the slice's file order.
         const site = [...details].sort(
           (a, b) =>
-            a.sourceFile.getFilePath().localeCompare(b.sourceFile.getFilePath()) ||
+            byCodepoint(a.sourceFile.getFilePath(), b.sourceFile.getFilePath()) ||
             a.importLine - b.importLine,
         )[0]
 

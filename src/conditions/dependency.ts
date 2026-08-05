@@ -22,6 +22,7 @@ export type { ImportOptions } from '../core/import-options.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { splitGlobArgs } from '../core/import-options.js'
 import { rootOf } from '../core/project-relative.js'
+import { byCodepoint } from '../core/violation.js'
 
 /**
  * Which edge kinds a forward dependency condition reports on.
@@ -437,7 +438,7 @@ export function dependOn(...args: [string[], ImportOptions] | string[]): Conditi
             // The globs are part of it because this finding is about a REQUIREMENT not met,
             // not about an edge: the same file failing two different `dependOn` rules is two
             // findings, and `rule` alone would not separate them if one rule carried both.
-            identity: `${sf.getFilePath()}::depends-on::${[...globs].sort((a, b) => a.localeCompare(b)).join(',')}`,
+            identity: `${sf.getFilePath()}::depends-on::${[...globs].sort(byCodepoint).join(',')}`,
             message: `${sf.getBaseName()} does not import from any path matching [${globs.join(', ')}]`,
             because: context.because,
           })

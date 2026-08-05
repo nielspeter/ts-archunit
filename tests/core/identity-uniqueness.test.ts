@@ -78,22 +78,61 @@ describe('the mechanism: only a collision is touched', () => {
   })
 
   it('a generated suffix never lands on a subject a producer already emits', () => {
-    // Without the reserved-set check this closes one collision by opening another: the
-    // second `X` would become `X#1`, colliding with the literal `X#1` below.
+    // THREE members of the colliding group, not two, and that is the whole point of the row.
+    //
+    // With two, the reservation is never exercised: only ONE candidate is generated, so
+    // deleting `taken.add(...)` changes nothing and the mutation survives the entire suite.
+    // Measured on `[X, X, X, X#1]` — with the reservation `X, X#2, X#3, X#1` (4 distinct);
+    // without it `X, X#2, X#2, X#1`, which reintroduces the collision this function exists to
+    // remove. The guard for a defect has to reach the second iteration of the loop that
+    // causes it.
     const out = disambiguateIdentities([
       violation('a.ts', 'm', 'X'),
       violation('b.ts', 'm', 'X'),
-      violation('c.ts', 'm', 'X#1'),
+      violation('c.ts', 'm', 'X'),
+      violation('d.ts', 'm', 'X#1'),
     ])
-    expect(hashes(out)).toBe(3)
-    expect(out[1]?.identity).toBe('X#2')
+    expect(out.map((v) => v.identity)).toEqual(['X', 'X#2', 'X#3', 'X#1'])
+    expect(hashes(out)).toBe(4)
   })
 
-  it('the subject formula agrees with hashViolation — the duplication is deliberate', () => {
-    // `disambiguateIdentities` recomputes `identity ?? element::message` rather than importing
-    // it, because `core/` must not depend on `helpers/`. If the two ever diverge, the mechanism
-    // would consider two findings distinct that the baseline considers the same, and the
-    // fail-open reopens silently. This row is what makes that a red.
+  it('two findings under DIFFERENT rules are not a collision, and neither moves', () => {
+    // `hashViolation` is `rule::subject`, so these already hash apart and were never ambiguous.
+    // The first draft grouped on the subject alone and suffixed the second anyway — moving a
+    // baseline entry that had no collision, which is precisely the failure this mechanism
+    // exists to prevent, committed by the mechanism.
+    //
+    // Reachable by construction: several builders mix `metadata?.id ?? description` with a
+    // bare `description` inside one batch. Asserted with two rule strings because a fixture
+    // sharing `rule` agrees under either grouping and proves nothing.
+    const a: ArchViolation = { ...violation('x.ts', 'same'), rule: 'rule one' }
+    const b: ArchViolation = { ...violation('x.ts', 'same'), rule: 'rule two' }
+    expect(hashViolation(a)).not.toBe(hashViolation(b)) // distinct BEFORE the mechanism runs
+
+    const out = disambiguateIdentities([a, b])
+    expect(out.map((v) => v.identity)).toEqual([undefined, undefined])
+  })
+
+  it('and a collision WITHIN one rule still separates when another rule shares the subject', () => {
+    // The pair under `rule one` collides and must separate; the lone `rule two` finding shares
+    // their subject but not their rule, so it must be left alone. This is the row that fails if
+    // the group key drops `rule` in either direction.
+    const out = disambiguateIdentities([
+      { ...violation('x.ts', 'same'), rule: 'rule one' },
+      { ...violation('x.ts', 'same'), rule: 'rule one' },
+      { ...violation('x.ts', 'same'), rule: 'rule two' },
+    ])
+    expect(out.map((v) => v.identity)).toEqual([undefined, 'x.ts::same#1', undefined])
+    expect(hashes(out)).toBe(3)
+  })
+
+  it('the mechanism and the hash read the same subject — one definition, not two', () => {
+    // `hashViolation` now CALLS `subjectOf` rather than spelling the formula out again. The
+    // first draft kept a private copy in `core/` on the reasoning that `core/` must not depend
+    // on `helpers/` — true, but the dependency runs the other way, and `helpers/baseline.ts`
+    // already imported from `core/`. A copy plus a test that the copies agree was strictly
+    // worse: the test could only compare them over a fixture it built, and that fixture shared
+    // every field, so it agreed under any formula at all.
     const a = violation('same.ts', 'msg')
     const b = violation('same.ts', 'msg')
     expect(hashViolation(a)).toBe(hashViolation(b))

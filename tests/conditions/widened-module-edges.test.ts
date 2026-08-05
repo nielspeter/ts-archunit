@@ -681,9 +681,17 @@ describe('onlyHaveTypeImportsFrom names each kind too', () => {
     // The two imports are now distinct: `names` is the inward name so an alias does not
     // separate them, but `disambiguateIdentities` suffixes the second occurrence of a
     // duplicated subject, which does (bug 0064). This row asserted the collision until
-    // that landed. The re-export stays distinct via its verb — reverting
-    // `edgeValuePhrase('reexport')` to the import phrase still collapses it into the
-    // same duplicate group, which the second assertion catches.
+    // that landed.
+    //
+    // An earlier version of this comment claimed the second assertion catches a revert of
+    // `edgeValuePhrase('reexport')` to the import phrase. **Measured: it does not.** The
+    // re-export is distinct because `edge.kind` is a component of the identity, never because
+    // of the verb — the verb is not in the hash at all. And once all three share a subject the
+    // mechanism hands them `bare`, `#1`, `#2`, so the assertion is satisfied by disambiguation
+    // rather than by anything this row is about. The revert still reds the file, via
+    // `item 19b`. Recorded rather than deleted because the claim was restated with fresh
+    // authority in the commit that rewrote this comment, in a project whose own rule is to run
+    // the sabotage before asserting its result.
     expect(identityOf(4)).not.toBe(identityOf(11))
     expect(identityOf(5)).not.toBe(identityOf(4))
   })
