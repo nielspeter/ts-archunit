@@ -31,4 +31,4 @@ jobs:
       # pathspec list has no `*.sh`, ESLint ignores them, and `typecheck` cannot see
       # them. One of them holds a secret in the release path. shellcheck is
       # preinstalled on ubuntu-latest.
-      - run: shellcheck -x .github/scripts/*.sh scripts/*.sh
+      - run: shellcheck -x .github/scripts/*.sh scripts/*.sh .claude/hooks/*.sh

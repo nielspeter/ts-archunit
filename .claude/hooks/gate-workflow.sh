@@ -35,9 +35,20 @@ payload=$(cat)
 
 # Fast path first: this hook runs on EVERY Bash call, and spawning python3 to parse a payload that
 # cannot possibly be a release or a PR is a tax on every command in the session. If none of the four
-# verbs appear anywhere in the raw payload, there is nothing to gate. Correctness is unaffected — the
-# precise, quote-stripping parser below still decides whether a match is an invocation or a mention.
-if ! printf '%s' "$payload" | grep -Eq 'git tag|git push|npm publish|gh pr create'; then
+# verbs appear anywhere in the raw payload, there is nothing to gate. The precise, quote-stripping
+# parser below still decides whether a match is an invocation or a mention.
+#
+# The whitespace class is load-bearing and was not there at first: the fast path used literal single
+# spaces while the parser uses `\s+`, so `git  tag v1.0.1` with two spaces — or a tab — skipped the
+# gate entirely while the parser would have classified it correctly. A pre-filter that is STRICTER than
+# what it fronts is not a pre-filter, it is a hole. Measured by review, three ways.
+# `_S` is "one or more spaces, AS THE RAW PAYLOAD SPELLS THEM". The payload is JSON, so a tab between
+# the verb and its object arrives as the two characters \t, not as a tab — and a fast path matching
+# only real whitespace let `npm<TAB>publish` through while the parser, which reads the DECODED command,
+# classified it correctly. Found by the row added for the previous version of this same mistake.
+_S='([[:space:]]|\\[tnr])+'
+if ! printf '%s' "$payload" |
+  grep -Eq "git${_S}tag|git${_S}push|npm${_S}publish|gh${_S}pr${_S}create"; then
   exit 0
 fi
 
@@ -52,7 +63,8 @@ if [ $? -ne 0 ]; then
   # It cannot fail closed for everything — that would block every Bash call on such a machine — so it
   # degrades to a coarse match over the RAW payload: over-broad (a commit message mentioning the words
   # trips it) but loud, rare, and in the safe direction.
-  if printf '%s' "$payload" | grep -Eq 'git tag v[0-9]|git push[^"]*--tags|npm publish|gh pr create'; then
+  if printf '%s' "$payload" |
+    grep -Eq "git${_S}tag${_S}[^\"]*v[0-9]|git${_S}push[^\"]*--tags|npm${_S}publish|gh${_S}pr${_S}create"; then
     echo "GATE UNAVAILABLE — python3 is missing, so this hook cannot parse the command." >&2
     echo "Blocking anything that looks like a PR or a release. Install python3, or act yourself." >&2
     exit 2
@@ -74,12 +86,15 @@ action=$(
 import re, sys
 
 text = sys.stdin.read()
-text = re.sub(r"\x27[^\x27]*\x27", " ", text)
+# Double-quoted spans FIRST. The other order lets two apostrophes in ordinary English erase the text
+# between them: `git commit -m "don\x27t" && gh pr create --title "won\x27t"` had its whole middle
+# swallowed and exited 0. Measured by review.
 text = re.sub(r"\"(?:[^\"\\\\]|\\\\.)*\"", " ", text)
+text = re.sub(r"\x27[^\x27]*\x27", " ", text)
 head = r"(?:^|[\n;&|(]|&&|\|\|)\s*"
 if re.search(head + r"gh\s+pr\s+create\b", text):
     print("pr")
-elif re.search(head + r"git\s+tag\s+v[0-9]", text) or re.search(
+elif re.search(head + r"git\s+tag\s+(?:-\S+\s+|--\S+\s+)*v[0-9]", text) or re.search(
     head + r"git\s+push\b[^\n;&|]*(?:--tags|\sv[0-9])", text
 ) or re.search(head + r"npm\s+publish\b", text):
     print("release")
@@ -102,16 +117,34 @@ cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 #                           green: without this the workflow is unsatisfiable, and the first thing a
 #                           blocked author would do is delete the hook.
 #
-# The third is scoped by CONTENT, not by message: a commit touching anything outside `reviews/` is not
-# exempt, so "docs: review record" cannot be used as a label to smuggle code past the gate.
+# **Both content exemptions are scoped by CONTENT, not by message.** That was true of the `reviews/`
+# one and false of the release one, which trusted the subject line alone — so a commit titled
+# `chore: release v1.0.1 and rewrite the auth layer` carrying `src/evil.ts` passed both gates. Measured
+# by review, on the one commit subject this repo writes at every single release. A message is a claim;
+# the file list is a fact.
 unreviewed_in() {
   local range="$1" record="$2" out=""
+  # A range git cannot walk must not come back as "all reviewed" — that is forall-over-the-empty-set
+  # inside the enforcement mechanism itself, which is the failure this whole repository is named after.
+  if ! git rev-list --quiet "$range" -- >/dev/null 2>&1; then
+    printf '  (this range could not be enumerated: %s)\n' "$range"
+    return
+  fi
   while read -r sha subject; do
     [ -n "$sha" ] || continue
+    local touched
+    touched=$(git show --name-only --format='' "$sha" | grep -v '^$')
+    # A release commit is exempt only if it looks like one: version and release-note bookkeeping.
     case "$subject" in
-      'chore: release'*) continue ;;
+      'chore: release'*)
+        if [ -z "$(printf '%s\n' "$touched" |
+          grep -Ev '^(package(-lock)?\.json|CHANGELOG\.md|docs/upgrading\.md|plans/|reviews/)')" ]; then
+          continue
+        fi
+        ;;
     esac
-    if [ -z "$(git show --name-only --format='' "$sha" | grep -v '^reviews/' | grep -v '^$')" ]; then
+    # The record commit cannot name its own sha, so a commit touching only `reviews/` is exempt.
+    if [ -z "$(printf '%s\n' "$touched" | grep -v '^reviews/')" ]; then
       continue
     fi
     if [ -n "$record" ]; then
@@ -150,6 +183,10 @@ REMEDY, in order:
   3. Write ${record}: the verdict per finding, and every sha above listed so this gate can see it.
   4. Then open the PR.
 
+If the branch was REBASED, amended or reworded after its review, every sha changed and the record is
+stale rather than absent. The remedy is to update the sha list — but re-read the range first if the
+rebase moved code, because rebased code is not the code that was reviewed.
+
 See reviews/README.md for the format.
 EOF
     exit 2
@@ -158,13 +195,24 @@ EOF
 fi
 
 # ── The release gates ─────────────────────────────────────────────────────────────────────────────
-version=$(node -p "require('./package.json').version" 2>/dev/null) || exit 0
-[ -n "$version" ] || exit 0
+# python3, not node: the argument at the top of this file is that a gate must not evaporate when a
+# tool is missing, and this line used `node` — so with node absent both release gates exited 0. Same
+# hole, one tool over. python3 is already required to have got this far.
+version=$(python3 -c 'import json;print(json.load(open("package.json"))["version"])' 2>/dev/null)
+if [ -z "$version" ]; then
+  echo "RELEASE BLOCKED — package.json has no readable version, so the baseline cannot be found." >&2
+  exit 2
+fi
 
 # The tag being created may already exist locally (a `git push origin vX` after `git tag vX`), so the
 # baseline is the newest tag that is NOT the one under release. Without this the diff below compares
 # HEAD to itself and Gate 1 blocks every push.
-prev=$(git tag --sort=-creatordate | grep -v "^v${version}\$" | head -1)
+# The tag under release is the one NAMED IN THE COMMAND when there is one, falling back to
+# package.json. Keying off package.json alone was measured wrong: tagging v1.0.2 while package.json
+# still said 1.0.1 resolved the baseline to v1.0.0 and passed on changes already shipped in v1.0.1.
+tagged=$(printf '%s' "$command" | grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+under_release="${tagged:-v$version}"
+prev=$(git tag --sort=-creatordate | grep -v "^${under_release}\$" | head -1)
 # First release ever: nothing to compare against, and nothing to review against either.
 [ -n "$prev" ] || exit 0
 

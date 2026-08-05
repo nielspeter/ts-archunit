@@ -11,10 +11,10 @@ The workflow these belong to is: **a bug or a plan → a branch → code → rev
 
 `.claude/hooks/gate-workflow.sh` reads these at the two events that are hard to undo:
 
-| Event                                              | What must be true                                                            |
-| -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `gh pr create`                                     | `reviews/<branch>.md` names every commit on the branch, by short sha           |
-| `git tag v*` · `git push … v*` · `npm publish`     | the packed artifact changed since the last tag, **and** every commit in the range appears in some record here |
+| Event                                          | What must be true                                                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `gh pr create`                                 | `reviews/<branch>.md` names every commit on the branch, by short sha                                          |
+| `git tag v*` · `git push … v*` · `npm publish` | the packed artifact changed since the last tag, **and** every commit in the range appears in some record here |
 
 That is the whole mechanism: the record has to account for each commit, so an unreviewed change means
 writing down shas nobody read rather than forgetting a step.
@@ -53,11 +53,11 @@ the sha list; a reader needs the verdicts. Both, briefly:
 
 **Findings**
 
-| #   | Reviewer  | Finding                                        | Verdict                          |
-| --- | --------- | ---------------------------------------------- | -------------------------------- |
-| 1   | testing   | the vacuity floor passes on an empty walk      | Fixed in `def5678`               |
-| 2   | architect | `PairCondition` excluded for no stated reason  | Rejected — it is stated, at L47  |
-| 3   | testing   | no guard on the identity of the population     | Filed as plan 0094               |
+| #   | Reviewer  | Finding                                       | Verdict                         |
+| --- | --------- | --------------------------------------------- | ------------------------------- |
+| 1   | testing   | the vacuity floor passes on an empty walk     | Fixed in `def5678`              |
+| 2   | architect | `PairCondition` excluded for no stated reason | Rejected — it is stated, at L47 |
+| 3   | testing   | no guard on the identity of the population    | Filed as plan 0094              |
 ```
 
 Three rules about the verdict column, all learned the hard way:

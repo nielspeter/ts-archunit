@@ -35,7 +35,7 @@ jobs:
       # Bug 0062: this was in ci.yml and NOT here, so CI's verdict on the release scripts
       # was concurrent with the publish run and gated nothing. One of them holds a secret
       # in the release path.
-      - run: shellcheck -x .github/scripts/*.sh scripts/*.sh
+      - run: shellcheck -x .github/scripts/*.sh scripts/*.sh .claude/hooks/*.sh
       - run: npm run test
       - run: npm run build
       # Plan 0083 Phase 3: resolve every `exports` subpath by PACKAGE NAME and assert each
