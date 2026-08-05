@@ -1,9 +1,9 @@
 # Bug 0065: reverse-dependency findings carry no identity, so two collide on a shared basename
 
-**Reported:** 2026-08-05 · **Fixed:** not yet
+**Reported:** 2026-08-05 · **Fixed:** 2026-08-05, shipped in v0.57.0
 **Found in:** pre-existing. Surfaced while settling whether `require()` identities move in v0.56.0 — they
 do not, and the reason is this defect.
-**Severity:** High. The same class as [bug 0063](./fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)
+**Severity:** High. The same class as [bug 0063](./0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)
 and [plan 0088](../plans/0088-a-slice-finding-identifies-itself.md), both of which were fixed for their
 own families and neither of which reached this one. Blast radius is the baseline identity string on disk
 — the top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6.
@@ -160,3 +160,31 @@ the number of releases, it is the number of unambiguous instructions.
 Ship 0064 first (its instruction shape is identical to v0.56.0's, which is now published and live), then
 this one alone, rescoped to the whole identity-less class and carrying a single regenerate-after
 migration.
+
+---
+
+## Fix as shipped — v0.57.0
+
+Closed by the same mechanism as [0064](./0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)
+— `disambiguateIdentities`, which needs no `identity` from the producer at all, because it falls back to
+the same `element::message` the baseline already hashes. **So this report's central claim was wrong twice
+over:** the migration is not merely avoidable, it never arises, and the scheme this report prescribed
+(importer path + edge kind + resolved target) was not needed.
+
+The **message** was fixed in the same release, and that is the part this report got right and understated.
+`onlyBeImportedVia` built `element`, `file`, `line` and message all from the _target's_ basename, so two
+colliding findings printed byte-identically — and `format-github` emitted two identical `::error` lines,
+which GitHub renders as **one annotation**, so the newly-surfaced sibling was invisible in a PR. It names
+the importer by path now. `element` stays a basename deliberately: `.excluding()` matches on it.
+
+Measured on this project's own source, `beImported()`: **138 findings across 123 baseline entries — 15
+absorbed.** On a 2,173-file external monorepo, the same rule: **710 across 526 — 184 absorbed, 26%.**
+Collisions concentrate where the subject is a basename, so `noDeadModules()` on a monorepo full of
+`index.ts`/`types.ts` is the worst case, not this repo.
+
+`haveNoUnusedExports` and `beImported`/`noDeadModules` are covered by the same mechanism; no per-condition
+work was required for any of them, which is the argument for fixing the mechanism rather than the family.
+
+### Residual
+
+Identical to 0064's: positional tiebreaker, equal-count swap still pre-accepts. Tracked in plan 0094.

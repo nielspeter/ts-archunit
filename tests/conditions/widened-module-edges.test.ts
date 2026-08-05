@@ -358,7 +358,7 @@ describe('item 12 — each kind names itself, so no finding is absorbed', () => 
     // `ModuleEdge` does not carry.
     //
     // It does not need the local binding. `disambiguateIdentities` closes it without one
-    // ([bug 0064](../../bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)):
+    // ([bug 0064](../../bugs/fixed/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)):
     // the second finding of any duplicated subject gains a `#n` suffix, so the pair
     // separates by position rather than by a field nobody had. The guard fired on the
     // change it was written to notice, which is why it is updated here rather than

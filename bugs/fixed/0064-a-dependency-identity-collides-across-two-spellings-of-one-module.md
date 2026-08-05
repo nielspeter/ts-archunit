@@ -1,6 +1,6 @@
 # Bug 0064: a dependency identity collides across two spellings of one module
 
-**Reported:** 2026-08-05 · **Fixed:** not yet
+**Reported:** 2026-08-05 · **Fixed:** 2026-08-05, shipped in v0.57.0
 **Found in:** pre-existing, long before v0.56.0. Surfaced by the five-persona review of the bug-0059
 branch, and **not** caused by it.
 **Severity:** High. A baseline fail-open on a published surface — one accepted entry silently
@@ -182,3 +182,47 @@ already walks the real corpus but asserts edges, lines and candidates — never 
    in-memory project, so the fixture is cheap), and
 2. **two edges of one kind to one module carrying _different_ names** — the row that fails under the
    refuted candidate and passes under the correct fix. Its absence is why the file was blind.
+
+---
+
+## Fix as shipped — v0.57.0
+
+**Not the remedy this report proposed.** Both candidates here operate on `edgeDiscriminator`, and the
+first was refuted by measurement (129 of 975 identities moved to close 3). What shipped is one layer up
+and covers every family at once: `disambiguateIdentities` in `src/core/violation.ts`, called from
+`applyFilters`, suffixes `#n` onto the 2nd..nth finding of a rule whose **subject** (`identity ??
+element::message`, keyed with `rule`) is already duplicated.
+
+The property that makes it safe is a theorem rather than a replay: **a finding whose subject is unique is
+returned as the same object.** Only a demonstrated collision is touched, and the first member of a group
+keeps its subject verbatim — so the entry an adopter already accepted still matches and only the hidden
+sibling reports as new.
+
+Measured, `notImportFrom` with `paths: { '@app/*': ['src/*'] }`, one file reaching one module by an alias
+and by a relative path:
+
+```
+dynamic       2 findings / 2 hashes   …::dynamic::/src/legacy/index.ts::  and  …::#1
+named import  2 findings / 2 hashes
+default       2 findings / 2 hashes
+```
+
+`dependOn` was **refuted from the scope** before the fix: it emits one violation per file and cannot
+collide, so a guard written against it would have been vacuous.
+
+### Sabotage
+
+| mutation                                       | verdict                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------- |
+| `disambiguateIdentities` → `return violations` | **CAUGHT** — 10 of 11 rows in `identity-uniqueness`, 2 files overall |
+| group key drops `rule`                         | **CAUGHT** — 3 rows                                                  |
+| `taken.add(candidate)` removed                 | **CAUGHT** — 1 row (needs a group of three to reach)                 |
+| producer identity collapsed to a constant      | **CAUGHT** by `baseline-portability` via `identityCollisions()`      |
+
+### Residual, deliberately not closed here
+
+The tiebreaker is **positional**, so a baseline entry accepts a position in a group rather than a specific
+finding. Insertion is safe; the **equal-count swap** — delete one member, add a different one — arrives
+pre-accepted. Strictly better than before (where _any_ number of added siblings was pre-accepted) and still
+a hole. The durable fix is a real per-finding identity, tracked in
+[plan 0094](../../plans/0094-the-residual-findings-from-the-v0-56-0-review.md).

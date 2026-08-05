@@ -337,8 +337,8 @@ function groupKeyOf(violation: ArchViolation): string {
  * three families broke it independently —
  * [bug 0063](../../bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)
  * (dependency), [plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md) (slice), and
- * then [0064](../../bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)
- * and [0065](../../bugs/0065-reverse-dependency-findings-carry-no-identity.md). Each was fixed
+ * then [0064](../../bugs/fixed/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)
+ * and [0065](../../bugs/fixed/0065-reverse-dependency-findings-carry-no-identity.md). Each was fixed
  * per-family, in the family that happened to be reviewed; this is the mechanism, so the next
  * producer cannot reintroduce it.
  *

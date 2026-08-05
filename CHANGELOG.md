@@ -14,8 +14,8 @@ two different baseline hashes on two different machines.
 ### Fixed
 
 - **Two distinct findings could share one baseline entry, so accepting one silently accepted the
-  other** ([bug 0064](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md),
-  [bug 0065](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0065-reverse-dependency-findings-carry-no-identity.md)).
+  other** ([bug 0064](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md),
+  [bug 0065](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0065-reverse-dependency-findings-carry-no-identity.md)).
   `ArchViolation.identity`'s own docstring has always required uniqueness per finding within a
   rule. It was prose with nothing behind it, and four bugs were filed against it — 0028, 0063,
   plan 0088, and now these — each fixed only in whichever family happened to be reviewed.
@@ -29,6 +29,14 @@ two different baseline hashes on two different machines.
   same rule gave **710 findings across 526 entries — 184 absorbed, 26%**. Collisions concentrate
   where the subject is a basename, so a monorepo with twenty `vitest.config.ts` files is hit far
   harder than this repo.
+
+- **Two same-named functions in one file shared a duplicate-pair baseline entry**
+  ([bug 0067](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0067-a-duplicate-pair-identity-collides-on-two-same-named-functions-in-one-file.md)).
+  `smells.duplicateBodies()` builds its identity from `getName()`, so three `errorResponseBuilder` arrows
+  in one file produced three findings and one entry. **No change to the detector was needed** — it
+  inherits the fix above through `SmellBuilder`, which is the argument for fixing the mechanism rather
+  than the family. This reaches adopters who never wrote a module rule, because `agentGuardrails` and
+  `strictBoundaries` both construct `duplicateBodies`.
 
 - **A baseline identity could depend on the machine that computed it.** Four sorts feeding
   identities, elements and reported locations used `localeCompare`, which reads the host locale.
