@@ -267,3 +267,96 @@ export function createViolation(
     codeFrame: generateCodeFrame(sourceText, line),
   }
 }
+
+/**
+ * The subject `hashViolation` keys a baseline entry on.
+ *
+ * **Duplicated deliberately from `src/helpers/baseline.ts` rather than imported**, because
+ * `core/` must not depend on `helpers/`. The two must stay byte-identical: this function
+ * decides which findings are *considered* the same, and `hashViolation` decides which ones
+ * *are* the same. `tests/core/identity-uniqueness.test.ts` asserts they agree, so a change to
+ * either without the other is a red rather than a silent divergence.
+ */
+function subjectOf(violation: ArchViolation): string {
+  return violation.identity ?? `${violation.element}::${violation.message}`
+}
+
+/**
+ * Give every finding in a rule a distinct identity, by suffixing only the ones that collide.
+ *
+ * {@link ArchViolation.identity} states the invariant this enforces: *"it must be unique per
+ * finding within a rule: two distinct violations sharing one identity are one violation to the
+ * baseline, and accepting either accepts both."* That was prose with nothing behind it, and
+ * three families broke it independently —
+ * [bug 0063](../../bugs/fixed/0063-a-dependency-identity-collides-across-files-sharing-a-basename.md)
+ * (dependency), [plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md) (slice), and
+ * then [0064](../../bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)
+ * and [0065](../../bugs/0065-reverse-dependency-findings-carry-no-identity.md). Each was fixed
+ * per-family, in the family that happened to be reviewed; this is the mechanism, so the next
+ * producer cannot reintroduce it.
+ *
+ * **A finding whose subject is unique is returned untouched — that is a theorem, not a
+ * measurement.** Only a subject that appears more than once is altered, and only from its
+ * second occurrence onward, so:
+ *
+ * - no existing baseline entry moves, because a *unique* entry is what a correct baseline holds;
+ * - the entry a colliding pair *did* record still matches, because the first occurrence keeps
+ *   its subject verbatim — so the fail-open closes by making the hidden sibling report as new,
+ *   which is the finding an adopter never got to see.
+ *
+ * Groups that collide were, by definition, one baseline entry standing for two findings: an
+ * entry that was already wrong. Those are the only ones that move.
+ *
+ * **Ordering.** The suffix follows the order the rule produced its findings — source order for
+ * the edge families, file-walk order for the reverse family. Inserting a sibling above the
+ * first of a colliding group therefore shifts which finding owns the bare subject. That is the
+ * residual of any positional tiebreaker and it is documented on `ModuleEdge.ordinal`; it is not
+ * a fail-open, because the group still yields as many distinct identities as it has findings.
+ *
+ * **Why here and not per condition.** `applyFilters` is the one path every terminal shares, and
+ * its own contract is that identity is complete before any filter reads it. Running before the
+ * filters also makes identity a property of *what the rule found* rather than of what a
+ * `--changed` or `.excluding()` run happened to keep — the same identity in CI and locally.
+ */
+export function disambiguateIdentities(violations: ArchViolation[]): ArchViolation[] {
+  const counts = new Map<string, number>()
+  for (const violation of violations) {
+    const subject = subjectOf(violation)
+    counts.set(subject, (counts.get(subject) ?? 0) + 1)
+  }
+  // Nothing collides: return the input untouched rather than rebuilding it, so the
+  // overwhelmingly common case costs one pass and no allocation.
+  let anyDuplicate = false
+  for (const count of counts.values()) {
+    if (count > 1) {
+      anyDuplicate = true
+      break
+    }
+  }
+  if (!anyDuplicate) return violations
+
+  // Every subject present before suffixing, so a generated `#n` can never land on a subject a
+  // producer already emits. Without this, a rule holding both `X` twice and a literal `X#1`
+  // would close one collision by opening another.
+  const taken = new Set(counts.keys())
+  const seen = new Map<string, number>()
+
+  return violations.map((violation) => {
+    const subject = subjectOf(violation)
+    if ((counts.get(subject) ?? 0) < 2) return violation
+
+    const occurrence = (seen.get(subject) ?? 0) + 1
+    seen.set(subject, occurrence)
+    // The first keeps its subject verbatim — this is what makes the migration empty.
+    if (occurrence === 1) return violation
+
+    let suffix = occurrence - 1
+    let candidate = `${subject}#${String(suffix)}`
+    while (taken.has(candidate)) {
+      suffix += 1
+      candidate = `${subject}#${String(suffix)}`
+    }
+    taken.add(candidate)
+    return { ...violation, identity: candidate }
+  })
+}

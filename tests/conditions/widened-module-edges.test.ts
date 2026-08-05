@@ -347,17 +347,25 @@ describe('item 12 — each kind names itself, so no finding is absorbed', () => 
       const v = found.find((x) => x.line === line)
       return v === undefined ? undefined : hashViolation(v, fixtureRoot)
     }
-    // TWO identities, and this is the honest number.
+    // THREE identities — and this row used to assert two.
     //
-    // The re-export at line 5 is distinct from both imports — that is §4's verb, and
-    // it is the collision bug 0028 mattered most for. The two IMPORTS at lines 4 and
-    // 11 still share one, because `names` is the INWARD name for an import and
-    // `import { SECRET }` / `import { SECRET as Hidden }` both carry `['SECRET']`.
-    // Separating those needs the local binding, which `ModuleEdge` does not carry.
+    // The re-export at line 5 was always distinct from both imports (that is §4's verb,
+    // the collision bug 0028 mattered most for). The two IMPORTS at lines 4 and 11 used
+    // to share one, because `names` is the INWARD name and `import { SECRET }` /
+    // `import { SECRET as Hidden }` both carry `['SECRET']`. This row asserted that
+    // residual deliberately — *"asserted rather than glossed, so the residual cannot be
+    // mistaken for a fix"* — and said separating them needed the local binding, which
+    // `ModuleEdge` does not carry.
     //
-    // Asserted rather than glossed, so the residual cannot be mistaken for a fix.
-    expect(new Set(found.map((v) => hashViolation(v, fixtureRoot))).size).toBe(2)
-    expect(identityOf(4)).toBe(identityOf(11))
+    // It does not need the local binding. `disambiguateIdentities` closes it without one
+    // ([bug 0064](../../bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md)):
+    // the second finding of any duplicated subject gains a `#n` suffix, so the pair
+    // separates by position rather than by a field nobody had. The guard fired on the
+    // change it was written to notice, which is why it is updated here rather than
+    // deleted — and line 4 keeps its identity verbatim, so nothing an adopter accepted
+    // moved.
+    expect(new Set(found.map((v) => hashViolation(v, fixtureRoot))).size).toBe(3)
+    expect(identityOf(4)).not.toBe(identityOf(11))
     expect(identityOf(5)).not.toBe(identityOf(4))
   })
 
@@ -670,11 +678,13 @@ describe('onlyHaveTypeImportsFrom names each kind too', () => {
       const v = found.find((x) => x.line === line)
       return v === undefined ? undefined : hashViolation(v, fixtureRoot)
     }
-    // The two imports still share an identity (`names` is the inward name, so an
-    // alias does not separate them); the re-export is distinct via its verb.
-    // Reverting `edgeValuePhrase('reexport')` to the import phrase collapses the
-    // second assertion.
-    expect(identityOf(4)).toBe(identityOf(11))
+    // The two imports are now distinct: `names` is the inward name so an alias does not
+    // separate them, but `disambiguateIdentities` suffixes the second occurrence of a
+    // duplicated subject, which does (bug 0064). This row asserted the collision until
+    // that landed. The re-export stays distinct via its verb — reverting
+    // `edgeValuePhrase('reexport')` to the import phrase still collapses it into the
+    // same duplicate group, which the second assertion catches.
+    expect(identityOf(4)).not.toBe(identityOf(11))
     expect(identityOf(5)).not.toBe(identityOf(4))
   })
 
