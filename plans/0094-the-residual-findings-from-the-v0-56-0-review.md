@@ -3,14 +3,15 @@
 **Status:** Open, not started. Filed 2026-08-05. These are the items from the five-persona review of the
 bug-0059 branch that were **triaged and deliberately not done** in v0.56.0, recorded so the deferral is a
 decision rather than an omission.
-**Priority:** Medium. Two are live fail-opens in guards (§1, §2); one is a pre-existing defect that needs
-its own bug number (§3); the rest are accuracy and reachability.
+**Priority:** Medium. Two are live fail-opens in guards (§1, §2); the two pre-existing defects that needed
+bug numbers are filed as 0064 and 0065 and §3 is now a pointer; the rest are accuracy and reachability.
 **Effort:** Small to medium. Eight independent items, none coupled to the others except §1 and §2, which
 touch the same file.
-**Blast radius:** Mixed, and each item states its own row. §3 is **the baseline identity string an adopter
-stores on disk** — the top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6, and the
-reason it is a bug and not a line here. Everything else is **an internal check over a corpus we control**
-(our own suite and docs): prove each detector fires once and stop. Do not build machinery for these.
+**Blast radius:** **An internal check over a corpus we control** — our own suite and docs. Per
+[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 that is the bottom row: prove each detector
+fires once and stop, and do not build machinery for these. The two items that carried the **top** row —
+the baseline identity string an adopter stores on disk — are the reason they left this plan and became
+bugs 0064 and 0065; nothing with that radius remains here.
 
 ## Why this is a plan and not eight more bugs
 
@@ -28,9 +29,9 @@ list moves every multi-name entry in an adopter's baseline, and an import-sortin
 exactly that. Both mutations left the full suite green before the row existed.
 
 What remains is a different class: guards that work but whose evidence is weaker than it could be,
-documentation that is accurate about the wrong scope, and one pre-existing defect that this release
-surfaced without causing. Filing each as a bug would overstate them; leaving them in five reviewers'
-messages would lose them.
+and documentation that is accurate about the wrong scope. Filing each as a bug would overstate them;
+leaving them in five reviewers' messages would lose them. The two items that _did_ warrant bug numbers
+are gone from here, which is the test working in both directions.
 
 **The pattern worth naming.** Bug 0059 was fixed, reviewed, and the fix introduced a second identity
 collision justified by a false claim and guarded by a test that exercised only the passing case. That is
@@ -71,44 +72,26 @@ plan-0085 rows, which is why the gap survived — it is specifically per-kind.
 **Fix.** Four rows: `{dynamic, type-expression}` × `{ignoreTypeImports: true, false}`, asserting the
 behaviour that is already correct today.
 
-## 3. The resolved-path collision — file it as its own bug
+## 3. The two identity defects — both filed, both discharged from this plan
 
-**This is the one item that must leave this plan and become a numbered bug.** It is pre-existing, it moves
-nothing in v0.56.0, and it is not caused by the ordinal.
+~~The resolved-path collision must leave this plan and become its own bug.~~ **Done.** It is
+[bug 0064](../bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md). While
+filing it a second, wider one was found and is
+[bug 0065](../bugs/0065-reverse-dependency-findings-carry-no-identity.md) — the reverse conditions set no
+`identity` at all.
 
-`edgeViolation`'s identity keys on the **resolved** path (`src/conditions/dependency.ts`), while every
-discriminator within it derives from the **specifier**. Two spellings that resolve to one file — a `paths`
-alias and a relative path, the common monorepo layout — therefore collapse to one identity. Measured:
-`notImportFrom` gives 2 findings and 1 hash.
+Both reports previously appeared here in full. **The duplicates are deleted rather than kept in sync**: two
+copies of the same three "got wrong once" claims will drift, and the copy an implementer working through
+`/plans` hits first was this one. The bugs are now the single source, and they carry material this plan
+never had — the refutation of 0064's first remedy by measurement, the measured constructions that replace
+it, `dependOn` dropped from scope, and the zero-migration path that falsifies 0065's original
+"the fix is not free" claim.
 
-Three things that must be in the bug report, because each was got wrong once already during review:
-
-- It is **not** a regression in v0.56.0, and **not** fixed by keying the ordinal counter on the resolved
-  path. It reproduces with plain named imports under the _pre-ordinal_ discriminator, where no ordinal is
-  consulted at all. Filing it against this release sends the next reader to the wrong commit.
-- It is **module-family only**. The slice family's `siteIdentity` keys on the raw specifier and reports 2
-  hashes. So the two families agree on _what counts as an edge_ and disagree on _what counts as the same
-  finding_ — the slice family is accidentally correct here, and a future "make them consistent" change
-  could propagate the defect rather than fix it.
-- `onlyImportFrom` and `dependOn` were **not measured**. Both read the same constant and `onlyImportFrom`
-  routes through the same `edgeViolation`, so the collision is expected there — expected, not measured.
-
-### 3b. The reverse family sets no `identity` at all — a second bug number, beside §3
-
-Found while settling whether `require` identities move (they do not — see below). `onlyBeImportedVia`
-(`src/conditions/reverse-dependency.ts:147-154`) and `beImported` (`:193-200`) push violations with **no
-`identity` field**, so `hashViolation` falls back to `rule::element::message` and `element` is a basename.
-Measured: two importers sharing a basename (`/src/feature/consumer.d.ts`, `/src/other/consumer.d.ts`) give
-**2 findings / 1 hash**. That is bug 0063's shape, live in the family plan 0088 never reached — and unlike
-§3 it is not a discriminator problem but the total absence of one.
-
-**Settled, and it needs no row: `require` identities cannot move.** `edgesOf` does compute an ordinal for
-`require`, and `edgeDiscriminator` would return `''`/`#1` for it, but nothing identity-bearing ever asks:
-no forward condition counts `require`, and the reverse conditions that do count it set no `identity`.
-Structurally unreachable rather than accidentally so — `addToGraph` (`:34-41`) dedupes on
-`(importer, target)`, so the reverse family sees one edge per importer however many spellings the file
-uses. `tests/conditions/identity-does-not-move.test.ts` is therefore correct to be silent about `require`,
-and that silence should not be read as a gap by whoever reviews it next.
+One thing settled here is worth keeping visible because it will be re-asked: **`require` identities cannot
+move**, so `tests/conditions/identity-does-not-move.test.ts` is correct to be silent about them. The full
+argument is in 0065; the short form is that no forward condition counts `require` and the reverse
+conditions that do count it set no identity, with `addToGraph`'s `(importer, target)` dedupe as the
+forward-looking third reason it will stay unreachable after 0065 ships.
 
 ## 4. Four statements contradicted by the code shipping beside them
 
