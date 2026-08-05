@@ -1,22 +1,46 @@
 # Slices & Layers
 
 ::: tip What counts as a dependency here
-`beFreeOfCycles()`, `notDependOn()` and `respectLayerOrder()` build their graph from the
-**eager static** dependencies of each file — `import` declarations _and_ re-exports.
-Since v0.48.0 that includes `export { x } from './b.js'` and `export * from './b.js'`,
-which emit an import of the module and so are real runtime dependencies. Before v0.48.0
-re-exports were invisible here, which meant a **barrel cycle** — `a → barrel → a`, the
-commonest cycle there is — could not be detected.
+**It depends on the question the condition asks**, and since v0.56.0 the two questions get
+two answers.
 
-Two kinds are deliberately **not** counted:
+`beFreeOfCycles()` asks an **initialization** question — what gets evaluated when the
+program starts — so it counts the **eager static** edges only: `import` declarations and
+re-exports. Since v0.48.0 that includes `export { x } from './b.js'` and
+`export * from './b.js'`, which emit an import of the module; before then a **barrel
+cycle** (`a → barrel → a`, the commonest cycle there is) could not be detected. Two kinds
+are deliberately excluded:
 
-- **Dynamic `import('./b.js')`** — it is lazy, so it cannot deadlock module
-  initialization, and it is usually the _deliberate_ fix for a cycle. Reporting it would
-  fail a rule for applying its own remedy.
-- **`require()`** — CommonJS, and this is an ESM-only package.
+- **Dynamic `import('./b.js')`** — lazy, so it cannot deadlock module initialization, and
+  it is usually the _deliberate_ fix for a cycle. Reporting it would fail a rule for
+  applying its own remedy.
+- **`type X = import('./b.js').Y`** — erased entirely, so no module is requested.
 
-Type-only forms are erased at compile time and handled by `ignoreTypeImports`; the
-default differs per condition, and the reason is under `beFreeOfCycles()` below.
+`notDependOn()` and `respectLayerOrder()` ask a **coupling** question — what does this
+slice reach for — so they count everything `notImportFrom()` and `dependOn()` count,
+including dynamic and type-expression imports. A lazy import of a forbidden slice is still
+a forbidden dependency: it is coupling, and it breaks when that slice is deleted.
+
+Until v0.56.0 both questions shared the cycle answer, so
+`slices(p).should().notDependOn('legacy')` reported **nothing** for
+`() => import('../legacy/index.js')` while `notImportFrom` reported it on the same file in
+the same run. That was [bug 0059](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md).
+
+**`require()` is counted by no _forward_ condition** — not by the slice conditions, and not
+by `notImportFrom()`, `onlyImportFrom()` or `dependOn()`. CommonJS, and this is an ESM-only
+package (ADR-004). **This is not limited to JavaScript files:** a `require()` in a `.js` file
+under `allowJs` crosses a forbidden boundary unreported, and so does the TypeScript form
+`import legacy = require('./legacy.js')` in a plain `.ts` file, with no flag involved. CJS
+edges land in interop and generated `.d.ts` where the remedy is usually "nothing you can do",
+so this trades a known false negative for a mislabelled true positive. That is a stated limit,
+not an oversight.
+
+The **reverse** conditions are the exception, deliberately: `beImported()` and
+`onlyBeImportedVia()` do count `require()`, because excluding it would report a module that
+CJS code requires as an orphan.
+
+Type-only forms are erased at compile time and handled by `ignoreTypeImports`; the default
+differs per condition, and the reason is under `beFreeOfCycles()` below.
 :::
 
 ::: tip Rule file or test file?

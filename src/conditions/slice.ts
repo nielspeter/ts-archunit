@@ -4,12 +4,8 @@ import type { Slice } from '../models/slice.js'
 import type { ImportOptions } from '../core/import-options.js'
 import { splitGlobArgs } from '../core/import-options.js'
 import type { SliceDependencySite } from '../helpers/slice-graph.js'
-import { edgeVerb } from '../core/module-edges.js'
-import {
-  buildSliceDependencyGraph,
-  buildFileToSliceMap,
-  findSliceDependencyDetails,
-} from '../helpers/slice-graph.js'
+import { edgeDiscriminator, edgeVerb } from '../core/module-edges.js'
+import { sliceGraph, buildFileToSliceMap } from '../helpers/slice-graph.js'
 import { tarjanSCC, type AdjacencyList } from '../helpers/tarjan.js'
 
 /**
@@ -97,7 +93,8 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
       // what matters is whether the target is EVALUATED, not whether the bindings are
       // type-level. Under `verbatimModuleSyntax`, `import { type X } from 's'` emits
       // `import {} from 's'` and can close a cycle (plan 0087).
-      const edges = buildSliceDependencyGraph(slices, fileToSlice, resolved, 'module-request')
+      const graph = sliceGraph(slices, fileToSlice, resolved, 'module-request')
+      const edges = graph.edges
 
       // Map slice names to indices for Tarjan's
       const sliceNames = slices.map((s) => s.name)
@@ -149,14 +146,11 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
         const details =
           realEdge === undefined
             ? []
-            : findSliceDependencyDetails(
-                slices,
-                realEdge.from,
-                realEdge.to,
-                fileToSlice,
-                resolved,
-                'module-request',
-              )
+            : // Through the graph, so the question and the options cannot diverge from the
+              // ones it was built with. Passing 'type-bindings' here used to be writable,
+              // and it turned this finding into "dynamically imports ... at line 1" —
+              // pointing the reader at the construct that FIXES cycles.
+              graph.detailsFor(realEdge.from, realEdge.to)
         // Same reason, one level down: `details` follows the slice's file order.
         const site = [...details].sort(
           (a, b) =>
@@ -229,12 +223,34 @@ function siteIdentity(from: string, to: string, site: SliceDependencySite): stri
     site.sourceFile.getFilePath(),
     site.edge.kind,
     site.edge.specifier,
-    [...site.edge.names].sort((a, b) => a.localeCompare(b)).join(','),
+    // Names when the edge carries them, the source-order ordinal when it does not — see
+    // `edgeDiscriminator`.
+    //
+    // This comment used to say the gap was unreachable here, on the reasoning that before
+    // bug 0059 the family only saw `import` and `reexport`, "both of which carry names".
+    // That was false: it is the SPELLING that carries names, not the kind. Measured on
+    // `main` through `notDependOn`, two default imports of one module from one file gave
+    // two findings and ONE identity, as did two bare side-effect imports. The collision
+    // was live in this family, not merely reachable — which is why the fix is in
+    // `edgeDiscriminator` where both families read it, rather than in either caller.
+    edgeDiscriminator(site.edge),
   ].join('::')
 }
 
 /**
  * Assert that slices respect a layered dependency order.
+ *
+ * **Which edges count:** every kind `notImportFrom()` and `onlyImportFrom()` count — plain
+ * imports, re-exports, `import('…')` and `type X = import('…').Y` — because this is a
+ * **coupling** question and a lazy import of a forbidden slice is still a forbidden
+ * dependency. `require()` is not counted (ESM-only package, ADR-004). Contrast
+ * `beFreeOfCycles`, which counts only the eager kinds because a cycle is a deadlock in
+ * initialization order.
+ *
+ * Stated here rather than only in `docs/slices.md` because this docstring is what an IDE
+ * and an agent read. The same omission stood from v0.48.0 to v0.49.1 and nothing pinned
+ * prose against behaviour then either
+ * ([bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)).
  *
  * Given layers ['presentation', 'application', 'persistence', 'domain'],
  * layer N may depend on layers N+1, N+2, ... but NOT on layers N-1, N-2, ...
@@ -265,7 +281,8 @@ export function respectLayerOrder(...args: [string[], ImportOptions] | string[])
       // 'type-bindings': layering and isolation are about COUPLING, so
       // `ignoreTypeImports` here means what it means on `dependOn`/`notImportFrom` —
       // ignore type-level references. Deliberately NOT the cycle question (plan 0087).
-      const edges = buildSliceDependencyGraph(slices, fileToSlice, resolved, 'type-bindings')
+      const graph = sliceGraph(slices, fileToSlice, resolved, 'type-bindings')
+      const edges = graph.edges
 
       // Map layer names to their position (lower index = higher layer)
       const layerIndex = new Map(layers.map((name, i) => [name, i]))
@@ -281,14 +298,7 @@ export function respectLayerOrder(...args: [string[], ImportOptions] | string[])
 
         // Violation: depending on a higher layer (lower index)
         if (toIdx < fromIdx) {
-          const details = findSliceDependencyDetails(
-            slices,
-            edge.from,
-            edge.to,
-            fileToSlice,
-            resolved,
-            'type-bindings',
-          )
+          const details = graph.detailsFor(edge.from, edge.to)
           for (const detail of details) {
             violations.push({
               rule: context.rule,
@@ -310,6 +320,15 @@ export function respectLayerOrder(...args: [string[], ImportOptions] | string[])
 
 /**
  * Assert that no slice depends on any of the listed slices.
+ *
+ * **Which edges count:** every kind `notImportFrom()` and `onlyImportFrom()` count — plain
+ * imports, re-exports, `import('…')` and `type X = import('…').Y` — because this is a
+ * **coupling** question: a lazy import of a forbidden slice is still a forbidden dependency.
+ * `require()` is not counted (ESM-only, ADR-004). Contrast `beFreeOfCycles`, which counts
+ * only the eager kinds because a cycle is a deadlock in initialization order. Dynamic and
+ * type-expression edges were invisible here until
+ * [bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md);
+ * this note exists because that docstring said nothing either way.
  *
  * Use for explicit isolation rules, e.g., "no slice may depend on legacy".
  *
@@ -335,20 +354,14 @@ export function notDependOn(...args: [string[], ImportOptions] | string[]): Cond
       // 'type-bindings': layering and isolation are about COUPLING, so
       // `ignoreTypeImports` here means what it means on `dependOn`/`notImportFrom` —
       // ignore type-level references. Deliberately NOT the cycle question (plan 0087).
-      const edges = buildSliceDependencyGraph(slices, fileToSlice, resolved, 'type-bindings')
+      const graph = sliceGraph(slices, fileToSlice, resolved, 'type-bindings')
+      const edges = graph.edges
 
       const violations: ArchViolation[] = []
 
       for (const edge of edges) {
         if (forbiddenSet.has(edge.to)) {
-          const details = findSliceDependencyDetails(
-            slices,
-            edge.from,
-            edge.to,
-            fileToSlice,
-            resolved,
-            'type-bindings',
-          )
+          const details = graph.detailsFor(edge.from, edge.to)
           for (const detail of details) {
             violations.push({
               rule: context.rule,

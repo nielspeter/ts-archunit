@@ -7,6 +7,7 @@ import { recordEdgeCoverage } from '../core/edge-coverage.js'
 import { globAnyOf } from '../core/glob-site.js'
 import {
   edgeTypeOnlyRemedy,
+  edgeDiscriminator,
   edgeValuePhrase,
   edgeTypeOnlyNoun,
   edgeStream,
@@ -143,7 +144,16 @@ function edgeViolation(
       // is a baseline identity — feeding it anything new would rewrite every
       // existing dependency entry for no gain.
       edgeCandidates(edge, sourceFile)[0],
-      [...edge.names].sort((a, b) => a.localeCompare(b)).join(','),
+      // See `edgeDiscriminator`. This family HAS reported `dynamic` and
+      // `type-expression` all along, so the collision was live here — and it was live in
+      // the slice family too, for the `import`/`reexport` spellings that carry no names.
+      //
+      // **Nothing moves.** The first edge of each `kind::specifier` group emits `''`,
+      // which is byte-for-byte what the pre-ordinal formula produced; only the second and
+      // later siblings gain `#n`, and those groups had one hash for two findings before.
+      // Measured against `main` across all seven `import`/`reexport` spellings plus
+      // `dynamic` and `type-expression`: zero diff.
+      edgeDiscriminator(edge),
     ].join('::'),
   }
 }

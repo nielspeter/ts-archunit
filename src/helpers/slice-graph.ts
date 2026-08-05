@@ -2,7 +2,7 @@ import type { SourceFile } from 'ts-morph'
 import type { Slice } from '../models/slice.js'
 import type { ImportOptions } from '../core/import-options.js'
 import type { ModuleEdge, ModuleEdgeKind } from '../core/module-edges.js'
-import { edgesOf } from '../core/module-edges.js'
+import { edgesOf, FORWARD_EDGE_KINDS } from '../core/module-edges.js'
 
 /**
  * An edge in the slice dependency graph.
@@ -28,11 +28,11 @@ export function buildFileToSliceMap(slices: Slice[]): Map<string, string> {
 }
 
 /**
- * The edge kinds a slice graph counts: the **eager static** ones.
+ * The edge kinds a **cycle** question counts: the eager static ones.
  *
- * A slice graph answers "what does this slice depend on when the program starts",
- * which is what makes a cycle a cycle. Of `module-edges.ts`' five kinds, two qualify —
- * and each exclusion is a decision with a reason, not an omission:
+ * A cycle question asks "what does this slice depend on when the program starts", which
+ * is what makes a cycle a cycle. Of `module-edges.ts`' five kinds, two qualify — and
+ * each exclusion is a decision with a reason, not an omission:
  *
  * - `import` and `reexport` — **counted.** Both are eager: `export { x } from './b.js'`
  *   emits an import of `./b.js`, so that module is evaluated whether or not anything
@@ -49,6 +49,13 @@ export function buildFileToSliceMap(slices: Slice[]): Map<string, string> {
  *   `typeOnly`. `type X = import('./b.js').Y` is erased, so it must stay out even
  *   under `ignoreTypeImports: false` — filtering it on the flag alone would make that
  *   option add a class of edge this graph has never had.
+ *
+ * **This set is the cycle question's answer and nothing else's.** It governed all three
+ * slice conditions until [bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
+ * which is how the cycle rationale came to justify a false negative on two conditions
+ * that are not about cycles: `slices(p).should().notDependOn('legacy')` reported **0**
+ * while `modules(p).should().notImportFromCondition('**\/legacy/**')` reported **1**, on
+ * the same file, the same edge and the same run. See `kindsFor` below.
  */
 const EAGER_STATIC_KINDS: ReadonlySet<ModuleEdgeKind> = new Set<ModuleEdgeKind>([
   'import',
@@ -113,11 +120,47 @@ function sliceEdgesOf(
   question: ErasureQuestion,
 ): readonly ModuleEdge[] {
   const ignoreErased = options?.ignoreTypeImports === true
-  const erased = (edge: ModuleEdge): boolean =>
-    question === 'module-request' ? edge.erasesModuleRequest : edge.typeOnly
-  return edgesOf(file).filter(
-    (edge) => EAGER_STATIC_KINDS.has(edge.kind) && !(ignoreErased && erased(edge)),
-  )
+  const { counts, erased } = QUESTIONS[question]
+  return edgesOf(file).filter((edge) => counts(edge.kind) && !(ignoreErased && erased(edge)))
+}
+
+/**
+ * Which edge kinds the question counts — the fix for
+ * [bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md).
+ *
+ * The erasure predicate was already a function of the question
+ * ([plan 0087](../../plans/completed/0087-an-inline-type-import-still-requests-the-module.md));
+ * the KIND set was not, so one answer — the cycle one — was serving both questions.
+ *
+ * - `'module-request'` → the eager static kinds above. A cycle is a deadlock in
+ *   initialization order, and `import('./b.js')` is lazy: it cannot deadlock, and it is
+ *   most often the deliberate *fix* for a cycle. Reporting it would fail the rule for
+ *   applying its own remedy.
+ * - `'type-bindings'` → whatever `FORWARD_EDGE_KINDS` says, which is the constant
+ *   `notImportFrom` and `dependOn` already read. A lazy import of `legacy` is still a
+ *   forbidden dependency: it is coupling, it breaks when `legacy` is deleted, and nobody
+ *   is applying a remedy by writing it.
+ *
+ * **Reusing `FORWARD_EDGE_KINDS` rather than writing a second list is the point.** It is
+ * what makes the two families agree *by construction* instead of by two lists someone
+ * must keep in step — which is exactly how
+ * [bug 0022](../../bugs/fixed/0022-forward-import-conditions-are-blind-to-reexports-and-dynamic-imports.md)
+ * happened one layer down, and how this bug re-opened it one layer up. That constant is
+ * a total `Record<ModuleEdgeKind, boolean>`, so a sixth edge kind is a compile error
+ * there rather than a silent omission here.
+ */
+const QUESTIONS: Record<
+  ErasureQuestion,
+  { counts: (kind: ModuleEdgeKind) => boolean; erased: (edge: ModuleEdge) => boolean }
+> = {
+  'module-request': {
+    counts: (kind) => EAGER_STATIC_KINDS.has(kind),
+    erased: (edge) => edge.erasesModuleRequest,
+  },
+  'type-bindings': {
+    counts: (kind) => FORWARD_EDGE_KINDS[kind],
+    erased: (edge) => edge.typeOnly,
+  },
 }
 
 /**
@@ -160,6 +203,49 @@ function collectEdgesFromFile(
  * @param options - `ignoreTypeImports` drops edges that are erased at compile time
  * @returns Unique directed edges between slices
  */
+/**
+ * A built graph, and the only way to ask it for the sites behind one of its edges.
+ *
+ * `question` and `options` must be the same for the graph and for the details walk, and
+ * for a while they were four literals across two call sites kept in step by convention.
+ * The failure is silent and specific: the conditions emit **one violation per detail**, so
+ * a graph that counts an edge the details walk cannot see reports nothing at all, and a
+ * details walk that counts more reports the wrong site.
+ *
+ * A review measured the live half of that. Passing `'type-bindings'` to `beFreeOfCycles`'s
+ * details call — the one mutation of eight that stayed **green** — turned the cycle finding
+ * into *"feature dynamically imports legacy at index.ts:1"*, pointing the reader at the one
+ * construct that BREAKS cycles and telling them to remove it. ADR-008 rule 2, from a
+ * mismatch no test could see.
+ *
+ * So the pairing is no longer expressible: `detailsFor` reads what the graph was built
+ * with. This also retires the older `options`-mismatch hazard the docstrings managed with
+ * prose.
+ */
+export interface SliceGraph {
+  readonly edges: SliceEdge[]
+  detailsFor(fromSliceName: string, toSliceName: string): SliceDependencySite[]
+}
+
+/**
+ * Build the graph, and bind the details walk to the same question and options.
+ *
+ * Prefer this over the two loose functions; they remain exported because
+ * `tests/` and the reverse-graph work call them directly with an explicit question.
+ */
+export function sliceGraph(
+  slices: Slice[],
+  fileToSlice: Map<string, string> | undefined,
+  options: ImportOptions | undefined,
+  question: ErasureQuestion,
+): SliceGraph {
+  const map = fileToSlice ?? buildFileToSliceMap(slices)
+  return {
+    edges: buildSliceDependencyGraph(slices, map, options, question),
+    detailsFor: (from, to) => findSliceDependencyDetails(slices, from, to, map, options, question),
+  }
+}
+
 export function buildSliceDependencyGraph(
   slices: Slice[],
   fileToSlice: Map<string, string> | undefined,

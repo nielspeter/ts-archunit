@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.56.0] - 2026-08-05
+
+### Fixed
+
+- **`notDependOn()` and `respectLayerOrder()` now count dynamic and type-expression imports**
+  ([bug 0059](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)).
+  `slices(p).should().notDependOn('legacy')` reported **nothing** for
+  `() => import('../legacy/index.js')` while `notImportFrom` reported it — the same file, the same edge,
+  the same run.
+
+  The slice graph shared one edge-kind set across all three slice conditions, justified with a cycle
+  argument. Cycles and coupling are different questions: a lazy import cannot deadlock initialization, so
+  a cycle question is right to ignore it, but a lazy import of a forbidden slice is still a forbidden
+  dependency. The kind set now follows the question, and the coupling side reads the same
+  `FORWARD_EDGE_KINDS` constant `notImportFrom` and `dependOn` read, so the two families agree by
+  construction rather than by two lists.
+
+  **`beFreeOfCycles()` is unchanged.** A dynamic-only cycle is still not reported, which is deliberate —
+  `import()` is often the deliberate fix for a cycle, and reporting it would fail a rule for applying its
+  own remedy.
+
+### Changed
+
+- **New findings on unchanged code, if you use `notDependOn()` or `respectLayerOrder()`.** Any dynamic
+  import or `type X = import('…').Y` crossing a forbidden boundary is now reported. These are true
+  findings that were previously invisible — but they are new output, and a baselined suite will report
+  them as new. See `docs/upgrading.md`.
+
+  Existing findings do **not** move — see the entry below, which states the guarantee precisely and
+  names what it was measured against. A new dynamic finding arrives as its own entry rather than as an
+  alteration of an existing `imports` entry for the same module, because `kind` is part of a slice
+  finding's `identity`. The per-kind verb in the message (`dynamically imports`, `references the type
+from`) makes the output readable, but it is **not** what the baseline hashes: a finding that sets
+  `identity` is hashed on that field alone, and which producers set it is listed in the 0.46.0 row of
+  `docs/upgrading.md`.
+
+- **A second lazy import of the same module from one file is now its own baseline entry.**
+  A finding's identity is built from `kind::specifier::names`, and `names` is **empty** whenever no name
+  crosses the edge — so two `import('../legacy/index.js')` calls in one file produced two findings
+  sharing **one** hash, and one accepted entry silently pre-accepted the next one anyone added. Measured
+  2 findings / 1 hash, against 2/2 for two named imports.
+
+  This was never limited to `dynamic`/`require`/`type-expression`. `names` is empty for four ordinary
+  spellings too — `import D from`, `import * as NS from`, a bare `import './x.js'`, and `export * from`
+  (the barrel) — and the same 2/1 collision was live there, in **both** families. (`export * as NS from`
+  is not among them: it carries one statically-known name.)
+
+  `ModuleEdge` now carries an `ordinal` — the nth edge of that kind to that specifier, in source order.
+  A source-order ordinal rather than a line number, because `identity` exists to survive edits elsewhere
+  in the file.
+
+  **No migration. No baseline entry moves.** The first edge of each group emits the same empty
+  discriminator the previous formula produced, so every single-occurrence finding keeps a byte-identical
+  identity; only the _second and later_ sibling gains a `#n` suffix, and those groups are exactly the
+  ones that had two findings and one hash before — a baseline entry that was already wrong. Verified two
+  ways. First, identity strings: nine forms replayed against v0.55.3 and diffed — the seven
+  `import`/`reexport` spellings plus `dynamic` and `type-expression`, enumerated in
+  `tests/conditions/identity-does-not-move.test.ts` so the list is checkable rather than asserted — with
+  zero difference. Second, and the one that matters: **baselines written by v0.55.3's own `baseline`
+  command, replayed through this version's filter, report 0 new findings on all nine** — and exactly 1 on
+  a file holding a colliding pair, which is the hidden sibling this release exists to surface.
+
+  **What you see:** the second and later siblings arrive as **new findings**, in the slice conditions and
+  in `notImportFrom()`/`onlyImportFrom()`/`dependOn()` alike. They are not new violations — each was
+  always there, hidden behind the first one's baseline entry. Triage them as you would any other new red;
+  there is nothing to regenerate.
+
+- **`require()` is counted by no _forward_ condition, and the limit is now stated** in `docs/slices.md`.
+  This is an ESM-only package (ADR-004), so a `require()` crossing a forbidden boundary goes unreported
+  by the slice conditions and by `notImportFrom`/`onlyImportFrom`/`dependOn` — **both** the JavaScript
+  form under `allowJs` and the TypeScript form `import legacy = require('./legacy.js')`, which needs no
+  flag and is unreported in a plain `.ts` file. The
+  **reverse** conditions `beImported()` and `onlyBeImportedVia()` do count it, deliberately: excluding it
+  would report a module that CJS code requires as an orphan.
+
 ## [0.55.3] - 2026-08-04
 
 Plan 0083's Phase 0. No shipped behaviour changed — the addition is a derivation over this repository's own
@@ -561,7 +636,7 @@ Eight bugs and four plans filed, none of them deferred silently. The behavioural
   package's `verbatimModuleSyntax` to every package, wrong in both directions, decided by a path sort.
 - [0060](bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — v0.47.0 moved every
   baselined stub finding's hash, and the diagnostic blames the repository root.
-- [0059](bugs/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
+- [0059](bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md),
   [0057](bugs/fixed/0057-an-empty-options-object-reverts-a-documented-default.md),
   [0061](bugs/fixed/0061-an-all-caps-stub-marker-no-longer-matches.md),
   [0062](bugs/0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md).
