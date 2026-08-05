@@ -36,9 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Existing findings do **not** move — see the entry below, which states the guarantee precisely and
   names what it was measured against. A new dynamic finding arrives as its own entry rather than as an
   alteration of an existing `imports` entry for the same module, because `kind` is part of a slice
-  finding's `identity`. (The per-kind verb in the message — `dynamically imports`, `references the type
-from` — makes the output readable, but the message is _not_ what the baseline hashes when a finding
-  sets `identity`, and an earlier draft of this entry said otherwise.)
+  finding's `identity`. The per-kind verb in the message (`dynamically imports`, `references the type
+from`) makes the output readable, but it is **not** what the baseline hashes: a finding that sets
+  `identity` is hashed on that field alone, and which producers set it is listed in the 0.46.0 row of
+  `docs/upgrading.md`.
 
 - **A second lazy import of the same module from one file is now its own baseline entry.**
   A finding's identity is built from `kind::specifier::names`, and `names` is **empty** whenever no name
@@ -58,14 +59,24 @@ from` — makes the output readable, but the message is _not_ what the baseline 
   **No migration. No baseline entry moves.** The first edge of each group emits the same empty
   discriminator the previous formula produced, so every single-occurrence finding keeps a byte-identical
   identity; only the _second and later_ sibling gains a `#n` suffix, and those groups are exactly the
-  ones that had two findings and one hash before — a baseline entry that was already wrong. Verified by
-  replaying all seven `import`/`reexport` spellings plus `dynamic` and `type-expression` against v0.55.3
-  and diffing the identity strings: zero difference. `tests/conditions/identity-does-not-move.test.ts`
-  pins that comparison, and reverting the fix fails 9 of its 14 rows.
+  ones that had two findings and one hash before — a baseline entry that was already wrong. Verified two
+  ways. First, identity strings: nine forms replayed against v0.55.3 and diffed — the seven
+  `import`/`reexport` spellings plus `dynamic` and `type-expression`, enumerated in
+  `tests/conditions/identity-does-not-move.test.ts` so the list is checkable rather than asserted — with
+  zero difference. Second, and the one that matters: **baselines written by v0.55.3's own `baseline`
+  command, replayed through this version's filter, report 0 new findings on all nine** — and exactly 1 on
+  a file holding a colliding pair, which is the hidden sibling this release exists to surface.
+
+  **What you see:** the second and later siblings arrive as **new findings**, in the slice conditions and
+  in `notImportFrom()`/`onlyImportFrom()`/`dependOn()` alike. They are not new violations — each was
+  always there, hidden behind the first one's baseline entry. Triage them as you would any other new red;
+  there is nothing to regenerate.
 
 - **`require()` is counted by no _forward_ condition, and the limit is now stated** in `docs/slices.md`.
-  This is an ESM-only package (ADR-004), so under `allowJs` a `require()` crossing a forbidden boundary
-  goes unreported by the slice conditions and by `notImportFrom`/`onlyImportFrom`/`dependOn`. The
+  This is an ESM-only package (ADR-004), so a `require()` crossing a forbidden boundary goes unreported
+  by the slice conditions and by `notImportFrom`/`onlyImportFrom`/`dependOn` — **both** the JavaScript
+  form under `allowJs` and the TypeScript form `import legacy = require('./legacy.js')`, which needs no
+  flag and is unreported in a plain `.ts` file. The
   **reverse** conditions `beImported()` and `onlyBeImportedVia()` do count it, deliberately: excluding it
   would report a module that CJS code requires as an orphan.
 

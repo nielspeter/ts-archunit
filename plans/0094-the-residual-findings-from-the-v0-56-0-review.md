@@ -18,7 +18,14 @@ v0.56.0 fixed the two findings that were _reachable from an adopter's baseline_:
 names-less `import`/`reexport` spellings moved while three shipped sentences promised they did not, and
 the guard for that promise asserted only the one spelling where it held. Both are closed, with
 `tests/conditions/identity-does-not-move.test.ts` as the enumerated guard — reverting the fix fails 9 of
-its 14 rows.
+its rows, and under that revert it is the **only** file in a 232-file suite that fails. (Of the rows that
+survive the revert, three are the forms that genuinely do not move and the rest are structural rows that
+would survive any discriminator change — an earlier version of this paragraph called all of them forms.)
+
+The follow-up round added the row that pins the **sort and the join separator**, which were the last two
+characters of that function guarded by nothing: without the sort, a cosmetic reorder of a named import
+list moves every multi-name entry in an adopter's baseline, and an import-sorting lint autofix does
+exactly that. Both mutations left the full suite green before the row existed.
 
 What remains is a different class: guards that work but whose evidence is weaker than it could be,
 documentation that is accurate about the wrong scope, and one pre-existing defect that this release
@@ -86,6 +93,23 @@ Three things that must be in the bug report, because each was got wrong once alr
 - `onlyImportFrom` and `dependOn` were **not measured**. Both read the same constant and `onlyImportFrom`
   routes through the same `edgeViolation`, so the collision is expected there — expected, not measured.
 
+### 3b. The reverse family sets no `identity` at all — a second bug number, beside §3
+
+Found while settling whether `require` identities move (they do not — see below). `onlyBeImportedVia`
+(`src/conditions/reverse-dependency.ts:147-154`) and `beImported` (`:193-200`) push violations with **no
+`identity` field**, so `hashViolation` falls back to `rule::element::message` and `element` is a basename.
+Measured: two importers sharing a basename (`/src/feature/consumer.d.ts`, `/src/other/consumer.d.ts`) give
+**2 findings / 1 hash**. That is bug 0063's shape, live in the family plan 0088 never reached — and unlike
+§3 it is not a discriminator problem but the total absence of one.
+
+**Settled, and it needs no row: `require` identities cannot move.** `edgesOf` does compute an ordinal for
+`require`, and `edgeDiscriminator` would return `''`/`#1` for it, but nothing identity-bearing ever asks:
+no forward condition counts `require`, and the reverse conditions that do count it set no `identity`.
+Structurally unreachable rather than accidentally so — `addToGraph` (`:34-41`) dedupes on
+`(importer, target)`, so the reverse family sees one edge per importer however many spellings the file
+uses. `tests/conditions/identity-does-not-move.test.ts` is therefore correct to be silent about `require`,
+and that silence should not be read as a gap by whoever reviews it next.
+
 ## 4. Four statements contradicted by the code shipping beside them
 
 Three were fixed in v0.56.0 (the identity promise, in the CHANGELOG, `docs/upgrading.md` and two source
@@ -117,12 +141,16 @@ The behavioural row is **free** — measured passing today: `allowJs`, a `.js` f
 `notImportFrom` report nothing. The counterpart claim (reverse conditions _do_ count `require`) is already
 properly guarded.
 
-Separately, `docs/slices.md` **mis-scopes the limit**: it says "under `allowJs`, a `require()` in a
-JavaScript file", which reads as "not me" to a pure-TypeScript adopter. The TypeScript form
-`import legacy = require('./legacy.js')` is equally unreported, in a `.ts` file, with `allowJs` off —
-`kindOf` classifies `ExternalModuleReference` as `require`. `docs/modules.md` gives a different and better
-reason for the identical behaviour ("CJS reds land in interop and generated `.d.ts` where the remedy is
-usually 'nothing you can do'"); two docs, one behaviour, two reasons.
+~~Separately, `docs/slices.md` mis-scopes the limit to `allowJs`.~~ **Done in the v0.56.0 follow-up.** The
+adopter review escalated it: a pure-TypeScript reader saw "under `allowJs`, a `require()` in a JavaScript
+file" and correctly concluded "not me", when `import legacy = require('./legacy.js')` in a plain `.ts`
+file is equally unreported (`kindOf` classifies `ExternalModuleReference` as `require`). Both
+`docs/slices.md` and the CHANGELOG now name the TypeScript form, and both now give `docs/modules.md`'s
+better reason for the identical behaviour ("CJS reds land in interop and generated `.d.ts` where the
+remedy is usually 'nothing you can do'") rather than the ESM-only-package reason, which described our
+distribution rather than the adopter's code.
+
+What remains here is only the **behavioural row**, which is still missing.
 
 ## 6. The agreement row discards cardinality
 
@@ -135,7 +163,17 @@ other 3. Compare the sets of `(file, line)` pairs instead — §3 is exactly the
 The asymmetry — `notDependOn()` counts dynamic imports, `beFreeOfCycles()` does not — is explained, and
 the explanation is good. It lives in the page-top container tip of `docs/slices.md`. A reader deep-linked
 from a failure lands on `### notDependOn` or `### respectLayerOrder`, which explain only the _type-only_
-split. One sentence in each section, naming the dynamic case, closes it.
+split. One sentence in each section, naming the dynamic case, closes it. **Still open.**
+
+~~And `docs/troubleshooting.md` has no section for "new violations after an upgrade on code I did not
+touch".~~ **Done in the v0.56.0 follow-up.** The adopter review argued the timing, and it was right: the
+person who hits this red is not the one who read the CHANGELOG, it is a teammate weeks later whose
+unrelated PR goes red on a file they never opened, and whose first move is to paste `dynamically imports`
+into search. The existing nearest heading ("A rule that passed for months now fails") is scoped to
+0.34.0's selector findings and would have actively misled them. That section is worth more in the release
+that manufactures the symptom than it will ever be again, so it did not wait. It is keyed to both shipped
+verbs, states that the finding is true rather than a regression, covers the second-sibling case in the
+module family too, and ends on the one instruction that matters — do not regenerate.
 
 Also: `docs/troubleshooting.md`'s "A rule that passed for months now fails" is scoped entirely to 0.34.0's
 selector findings. Nothing covers "new violations after an upgrade on code I did not touch", which is the

@@ -165,12 +165,24 @@ export interface ModuleEdge {
    * The ordinal only moves when an edge of the same kind to the same module is
    * added or removed before it — which is a real change to what the file does.
    *
-   * The residual caveat, and it is inherent to any positional tiebreaker: inserting a
-   * sibling **above** the first of a colliding group shifts which physical edge owns the
-   * empty discriminator. That is not a fail-open — one new finding is still reported — but
-   * it is why {@link edgeDiscriminator} is a tiebreaker of last resort rather than an
-   * identity component, and why widening it to carry the local binding is the durable
-   * improvement rather than more ordinal.
+   * The residual caveat, and it is inherent to any positional tiebreaker. **A baseline entry
+   * accepts "an edge of this kind to this module at position n", not _this_ edge.** Measured
+   * end-to-end, v0.55.3 baselines replayed through this version:
+   *
+   * | edit to an accepted colliding pair      | new reds reported |
+   * | --------------------------------------- | ----------------- |
+   * | add a third sibling                     | 1 — correct       |
+   * | insert a sibling **above** the first     | 1 — correct       |
+   * | **delete the first, add a different one**| **0 — silent**    |
+   *
+   * So the insertion case is safe and the equal-count swap is a fail-open: a dependency edge
+   * that did not exist when the baseline was written arrives accepted. This is strictly better
+   * than the pre-ordinal behaviour, where *any* number of added siblings was pre-accepted
+   * rather than only an equal-count swap — but it is a limitation, not a guarantee, and it is
+   * why {@link edgeDiscriminator} is a tiebreaker of last resort rather than an identity
+   * component. The durable fix is a `binding` field consulted before the ordinal, which would
+   * separate `import A` from `import C` outright; recorded as out-of-scope in
+   * [plan 0094](../../plans/0094-the-residual-findings-from-the-v0-56-0-review.md).
    *
    * Both collectors must agree on it, so both walk the literals in source order;
    * `edgeStream` sorts for that reason and not for output tidiness.
@@ -308,14 +320,23 @@ function buildEdges(sourceFile: SourceFile): readonly ModuleEdge[] {
 /**
  * What tells two edges of the same kind, from the same file, to the same module apart.
  *
- * `names` when there are any; the source-order ordinal when there are not. `names` is
- * **empty** for `dynamic`, `require` and `type-expression`, so those three had no
- * discriminator at all: two lazy imports of one module from one file measured
- * **2 findings, 1 hash**, against a control of 2/2 for two named imports. One accepted
- * baseline entry then silently pre-accepts the next one someone adds — bug 0028's shape,
- * in the kinds that never reached this function until
+ * `names` when there are any; the source-order ordinal when there are not — and **`names` is
+ * empty for a SPELLING, not for a kind**, which is the distinction the whole of this comment
+ * turns on. `dynamic`, `require` and `type-expression` never carry names, and neither do four
+ * ordinary `import`/`reexport` spellings (`import D from`, `import * as NS from`, a bare
+ * `import './x.js'`, `export * from`). Any of them, twice to one module from one file,
+ * measured **2 findings, 1 hash** against a control of 2/2 for two named imports — so one
+ * accepted baseline entry silently pre-accepts the next one someone adds. Bug 0028's shape,
+ * in every spelling that reached this function without a discriminator; the lazy kinds are
+ * merely the ones
  * [bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)
- * made them reportable.
+ * made reportable, which is how the narrower reading got written here in the first place.
+ *
+ * The sort and the `,` are load-bearing and cheap to lose: `getNamedImports()` returns source
+ * order, so without the sort a cosmetic reorder of a named import list moves every multi-name
+ * entry in an adopter's baseline — an import-sorting lint autofix would do it. Without the
+ * separator, `['a','b']` and `['ab']` collide. Both are pinned by the multi-name row in
+ * `tests/conditions/identity-does-not-move.test.ts`, and by nothing else in the suite.
  *
  * **No existing baseline entry moves**, and that is what the `ordinal === 0` branch buys.
  * The naive form — `#${ordinal}` whenever `names` is empty — moves far more than the three

@@ -47,7 +47,11 @@ import { modules } from '../../src/builders/module-rule-builder.js'
 import { edgesOf } from '../../src/core/module-edges.js'
 import { hashViolation } from '../../src/helpers/baseline.js'
 
-/** `legacy/` exports a default, a named value and a type, so every spelling below resolves. */
+/**
+ * `legacy/` exports a default, a named value, a type and two more names, so every spelling
+ * below resolves. `alpha`/`beta` exist for the multi-name row, which is the only one that can
+ * see the sort and the join separator.
+ */
 function twoSlices(featureToLegacy: string): ArchProject {
   const tsm = new Project({
     useInMemoryFileSystem: true,
@@ -55,7 +59,7 @@ function twoSlices(featureToLegacy: string): ArchProject {
   })
   tsm.createSourceFile(
     '/src/legacy/index.ts',
-    `export type Old = { n: number }\nexport const old = 1\nexport default old\n`,
+    `export type Old = { n: number }\nexport const old = 1\nexport const alpha = 1\nexport const beta = 2\nexport default old\n`,
   )
   tsm.createSourceFile('/src/feature/index.ts', `${featureToLegacy}\nexport const fresh = 1\n`)
   return {
@@ -141,6 +145,22 @@ const SPELLINGS: ReadonlyArray<{
     moduleIdentity: `${MODULE}::reexport::${RESOLVED}::old`,
   },
   {
+    // THE ONLY ROW THAT CAN SEE THE SORT OR THE SEPARATOR. Every other spelling here yields at
+    // most one name, so `[...names].sort().join(',')` is indistinguishable from `names[0]` for
+    // them — measured: with this row absent, deleting the `.sort()` and changing `,` to `''`
+    // each left the FULL 3165-test suite green.
+    //
+    // Written `beta, alpha` deliberately. `getNamedImports()` returns source order, so without
+    // the sort this yields `beta,alpha` and every multi-name entry in an adopter's baseline
+    // moves the first time anyone runs an import-sorting lint autofix — the defect class this
+    // whole file exists to close, one layer over. The comma is pinned at the same time:
+    // `['alpha','beta']` and `['alphabeta']` are distinct only while the separator is there.
+    label: 'multi-name import — pins the sort and the join separator',
+    source: `import { beta, alpha } from '${SPEC}'\nexport const u = [alpha, beta]`,
+    sliceIdentity: `${SLICE}::import::${SPEC}::alpha,beta`,
+    moduleIdentity: `${MODULE}::import::${RESOLVED}::alpha,beta`,
+  },
+  {
     // THE CONTROL. `export * as NS` is a star form that carries a name, so it must not move.
     // If this row ever joins the names-less set, the rule has been generalised to "star" and
     // the generalisation is wrong.
@@ -169,7 +189,10 @@ const SPELLINGS: ReadonlyArray<{
 describe('every spelling keeps the identity a v0.55.3 baseline holds', () => {
   it.each(SPELLINGS)('$label', ({ source, sliceIdentity, moduleIdentity }) => {
     const mod = notImportFrom(twoSlices(source))
-    // Vacuity: a row asserting "the identity is X" passes over an empty list. It must report.
+    // Stated for the reader, not load-bearing: the `toEqual([…])` below already fails on an
+    // empty list, and measured, deleting this line changes no verdict under either emptying
+    // mutation. The one vacuity assertion in this file that IS load-bearing is marked as such,
+    // in the ordinal-survives-an-edit row — where both sides are lists and `[] === []` passes.
     expect(mod).toHaveLength(1)
     expect(mod.map((v) => v.identity)).toEqual([moduleIdentity])
 

@@ -28,8 +28,12 @@ the same run. That was [bug 0059](https://github.com/nielspeter/ts-archunit/blob
 
 **`require()` is counted by no _forward_ condition** — not by the slice conditions, and not
 by `notImportFrom()`, `onlyImportFrom()` or `dependOn()`. CommonJS, and this is an ESM-only
-package (ADR-004). So under `allowJs`, a `require()` in a JavaScript file crosses a
-forbidden boundary unreported. That is a stated limit, not an oversight.
+package (ADR-004). **This is not limited to JavaScript files:** a `require()` in a `.js` file
+under `allowJs` crosses a forbidden boundary unreported, and so does the TypeScript form
+`import legacy = require('./legacy.js')` in a plain `.ts` file, with no flag involved. CJS
+edges land in interop and generated `.d.ts` where the remedy is usually "nothing you can do",
+so this trades a known false negative for a mislabelled true positive. That is a stated limit,
+not an oversight.
 
 The **reverse** conditions are the exception, deliberately: `beImported()` and
 `onlyBeImportedVia()` do count `require()`, because excluding it would report a module that

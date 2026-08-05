@@ -96,6 +96,40 @@ const p = project('./config/tsconfig.build.json')
 
 In a monorepo, load the specific package's tsconfig, or use [`workspace()`](/core-concepts#monorepo-workspace) to unify several.
 
+## New violations after an upgrade, on a file nobody touched: "dynamically imports" or "references the type from"
+
+You did not write the dependency this run is reporting. It was there before, and the release you
+just took is the reason it is visible now — this is the expected outcome of an
+enforcement-widening release, not a false positive and not a regression in your code.
+
+**Since 0.56.0**, `notDependOn()` and `respectLayerOrder()` count two edge kinds they previously
+ignored:
+
+| Message                                          | The edge it found                                   |
+| ------------------------------------------------ | --------------------------------------------------- |
+| `Slice "x" dynamically imports … slice "y"`      | `import('…')` — a lazy import, still a dependency   |
+| `Slice "x" references the type from … slice "y"` | `type T = import('…').Y` — a type-expression import |
+
+A lazy import of a forbidden slice is still coupling: it still breaks when the target is deleted,
+and nobody is applying a remedy by writing it. So the finding is true; it was simply unreachable
+before.
+
+**`beFreeOfCycles()` is deliberately not affected.** A dynamic import cannot deadlock
+initialization and is often the deliberate _fix_ for a cycle, so reporting it there would fail a
+rule for applying its own remedy. If you see a dynamic import in a cycle finding, that is a bug —
+please report it.
+
+A second, rarer source of new red in the same release: if one file reaches one module **twice the
+same way** (two `import('./x.js')` calls, say), those two findings used to share a single baseline
+entry, so accepting one silently accepted the other. They are now separate entries and the hidden
+one is reported — in `notImportFrom()`/`onlyImportFrom()`/`dependOn()` as well as the slice
+conditions.
+
+**What to do:** triage them, or hold the rule at `.asSeverity('warn')` and ratchet down. Do **not**
+regenerate the baseline to absorb them — see [Upgrading](/upgrading) for why that is the one action
+this project asks you never to take. Nothing needs regenerating for this release: no existing
+baseline entry moves.
+
 ## A rule that passed for months now fails: "selector can never match" or "matched 0 subjects"
 
 **0.34.0** turned two silent passes into failures. Both mean the rule was never enforcing anything; neither is a new problem in your code.
