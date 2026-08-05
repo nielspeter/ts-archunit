@@ -202,11 +202,12 @@ function returnKindOf(declaration: ExportedDeclarations): string | undefined {
  * The declaration's signature text — what a reader sees, independent of what the checker resolved.
  *
  * Per declaration rather than per file. The first version corroborated the checker's verdict against
- * the whole containing file, which certifies "something in here returns this kind" — 28 of 30 files
- * hold more than one primitive, so a mislabelled member sailed through unless it happened to be one
- * of five named names.
+ * the whole containing file, which certifies "something in here returns this kind" — **36 of the 39**
+ * declaring files hold more than one primitive, so a mislabelled member sailed through unless it
+ * happened to be one of a handful of named names. (That 36 is measured; the first version of this
+ * sentence carried a reviewer's figure for the smaller population without re-deriving it.)
  */
-export function signatureTextOf(declaration: ExportedDeclarations): string {
+function signatureTextOf(declaration: ExportedDeclarations): string {
   const full = declaration.getSourceFile().getFullText()
   if (Node.isFunctionDeclaration(declaration)) {
     const body = declaration.getBody()
@@ -229,6 +230,8 @@ export function scanEnforceablePrimitives(repo: string): PrimitivePopulation {
   const publicFunctions = new Set<string>()
   const returnKinds = new Map<string, number>()
   const heterogeneous = new Set<string>()
+  /** Declaration keys already counted in the histogram — see the comment at its increment. */
+  const counted = new Set<string>()
 
   for (const entry of entryPoints) {
     const file: SourceFile | undefined = project.getSourceFile(path.join(repo, entry.file))
@@ -276,19 +279,26 @@ export function scanEnforceablePrimitives(repo: string): PrimitivePopulation {
       if (kind === undefined) continue
       const declaringSignature = byKind.get(kind) ?? declaration
 
-      // Once per NAME, not once per (subpath, name): 28 names are reachable from more than one entry
-      // point, and counting each sighting made the histogram sum to 209 where the population is 181.
-      // Measured while writing the test that reads it — which is the argument for returning it.
-      if (!publicFunctions.has(name)) {
-        publicFunctions.add(name)
-        returnKinds.set(kind, (returnKinds.get(kind) ?? 0) + 1)
-      }
-      if (!PRIMITIVE_KINDS.includes(kind)) continue
-
       // Keyed on the DECLARATION, not the name: one primitive exported from two subpaths is one
       // primitive, and two different primitives could in principle share a name across entry points.
       const declFile = path.relative(repo, declaration.getSourceFile().getFilePath())
       const key = `${declFile}::${name}`
+
+      // The histogram counts DECLARATIONS, on the same key as the population, so that
+      // "primitive kinds sum to the population" holds by construction rather than by luck.
+      //
+      // Counting sightings made it sum to 209 against a population of 181, because 28 names are
+      // reachable from more than one entry point. Counting names instead fixed that and left a subtler
+      // version: two different declarations sharing a name would be one histogram entry and two
+      // population members, and the test asserting the two agree would red with a message about the
+      // audit trail rather than about the collision. There are no such collisions today — which is
+      // exactly why the invariant should not rest on there being none.
+      if (!counted.has(key)) {
+        counted.add(key)
+        returnKinds.set(kind, (returnKinds.get(kind) ?? 0) + 1)
+      }
+      publicFunctions.add(name)
+      if (!PRIMITIVE_KINDS.includes(kind)) continue
       const existing = found.get(key)
       if (existing === undefined) {
         found.set(key, {

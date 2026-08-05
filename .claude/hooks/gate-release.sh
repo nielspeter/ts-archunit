@@ -29,7 +29,23 @@ command=$(
   printf '%s' "$payload" |
     python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' \
       2>/dev/null
-) || exit 0
+)
+if [ $? -ne 0 ]; then
+  # **The one fail-open worth arguing about.** Without python3 the payload cannot be parsed, and a gate
+  # that opens whenever its parser is missing is a gate that vanishes on the machine you least expect.
+  # It cannot fail closed for everything — that would block every Bash call on such a machine — so it
+  # degrades to a coarse match over the RAW payload: over-broad (a commit message mentioning the words
+  # trips it) but loud, rare, and in the safe direction.
+  if printf '%s' "$payload" | grep -Eq 'git tag v[0-9]|git push[^"]*--tags|npm publish'; then
+    echo "RELEASE GATE UNAVAILABLE — python3 is missing, so this hook cannot parse the command." >&2
+    echo "Blocking anything that looks like a release. Install python3, or run the tag yourself." >&2
+    exit 2
+  fi
+  exit 0
+fi
+
+# The remaining early exits below are deliberate and are NOT this case: they mean the command is not a
+# release, or this is not the package, or there is no previous tag to compare against.
 
 # Only the actions that cannot be undone: creating a release tag, pushing one, publishing directly.
 # `git tag` with no version and `git tag --sort=...` are listings and are not gated.
