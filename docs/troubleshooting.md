@@ -125,15 +125,49 @@ baseline entry, so accepting one silently accepted the other. They are now separ
 hidden one is reported — in `notImportFrom()`/`onlyImportFrom()`/`dependOn()` as well as the slice
 conditions.
 
-**By the same specifier, deliberately narrow.** Two _different_ spellings that resolve to the same
-file — a `paths` alias beside a relative path — still share one entry. That is a separate,
-pre-existing defect (bug 0064), not fixed in this release, so if that is your layout your exposure is
-unchanged.
+**By the same specifier, in 0.56.0 only.** In that release, two _different_ spellings resolving to
+one file — a `paths` alias, or a workspace package name, beside a relative path — still shared one
+entry. **0.57.0 fixes that**, so if it is your layout, read the 0.57.0 section below: your exposure
+did change, one release later than this paragraph originally said it would.
 
 **What to do:** triage them, or hold the rule at `.asSeverity('warn')` and ratchet down. Do **not**
 regenerate the baseline to absorb them — see [Upgrading](/upgrading) for why that is the one action
 this project asks you never to take. Nothing needs regenerating for this release: no existing
 baseline entry moves.
+
+## After upgrading to 0.57.0: a violation I already accepted is reported again, or a file I never touched went red
+
+Neither is a regression, and in both cases the violation is real.
+
+Until 0.57.0, two findings of one rule could be **indistinguishable to the baseline** — two orphan
+`index.ts` files under `noDeadModules()`, two `import('./x.js')` calls in one file, two spellings of
+one module, two duplicate bodies. They shared a single entry, so accepting one silently accepted the
+other, including a sibling that appeared months later. They now get separate entries.
+
+**"A violation identical to one I accepted is reported again."** It is not the same violation — it is
+the sibling that was hiding behind it, and it has been real the whole time. The one you accepted still
+matches; nothing was invalidated.
+
+**"A file I never touched went red, and the one I just added is silent."** Within a colliding group
+the suffix follows source order, so adding a member above the first shifts which one holds the
+unsuffixed identity. The **number** of new findings is always correct — you added one violation and
+you got one red. The **file named** may be a sibling. Fix any member of the group and the count drops
+by one; the group is the unit, not the individual file.
+
+**To see which findings this affects, before you upgrade**, on 0.56.0:
+
+```bash
+jq -r '(.violations|length) as $n | ([.violations[].hash]|unique|length) as $d
+  | "\($n) entries, \($d) distinct — \($n - $d) finding(s) hidden inside another entry"' \
+  arch-baseline.json
+```
+
+Duplicate `hash` values in `arch-baseline.json` **are** the collisions. Refresh the baseline on 0.56.0
+**first** — the command only sees collisions that existed when the file was written, so a sibling
+added since the last refresh is invisible to it. `0 finding(s) hidden` after a fresh refresh means
+this release adds nothing for you.
+
+**Do not regenerate the baseline to make the new red go away.** See [Upgrading](/upgrading).
 
 ## A rule that passed for months now fails: "selector can never match" or "matched 0 subjects"
 

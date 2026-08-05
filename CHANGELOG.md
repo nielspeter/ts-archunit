@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.57.0] - 2026-08-05
+
+The identity invariant becomes a mechanism. Three filed collisions close together because one
+fix closes all three, and a fourth defect — found while measuring them — could give one finding
+two different baseline hashes on two different machines.
+
+### Fixed
+
+- **Two distinct findings could share one baseline entry, so accepting one silently accepted the
+  other** ([bug 0064](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md),
+  [bug 0065](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0065-reverse-dependency-findings-carry-no-identity.md)).
+  `ArchViolation.identity`'s own docstring has always required uniqueness per finding within a
+  rule. It was prose with nothing behind it, and four bugs were filed against it — 0028, 0063,
+  plan 0088, and now these — each fixed only in whichever family happened to be reviewed.
+
+  This fixes the **mechanism**, not the families. `disambiguateIdentities` runs in the one path
+  every terminal shares and suffixes only a subject that occurs more than once, from its second
+  occurrence onward. It therefore also covers `src/smells/` and any producer written in future.
+
+  Measured on this project's own source: `beImported()` produced **138 findings across 123
+  baseline entries — 15 were being absorbed** by a sibling. On a 2,173-file external monorepo the
+  same rule gave **710 findings across 526 entries — 184 absorbed, 26%**. Collisions concentrate
+  where the subject is a basename, so a monorepo with twenty `vitest.config.ts` files is hit far
+  harder than this repo.
+
+- **A baseline identity could depend on the machine that computed it.** Four sorts feeding
+  identities, elements and reported locations used `localeCompare`, which reads the host locale.
+  Danish collates `aa` as `å`, after `z`, so `import { zebra, aardvark }` hashed one way on a
+  Danish laptop and another in CI — on plain ASCII, with no unusual characters. `src/core/module-edges.ts`
+  had documented that exact hazard sixty lines above one of the four sites.
+
+- **`onlyBeImportedVia()` names the importer by path, not by basename.** Two importers sharing a
+  filename produced findings that were byte-identical in every visible field — and in GitHub's
+  annotation format the two collapsed into one, so the second was invisible in a PR.
+
+### Changed
+
+- **Previously-hidden findings are reported, on code you did not change.** Three families are
+  affected and adopters map them to different rules: module (`notImportFrom`, `onlyImportFrom`),
+  reverse (`beImported`, `noDeadModules`, `onlyBeImportedVia`), and duplicate-body smells —
+  including via the `agentGuardrails` and `strictBoundaries` presets, so a project with no module
+  rules at all can still see new findings.
+
+  **No migration for that half. No baseline entry moves.** A finding whose subject is already
+  unique is returned unchanged — the same object, not a copy — so it cannot move; and the first
+  of a colliding group keeps its subject verbatim, so the entry you already accepted still
+  matches and only the hidden sibling reports as new. That is a property of the code, not a
+  measurement that might not generalise: the previous attempt at this fix was validated by
+  replaying spellings and still moved 129 of 975 identities.
+
+- **Two rules' entries do move**, and both need regenerating on 0.56.0 before upgrading:
+  `onlyBeImportedVia()`, because its message changed; and any rule whose findings carry a
+  **multi-name import** (`import { b, a } from '…'`), because the name sort is no longer
+  locale-dependent. On a machine whose locale already agreed with codepoint order — which is
+  every `en-*` machine, and CI — the second of those moves nothing.
+
+- **Within a colliding group, entries are matched by position.** The count of new findings is
+  always right; the file _named_ may be a sibling you did not touch, and deleting one member
+  while adding another can let the new one arrive pre-accepted. That is a limitation of a
+  positional tiebreaker, it is strictly better than the previous behaviour (where _any_ number of
+  added siblings was pre-accepted), and the durable fix is tracked in plan 0094.
+
 ## [0.56.0] - 2026-08-05
 
 ### Fixed

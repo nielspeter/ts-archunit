@@ -1,5 +1,6 @@
 import { Node } from 'ts-morph'
 import { generateCodeFrame } from './code-frame.js'
+import { registerCacheReset } from './cache-registry.js'
 
 /**
  * A single architecture rule violation.
@@ -390,6 +391,43 @@ function groupKeyOf(violation: ArchViolation): string {
  * filters also makes identity a property of *what the rule found* rather than of what a
  * `--changed` or `.excluding()` run happened to keep — the same identity in CI and locally.
  */
+/**
+ * Subjects the mechanism had to disambiguate, by rule — the producer-quality signal.
+ *
+ * **Why this exists.** `disambiguateIdentities` guarantees that a rule's findings have distinct
+ * identities, which silently turned every `new Set(hashes).size === findings.length` assertion
+ * in the suite into a tautology. Measured: collapsing `duplicate-bodies.ts`'s identity to a
+ * literal constant — the worst producer defect available — left **all 234 files and 3178 tests
+ * green**, including `baseline-portability.test.ts`, whose own comment says *"collision is the
+ * failure mode this primitive introduces, so it gets its own guard."*
+ *
+ * The mechanism is a safety net, not a licence for producers to stop identifying their
+ * findings: a positional suffix makes an entry a *slot*, while a producer identity makes it a
+ * *reference*, and only the latter survives a sibling being deleted (see the ordering table
+ * above). So the guards must keep measuring the producer, and after this mechanism the only
+ * way to do that is to ask what the mechanism had to repair.
+ *
+ * Same shape as `recordEdgeCoverage`/`untestedRules` next door, for the same reason: a
+ * disclosure channel that a test can assert on without the production path knowing it exists.
+ */
+const collisions: { rule: string; subject: string; findings: number }[] = []
+
+/** Every subject a rule produced more than once, since the last reset. */
+export function identityCollisions(): readonly {
+  rule: string
+  subject: string
+  findings: number
+}[] {
+  return collisions
+}
+
+/** Clear the record — call in a `beforeEach` when asserting on a specific rule. */
+export function resetIdentityCollisions(): void {
+  collisions.length = 0
+}
+
+registerCacheReset(resetIdentityCollisions)
+
 export function disambiguateIdentities(violations: ArchViolation[]): ArchViolation[] {
   const counts = new Map<string, number>()
   for (const violation of violations) {
@@ -406,6 +444,20 @@ export function disambiguateIdentities(violations: ArchViolation[]): ArchViolati
     }
   }
   if (!anyDuplicate) return violations
+
+  // Disclose what had to be repaired, so a guard can still measure the PRODUCER — see
+  // `identityCollisions`. Recorded before the repair, because afterwards there is nothing left
+  // to see, which is precisely how this mechanism disarmed the existing collision guards.
+  for (const [key, count] of counts) {
+    if (count > 1) {
+      const split = key.indexOf('::')
+      collisions.push({
+        rule: key.slice(0, split),
+        subject: key.slice(split + 2),
+        findings: count,
+      })
+    }
+  }
 
   // Every key present before suffixing, so a generated `#n` can never land on one a producer
   // already emits. Without it, a rule holding `X` twice plus a literal `X#1` closes one

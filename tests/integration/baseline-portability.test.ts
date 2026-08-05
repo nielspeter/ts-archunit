@@ -26,6 +26,7 @@ import { calls } from '../../src/builders/call-rule-builder.js'
 import { generateBaseline, withBaseline, hashViolation } from '../../src/helpers/baseline.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
+import { identityCollisions, resetIdentityCollisions } from '../../src/core/violation.js'
 
 const duplicateFixture = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
 const siblingFixture = path.resolve(import.meta.dirname, '../fixtures/smells/inconsistent-siblings')
@@ -119,6 +120,7 @@ function materialize(prefix: string, nesting: string[], options: MaterializeOpti
 }
 
 function duplicateFindings(project: ArchProject): ArchViolation[] {
+  resetIdentityCollisions()
   return smells.duplicateBodies(project).withMinSimilarity(0.8).minLines(2).violations()
 }
 
@@ -573,6 +575,22 @@ export function b(): void {
     // Vacuity guard with teeth: one finding can never collide with anything.
     expect(findings.length, 'the fixture must produce several findings').toBeGreaterThan(2)
     expect(identitiesOf(findings, layout.root).size).toBe(findings.length)
+
+    // **The assertion above no longer measures this producer**, and this one does.
+    //
+    // `disambiguateIdentities` guarantees distinct identities for every rule, so
+    // `size === length` became true for all possible input the day it landed. Measured:
+    // collapsing this producer's identity to a literal constant left the entire suite green,
+    // including this row — whose own comment says collision "is the failure mode this
+    // primitive introduces, so it gets its own guard".
+    //
+    // `identityCollisions()` reports what the mechanism had to repair, so a producer that
+    // stops identifying its findings is visible again. Zero is the assertion: this producer is
+    // expected to be correct on its own, with the mechanism as a net it never needs.
+    expect(
+      identityCollisions().filter((c) => c.rule.includes('duplicate')),
+      'duplicateBodies must produce distinct identities WITHOUT relying on disambiguation',
+    ).toEqual([])
   })
 
   it('distinguishes same-named keys in different object literals', () => {
