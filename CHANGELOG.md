@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.56.0] - 2026-08-05
+
+### Fixed
+
+- **`notDependOn()` and `respectLayerOrder()` now count dynamic and type-expression imports**
+  ([bug 0059](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)).
+  `slices(p).should().notDependOn('legacy')` reported **nothing** for
+  `() => import('../legacy/index.js')` while `notImportFrom` reported it — the same file, the same edge,
+  the same run.
+
+  The slice graph shared one edge-kind set across all three slice conditions, justified with a cycle
+  argument. Cycles and coupling are different questions: a lazy import cannot deadlock initialization, so
+  a cycle question is right to ignore it, but a lazy import of a forbidden slice is still a forbidden
+  dependency. The kind set now follows the question, and the coupling side reads the same
+  `FORWARD_EDGE_KINDS` constant `notImportFrom` and `dependOn` read, so the two families agree by
+  construction rather than by two lists.
+
+  **`beFreeOfCycles()` is unchanged.** A dynamic-only cycle is still not reported, which is deliberate —
+  `import()` is often the deliberate fix for a cycle, and reporting it would fail a rule for applying its
+  own remedy.
+
+### Changed
+
+- **New findings on unchanged code, if you use `notDependOn()` or `respectLayerOrder()`.** Any dynamic
+  import or `type X = import('…').Y` crossing a forbidden boundary is now reported. These are true
+  findings that were previously invisible — but they are new output, and a baselined suite will report
+  them as new. See `docs/upgrading.md`.
+
+  Existing findings do **not** move: the message carries a per-kind verb (`dynamically imports`,
+  `references the type from`), so a new dynamic finding is its own identity rather than an alteration of
+  an existing `imports` entry for the same module.
+
+- **Two lazy imports of the same module from one file are now two baseline entries, not one.**
+  A finding's identity is built from `kind::specifier::names`, and `names` is **empty** for `dynamic`,
+  `require` and `type-expression` — so two `import('../legacy/index.js')` calls in one file produced two
+  findings sharing **one** hash. One accepted entry then silently pre-accepted the next one anyone added.
+  Measured 2 findings / 1 hash, against 2/2 for two named imports.
+
+  `ModuleEdge` now carries an `ordinal` (the nth edge of that kind to that specifier, in source order),
+  and the identity uses names **or** the ordinal. A source-order ordinal rather than a line number,
+  because `identity` exists to survive edits elsewhere in the file.
+
+  **Migration:** `notImportFrom()`, `onlyImportFrom()` and `dependOn()` have always reported `dynamic`
+  and `type-expression` edges, so **baselined findings of those two kinds move** and must be regenerated.
+  `import` and `reexport` identities are byte-identical — the discriminator is "names or ordinal", not
+  "names and ordinal", precisely so the common kinds do not move.
+
+- **`require()` is counted by no _forward_ condition, and the limit is now stated** in `docs/slices.md`.
+  This is an ESM-only package (ADR-004), so under `allowJs` a `require()` crossing a forbidden boundary
+  goes unreported by the slice conditions and by `notImportFrom`/`onlyImportFrom`/`dependOn`. The
+  **reverse** conditions `beImported()` and `onlyBeImportedVia()` do count it, deliberately: excluding it
+  would report a module that CJS code requires as an orphan.
+
 ## [0.55.3] - 2026-08-04
 
 Plan 0083's Phase 0. No shipped behaviour changed — the addition is a derivation over this repository's own

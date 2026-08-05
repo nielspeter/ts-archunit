@@ -7,6 +7,7 @@ import { recordEdgeCoverage } from '../core/edge-coverage.js'
 import { globAnyOf } from '../core/glob-site.js'
 import {
   edgeTypeOnlyRemedy,
+  edgeDiscriminator,
   edgeValuePhrase,
   edgeTypeOnlyNoun,
   edgeStream,
@@ -143,7 +144,10 @@ function edgeViolation(
       // is a baseline identity — feeding it anything new would rewrite every
       // existing dependency entry for no gain.
       edgeCandidates(edge, sourceFile)[0],
-      [...edge.names].sort((a, b) => a.localeCompare(b)).join(','),
+      // See `edgeDiscriminator`. This family HAS reported `dynamic` and
+      // `type-expression` all along, so unlike the slice family the collision was live
+      // here — and fixing it moves those entries. `import` and `reexport` do not move.
+      edgeDiscriminator(edge),
     ].join('::'),
   }
 }

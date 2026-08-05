@@ -13,7 +13,7 @@
 
 ## Open
 
-All three came out of the five-persona review of v0.47.0–v0.49.0 (except 0054, which those releases found).
+Both came out of the five-persona review of v0.47.0–v0.49.0 (except 0054, which those releases found).
 Every claim below was reproduced by measurement before filing.
 
 | Bug                                                                                                                            | Severity | What                                                                                                                                                                                                                                                                                                                                                         |

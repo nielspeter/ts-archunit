@@ -144,6 +144,27 @@ export interface ModuleEdge {
    * which cross an edge under a name the specifier list does not carry.
    */
   readonly names: readonly string[]
+  /**
+   * How many edges of the same `kind` and `specifier` precede this one in the file,
+   * in source order. `0` for the first.
+   *
+   * It exists because {@link names} is **empty** for `dynamic`, `require` and
+   * `type-expression`, and a finding's identity is built from
+   * `kind::specifier::names`. So two lazy imports of the same module from one file
+   * produced two findings and **one** baseline hash — measured 2/1, against a
+   * control of 2/2 for two named imports — which means one accepted entry silently
+   * pre-accepts the next one someone adds. Bug 0028's shape, in the two kinds that
+   * had no discriminator ([bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)).
+   *
+   * **Source-order ordinal rather than the line**, deliberately: a line moves when
+   * anything above it is edited, and `identity` exists precisely to survive that.
+   * The ordinal only moves when an edge of the same kind to the same module is
+   * added or removed before it — which is a real change to what the file does.
+   *
+   * Both collectors must agree on it, so both walk the literals in source order;
+   * `edgeStream` sorts for that reason and not for output tidiness.
+   */
+  readonly ordinal: number
 }
 
 /**
@@ -267,9 +288,34 @@ function buildEdges(sourceFile: SourceFile): readonly ModuleEdge[] {
   // sensitive — exactly the machine-dependent ordering `conditions/slice.ts` goes
   // out of its way to eliminate, because a value that differs per machine gives
   // one finding two identities.
+  const counters = new Map<string, number>()
   return (edges.length > 1 ? [...edges].sort((a, b) => a.pos - b.pos) : edges).map(
-    ({ pos: _pos, ...edge }) => edge,
+    ({ pos: _pos, ...edge }) => ({ ...edge, ordinal: nextOrdinal(counters, edge) }),
   )
+}
+
+/**
+ * What tells two edges of the same kind, from the same file, to the same module apart.
+ *
+ * `names` when there are any; the source-order ordinal when there are not. `names` is
+ * **empty** for `dynamic`, `require` and `type-expression`, so those three had no
+ * discriminator at all: two lazy imports of one module from one file measured
+ * **2 findings, 1 hash**, against a control of 2/2 for two named imports. One accepted
+ * baseline entry then silently pre-accepts the next one someone adds — bug 0028's shape,
+ * in the kinds that never reached this function until
+ * [bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)
+ * made them reportable.
+ *
+ * **Named kinds keep a byte-identical identity**, which is why this is "names OR ordinal"
+ * rather than "names AND ordinal": appending an ordinal unconditionally would rewrite every
+ * existing `import` and `reexport` entry in every adopter's baseline to fix a defect those
+ * kinds do not have. The condition is a property of the data, not a convenience — a kind
+ * with names does not need the ordinal, and a kind without names has nothing else.
+ */
+export function edgeDiscriminator(edge: ModuleEdge): string {
+  return edge.names.length > 0
+    ? [...edge.names].sort((a, b) => a.localeCompare(b)).join(',')
+    : `#${String(edge.ordinal)}`
 }
 
 /** Which of the five forms this literal belongs to, or `undefined` if none. */
@@ -438,7 +484,23 @@ function makeEdge(
     typeOnly,
     erasesModuleRequest: erasesRequest(kind, parent, typeOnly, verbatimModuleSyntax),
     names: namesOf(kind, parent),
+    // Filled by the collectors, which are the only callers that can see the file's
+    // other edges. `makeEdge` is per-literal and has no way to count siblings.
+    ordinal: 0,
   }
+}
+
+/**
+ * The next ordinal for `kind::specifier`, mutating `counters`.
+ *
+ * Shared by both collectors so they cannot drift: an identity that depended on which
+ * code path built the edge would be worse than the collision it fixes.
+ */
+function nextOrdinal(counters: Map<string, number>, edge: ModuleEdge): number {
+  const key = `${edge.kind}::${edge.specifier}`
+  const n = counters.get(key) ?? 0
+  counters.set(key, n + 1)
+  return n
 }
 
 /**
@@ -653,12 +715,21 @@ export function* edgeStream(sourceFile: SourceFile): Generator<ModuleEdge> {
   // would resolve every literal in the file to answer a question the first one
   // may settle, which is the cost this generator exists to avoid
   // (`dependency.ts:327-334`).
-  for (const literal of sourceFile.getImportStringLiterals()) {
+  // Sorted by position, so `ordinal` matches what `buildEdges` assigns. The binder's
+  // array puts declaration forms before expression forms regardless of where they
+  // appear, so without this a file mixing `import` and `import()` of the same module
+  // gets different ordinals depending on which collector ran — and the identity would
+  // depend on whether the cache was warm. Sorting costs a comparison per literal and
+  // resolves nothing, so the early exit this generator exists for is untouched.
+  const literals = [...sourceFile.getImportStringLiterals()].sort((a, b) => a.getPos() - b.getPos())
+  const counters = new Map<string, number>()
+  for (const literal of literals) {
     const parent = literal.getParent()
     if (parent === undefined) continue
     const kind = kindOf(parent)
     if (kind === undefined) continue
-    yield makeEdge(literal, parent, kind, verbatim)
+    const edge = makeEdge(literal, parent, kind, verbatim)
+    yield { ...edge, ordinal: nextOrdinal(counters, edge) }
   }
 }
 

@@ -26,9 +26,14 @@ Until v0.56.0 both questions shared the cycle answer, so
 `() => import('../legacy/index.js')` while `notImportFrom` reported it on the same file in
 the same run. That was [bug 0059](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md).
 
-**`require()` is counted by none of them.** CommonJS, and this is an ESM-only package
-(ADR-004) — but if you run with `allowJs` and have `require()` calls in JavaScript files,
-no slice or module condition sees them. That is a stated limit, not an oversight.
+**`require()` is counted by no _forward_ condition** — not by the slice conditions, and not
+by `notImportFrom()`, `onlyImportFrom()` or `dependOn()`. CommonJS, and this is an ESM-only
+package (ADR-004). So under `allowJs`, a `require()` in a JavaScript file crosses a
+forbidden boundary unreported. That is a stated limit, not an oversight.
+
+The **reverse** conditions are the exception, deliberately: `beImported()` and
+`onlyBeImportedVia()` do count `require()`, because excluding it would report a module that
+CJS code requires as an orphan.
 
 Type-only forms are erased at compile time and handled by `ignoreTypeImports`; the default
 differs per condition, and the reason is under `beFreeOfCycles()` below.

@@ -241,6 +241,9 @@ export class SliceRuleBuilder extends TerminalBuilder {
    * `legacy` that breaks when `legacy` is deleted. This matches `dependOn` and
    * `notImportFrom` as shipped. Pass `{ ignoreTypeImports: true }` to disagree.
    *
+   * Counts every edge kind `notImportFrom()` counts, including `import('…')` and
+   * `type X = import('…').Y`. `require()` is not counted (ESM-only, ADR-004).
+   *
    * @param args - Forbidden slice names, or `(names[], options)`
    *
    * @example

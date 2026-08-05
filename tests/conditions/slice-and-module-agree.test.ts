@@ -36,6 +36,7 @@ import type { ArchViolation } from '../../src/core/violation.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
 import { edgesOf, FORWARD_EDGE_KINDS } from '../../src/core/module-edges.js'
+import { hashViolation } from '../../src/helpers/baseline.js'
 
 /**
  * Two slices. `feature/` reaches `legacy/` by whichever spelling is under test, and
@@ -181,5 +182,63 @@ describe('the two families agree by construction, not by two lists', () => {
     expect(FORWARD_EDGE_KINDS.require).toBe(false)
     expect(FORWARD_EDGE_KINDS.dynamic).toBe(true)
     expect(FORWARD_EDGE_KINDS['type-expression']).toBe(true)
+  })
+})
+
+describe('two edges of one kind to one slice are two baseline entries (bug 0059)', () => {
+  // The defect a review measured after the kind fix landed: `siteIdentity` keyed on
+  // `kind::specifier::names`, and `names` is EMPTY for dynamic, require and
+  // type-expression. So two lazy imports of the same module from one file gave
+  // **2 findings and 1 hash** — one accepted baseline entry silently pre-accepting the
+  // next one someone adds. Bug 0028's shape, reachable in this family only because the
+  // kind fix made those edges reportable at all.
+  const twoOf = (spelling: string): ArchProject =>
+    twoSlices(spelling.replace('NAME', 'a') + '\n' + spelling.replace('NAME', 'b'))
+
+  const hashes = (vs: ArchViolation[]): number => new Set(vs.map((v) => hashViolation(v))).size
+
+  it.each([
+    ['dynamic', "export const NAME = () => import('../legacy/index.js')"],
+    ['type-expression', "export type NAME_T = import('../legacy/index.js').Old"],
+  ])('%s: two edges, two identities — in the slice family', (_kind, spelling) => {
+    const found = notDependOn(twoOf(spelling.replace('NAME_T', 'NAME')))
+    expect(found.length).toBe(2)
+    expect(hashes(found)).toBe(2)
+  })
+
+  it.each([
+    ['dynamic', "export const NAME = () => import('../legacy/index.js')"],
+    ['type-expression', "export type NAME_T = import('../legacy/index.js').Old"],
+  ])('%s: two edges, two identities — in the module family too', (_kind, spelling) => {
+    // The same collision was LIVE here before the fix, because this family has always
+    // reported these kinds. Fixing it in one shared place is what keeps the two schemes
+    // from drifting again.
+    const found = notImportFrom(twoOf(spelling.replace('NAME_T', 'NAME')))
+    expect(found.length).toBe(2)
+    expect(hashes(found)).toBe(2)
+  })
+
+  it('the ordinal survives an edit ABOVE the edges — which a line number would not', () => {
+    // Why an ordinal and not the line: `identity` exists to survive edits elsewhere in
+    // the file. Adding a line above must not move either identity.
+    const base =
+      "export const a = () => import('../legacy/index.js')\nexport const b = () => import('../legacy/index.js')"
+    const before = notDependOn(twoSlices(base)).map((v) => v.identity)
+    const after = notDependOn(twoSlices('export const unrelated = 1\n' + base)).map(
+      (v) => v.identity,
+    )
+    expect(after).toEqual(before)
+  })
+
+  it('a NAMED kind keeps a byte-identical identity — no baseline migration', () => {
+    // The reason the discriminator is "names OR ordinal" rather than "names AND ordinal":
+    // appending an ordinal unconditionally would rewrite every existing import and
+    // reexport entry in every adopter's baseline, to fix a defect those kinds never had.
+    const found = notDependOn(
+      twoSlices(
+        "import { old } from '../legacy/index.js'\nimport type { Old } from '../legacy/index.js'\nexport const u = old\nexport type V = Old",
+      ),
+    )
+    expect(found.map((v) => v.identity?.split('::').pop())).toEqual(['old', 'Old'])
   })
 })

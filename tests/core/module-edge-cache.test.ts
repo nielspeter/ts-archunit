@@ -249,18 +249,25 @@ describe('edgeStream keeps its early exit', () => {
     expect(afterStream).toBeGreaterThan(0)
   })
 
-  it('agrees with edgesOf as a SET, cold and warm — order is not part of it', () => {
+  it('agrees with edgesOf as a SEQUENCE, cold and warm — since bug 0059', () => {
     /**
-     * Compared as a multiset, deliberately. The first version of this test used
-     * `toEqual` on a three-plain-imports fixture where walk order and source
-     * order happen to coincide, so it asserted a sequence property that does
-     * **not** hold and passed because the fixture could not exercise it.
+     * **This was a multiset comparison, and the row below told us when to change it.**
      *
-     * Measured on a file whose dynamic import precedes its declaration import:
-     * cold yields `./a.js, ./b.js` (walk order) and warm yields `./b.js, ./a.js`
-     * (the source order `edgesOf` sorts into). Safe today because `dependOn` is
-     * the only consumer and is a `.some()`; asserted as a set so the real
-     * contract is what is pinned.
+     * The history is worth keeping. The first version compared sequences over a
+     * three-plain-imports fixture where walk order and source order coincide, so it
+     * asserted a property that did not hold and passed because the fixture could not
+     * exercise it. That was corrected to a set comparison, with a companion row
+     * asserting the two orders really did differ — and a comment saying that if they
+     * ever coincided, someone should reconsider.
+     *
+     * They now coincide, deliberately.
+     * [Bug 0059](../../bugs/fixed/0059-slice-conditions-and-module-conditions-disagree-about-a-dependency.md)
+     * gave `ModuleEdge` an `ordinal` — the nth edge of the same kind to the same
+     * specifier — because `names` is empty for `dynamic`, `require` and
+     * `type-expression`, so two lazy imports of one module shared one baseline hash.
+     * An ordinal that depended on whether the cache was warm would be worse than the
+     * collision it fixes, so `edgeStream` now walks in source order too, and the
+     * sequence is the contract.
      */
     const project = new Project({ useInMemoryFileSystem: true })
     project.createSourceFile('/a.ts', 'export const a = 1')
@@ -270,22 +277,26 @@ describe('edgeStream keeps its early exit', () => {
       "const later = await import('./b.js')\nimport { a } from './a.js'\n",
     )
 
-    const sorted = (edges: readonly { specifier: string }[]): string[] =>
-      edges.map((e) => e.specifier).sort()
+    const specifiers = (edges: readonly { specifier: string }[]): string[] =>
+      edges.map((e) => e.specifier)
 
-    const coldStream = sorted([...edgeStream(main)])
-    const fromEdges = sorted(edgesOf(main))
-    const warmStream = sorted([...edgeStream(main)])
+    const coldStream = specifiers([...edgeStream(main)])
+    const fromEdges = specifiers(edgesOf(main))
+    const warmStream = specifiers([...edgeStream(main)])
 
     expect(coldStream).toEqual(fromEdges)
     expect(warmStream).toEqual(fromEdges)
-    expect(fromEdges).toEqual(['./a.js', './b.js'])
+    // Source order, so the dynamic import on line 1 comes first.
+    expect(fromEdges).toEqual(['./b.js', './a.js'])
   })
 
-  it('yields a different ORDER warm than cold, which is why the above is a set', () => {
-    // The discriminator. If the two orders ever coincide for this fixture, the
-    // set comparison above has stopped being a deliberate choice and someone
-    // should reconsider it — this test is what tells them.
+  it('yields the SAME order warm and cold — the ordinal depends on it', () => {
+    // This row used to assert the opposite, and its comment said: "if the two orders
+    // ever coincide for this fixture, the set comparison above has stopped being a
+    // deliberate choice and someone should reconsider it — this test is what tells
+    // them." It did exactly that. Kept, inverted, on the same fixture: a dynamic
+    // import BEFORE a declaration import is the shape where the binder's
+    // declarations-first array diverges from source order.
     const project = new Project({ useInMemoryFileSystem: true })
     project.createSourceFile('/a.ts', 'export const a = 1')
     project.createSourceFile('/b.ts', 'export const b = 2')
@@ -301,8 +312,9 @@ describe('edgeStream keeps its early exit', () => {
     edgesOf(main)
     const warm = [...edgeStream(main)].map((e) => e.specifier)
 
-    expect(cold).toEqual(['./a.js', './b.js'])
-    expect(warm).toEqual(['./b.js', './a.js'])
+    // Source order both ways: the dynamic import is on line 1.
+    expect(cold).toEqual(['./b.js', './a.js'])
+    expect(warm).toEqual(cold)
   })
 
   it('sees an edit through the stream too', () => {

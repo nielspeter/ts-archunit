@@ -120,11 +120,8 @@ function sliceEdgesOf(
   question: ErasureQuestion,
 ): readonly ModuleEdge[] {
   const ignoreErased = options?.ignoreTypeImports === true
-  const erased = (edge: ModuleEdge): boolean =>
-    question === 'module-request' ? edge.erasesModuleRequest : edge.typeOnly
-  return edgesOf(file).filter(
-    (edge) => kindsFor(question)(edge.kind) && !(ignoreErased && erased(edge)),
-  )
+  const { counts, erased } = QUESTIONS[question]
+  return edgesOf(file).filter((edge) => counts(edge.kind) && !(ignoreErased && erased(edge)))
 }
 
 /**
@@ -152,10 +149,18 @@ function sliceEdgesOf(
  * a total `Record<ModuleEdgeKind, boolean>`, so a sixth edge kind is a compile error
  * there rather than a silent omission here.
  */
-function kindsFor(question: ErasureQuestion): (kind: ModuleEdgeKind) => boolean {
-  return question === 'module-request'
-    ? (kind): boolean => EAGER_STATIC_KINDS.has(kind)
-    : (kind): boolean => FORWARD_EDGE_KINDS[kind]
+const QUESTIONS: Record<
+  ErasureQuestion,
+  { counts: (kind: ModuleEdgeKind) => boolean; erased: (edge: ModuleEdge) => boolean }
+> = {
+  'module-request': {
+    counts: (kind) => EAGER_STATIC_KINDS.has(kind),
+    erased: (edge) => edge.erasesModuleRequest,
+  },
+  'type-bindings': {
+    counts: (kind) => FORWARD_EDGE_KINDS[kind],
+    erased: (edge) => edge.typeOnly,
+  },
 }
 
 /**
@@ -198,6 +203,49 @@ function collectEdgesFromFile(
  * @param options - `ignoreTypeImports` drops edges that are erased at compile time
  * @returns Unique directed edges between slices
  */
+/**
+ * A built graph, and the only way to ask it for the sites behind one of its edges.
+ *
+ * `question` and `options` must be the same for the graph and for the details walk, and
+ * for a while they were four literals across two call sites kept in step by convention.
+ * The failure is silent and specific: the conditions emit **one violation per detail**, so
+ * a graph that counts an edge the details walk cannot see reports nothing at all, and a
+ * details walk that counts more reports the wrong site.
+ *
+ * A review measured the live half of that. Passing `'type-bindings'` to `beFreeOfCycles`'s
+ * details call — the one mutation of eight that stayed **green** — turned the cycle finding
+ * into *"feature dynamically imports legacy at index.ts:1"*, pointing the reader at the one
+ * construct that BREAKS cycles and telling them to remove it. ADR-008 rule 2, from a
+ * mismatch no test could see.
+ *
+ * So the pairing is no longer expressible: `detailsFor` reads what the graph was built
+ * with. This also retires the older `options`-mismatch hazard the docstrings managed with
+ * prose.
+ */
+export interface SliceGraph {
+  readonly edges: SliceEdge[]
+  detailsFor(fromSliceName: string, toSliceName: string): SliceDependencySite[]
+}
+
+/**
+ * Build the graph, and bind the details walk to the same question and options.
+ *
+ * Prefer this over the two loose functions; they remain exported because
+ * `tests/` and the reverse-graph work call them directly with an explicit question.
+ */
+export function sliceGraph(
+  slices: Slice[],
+  fileToSlice: Map<string, string> | undefined,
+  options: ImportOptions | undefined,
+  question: ErasureQuestion,
+): SliceGraph {
+  const map = fileToSlice ?? buildFileToSliceMap(slices)
+  return {
+    edges: buildSliceDependencyGraph(slices, map, options, question),
+    detailsFor: (from, to) => findSliceDependencyDetails(slices, from, to, map, options, question),
+  }
+}
+
 export function buildSliceDependencyGraph(
   slices: Slice[],
   fileToSlice: Map<string, string> | undefined,
