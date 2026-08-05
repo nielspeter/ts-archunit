@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { ArchViolation } from '../core/violation.js'
+import { subjectOf } from '../core/violation.js'
 import {
   discoverIdentityRoot,
   normalizeIdentityText,
@@ -170,8 +171,10 @@ export function hashViolation(violation: ArchViolation, root?: string): string {
   // supersedes both element and message — see ArchViolation.identity. Without
   // one, the composed string is byte-identical to the pre-0.19 input, so a
   // violation whose fields never contained a path keeps its old hash.
-  const subject = violation.identity ?? `${violation.element}::${violation.message}`
-  const content = `${scrub(violation.rule)}::${scrub(subject)}`
+  // ONE definition, shared with `disambiguateIdentities` — see `subjectOf`. It used to be
+  // spelled out here and copied there, guarded by a test asserting the copies agree; the copy
+  // is gone because `helpers/` may import from `core/` and a shared definition cannot diverge.
+  const content = `${scrub(violation.rule)}::${scrub(subjectOf(violation))}`
   return createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 
@@ -198,8 +201,10 @@ export function hashViolation(violation: ArchViolation, root?: string): string {
 export function hashSubject(violation: ArchViolation, root?: string): string {
   const scrub = (text: string): string =>
     root === undefined ? text : normalizeIdentityText(text, root)
-  const subject = violation.identity ?? `${violation.element}::${violation.message}`
-  return createHash('sha256').update(scrub(subject)).digest('hex').slice(0, 16)
+  return createHash('sha256')
+    .update(scrub(subjectOf(violation)))
+    .digest('hex')
+    .slice(0, 16)
 }
 
 /** Forward slashes so the recorded root reads the same on Windows and CI. */

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import type { ArchViolation } from './violation.js'
-import { severityFor } from './violation.js'
+import { severityFor, disambiguateIdentities } from './violation.js'
 import type { CheckOptions, OutputFormat } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import { ArchRuleError } from './errors.js'
@@ -58,7 +58,22 @@ export function applyFilters(
   violations: ArchViolation[],
   ctx: ExecuteRuleContext,
 ): ArchViolation[] {
-  let result = violations
+  // Identity uniqueness, BEFORE the enrichment below and before every filter — see
+  // `disambiguateIdentities`. Two reasons for this position specifically:
+  //
+  // 1. This function's own contract is that identity is complete before anything reads it,
+  //    and the baseline reads it after. A producer that emits two findings with one identity
+  //    hands the baseline one entry for two findings, and accepting either accepts both —
+  //    which is bugs 0028, 0063, 0064 and 0065, one per family that got reviewed.
+  // 2. Ahead of the filters rather than after them, so a finding's identity is a property of
+  //    what the RULE found, not of what a `--changed` or `.excluding()` run happened to keep.
+  //    Suffixing after filtering would give the same finding different identities in CI and
+  //    on a laptop, which is the defect `identity` exists to prevent.
+  //
+  // Enrichment does not touch `element`, `message` or `identity`, so the order between this
+  // and the block below is free; it runs first to keep "identity is settled" the outermost
+  // statement about this function.
+  let result = disambiguateIdentities(violations)
 
   // Enrich FIRST, because a filter cannot match on a field that is not set yet.
   //

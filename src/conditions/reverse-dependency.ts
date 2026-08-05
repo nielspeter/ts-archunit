@@ -149,7 +149,30 @@ export function onlyBeImportedVia(...globs: string[]): Condition<SourceFile> {
               element: sf.getBaseName(),
               file: sf.getFilePath(),
               line: 1,
-              message: `${sf.getBaseName()} is imported by ${importer.getBaseName()} which does not match [${globs.join(', ')}]`,
+              // The importer by PATH, not by basename — and the message is the only place it
+              // can appear, because `element`, `file` and `line` all describe the TARGET.
+              //
+              // Two importers sharing a filename produced findings that were byte-identical on
+              // screen: same element, same file, same line, same message. Measured, and worse
+              // in the two surfaces that matter most — `check --format json` emitted two
+              // identical objects, and `format-github` emitted two identical `::error` lines,
+              // which GitHub renders as ONE annotation, so in a PR's Files view the second
+              // finding did not exist at all.
+              //
+              // That was survivable while the two shared a baseline entry and only one was
+              // ever reported. Once `disambiguateIdentities` gives them separate entries the
+              // hidden sibling surfaces — and an adopter is handed a red identical to one they
+              // already accepted, pointing at the victim rather than the offender, with no way
+              // to tell which importer is new. The release that makes a finding visible owns
+              // making it readable.
+              //
+              // `element` is deliberately left as the basename: `.excluding()` matches on
+              // `element`/`file`/`message`, so promoting it to a path would silently break
+              // every `.excluding('index.ts')` in the wild. Changing the MESSAGE breaks an
+              // exact-string message exclusion, which surfaces as an unused-pattern warning
+              // rather than failing open — the acceptable direction, and stated in the
+              // upgrading row.
+              message: `${sf.getBaseName()} is imported by ${fromRoot ?? importerPath} which does not match [${globs.join(', ')}]`,
               because: context.because,
             })
           }

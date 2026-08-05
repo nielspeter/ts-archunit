@@ -1,10 +1,44 @@
 name: Deploy Docs
 
+# Docs must never describe a version npm does not serve — bug 0062 gap 4.
+#
+# Measured on the v0.56.0 release: `Deploy Docs` finished in 35s and `Publish to npm`
+# finished 12m52s later, so the site documented 0.56.0 while `npm latest` was 0.55.3 for
+# **32m54s**. "Tag promptly" cannot close that — even a simultaneous push leaves docs
+# ahead by the length of the publish gate, and if the tag is forgotten the window is
+# unbounded.
+#
+# The harm is the shape this project exists to prevent: a reader — especially an agent —
+# reads "notDependOn() counts dynamic imports", runs it against the installed version,
+# gets zero findings, and concludes the boundary is clean. A false green produced by our
+# own documentation. v0.57.0 makes it sharper, because the skewed prose says *regenerate
+# your baseline*, and regenerating on the OLD version silently accepts everything the new
+# one would have reported.
+#
+# So the deploy is gated on the version actually being published, and the release path
+# deploys from `publish.yml` after `npm publish` succeeds. A docs-only edit to `main` is
+# unaffected: its version is already on npm, so the gate passes and it ships immediately.
+
 on:
   push:
     branches: [main]
     paths: ['docs/**', '.github/workflows/docs.yml']
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Deploy even if package.json version is not on npm yet'
+        type: boolean
+        default: false
+
+# Two pushes to `main` touching `docs/**` in quick succession otherwise race two
+# `deploy-pages` calls against one environment. `publish.yml` has carried a concurrency
+# group since it was written; this workflow never got one.
+#
+# `cancel-in-progress: false`, not true: a half-finished Pages deploy is worse than a
+# queued one, and the later push's content supersedes the earlier one anyway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -14,13 +48,43 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v6
+
+      # The gate. **Derived, not guessed**: it asks the registry whether THIS tree's
+      # version is served, rather than pattern-matching a commit message for "release" or
+      # trusting a step order an operator has to remember under pressure. The thing that
+      # failed last release was the convention, so the replacement must not be one.
+      #
+      # A release merge lands `docs/**` and a bumped `package.json` together, so the
+      # version is not on npm yet and this skips — `publish.yml` deploys the docs after
+      # publishing. A docs-only edit carries the already-published version, so it passes
+      # and ships immediately, which is the case that must stay fast.
+      - id: gate
+        name: Is this tree's version published?
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo "::notice::forced: deploying docs for $VERSION without checking npm"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif npm view "@nielspeter/ts-archunit@$VERSION" version >/dev/null 2>&1; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::$VERSION is not on npm yet — docs deploy deferred to the publish workflow, so the site cannot describe a version the registry does not serve (bug 0062 gap 4)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v6
+        if: steps.gate.outputs.skip != 'true'
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+        if: steps.gate.outputs.skip != 'true'
       - run: npm run docs:build
+        if: steps.gate.outputs.skip != 'true'
       - uses: actions/upload-pages-artifact@v4
+        if: steps.gate.outputs.skip != 'true'
         with:
           path: docs/.vitepress/dist
       - uses: actions/deploy-pages@v5
+        if: steps.gate.outputs.skip != 'true'

@@ -75,9 +75,9 @@ behaviour that is already correct today.
 ## 3. The two identity defects — both filed, both discharged from this plan
 
 ~~The resolved-path collision must leave this plan and become its own bug.~~ **Done.** It is
-[bug 0064](../bugs/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md). While
+[bug 0064](../bugs/fixed/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md). While
 filing it a second, wider one was found and is
-[bug 0065](../bugs/0065-reverse-dependency-findings-carry-no-identity.md) — the reverse conditions set no
+[bug 0065](../bugs/fixed/0065-reverse-dependency-findings-carry-no-identity.md) — the reverse conditions set no
 `identity` at all.
 
 Both reports previously appeared here in full. **The duplicates are deleted rather than kept in sync**: two
@@ -92,6 +92,33 @@ move**, so `tests/conditions/identity-does-not-move.test.ts` is correct to be si
 argument is in 0065; the short form is that no forward condition counts `require` and the reverse
 conditions that do count it set no identity, with `addToGraph`'s `(importer, target)` dedupe as the
 forward-looking third reason it will stay unreachable after 0065 ships.
+
+## 3b. The positional residual — what v0.57.0's identity mechanism did NOT close
+
+`disambiguateIdentities` guarantees a rule's findings have distinct identities, which closed bugs 0064,
+0065 and 0067 together. It does so with a **positional** tiebreaker, so a baseline entry accepts a
+_position in a group_ rather than a _specific finding_. Three edits, measured:
+
+| edit to an accepted colliding group | new reds reported             |
+| ----------------------------------- | ----------------------------- |
+| add a sibling                       | 1 — correct                   |
+| insert a sibling above the first    | 1 — correct count, wrong name |
+| **delete one, add a different one** | **0 — silent**                |
+
+Strictly better than before, where _any_ number of added siblings was pre-accepted. Still a hole, and
+sharpest where an entry carries state: a `measured` metric ceiling can transfer to a different element and
+silently accept a regression.
+
+**What closes it is a real per-finding identity**, and the candidates are family-specific — a `binding`
+field for the edge family (already the "Out of scope" item below), qualified names for the metric family,
+and for `duplicateBodies` the structural path bug 0067 proposed. **That last one is explicitly withdrawn
+as a fix for 0067** and survives only as an input here, because on its own it now costs a migration to fix
+something that no longer loses coverage. Judge the three together, not one bug at a time — judging them
+one at a time is what produced four reports of one invariant.
+
+Note the reorder case was **measured and does not fire**: reordering the members of a colliding group
+leaves the identity _set_ unchanged, and baseline matching is set membership. 0067's caution about
+reordering was correct to record and does not reach this mechanism.
 
 ## 4. Four statements contradicted by the code shipping beside them
 

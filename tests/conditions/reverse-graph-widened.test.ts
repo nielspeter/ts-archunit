@@ -30,10 +30,16 @@ const importersOfSecret = (): string[] =>
     .onlyBeImportedVia('**/nothing-matches-this.ts')
     .violations()
     .map((v) => {
+      // The message names the importer by PATH from the project root since the identity
+      // release — two importers sharing a basename otherwise printed byte-identically, and
+      // once they get separate baseline entries an adopter is handed a red they cannot
+      // locate. Reduced to the basename HERE so these rows keep asserting which KINDS the
+      // reverse graph counts, which is what this file is about; `identity-uniqueness` and
+      // `baseline-portability` are where the path form itself is pinned.
       const match = /is imported by (\S+)/.exec(v.message)
-      return match?.[1] ?? '?'
+      return (match?.[1] ?? '?').split('/').pop() ?? '?'
     })
-    .sort((a, b) => a.localeCompare(b))
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 
 describe('item 20 — one importer, one reverse edge', () => {
   /**
