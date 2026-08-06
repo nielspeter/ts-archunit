@@ -34,6 +34,11 @@ export function maxFunctionComplexity(threshold: number): Condition<ArchFunction
                 metric: 'complexity',
                 measured: cc,
                 message: `${fn.getName() ?? '<anonymous>'} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)})`,
+                // The name the message already uses (bug 0068). Without it the
+                // identity re-derives a name from the AST node, which for an
+                // object-literal function resolves up to the enclosing
+                // function — two derivations in one violation, disagreeing.
+                qualifiedName: fn.getName(),
               },
               context,
             ),
@@ -70,6 +75,7 @@ export function maxFunctionLines(threshold: number): Condition<ArchFunction> {
                 metric: 'lines',
                 measured: loc,
                 message: `${fn.getName() ?? '<anonymous>'} has ${String(loc)} lines (max: ${String(threshold)})`,
+                qualifiedName: fn.getName(), // bug 0068 — see maxFunctionComplexity
               },
               context,
             ),
@@ -110,6 +116,7 @@ export function maxFunctionParameters(threshold: number): Condition<ArchFunction
                 metric: 'parameters',
                 measured: params,
                 message: `${fn.getName() ?? '<anonymous>'} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
+                qualifiedName: fn.getName(), // bug 0068 — see maxFunctionComplexity
               },
               context,
             ),

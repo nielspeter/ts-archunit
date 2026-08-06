@@ -78,8 +78,19 @@ export function metricViolation(
     docs?: string
   },
 ): ArchViolation {
+  const base = createViolation(node, options.message, context)
   return {
-    ...createViolation(node, options.message, context),
+    ...base,
+    // The qualified name reaches `element` too, not only `identity` — bug 0068's
+    // first consequence. `createViolation` derives it with `getElementName`,
+    // which resolves an unnamed node up to its nearest named ancestor, so a
+    // finding ABOUT an object-literal function was labelled with the ENCLOSING
+    // function's name while its own message named it correctly. `element` is
+    // what the terminal prints, what the JSON reports, and one of the three
+    // fields string-form `.excluding()` matches by exact membership
+    // (`execute-rule.ts`), so the disagreement also made an exclusion written
+    // against the printed name silently miss.
+    element: options.qualifiedName ?? base.element,
     // File, element and metric — never the value. The value is the thing being
     // ratcheted, so putting it here makes every change a new finding, which is
     // the bug. Leaving the FILE out is the other half, and it was shipped once:
