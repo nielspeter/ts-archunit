@@ -77,10 +77,41 @@ describe('a config finding carries its own remedy, not the author’s (bug 0021)
     // produced it.
     expect(f?.suggestion).toContain('.expectEmpty()')
     expect(f?.suggestion).not.toContain('drop .expectNonEmpty()')
+    // Bug 0069: R3b fixed the field above and left the identical defect in the
+    // one the reader meets first — the message named `.expectNonEmpty()` twice,
+    // on rules that never called it, and told them to remove it. The guard was
+    // written for the field being fixed, so it could not see that. Both fields
+    // are now one assertion-pair, not two.
+    expect(f?.message).not.toContain('.expectNonEmpty()')
     expect(f?.docs).not.toBe(AUTHOR.docs)
     // Kept: neither asserts a remedy for this finding.
     expect(f?.ruleId).toBe('arch/example')
     expect(f?.because).toBe(AUTHOR.because)
+  })
+
+  it('empty selector: the message names no API the rule never called (bug 0069)', () => {
+    // The sharp case. The test above calls `.expectNonEmpty()`, so a message
+    // naming it there is merely useless; here the chain never calls it, and the
+    // shipped text said "`.expectNonEmpty()` requires at least one … remove
+    // `.expectNonEmpty()`" — a remedy with nothing to remove. ADR-008 rule 2:
+    // an impossible fix is worse than none, because the agent tries it, fails,
+    // and then improvises.
+    const p = load('poc')
+    const findings = functions(p)
+      .that()
+      .haveNameMatching(/^definitelyNotAFunction$/)
+      .should()
+      .beExported()
+      .violations()
+
+    expect(findings).toHaveLength(1)
+    const [f] = findings
+    expect(f?.bypassFilters).toBe(true)
+    expect(f?.message).not.toContain('.expectNonEmpty()')
+    // Not vacuous by silence: the finding still states the fault and still
+    // carries a remedy that IS reachable from this chain.
+    expect(f?.message).toContain('0 subjects')
+    expect(f?.suggestion).toContain('.expectEmpty()')
   })
 
   it('empty slice discovery: own suggestion, own docs, never the author’s', () => {
