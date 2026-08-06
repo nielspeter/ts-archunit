@@ -27,18 +27,20 @@ export function maxFunctionComplexity(threshold: number): Condition<ArchFunction
       for (const fn of elements) {
         const cc = cyclomaticComplexity(fn.getBody())
         if (cc > threshold) {
+          // ONE derivation, used for the message and the identity alike. Two
+          // expressions that agree in every branch but one is how bug 0068
+          // happened: `fn.getName() ?? '<anonymous>'` beside a bare
+          // `fn.getName()` disagree for an anonymous function, which would have
+          // reproduced the same defect inside its own fix.
+          const name = fn.getName() ?? '<anonymous>'
           violations.push(
             metricViolation(
               fn.getNode(),
               {
                 metric: 'complexity',
                 measured: cc,
-                message: `${fn.getName() ?? '<anonymous>'} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)})`,
-                // The name the message already uses (bug 0068). Without it the
-                // identity re-derives a name from the AST node, which for an
-                // object-literal function resolves up to the enclosing
-                // function — two derivations in one violation, disagreeing.
-                qualifiedName: fn.getName(),
+                message: `${name} has cyclomatic complexity ${String(cc)} (max: ${String(threshold)})`,
+                qualifiedName: name,
               },
               context,
             ),
@@ -68,14 +70,15 @@ export function maxFunctionLines(threshold: number): Condition<ArchFunction> {
       for (const fn of elements) {
         const loc = linesOfCode(fn.getNode())
         if (loc > threshold) {
+          const name = fn.getName() ?? '<anonymous>' // one derivation — see maxFunctionComplexity
           violations.push(
             metricViolation(
               fn.getNode(),
               {
                 metric: 'lines',
                 measured: loc,
-                message: `${fn.getName() ?? '<anonymous>'} has ${String(loc)} lines (max: ${String(threshold)})`,
-                qualifiedName: fn.getName(), // bug 0068 — see maxFunctionComplexity
+                message: `${name} has ${String(loc)} lines (max: ${String(threshold)})`,
+                qualifiedName: name,
               },
               context,
             ),
@@ -109,14 +112,15 @@ export function maxFunctionParameters(threshold: number): Condition<ArchFunction
       for (const fn of elements) {
         const params = fn.getParameters().length
         if (params > threshold) {
+          const name = fn.getName() ?? '<anonymous>' // one derivation — see maxFunctionComplexity
           violations.push(
             metricViolation(
               fn.getNode(),
               {
                 metric: 'parameters',
                 measured: params,
-                message: `${fn.getName() ?? '<anonymous>'} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
-                qualifiedName: fn.getName(), // bug 0068 — see maxFunctionComplexity
+                message: `${name} has ${String(params)} parameters (max: ${String(threshold)}) — use an options object`,
+                qualifiedName: name,
               },
               context,
             ),

@@ -104,7 +104,42 @@ export function metricViolation(
     //
     // A path here is portable: `hashViolation` scrubs identity through
     // `normalizeIdentityText(text, root)`, which is what that scrub is for.
-    identity: `${node.getSourceFile().getFilePath()}::${options.qualifiedName ?? getElementName(node)}::${options.metric}`,
+    identity: `${node.getSourceFile().getFilePath()}::${identityName(node, options.qualifiedName)}::${options.metric}`,
     measured: options.measured,
   }
+}
+
+/**
+ * The name segment of a metric identity: the subject's own name, **scope-qualified
+ * when its own name is not unique within the file**.
+ *
+ * Two names are available and neither is sufficient alone — measured across every
+ * function shape:
+ *
+ * | shape                          | own name (`qualifiedName`) | scope (`getElementName`) |
+ * | ------------------------------ | -------------------------- | ------------------------ |
+ * | two factories returning `{build}` | `build`, `build` — COLLIDE | `makeAlpha`, `makeBeta` |
+ * | an arrow inside a named function  | `errorResponseBuilder`     | `makeAlpha` — COLLIDES with the enclosing function's own finding |
+ * | a bound literal `resolvers.top`   | `resolvers.top`            | `ArrowFunction` — no real scope |
+ *
+ * The own name alone was bug 0068's first fix and it moved the collision rather
+ * than closing it: `owningBindingName` deliberately refuses to prefix a literal
+ * that is returned from a factory or passed as an argument ("inventing one from a
+ * distant ancestor would be a guess"), so both `build`s are just `build`. That
+ * refusal is right for a **display name**, which is what it governs. An identity
+ * is an opaque key, not a claim about what the thing is called, so qualifying it
+ * by scope is not a guess — and the display name, the message and
+ * `haveNameMatching` are all left exactly as they were.
+ *
+ * The scope is only used when it is a real name: `getElementName` falls back to
+ * the node's kind (`ArrowFunction`) when no named ancestor exists, and a kind is
+ * not a scope.
+ */
+function identityName(node: Node, qualifiedName: string | undefined): string {
+  const scope = getElementName(node)
+  const own = qualifiedName ?? scope
+  const scopeIsRealName = scope !== node.getKindName()
+  const alreadyCarriesScope = own.startsWith(`${scope}.`) || own.endsWith(`.${scope}`)
+  if (!scopeIsRealName || own === scope || alreadyCarriesScope) return own
+  return `${scope}.${own}`
 }
