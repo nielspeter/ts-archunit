@@ -1,6 +1,6 @@
 # ts-archunit Defects
 
-**Version:** 0.57.0 · **Open:** 4 · **Fixed:** 65 (`fixed/`) · **Updated:** 2026-08-05
+**Version:** 0.58.0 · **Open:** 3 · **Fixed:** 67 (`fixed/`) · **Updated:** 2026-08-06
 **Roadmap:** `../plans/ROADMAP.md` · **Standard:** [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 
 > Conventions: a bug lives here while open and moves to `fixed/` when it ships, with a
@@ -18,12 +18,14 @@ different method, and it is worth naming: running the published package against 
 (cmless `main` @ `1481446`, 2,371 TS/TSX files) rather than reading our own source. Neither was visible
 from inside — 0066 because every fixture here has files in it, 0068 because our fixture uses the one
 object-literal shape the existing prefix handles. Both are in families our own suite exercises heavily.
+0068 shipped fixed in v0.58.0; 0066 is carried by [plan 0095](../plans/0095-a-pass-carries-its-evidence.md),
+which fixes it as part of one release rather than as a fifth per-family wave.
 
 0069 came from a third method worth naming too: **a measurement taken to test an unrelated hypothesis.**
 Probing whether `within()` fails open (plan 0095's Phase 0 — it does not) printed a finding whose first
-sentence names a method the rule never called. Nothing was looking for it. The suspicion under test was
+sentence named a method the rule never called. Nothing was looking for it. The suspicion under test was
 refuted and the byproduct was the real defect, which is an argument for running the probe even when you
-expect it to come back clean.
+expect it to come back clean. Fixed in v0.58.0, same day.
 
 This paragraph used to end _"Every claim below was reproduced by measurement before filing"_, and that
 sentence is withdrawn. It was not true of 0064, which shipped with a **"Not measured"** section and a
@@ -39,8 +41,6 @@ and marks what is expected rather than measured.**
 | [0062](./0062-the-release-pipelines-gates-drift-and-its-diagnostics-misname-the-cause.md) — the release pipeline's gates drift | Medium   | ~~`shellcheck` is in `ci.yml` and not `publish.yml`~~ — **that half is now fixed**, `shellcheck` runs in `publish.yml`, though as a hand-maintained second copy rather than the reusable workflow the bug prescribed, so the drift is reset and not prevented. ~~the docs site deploys with no concurrency group~~ — **also fixed**, `docs.yml` has one now; a version gate was built alongside it and **reverted the same day** (it stranded docs between a release merge and its tag, treated an unreachable registry as "not published" while reporting green, and its release-path half would have been rejected by the `github-pages` environment, which allows the `main` branch and no tags). Still open: that step's timeout is budgeted at 600s against a ~660s worst case. **Gap 2's premise is refuted** — twelve publish runs sampled, **zero 429s**; what actually recurs is a false "index unchanged" warning on every release, because the Context7 crawl finalises ~29 minutes later, past any poll budget. Re-specify before implementing. **Verified sound:** a tag cannot publish a failing commit, and no fixture leaks into the tarball. |
 
 | [0066](./0066-a-smell-detector-over-zero-files-passes.md) — a smell detector over zero source files passes | **High** | `smells.duplicateBodies(p).check()` over a project that loaded **zero files** passes — measured, and on the corpus it reported **401 findings as clean** across two apps (23% of its TypeScript). The empty-project check sits _inside_ the dead-glob gate, behind an early return that fires whenever the rule declares no glob, and smell detectors declare none. `inconsistentSiblings` fails open identically (measured). **The preset claim was corrected after review**: 6 of 7 `agentGuardrails` rules throw loudly, so the silent path is a smell-only rule file or the direct API — which is what the corpus evaluation used. `doctor` catches it today and `check` does not, and `docs/cli.md` tells adopters not to put `doctor` in CI. |
-| [0069](./0069-the-empty-selection-message-names-a-method-the-rule-never-called.md) — the empty-selection message names a method the rule never called | Medium | The most-seen configuration finding in the library opens with _"Selector matched 0 subjects, but `.expectNonEmpty()` requires at least one … remove `.expectNonEmpty()`"_ — on rules that never called it, and where removing it is impossible because 0074 made empty the default fault and the opt-in a no-op. The `Fix:` line beside it is correct, which is the whole severity discount. **Plan 0074 diagnosed this exact defect and fixed the field below it**: the comment explaining why the text had to change sits three lines under the unchanged text, and the guard it added (`config-findings-carry-their-own-remedy.test.ts:73-79`) asserts `suggestion` only. Two other tests do assert the message and both truncate before the defect. One string; two guards, the second general. |
-| [0068](./0068-a-function-metric-identifies-an-object-literal-function-by-its-enclosing-function.md) — a function metric names an object-literal function after its enclosing function | **High** | Filed as an identity collision; **v0.57.0 closed the collision and masks what remains.** `measured` is a per-identity **ceiling** and the identities in a colliding group are separated only by a positional `#N`, so ceilings are keyed to a slot rather than a function. Measured by three reviewers: delete one member and the survivor inherits another's ceiling — a regression grows 62% past what was accepted, silently green. The mirror case is a false **red** from alphabetising a handler map, with no code change. Severity was downgraded to Low and **restored** on that evidence. `.excluding()` on the outer function also silently waives every arrow nested inside it. |
 
 **Three closed in v0.57.0, by one fix.**
 [0064](./fixed/0064-a-dependency-identity-collides-across-two-spellings-of-one-module.md) (two spellings

@@ -1,8 +1,8 @@
 # Bug 0068: a function metric names an object-literal function after its enclosing function
 
-**Reported:** 2026-08-05 · **Fixed:** not yet · **Rewritten:** 2026-08-05, after v0.57.0 closed the half
+**Reported:** 2026-08-05 · **Fixed:** 2026-08-06 (v0.58.0) · **Rewritten:** 2026-08-05, after v0.57.0 closed the half
 this report led with.
-**Found in:** asking whether [0067](./fixed/0067-a-duplicate-pair-identity-collides-on-two-same-named-functions-in-one-file.md)
+**Found in:** asking whether [0067](./0067-a-duplicate-pair-identity-collides-on-two-same-named-functions-in-one-file.md)
 was smells-only. It is not — the same wrong-name mechanism reaches `rules/metrics`.
 **Severity:** **High.** Downgraded to Low after v0.57.0 closed the collision half, then **restored** when
 three reviewers independently measured that it still costs coverage — see "Why Low was wrong" below.
@@ -188,3 +188,75 @@ Derive the census rather than listing the three rules: every `metricViolation` c
 - Whether `element` disagreeing with `message` has consequences beyond identity — `.excluding()` matches
   against `[element, file, message]`, so an exclusion written against the message may not match the element.
   Not tested.
+
+## Fix as shipped
+
+**v0.58.0**, 2026-08-06. One line per rule at the three function-metric call sites, plus the `element`
+half the identity fix does not reach.
+
+```ts
+// src/rules/metrics-function.ts — all three conditions
+qualifiedName: fn.getName(),
+
+// src/core/metric-violation.ts — the qualified name reaches `element`, not only `identity`
+element: options.qualifiedName ?? base.element,
+```
+
+`element` was not in the report's Fix section and had to be added: passing `qualifiedName` alone makes
+the **identity** correct and leaves consequence 1 — the terminal and JSON field — still naming the
+enclosing function, and leaves the `.excluding()` half of consequence 2 unfixed.
+
+### Measured, before and after
+
+New fixture `tests/fixtures/metrics/src/nested-object-literal.ts` — an object-literal function **and**
+its enclosing function both breaching the same threshold, which is the only shape that shows this
+(one per file cannot).
+
+| metric     | before                                                            | after                                     |
+| ---------- | ----------------------------------------------------------------- | ----------------------------------------- |
+| lines      | `element=makeAlpha  id=…::makeAlpha::lines` for **both** findings | each finding carries its own name         |
+| parameters | `element=makeAlpha` for the arrow named `manyParams`              | `element=manyParams  id=…::manyParams::…` |
+
+**The `maxFunctionParameters` item from "Not measured" is now measured, and the report's expectation was
+half right.** It produces the wrong name, as expected — but it did **not** collide here. A collision
+needs the enclosing function to breach the _same_ metric, which `makeAlpha` does for `lines` and does
+not for `parameters`. So the parameters defect is a wrong label, not a shared ceiling, unless the outer
+function also breaches.
+
+### Guard
+
+`tests/rules/metric-identity-names-its-own-function.test.ts`, built around the two traps the report
+named:
+
+- **Never a count.** `expect(findings).toHaveLength(4)` passes with the bug fully intact — the bug loses
+  identities, not findings. Every assertion is on identity or on `element`.
+- **A control that the fixture still produces both findings**, so the identity assertions cannot hold
+  vacuously over one element.
+- **A derived census** rather than a list of three: every `metricViolation` call site in `src/rules/`
+  and `src/conditions/` must pass `qualifiedName`, so a metric rule added tomorrow joins by existing.
+
+### Sabotage
+
+5 rows, full ADR-008 rule 5 discipline: green baseline asserted first, each patch asserted to apply
+non-trivially, verdicts read from **exit codes**. The three `qualifiedName` edits are textually
+identical — the exact bundling that once credited one test to two conditions — so they are **three
+rows, not one**, plus the `element` site and bug 0069's message.
+
+| row                                      | verdict |
+| ---------------------------------------- | ------- |
+| complexity site drops `qualifiedName`    | caught  |
+| lines site drops `qualifiedName`         | caught  |
+| parameters site drops `qualifiedName`    | caught  |
+| `element` stops using the qualified name | caught  |
+
+**Caught by nothing: 0 of 5.**
+
+### Still open
+
+- **Adopter baselines for function metrics go stale.** The identity changed for every object-literal
+  function metric finding, so an entry keyed on the enclosing function's name no longer matches. This is
+  the same class as 0064/0065 and ships with the same changelog treatment: regenerate.
+- Whether two classes in one file with a same-named method collide — the report's second unmeasured
+  item, untouched here because it is the **class** path, which already passed `qualifiedName`.
+- 0067 is **not** closed by this and must not be merged into it: there the qualified names are equal
+  because nothing distinguishes them, so passing the name through changes nothing.

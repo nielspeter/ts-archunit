@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.58.0] - 2026-08-06
+
+Two messages that named the wrong thing. Both were found the same way — by a measurement taken for
+another purpose — and both had a guard beside them that could not see them, because each guard was
+written for the field its own fix had touched.
+
+### Fixed
+
+- **A function metric identifies the function its message names.** The three function metrics built
+  their message from `fn.getName()` and then handed the AST node to `metricViolation` with no
+  `qualifiedName`, so the identity re-derived a name and `getElementName` resolved an unnamed node up to
+  its nearest **named ancestor** — the enclosing function. Measured: an object-literal function's `lines`
+  finding reported `element=makeAlpha` with identity `…::makeAlpha::lines`, byte-identical to the
+  enclosing function's own. `BaselineEntry.measured` is a per-identity ceiling, so ceilings were keyed to
+  a positional slot rather than to a function. `element` now carries the qualified name too — it is what
+  the terminal prints, what JSON reports, and one of three fields string-form `.excluding()` matches by
+  exact membership, so the disagreement also made an exclusion written against the printed name silently
+  miss. ([bug 0068](bugs/fixed/0068-a-function-metric-identifies-an-object-literal-function-by-its-enclosing-function.md))
+
+  ⚠️ **Regenerate your baseline if you ratchet function metrics on object-literal functions.** The
+  identity changed for exactly those findings; entries keyed on the enclosing function's name no longer
+  match. Class metrics are unaffected — they already passed the qualified name.
+
+- **The empty-selection finding names no method the rule never called.** It opened with _"Selector
+  matched 0 subjects, but `.expectNonEmpty()` requires at least one"_ and closed with _"remove
+  `.expectNonEmpty()`"_ — on rules that never called it, and where removing it is impossible, because
+  0.34.0 made an empty selection the default fault and left the opt-in a no-op. ADR-008 rule 2: a remedy
+  impossible on the path that produced it is worse than none. The `Fix:` line is unchanged; it already
+  carried both reachable remedies. No baseline impact — this finding bypasses filters, so none ever
+  stored it. ([bug 0069](bugs/fixed/0069-the-empty-selection-message-names-a-method-the-rule-never-called.md))
+
+### Notes
+
+Both fixes ship with the guard the original fix should have had. Plan 0074 diagnosed bug 0069's exact
+defect, corrected the `suggestion`, and its test asserted that field alone — so the identical sentence
+survived one line above it, in the text the reader meets first. Both fields are now one assertion pair.
+For 0068 the census is derived rather than listed: every `metricViolation` call site must pass
+`qualifiedName`, so a metric rule added later joins the check by existing.
+
+Sabotage matrix, 5 rows, ADR-008 rule 5 discipline — green baseline asserted first, every patch asserted
+to apply non-trivially, verdicts read from exit codes, and the three textually-identical `qualifiedName`
+edits split into three rows rather than bundled. **Caught by nothing: 0 of 5.**
+
+Also landed (docs only): [ADR-009](adr/009-a-pass-is-constructed-from-evidence.md) — a pass is
+constructed from evidence of examination — with [ADR-010](adr/010-the-extension-surface-is-a-contract.md)
+and [plan 0095](plans/0095-a-pass-carries-its-evidence.md). Both ADRs are Proposed; no behaviour follows
+from them yet.
+
 ## [0.57.0] - 2026-08-05
 
 The identity invariant becomes a mechanism. Three filed collisions close together because one

@@ -1,13 +1,13 @@
 # Bug 0069: the empty-selection message names a method the rule never called, and tells the reader to remove it
 
-**Reported:** 2026-08-06 · **Fixed:** not yet
+**Reported:** 2026-08-06 · **Fixed:** 2026-08-06 (v0.58.0)
 **Found in:** an unrelated measurement — probing the `within()` vacuity cell for
-[plan 0095](../plans/0095-a-pass-carries-its-evidence.md) Phase 0. The finding fired correctly; its
+[plan 0095](../../plans/0095-a-pass-carries-its-evidence.md) Phase 0. The finding fired correctly; its
 first sentence was wrong. Reproduced on the published 0.57.0 dist.
 **Severity:** **Medium.** Published API and every adopter meets it — this is the finding 0.34.0 made the
 default fault, so it is the most-seen configuration finding in the library. It is not High because the
 `Fix:` line beside it is correct and mechanical, so the reader who reads both lines is steered right.
-Top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 by blast radius, discounted by
+Top row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 by blast radius, discounted by
 that.
 
 ## What happens
@@ -34,10 +34,10 @@ within(calls(p).that().onObject('logger')) //  2 calls matched, zero callbacks
 No `.expectNonEmpty()` anywhere in the chain. The message names it twice: once as the requirement being
 violated, once as the thing to remove.
 
-**Removing it is impossible — there is nothing to remove.** Since [plan 0074](../plans/completed/0074-r3b-the-selector-glob-flip.md)
+**Removing it is impossible — there is nothing to remove.** Since [plan 0074](../../plans/completed/0074-r3b-the-selector-glob-flip.md)
 (v0.34.0) an empty selection is a finding **by default**; `.expectNonEmpty()` became a no-op opt-in that
 no longer gates anything. So the sentence describes the pre-0.34.0 world, and its instruction is
-unfollowable in the current one. [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 2:
+unfollowable in the current one. [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 2:
 _"A message whose stated fix is impossible on the path that produced it is worse than no message: the
 agent tries it, it fails, and the agent then does the forbidden thing."_
 
@@ -121,3 +121,46 @@ is not there. Ship as a patch or with any minor; no migration.
 - Whether `unexpectedlyNonEmptyViolation` (`:588`, the `.expectEmpty()` expiry counterpart) has an
   equivalent staleness. Plan 0095 deletes that producer, so it may be moot — but "may be" is not
   measured, and 0095 has not shipped.
+
+## Fix as shipped
+
+**v0.58.0**, 2026-08-06. One string, `src/core/rule-builder.ts`:
+
+```ts
+message:
+  'Selector matched 0 subjects, so this rule can never fail — ' +
+  'likely a wrong glob or filter.',
+```
+
+The `Fix:` line is unchanged — it already carried both remedies reachable from any path that produces
+this finding.
+
+**No adopter identity change.** The finding sets `bypassFilters`, so no baseline ever stored it; and
+`dead-selector-fails.test.ts`'s assertions split the message on its first comma, so the prefix they pin
+is genuinely unchanged rather than accidentally so.
+
+### Guard — both fields, one thought
+
+The reason this shipped is that plan 0074's guard was written for the field being fixed. So the fix is
+paired:
+
+- the existing test gains `expect(f?.message).not.toContain('.expectNonEmpty()')` beside its
+  `suggestion` assertions, so a future edit meets both in one place;
+- a new test makes the **sharp** case its own row — a chain that never calls `.expectNonEmpty()`, where
+  the old text named a method that was not there and told the reader to remove it. It also asserts the
+  finding still states the fault and still carries a reachable remedy, so passing by saying nothing is
+  not available.
+
+### Sabotage
+
+Restoring the old message reds **both** assertions (2 failed, 4 passed). Run inside the 5-row matrix
+shared with bug 0068: green baseline first, patch asserted to apply, verdict from the exit code.
+**Caught by nothing: 0 of 5.**
+
+### Not fixed here
+
+The general form — _no configuration finding may name an API the rule did not call_ — is deliberately
+not built. This report has **one** data point, and the sibling producers (empty project, dead glob,
+preset discovery, asserts-nothing) were not audited for it. The guard's shape depends on how many
+producers it must serve, so auditing comes first. Plan 0095 Phase 2d rewrites this producer's remedy
+text anyway; whoever does that should expect this string to have moved.
