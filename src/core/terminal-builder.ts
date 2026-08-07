@@ -129,7 +129,7 @@ export abstract class TerminalBuilder {
    * failure the moment the typo is fixed, and until then the intent is stated
    * in the rule where a reader sees it — rather than in a baseline, or nowhere.
    *
-   * Exactly symmetric with {@link expectNonEmpty}, and the two together mean
+   * Symmetric with {@link expectNonEmpty} for the rule builders. A family may **refuse** the zero-arg form where a whole-rule notion of empty has no meaning — `CorrespondenceBuilder` throws, because it declares per side — so a consumer walking `TerminalBuilder[]` must not call it unguarded. Exactly symmetric, and the two together mean
    * the empty/non-empty question is always answerable from the rule text.
    * Declaring both is a contradiction and throws here rather than silently
    * picking one.
@@ -139,6 +139,28 @@ export abstract class TerminalBuilder {
     const next = this.copy()
     next._expectEmpty = true
     return next
+  }
+
+  /**
+   * True when this rule's emptiness is DECLARED — plan 0097, consumed by 0098.
+   *
+   * The base answer is the whole-rule flag. It is `protected` and overridable
+   * because a family whose declaration is not whole-rule must be able to say so:
+   * `CorrespondenceBuilder` declares per SIDE and refuses the zero-arg form
+   * entirely, so `_expectEmpty` is unreachable there and this default would
+   * answer `false` for a rule whose every side the author declared — reporting a
+   * finding that tells them to declare what they declared, which is ADR-008
+   * rule 2's loop.
+   *
+   * It exists now, ahead of the floor that reads it, for a reason worth stating:
+   * a private version of this lived on `CorrespondenceBuilder` and was deleted
+   * as dead code, correctly — but the deletion also removed the only expression
+   * of the concept, so the override 0098 needs would have gone missing SILENTLY
+   * rather than as the compile error a narrowed-visibility clash would have
+   * produced. Declaring it here makes the coupling loud again.
+   */
+  protected declaresEmpty(): boolean {
+    return this._expectEmpty
   }
 
   /**

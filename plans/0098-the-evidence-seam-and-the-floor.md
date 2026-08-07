@@ -95,6 +95,12 @@ tiny), `bugs/0066-*.md` → `bugs/fixed/`; this plan moves to `plans/completed/`
 
 ## Test inventory
 
+- **`.expectEmpty()` is EFFECTIVE, not merely reachable** — moved here from 0097, whose hoist made it
+  callable on every family while nothing read the flag. A smell detector that declares empty over a
+  zero-subject corpus passes; one that declares empty and then examines something fails. And
+  `CorrespondenceBuilder.declaresEmpty()` is overridden per side, so a rule whose every side is
+  declared does **not** red at the floor asking the author to declare — ADR-008 rule 2's loop, which
+  the base implementation would produce because that class refuses the whole-rule form.
 - **Per family, the triple-route shape**: the zero-units finding asserted through `violations()` **and**
   `check()` **and** `.warn()`, with `bypassFilters` read off the `violations()` result. That is the row
   that catches the two non-equivalent mis-wirings — the floor inside one terminal only, or the finding

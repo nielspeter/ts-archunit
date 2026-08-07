@@ -163,17 +163,70 @@ describe('correspondence()', () => {
         .expectEmpty('servcies') // typo
         .beComplete()
         .violations()
-      expect(v).toHaveLength(1)
+      // NOT the length — under an inverted filter the typo case also yields
+      // exactly one violation (the real `beComplete` finding), so `1 === 1`
+      // passes on that sabotage. The substring is what carries this row.
       expect(v[0]!.message).toContain("sides are 'services' and 'registry'")
       expect(v[0]!.bypassFilters).toBe(true)
-      // The remedy remediates: spell it correctly and the finding clears.
+      // The remedy names the ACTION, and is pinned separately from the message,
+      // which names the facts. The census proves whose remedy it is; only this
+      // proves what it says — and an agent handed facts with no imperative
+      // invents one.
+      expect(v[0]!.suggestion).toContain(
+        "Correct the side name to one of 'services' and 'registry'",
+      )
+
+      // Applying the stated remedy: spell it correctly. The unbound finding
+      // clears — and the rule is still red, with a DIFFERENT finding, because
+      // `services` genuinely is not empty so the corrected declaration has
+      // genuinely expired. Asserted rather than filtered, because a filtered
+      // empty list would also pass if `violations()` returned nothing at all.
       const fixed = correspondence(stubProject)
         .side('services', services(), byNameKey)
         .side('registry', ['UserService'])
         .expectEmpty('services')
         .beComplete()
         .violations()
-      expect(fixed.filter((x) => x.message.includes('binds to nothing'))).toEqual([])
+      expect(fixed).toHaveLength(1)
+      expect(fixed[0]!.message).toContain('was declared empty')
+
+      // The remedy's OTHER branch — remove the declaration — is the one an
+      // agent takes, and it clears everything.
+      const removed = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .beComplete()
+        .violations()
+      expect(removed.filter((x) => x.message.includes('binds to nothing'))).toEqual([])
+      expect(removed.filter((x) => x.message.includes('was declared empty'))).toEqual([])
+    })
+
+    it('one bad name in BOTH declaration sets is ONE finding', () => {
+      // Concatenating the two sets produced two findings with identical element,
+      // message, file and line — the identity shape bugs 0064, 0065 and 0067 were
+      // filed for, where `hashViolation` keys both to one baseline entry and the
+      // terminal prints the same sentence twice.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('typo')
+        .distinctKeysOn('typo')
+        .beComplete()
+        .violations()
+      expect(v.map((x) => x.element)).toEqual(['typo'])
+    })
+
+    it('two unbound names report two findings, by identity', () => {
+      // The `.map()`'s identity property: one finding per bad name, not one
+      // per rule. Catches a future "report only the first" simplification.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('servcies')
+        .distinctKeysOn('registrees')
+        .beComplete()
+        .violations()
+      expect(v.map((x) => x.element)).toEqual(['servcies', 'registrees'])
     })
 
     it('distinctKeysOn() with an unbound name is caught by the same check', () => {

@@ -217,6 +217,28 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     return next
   }
 
+  /**
+   * Declared when EVERY side is — plan 0097.
+   *
+   * The base implementation reads the whole-rule flag, which this class refuses
+   * to let anyone set. Without this override, 0098's floor would red a rule
+   * whose every side the author declared, with a finding telling them to
+   * declare. The per-side loop in `collectViolations` does not need this — its
+   * membership test covers each side directly — which is exactly why the
+   * previous private version was dead code and was removed. This one is for
+   * the root, which asks the question about the rule rather than about a side.
+   *
+   * **Unobservable until 0098, and recorded as such rather than guarded.** No
+   * shipped code reads `declaresEmpty()` yet, so reverting this override to the
+   * base body changes no output and no test fails — measured. ADR-008's
+   * split-row corollary says to record an equivalence rather than invent a guard
+   * for it; the row that makes it observable is in 0098's inventory, where the
+   * floor that calls it lands.
+   */
+  protected override declaresEmpty(): boolean {
+    return this._sides.length > 0 && this._sides.every((s) => this._expectEmptySides.has(s.name))
+  }
+
   /** Fail if a side maps two distinct subjects to one key (over-normalization guard). */
   distinctKeysOn(sideName: string): this {
     const next = this.copy()
@@ -290,6 +312,14 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     const sideA = this._sides[0]!
     const sideB = this._sides[1]!
 
+    const meta: ViolationMeta = {
+      rule: `correspondence [${sideA.name} <-> ${sideB.name}]`,
+      because: this._reason,
+      ruleId: this._metadata?.id,
+      suggestion: this._metadata?.suggestion,
+      docs: this._metadata?.docs,
+    }
+
     // A declaration that binds to no side is a configuration finding, not a
     // no-op — plan 0097, correcting the same defect the shipped version had.
     // `.expectEmpty('servcies')` was accepted silently and asserted nothing
@@ -303,22 +333,18 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     //
     // Here rather than in the setter: `.expectEmpty(name)` may legally precede
     // `.side(name, …)`, so the setter cannot know yet.
-    const declaredNames = [...this._expectEmptySides, ...this._distinctKeys]
-    const unbound = declaredNames.filter((n) => n !== sideA.name && n !== sideB.name)
+    // A Set, not a concatenation: a name in BOTH sets produced two findings with
+    // identical element, message, file and line — the identity shape bugs 0064,
+    // 0065 and 0067 were filed for. And membership by the side LIST rather than
+    // two name comparisons, so it cannot rot if arity ever changes.
+    const declaredNames = new Set([...this._expectEmptySides, ...this._distinctKeys])
+    const unbound = [...declaredNames].filter((n) => !this._sides.some((side) => side.name === n))
     if (unbound.length > 0) {
-      return unbound.map((name) => this.unboundSideViolation(name, [sideA.name, sideB.name]))
+      return unbound.map((name) => this.unboundSideViolation(name, meta, [sideA.name, sideB.name]))
     }
 
     const aKeyed = sideA.materialize()
     const bKeyed = sideB.materialize()
-
-    const meta: ViolationMeta = {
-      rule: `correspondence [${sideA.name} <-> ${sideB.name}]`,
-      because: this._reason,
-      ruleId: this._metadata?.id,
-      suggestion: this._metadata?.suggestion,
-      docs: this._metadata?.docs,
-    }
 
     const result = setCorrespondence(aKeyed.keys(), bKeyed.keys())
 
@@ -438,7 +464,11 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * remedy is mechanical and names the sides that DO exist, so the reader does
    * not have to go and look.
    */
-  private unboundSideViolation(name: string, actual: readonly string[]): ArchViolation {
+  private unboundSideViolation(
+    name: string,
+    meta: ViolationMeta,
+    actual: readonly string[],
+  ): ArchViolation {
     const known = actual.map((s) => `'${s}'`).join(' and ')
     return {
       ...this.baseViolation(

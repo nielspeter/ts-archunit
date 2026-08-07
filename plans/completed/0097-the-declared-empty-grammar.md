@@ -71,8 +71,10 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 
 ## Test inventory
 
-- `.expectEmpty()` reachable **and effective** on `SmellBuilder` — bug 0066's unmeasured item, now
-  asserted rather than assumed.
+- `.expectEmpty()` **reachable** on `SmellBuilder` — bug 0066's unmeasured item, answered: it was
+  unreachable, and now is not. The **effectiveness** half moved to
+  [0098](../0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor that reads the flag
+  lands; claiming it here would be a row nothing can satisfy in this plan's scope.
 - the contradiction guard with `.expectNonEmpty()` still throws after the hoist.
 - `expectEmpty(side?)` rows: some-sides-declared → still reds; **all-sides-declared → passes**;
   one-side declared and that side gains a key → expires.
