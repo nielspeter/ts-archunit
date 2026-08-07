@@ -81,7 +81,7 @@ Also landed (docs only):
 [ADR-009](https://github.com/nielspeter/ts-archunit/blob/main/adr/009-a-pass-is-constructed-from-evidence.md)
 — a pass is constructed from evidence of examination — with
 [ADR-010](https://github.com/nielspeter/ts-archunit/blob/main/adr/010-the-extension-surface-is-a-contract.md)
-and [plan 0095](https://github.com/nielspeter/ts-archunit/blob/main/plans/0095-a-pass-carries-its-evidence.md).
+and [plan 0095](https://github.com/nielspeter/ts-archunit/blob/main/plans/0095-the-vacuity-matrix-and-the-conformance-audit.md).
 Both ADRs are Proposed; no behaviour follows from them yet.
 
 ## [0.57.0] - 2026-08-05

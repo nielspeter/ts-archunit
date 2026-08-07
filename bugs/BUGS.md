@@ -18,7 +18,7 @@ different method, and it is worth naming: running the published package against 
 (cmless `main` @ `1481446`, 2,371 TS/TSX files) rather than reading our own source. Neither was visible
 from inside — 0066 because every fixture here has files in it, 0068 because our fixture uses the one
 object-literal shape the existing prefix handles. Both are in families our own suite exercises heavily.
-0068 shipped fixed in v0.58.0; 0066 is carried by [plan 0095](../plans/0095-a-pass-carries-its-evidence.md),
+0068 shipped fixed in v0.58.0; 0066 is carried by [plan 0098](../plans/0098-the-evidence-seam-and-the-floor.md),
 which fixes it as part of one release rather than as a fifth per-family wave.
 
 0069 came from a third method worth naming too: **a measurement taken to test an unrelated hypothesis.**
