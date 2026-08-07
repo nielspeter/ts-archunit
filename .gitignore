@@ -6,9 +6,15 @@ coverage/
 .idea/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
-/.claude/
 /.serena/
 .playwright-mcp/
+
+# `.claude/` is checked in on purpose — the review agents and skills are shared
+# project config, not machine state. This one file is not: Claude Code
+# accumulates its permission allowlist into it, so what is one harmless boolean
+# today becomes a record of what an agent may run, published in a public repo.
+# Untracked deliberately; the same reasoning as the credential block below.
+.claude/settings.local.json
 
 # Probe test files generated at runtime by tests/core/warn-survives-the-test-runner.test.ts.
 # Deleted in afterAll; ignored so a crashed run cannot leave them to be committed —
