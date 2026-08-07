@@ -1,0 +1,2631 @@
+{
+  "_README": [
+    "Hand labels for proposal 022 and the signal scoring in 022-signals-scored.mjs.",
+    "QUESTION: do these two functions DO THE SAME THING?",
+    "  SAME = one operation, differing only by data (entity, template key, table, endpoint).",
+    "  DIFF = they share a skeleton (framework or library idiom) but perform unrelated work.",
+    "These labels are a JUDGEMENT, not a derivation. They were assigned by reading all 153",
+    "pairs in one pass against the rule above. Disagree with one? Flip its label and re-run",
+    "the scorer — that is what this file is for. The boundary cases are publish-vs-unpublish,",
+    "create-vs-update, and opposite-direction transforms, all labelled DIFF.",
+    "Corpus: nielspeter/cmless @ 1481446. Detector: @nielspeter/ts-archunit 0.56.0,",
+    "minLines(10), similarity >= 0.9, stratified over (similarity band x body size)."
+  ],
+  "corpus": {
+    "repo": "nielspeter/cmless",
+    "sha": "148144656d78c29d1879d37985335168f2aa02a2"
+  },
+  "detector": {
+    "version": "0.56.0",
+    "minLines": 10,
+    "minSimilarity": 0.9
+  },
+  "counts": {
+    "total": 153,
+    "same": 130,
+    "diff": 23
+  },
+  "pairs": [
+    {
+      "n": 1,
+      "label": "SAME",
+      "a": "useApiKey (apps/admin-ui/src/hooks/useApiKey.ts:8)",
+      "b": "useContentType (apps/admin-ui/src/hooks/useContentType.ts:7)",
+      "signals": {
+        "kinds": 0.9316,
+        "exactCalls": 0.3333,
+        "rename": 0.2381,
+        "callVocab": 0.3,
+        "opVocab": 0.3333,
+        "fnNameSim": 0.2,
+        "minLines": 12,
+        "minNodes": 113,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 2,
+      "label": "SAME",
+      "a": "useCreateTaxonomyConceptScheme (apps/admin-ui/src/hooks/useTaxonomy.ts:113)",
+      "b": "useCreateTaxonomyValidation (apps/admin-ui/src/hooks/useTaxonomy.ts:191)",
+      "signals": {
+        "kinds": 0.9167,
+        "exactCalls": 0.75,
+        "rename": 0.5,
+        "callVocab": 0.7273,
+        "opVocab": 0.7273,
+        "fnNameSim": 0.5,
+        "minLines": 11,
+        "minNodes": 88,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 3,
+      "label": "SAME",
+      "a": "findByIds (apps/api/src/repositories/saved-view.repository.ts:29)",
+      "b": "findByIds (apps/api/src/repositories/workflow.repository.ts:34)",
+      "signals": {
+        "kinds": 0.9145,
+        "exactCalls": 0.2222,
+        "rename": 0.6456,
+        "callVocab": 0.6786,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 12,
+        "minNodes": 107,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 4,
+      "label": "SAME",
+      "a": "findByIds (apps/api/src/repositories/webhook.repository.ts:59)",
+      "b": "findByContentTypeId (apps/api/src/repositories/workflow-binding.repository.ts:26)",
+      "signals": {
+        "kinds": 0.9412,
+        "exactCalls": 0.3333,
+        "rename": 0.4262,
+        "callVocab": 0.4815,
+        "opVocab": 1,
+        "fnNameSim": 0.2,
+        "minLines": 10,
+        "minNodes": 82,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 5,
+      "label": "DIFF",
+      "a": "handlePublishContentType (apps/api/src/routes/content-types.ts:361)",
+      "b": "handleUnpublishContentType (apps/api/src/routes/content-types.ts:396)",
+      "signals": {
+        "kinds": 0.9397,
+        "exactCalls": 0.6,
+        "rename": 0.2,
+        "callVocab": 0.7143,
+        "opVocab": 0.6364,
+        "fnNameSim": 0.6,
+        "minLines": 10,
+        "minNodes": 109,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 6,
+      "label": "DIFF",
+      "a": "handleUnpublishEntry (apps/api/src/routes/mgmt-entries.ts:324)",
+      "b": "handleDeleteEntry (apps/api/src/routes/mgmt-entries.ts:339)",
+      "signals": {
+        "kinds": 0.9316,
+        "exactCalls": 0.5,
+        "rename": 0.3333,
+        "callVocab": 0.7333,
+        "opVocab": 0.7273,
+        "fnNameSim": 0.5,
+        "minLines": 10,
+        "minNodes": 116,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 7,
+      "label": "SAME",
+      "a": "verifyContext (apps/api/src/services/entry.service.ts:1109)",
+      "b": "verifyContext (apps/api/src/services/tag-management.service.ts:218)",
+      "signals": {
+        "kinds": 0.9158,
+        "exactCalls": 0,
+        "rename": 0.4018,
+        "callVocab": 0.4,
+        "opVocab": 0,
+        "fnNameSim": 1,
+        "minLines": 11,
+        "minNodes": 91,
+        "nCalls": 2
+      }
+    },
+    {
+      "n": 8,
+      "label": "SAME",
+      "a": "useEmailLogDetail (apps/identity-gateway-ui/src/hooks/useEmails.ts:49)",
+      "b": "useEmailStats (apps/identity-gateway-ui/src/hooks/useEmails.ts:65)",
+      "signals": {
+        "kinds": 0.9263,
+        "exactCalls": 0.6667,
+        "rename": 0.5,
+        "callVocab": 0.6667,
+        "opVocab": 0.6667,
+        "fnNameSim": 0.4,
+        "minLines": 12,
+        "minNodes": 93,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 9,
+      "label": "SAME",
+      "a": "useEmailLogDetail (apps/identity-gateway-ui/src/hooks/useEmails.ts:49)",
+      "b": "useIGInfo (apps/identity-gateway-ui/src/hooks/useSystem.ts:315)",
+      "signals": {
+        "kinds": 0.9053,
+        "exactCalls": 0.6667,
+        "rename": 0.2857,
+        "callVocab": 0.5,
+        "opVocab": 0.5,
+        "fnNameSim": 0.1667,
+        "minLines": 12,
+        "minNodes": 90,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 10,
+      "label": "SAME",
+      "a": "useEmailSuppressions (apps/identity-gateway-ui/src/hooks/useEmails.ts:178)",
+      "b": "useSystemUsage (apps/identity-gateway-ui/src/hooks/useSystem.ts:52)",
+      "signals": {
+        "kinds": 0.9022,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.2,
+        "minLines": 12,
+        "minNodes": 88,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 11,
+      "label": "SAME",
+      "a": "useSendTestEmail (apps/identity-gateway-ui/src/hooks/useEmails.ts:160)",
+      "b": "useSendTestAlert (apps/identity-gateway-ui/src/hooks/useSystem.ts:389)",
+      "signals": {
+        "kinds": 0.9275,
+        "exactCalls": 0.6667,
+        "rename": 0.6,
+        "callVocab": 0.75,
+        "opVocab": 0.75,
+        "fnNameSim": 0.6,
+        "minLines": 10,
+        "minNodes": 64,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 12,
+      "label": "SAME",
+      "a": "usePlatformOrganizations (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:131)",
+      "b": "useIGInfo (apps/identity-gateway-ui/src/hooks/useSystem.ts:315)",
+      "signals": {
+        "kinds": 0.9333,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.2,
+        "minLines": 12,
+        "minNodes": 86,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 13,
+      "label": "SAME",
+      "a": "useSystemHealth (apps/identity-gateway-ui/src/hooks/useSystem.ts:35)",
+      "b": "useAlertSettings (apps/identity-gateway-ui/src/hooks/useSystem.ts:336)",
+      "signals": {
+        "kinds": 0.9432,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.2,
+        "minLines": 12,
+        "minNodes": 85,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 14,
+      "label": "SAME",
+      "a": "findPendingByEmail (apps/identity-gateway/src/repositories/invitation.repository.ts:110)",
+      "b": "findByUserCmlessId (apps/identity-gateway/src/repositories/organization-membership.repository.ts:97)",
+      "signals": {
+        "kinds": 0.9072,
+        "exactCalls": 0.1667,
+        "rename": 0.3108,
+        "callVocab": 0.3462,
+        "opVocab": 0.375,
+        "fnNameSim": 0.1667,
+        "minLines": 10,
+        "minNodes": 94,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 15,
+      "label": "SAME",
+      "a": "sendOrganizationSuspendedEmail (apps/identity-gateway/src/services/email.service.ts:374)",
+      "b": "sendRecoveryCodeUsedEmail (apps/identity-gateway/src/services/email.service.ts:420)",
+      "signals": {
+        "kinds": 0.9417,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 10,
+        "minNodes": 98,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 16,
+      "label": "SAME",
+      "a": "sendTwoFactorEnabledEmail (apps/identity-gateway/src/services/email.service.ts:398)",
+      "b": "sendRecoveryCodeUsedEmail (apps/identity-gateway/src/services/email.service.ts:420)",
+      "signals": {
+        "kinds": 0.9388,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.25,
+        "minLines": 10,
+        "minNodes": 92,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 17,
+      "label": "SAME",
+      "a": "buildUrl (packages/sdk/src/wrappers/environment.ts:404)",
+      "b": "buildUrl (packages/sdk/src/wrappers/space.ts:93)",
+      "signals": {
+        "kinds": 0.9302,
+        "exactCalls": 1,
+        "rename": 0,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 10,
+        "minNodes": 80,
+        "nCalls": 0
+      }
+    },
+    {
+      "n": 18,
+      "label": "SAME",
+      "a": "formatValue (apps/admin-ui/src/components/entry/VersionDiff.tsx:38)",
+      "b": "formatFieldValue (apps/admin-ui/src/components/entry/VersionPreview.tsx:32)",
+      "signals": {
+        "kinds": 0.9112,
+        "exactCalls": 0.8571,
+        "rename": 0.1667,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.6667,
+        "minLines": 24,
+        "minNodes": 324,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 19,
+      "label": "SAME",
+      "a": "useDeleteEnvironment (apps/admin-ui/src/hooks/useDeleteEnvironment.ts:11)",
+      "b": "useDeleteLocale (apps/admin-ui/src/hooks/useDeleteLocale.ts:8)",
+      "signals": {
+        "kinds": 0.9014,
+        "exactCalls": 0.4286,
+        "rename": 0.2917,
+        "callVocab": 0.9091,
+        "opVocab": 0.9,
+        "fnNameSim": 0.5,
+        "minLines": 16,
+        "minNodes": 141,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 20,
+      "label": "DIFF",
+      "a": "convertContent (apps/admin-ui/src/utils/richtext/richtext-to-tiptap.ts:252)",
+      "b": "convertContent (apps/admin-ui/src/utils/richtext/tiptap-to-richtext.ts:313)",
+      "signals": {
+        "kinds": 0.9259,
+        "exactCalls": 0.8333,
+        "rename": 0.5,
+        "callVocab": 0.5,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 21,
+        "minNodes": 134,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 21,
+      "label": "SAME",
+      "a": "create (apps/api/src/repositories/asset.repository.ts:441)",
+      "b": "create (apps/api/src/repositories/saved-view.repository.ts:87)",
+      "signals": {
+        "kinds": 0.9298,
+        "exactCalls": 0.875,
+        "rename": 1,
+        "callVocab": 0.9167,
+        "opVocab": 0.8571,
+        "fnNameSim": 1,
+        "minLines": 23,
+        "minNodes": 164,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 22,
+      "label": "SAME",
+      "a": "create (apps/api/src/repositories/locale.repository.ts:147)",
+      "b": "create (apps/api/src/repositories/tag.repository.ts:109)",
+      "signals": {
+        "kinds": 0.9136,
+        "exactCalls": 0.8571,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 19,
+        "minNodes": 148,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 23,
+      "label": "DIFF",
+      "a": "handleCreateTaxonomyValidation (apps/api/src/routes/content-types.ts:451)",
+      "b": "handleUpdateTaxonomyValidation (apps/api/src/routes/content-types.ts:472)",
+      "signals": {
+        "kinds": 0.9385,
+        "exactCalls": 0.4,
+        "rename": 0.3333,
+        "callVocab": 0.7143,
+        "opVocab": 0.7,
+        "fnNameSim": 0.6,
+        "minLines": 16,
+        "minNodes": 127,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 24,
+      "label": "DIFF",
+      "a": "useUpdateClientPolicies (apps/identity-gateway-ui/src/hooks/useClientPolicies.ts:62)",
+      "b": "useCreateTeam (apps/identity-gateway-ui/src/hooks/useTeamMutations.ts:11)",
+      "signals": {
+        "kinds": 0.9097,
+        "exactCalls": 0.6667,
+        "rename": 0.125,
+        "callVocab": 0.4286,
+        "opVocab": 0.5455,
+        "fnNameSim": 0.1667,
+        "minLines": 14,
+        "minNodes": 135,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 25,
+      "label": "SAME",
+      "a": "useEmailStats (apps/identity-gateway-ui/src/hooks/useEmails.ts:65)",
+      "b": "useEmailTemplates (apps/identity-gateway-ui/src/hooks/useEmails.ts:102)",
+      "signals": {
+        "kinds": 0.9375,
+        "exactCalls": 0.6667,
+        "rename": 0.6,
+        "callVocab": 0.75,
+        "opVocab": 0.75,
+        "fnNameSim": 0.5,
+        "minLines": 13,
+        "minNodes": 93,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 26,
+      "label": "SAME",
+      "a": "useEmailTemplates (apps/identity-gateway-ui/src/hooks/useEmails.ts:102)",
+      "b": "useAlerts (apps/identity-gateway-ui/src/hooks/useSystem.ts:352)",
+      "signals": {
+        "kinds": 0.9167,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.25,
+        "minLines": 13,
+        "minNodes": 88,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 27,
+      "label": "SAME",
+      "a": "useOrgAuditActions (apps/identity-gateway-ui/src/hooks/useOrgAuditLogs.ts:67)",
+      "b": "useCellsStatus (apps/identity-gateway-ui/src/hooks/useSystem.ts:281)",
+      "signals": {
+        "kinds": 0.9091,
+        "exactCalls": 0.6667,
+        "rename": 0.2857,
+        "callVocab": 0.5,
+        "opVocab": 0.5,
+        "fnNameSim": 0.1667,
+        "minLines": 13,
+        "minNodes": 90,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 28,
+      "label": "SAME",
+      "a": "useAuditActions (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:267)",
+      "b": "useAlerts (apps/identity-gateway-ui/src/hooks/useSystem.ts:352)",
+      "signals": {
+        "kinds": 0.9167,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.25,
+        "minLines": 13,
+        "minNodes": 88,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 29,
+      "label": "DIFF",
+      "a": "useVerifyUserEmail (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:79)",
+      "b": "useDeleteUser (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:111)",
+      "signals": {
+        "kinds": 0.9379,
+        "exactCalls": 0.8333,
+        "rename": 0.25,
+        "callVocab": 0.75,
+        "opVocab": 0.75,
+        "fnNameSim": 0.4,
+        "minLines": 15,
+        "minNodes": 139,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 30,
+      "label": "SAME",
+      "a": "update (apps/identity-gateway/src/repositories/organization-membership.repository.ts:189)",
+      "b": "update (apps/identity-gateway/src/repositories/taxonomy-concept-scheme.repository.ts:268)",
+      "signals": {
+        "kinds": 0.916,
+        "exactCalls": 0.2,
+        "rename": 0.4862,
+        "callVocab": 0.7391,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 17,
+        "minNodes": 125,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 31,
+      "label": "SAME",
+      "a": "sendBillingEmail (apps/identity-gateway/src/services/logging-email.service.ts:333)",
+      "b": "sendTrialLifecycleEmail (apps/identity-gateway/src/services/resend-email.service.ts:579)",
+      "signals": {
+        "kinds": 0.9277,
+        "exactCalls": 0,
+        "rename": 0.4,
+        "callVocab": 0.4,
+        "opVocab": 0.25,
+        "fnNameSim": 0.4,
+        "minLines": 14,
+        "minNodes": 80,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 32,
+      "label": "SAME",
+      "a": "sendOrganizationUnsuspendedEmail (apps/identity-gateway/src/services/logging-email.service.ts:183)",
+      "b": "sendTrialLifecycleEmail (apps/identity-gateway/src/services/resend-email.service.ts:579)",
+      "signals": {
+        "kinds": 0.9157,
+        "exactCalls": 0,
+        "rename": 0.4,
+        "callVocab": 0.4,
+        "opVocab": 0.25,
+        "fnNameSim": 0.3333,
+        "minLines": 14,
+        "minNodes": 82,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 33,
+      "label": "SAME",
+      "a": "sendRecoveryCodeUsedEmail (apps/identity-gateway/src/services/logging-email.service.ts:228)",
+      "b": "sendTrialDeletionWarningEmail (apps/identity-gateway/src/services/resend-email.service.ts:541)",
+      "signals": {
+        "kinds": 0.9412,
+        "exactCalls": 0,
+        "rename": 0.4,
+        "callVocab": 0.4,
+        "opVocab": 0.25,
+        "fnNameSim": 0.25,
+        "minLines": 14,
+        "minNodes": 82,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 34,
+      "label": "SAME",
+      "a": "sendTrialLifecycleEmail (apps/identity-gateway/src/services/logging-email.service.ts:314)",
+      "b": "sendTrialDeletionWarningEmail (apps/identity-gateway/src/services/resend-email.service.ts:541)",
+      "signals": {
+        "kinds": 0.9318,
+        "exactCalls": 0,
+        "rename": 0.4,
+        "callVocab": 0.4,
+        "opVocab": 0.25,
+        "fnNameSim": 0.5,
+        "minLines": 14,
+        "minNodes": 85,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 35,
+      "label": "SAME",
+      "a": "createArrayEntryLinkResolver (apps/api/src/graphql/resolvers/field-resolvers.ts:208)",
+      "b": "createArrayAssetLinkResolver (apps/api/src/graphql/resolvers/field-resolvers.ts:452)",
+      "signals": {
+        "kinds": 0.9264,
+        "exactCalls": 0.4,
+        "rename": 0.3253,
+        "callVocab": 0.8088,
+        "opVocab": 0.7778,
+        "fnNameSim": 0.6667,
+        "minLines": 82,
+        "minNodes": 706,
+        "nCalls": 14
+      }
+    },
+    {
+      "n": 36,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/asset-queue.ts:160)",
+      "b": "close (apps/api/src/lib/queues/usage-queue.ts:248)",
+      "signals": {
+        "kinds": 0.948,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 37,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/backup-queue.ts:147)",
+      "b": "close (apps/api/src/lib/queues/scheduled-queue.ts:143)",
+      "signals": {
+        "kinds": 0.9444,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 38,
+      "label": "SAME",
+      "a": "getWorker (apps/api/src/lib/queues/clone-queue.ts:91)",
+      "b": "getWorker (apps/api/src/lib/queues/ig-notification-queue.ts:113)",
+      "signals": {
+        "kinds": 0.92,
+        "exactCalls": 0.8571,
+        "rename": 0.5,
+        "callVocab": 0.9091,
+        "opVocab": 0.875,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 254,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 39,
+      "label": "SAME",
+      "a": "close (apps/api/src/lib/queues/gc-queue.ts:314)",
+      "b": "shutdown (apps/api/src/lib/queues/webhook-queue.ts:136)",
+      "signals": {
+        "kinds": 0.948,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 40,
+      "label": "DIFF",
+      "a": "findWithinRadiusWithDistance (apps/api/src/repositories/entry-location.repository.ts:325)",
+      "b": "findNearest (apps/api/src/repositories/entry-location.repository.ts:458)",
+      "signals": {
+        "kinds": 0.9083,
+        "exactCalls": 0.8,
+        "rename": 0,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.1667,
+        "minLines": 51,
+        "minNodes": 210,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 41,
+      "label": "SAME",
+      "a": "listBySpace (apps/api/src/repositories/team-space-membership.repository.ts:106)",
+      "b": "listByTeam (apps/api/src/repositories/team-space-membership.repository.ts:139)",
+      "signals": {
+        "kinds": 0.931,
+        "exactCalls": 0.4286,
+        "rename": 0.7384,
+        "callVocab": 0.9167,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 25,
+        "minNodes": 243,
+        "nCalls": 13
+      }
+    },
+    {
+      "n": 42,
+      "label": "SAME",
+      "a": "load (apps/api/src/services/capacity-tier-cache.service.ts:125)",
+      "b": "load (apps/api/src/services/plan-cache.service.ts:113)",
+      "signals": {
+        "kinds": 0.93,
+        "exactCalls": 0.1667,
+        "rename": 0.3929,
+        "callVocab": 0.625,
+        "opVocab": 0.5,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 239,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 43,
+      "label": "SAME",
+      "a": "getPlans (apps/api/src/services/ig-client.ts:687)",
+      "b": "getSpaceCapacityTiers (apps/api/src/services/ig-client.ts:1491)",
+      "signals": {
+        "kinds": 0.9341,
+        "exactCalls": 0.9,
+        "rename": 0,
+        "callVocab": 0.9333,
+        "opVocab": 0.9167,
+        "fnNameSim": 0,
+        "minLines": 41,
+        "minNodes": 353,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 44,
+      "label": "SAME",
+      "a": "validatePat (apps/api/src/services/ig-client.ts:347)",
+      "b": "getCapacityTiers (apps/api/src/services/ig-client.ts:1442)",
+      "signals": {
+        "kinds": 0.9292,
+        "exactCalls": 0.9,
+        "rename": 0,
+        "callVocab": 0.9333,
+        "opVocab": 0.9167,
+        "fnNameSim": 0,
+        "minLines": 41,
+        "minNodes": 346,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 45,
+      "label": "DIFF",
+      "a": "handleAddConceptToScheme (apps/identity-gateway/src/routes/internal-taxonomy.ts:396)",
+      "b": "handleDeleteTeam (apps/identity-gateway/src/routes/internal-teams.ts:167)",
+      "signals": {
+        "kinds": 0.9291,
+        "exactCalls": 0.5833,
+        "rename": 0.1474,
+        "callVocab": 0.5517,
+        "opVocab": 0.55,
+        "fnNameSim": 0.1667,
+        "minLines": 31,
+        "minNodes": 280,
+        "nCalls": 11
+      }
+    },
+    {
+      "n": 46,
+      "label": "DIFF",
+      "a": "handleDeleteConcept (apps/identity-gateway/src/routes/internal-taxonomy.ts:204)",
+      "b": "handleRemoveConceptFromScheme (apps/identity-gateway/src/routes/internal-taxonomy.ts:435)",
+      "signals": {
+        "kinds": 0.9441,
+        "exactCalls": 0.6667,
+        "rename": 0.1573,
+        "callVocab": 0.7308,
+        "opVocab": 0.6842,
+        "fnNameSim": 0.3333,
+        "minLines": 31,
+        "minNodes": 280,
+        "nCalls": 11
+      }
+    },
+    {
+      "n": 47,
+      "label": "DIFF",
+      "a": "handleRemoveConceptFromScheme (apps/identity-gateway/src/routes/internal-taxonomy.ts:435)",
+      "b": "handleDeleteTeam (apps/identity-gateway/src/routes/internal-teams.ts:167)",
+      "signals": {
+        "kinds": 0.9291,
+        "exactCalls": 0.5833,
+        "rename": 0.1474,
+        "callVocab": 0.5517,
+        "opVocab": 0.55,
+        "fnNameSim": 0.1429,
+        "minLines": 31,
+        "minNodes": 280,
+        "nCalls": 11
+      }
+    },
+    {
+      "n": 48,
+      "label": "DIFF",
+      "a": "handleUpdateTeam (apps/identity-gateway/src/routes/internal-teams.ts:124)",
+      "b": "handleAddMember (apps/identity-gateway/src/routes/internal-teams.ts:203)",
+      "signals": {
+        "kinds": 0.9456,
+        "exactCalls": 0.6667,
+        "rename": 0.1643,
+        "callVocab": 0.76,
+        "opVocab": 0.7059,
+        "fnNameSim": 0.2,
+        "minLines": 38,
+        "minNodes": 325,
+        "nCalls": 11
+      }
+    },
+    {
+      "n": 49,
+      "label": "SAME",
+      "a": "sendAccountDeletedEmail (apps/identity-gateway/src/services/resend-email.service.ts:203)",
+      "b": "sendRecoveryCodeUsedEmail (apps/identity-gateway/src/services/resend-email.service.ts:453)",
+      "signals": {
+        "kinds": 0.936,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 30,
+        "minNodes": 307,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 50,
+      "label": "SAME",
+      "a": "sendPasswordResetEmail (apps/identity-gateway/src/services/resend-email.service.ts:101)",
+      "b": "sendTemplated (apps/identity-gateway/src/services/resend-email.service.ts:620)",
+      "signals": {
+        "kinds": 0.9122,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2,
+        "minLines": 25,
+        "minNodes": 310,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 51,
+      "label": "SAME",
+      "a": "registerApiKeysCommands (packages/cli/src/commands/api-key.ts:35)",
+      "b": "registerTagsCommands (packages/cli/src/commands/tag.ts:31)",
+      "signals": {
+        "kinds": 0.9452,
+        "exactCalls": 0.4615,
+        "rename": 0.1002,
+        "callVocab": 0.6629,
+        "opVocab": 0.7368,
+        "fnNameSim": 0.4,
+        "minLines": 120,
+        "minNodes": 1641,
+        "nCalls": 63
+      }
+    },
+    {
+      "n": 52,
+      "label": "SAME",
+      "a": "useContentType (apps/admin-ui/src/hooks/useContentType.ts:7)",
+      "b": "useWebhook (apps/admin-ui/src/hooks/useWebhook.ts:7)",
+      "signals": {
+        "kinds": 0.9646,
+        "exactCalls": 0.3333,
+        "rename": 0.25,
+        "callVocab": 0.3333,
+        "opVocab": 0.375,
+        "fnNameSim": 0.25,
+        "minLines": 12,
+        "minNodes": 109,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 53,
+      "label": "SAME",
+      "a": "useEnvironments (apps/admin-ui/src/hooks/useEnvironments.ts:7)",
+      "b": "useLocales (apps/admin-ui/src/hooks/useLocales.ts:7)",
+      "signals": {
+        "kinds": 0.9592,
+        "exactCalls": 0.3333,
+        "rename": 0.2667,
+        "callVocab": 0.375,
+        "opVocab": 0.4286,
+        "fnNameSim": 0.3333,
+        "minLines": 12,
+        "minNodes": 94,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 54,
+      "label": "SAME",
+      "a": "findByCmlessId (apps/api/src/repositories/locale.repository.ts:32)",
+      "b": "findDefaultLocale (apps/api/src/repositories/locale.repository.ts:51)",
+      "signals": {
+        "kinds": 0.9904,
+        "exactCalls": 0.75,
+        "rename": 0.8598,
+        "callVocab": 0.875,
+        "opVocab": 1,
+        "fnNameSim": 0.2,
+        "minLines": 11,
+        "minNodes": 104,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 55,
+      "label": "SAME",
+      "a": "findByCode (apps/api/src/repositories/locale.repository.ts:17)",
+      "b": "findByIds (apps/api/src/repositories/tag.repository.ts:25)",
+      "signals": {
+        "kinds": 0.9533,
+        "exactCalls": 0.25,
+        "rename": 0.8219,
+        "callVocab": 0.7308,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 11,
+        "minNodes": 104,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 56,
+      "label": "SAME",
+      "a": "exists (apps/api/src/repositories/taxonomy-concept-scheme.repository.ts:366)",
+      "b": "hasConceptById (apps/api/src/repositories/taxonomy-concept-scheme.repository.ts:663)",
+      "signals": {
+        "kinds": 0.9717,
+        "exactCalls": 0.3333,
+        "rename": 0.6424,
+        "callVocab": 0.619,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 10,
+        "minNodes": 103,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 57,
+      "label": "SAME",
+      "a": "existsByContentTypeAndTarget (apps/api/src/repositories/taxonomy-validation.repository.ts:236)",
+      "b": "hasTeamAccess (apps/api/src/repositories/team-space-membership.repository.ts:207)",
+      "signals": {
+        "kinds": 0.9739,
+        "exactCalls": 0.2857,
+        "rename": 0.342,
+        "callVocab": 0.4,
+        "opVocab": 0.8333,
+        "fnNameSim": 0,
+        "minLines": 11,
+        "minNodes": 113,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 58,
+      "label": "SAME",
+      "a": "handleDeleteTaxonomyValidation (apps/api/src/routes/content-types.ts:497)",
+      "b": "handleDeleteEntry (apps/api/src/routes/mgmt-entries.ts:339)",
+      "signals": {
+        "kinds": 0.9573,
+        "exactCalls": 0.5,
+        "rename": 0.3143,
+        "callVocab": 0.6875,
+        "opVocab": 0.5833,
+        "fnNameSim": 0.4,
+        "minLines": 10,
+        "minNodes": 115,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 59,
+      "label": "DIFF",
+      "a": "handleGetTaxonomyValidation (apps/api/src/routes/content-types.ts:431)",
+      "b": "handleArchiveEntry (apps/api/src/routes/mgmt-entries.ts:354)",
+      "signals": {
+        "kinds": 0.9561,
+        "exactCalls": 0.5,
+        "rename": 0.3857,
+        "callVocab": 0.6667,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.2,
+        "minLines": 10,
+        "minNodes": 109,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 60,
+      "label": "DIFF",
+      "a": "handleUnpublishContentType (apps/api/src/routes/content-types.ts:396)",
+      "b": "handleGetConcept (apps/api/src/routes/taxonomy.ts:236)",
+      "signals": {
+        "kinds": 0.9541,
+        "exactCalls": 0.5,
+        "rename": 0.3571,
+        "callVocab": 0.6154,
+        "opVocab": 0.5,
+        "fnNameSim": 0.2,
+        "minLines": 10,
+        "minNodes": 104,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 61,
+      "label": "DIFF",
+      "a": "handleArchiveEntry (apps/api/src/routes/mgmt-entries.ts:354)",
+      "b": "handleGetConcept (apps/api/src/routes/taxonomy.ts:236)",
+      "signals": {
+        "kinds": 0.9541,
+        "exactCalls": 0.5,
+        "rename": 0.4167,
+        "callVocab": 0.6667,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.25,
+        "minLines": 10,
+        "minNodes": 104,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 62,
+      "label": "DIFF",
+      "a": "handleUnarchiveEntry (apps/api/src/routes/mgmt-entries.ts:369)",
+      "b": "handleGetConcept (apps/api/src/routes/taxonomy.ts:236)",
+      "signals": {
+        "kinds": 0.9541,
+        "exactCalls": 0.5,
+        "rename": 0.4167,
+        "callVocab": 0.6667,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.25,
+        "minLines": 10,
+        "minNodes": 104,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 63,
+      "label": "SAME",
+      "a": "handleGetConcept (apps/api/src/routes/taxonomy.ts:236)",
+      "b": "handleGetTeamMembership (apps/api/src/routes/teams.ts:356)",
+      "signals": {
+        "kinds": 0.9541,
+        "exactCalls": 0.5,
+        "rename": 0.5,
+        "callVocab": 0.6667,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.25,
+        "minLines": 10,
+        "minNodes": 104,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 64,
+      "label": "SAME",
+      "a": "handleListTeamMembers (apps/api/src/routes/teams.ts:340)",
+      "b": "handleListTeamSpaceMemberships (apps/api/src/routes/teams.ts:429)",
+      "signals": {
+        "kinds": 0.9664,
+        "exactCalls": 0.8,
+        "rename": 0.5,
+        "callVocab": 0.8,
+        "opVocab": 0.75,
+        "fnNameSim": 0.5,
+        "minLines": 11,
+        "minNodes": 144,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 65,
+      "label": "SAME",
+      "a": "handleRemoveTeamFromSpace (apps/api/src/routes/teams.ts:498)",
+      "b": "handleUnbindWorkflow (apps/api/src/routes/workflows.ts:191)",
+      "signals": {
+        "kinds": 0.9545,
+        "exactCalls": 0.6,
+        "rename": 0.4444,
+        "callVocab": 0.6111,
+        "opVocab": 0.5,
+        "fnNameSim": 0.1429,
+        "minLines": 10,
+        "minNodes": 105,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 66,
+      "label": "DIFF",
+      "a": "useDeleteCapacityTier (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:492)",
+      "b": "useSetDefaultCapacityTier (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:507)",
+      "signals": {
+        "kinds": 0.9913,
+        "exactCalls": 0.75,
+        "rename": 0.2,
+        "callVocab": 0.6364,
+        "opVocab": 0.6,
+        "fnNameSim": 0.6,
+        "minLines": 10,
+        "minNodes": 115,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 67,
+      "label": "DIFF",
+      "a": "useDeletePlan (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:358)",
+      "b": "useSetDefaultCapacityTier (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:507)",
+      "signals": {
+        "kinds": 0.9913,
+        "exactCalls": 0.75,
+        "rename": 0,
+        "callVocab": 0.5,
+        "opVocab": 0.6,
+        "fnNameSim": 0.1667,
+        "minLines": 10,
+        "minNodes": 115,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 68,
+      "label": "SAME",
+      "a": "usePlatformOrganizations (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:131)",
+      "b": "usePlatformPlans (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:299)",
+      "signals": {
+        "kinds": 0.9651,
+        "exactCalls": 0.6667,
+        "rename": 0.5,
+        "callVocab": 0.7143,
+        "opVocab": 0.7143,
+        "fnNameSim": 0.5,
+        "minLines": 12,
+        "minNodes": 83,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 69,
+      "label": "SAME",
+      "a": "queryFn (apps/admin-ui/src/hooks/useAuditLogs.ts:27)",
+      "b": "queryFn (apps/admin-ui/src/hooks/useAuditLogs.ts:58)",
+      "signals": {
+        "kinds": 0.9697,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 15,
+        "minNodes": 97,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 70,
+      "label": "SAME",
+      "a": "useDeleteLocale (apps/admin-ui/src/hooks/useDeleteLocale.ts:8)",
+      "b": "useDeleteWebhook (apps/admin-ui/src/hooks/useDeleteWebhook.ts:7)",
+      "signals": {
+        "kinds": 0.9648,
+        "exactCalls": 0.4286,
+        "rename": 0.3417,
+        "callVocab": 0.6154,
+        "opVocab": 0.6667,
+        "fnNameSim": 0.5,
+        "minLines": 15,
+        "minNodes": 137,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 71,
+      "label": "SAME",
+      "a": "getQueue (apps/api/src/lib/queues/gc-queue.ts:87)",
+      "b": "getQueue (apps/api/src/lib/queues/sync-reconcile-queue.ts:151)",
+      "signals": {
+        "kinds": 0.9924,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 17,
+        "minNodes": 132,
+        "nCalls": 2
+      }
+    },
+    {
+      "n": 72,
+      "label": "SAME",
+      "a": "updateAsset (apps/api/src/repositories/asset.repository.ts:472)",
+      "b": "updateContentType (apps/api/src/repositories/content-type.repository.ts:223)",
+      "signals": {
+        "kinds": 0.9721,
+        "exactCalls": 0.6,
+        "rename": 0.5237,
+        "callVocab": 0.7576,
+        "opVocab": 1,
+        "fnNameSim": 0.25,
+        "minLines": 23,
+        "minNodes": 174,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 73,
+      "label": "SAME",
+      "a": "incrementVersion (apps/api/src/repositories/taxonomy-concept-scheme.repository.ts:397)",
+      "b": "incrementVersion (apps/api/src/repositories/taxonomy-concept.repository.ts:599)",
+      "signals": {
+        "kinds": 0.9667,
+        "exactCalls": 0.1667,
+        "rename": 0.6624,
+        "callVocab": 0.8519,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 18,
+        "minNodes": 145,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 74,
+      "label": "SAME",
+      "a": "listTags (apps/api/src/services/tag-management.service.ts:76)",
+      "b": "listWebhooks (apps/api/src/services/webhook-management.service.ts:129)",
+      "signals": {
+        "kinds": 0.961,
+        "exactCalls": 0.25,
+        "rename": 0.5333,
+        "callVocab": 0.6364,
+        "opVocab": 0.5,
+        "fnNameSim": 0.3333,
+        "minLines": 22,
+        "minNodes": 148,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 75,
+      "label": "SAME",
+      "a": "useEmailLogs (apps/identity-gateway-ui/src/hooks/useEmails.ts:32)",
+      "b": "useIGQueues (apps/identity-gateway-ui/src/hooks/useSystem.ts:203)",
+      "signals": {
+        "kinds": 0.978,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.2,
+        "minLines": 13,
+        "minNodes": 90,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 76,
+      "label": "SAME",
+      "a": "useEmailStats (apps/identity-gateway-ui/src/hooks/useEmails.ts:65)",
+      "b": "useIGInfo (apps/identity-gateway-ui/src/hooks/useSystem.ts:315)",
+      "signals": {
+        "kinds": 0.9677,
+        "exactCalls": 0.6667,
+        "rename": 0.3333,
+        "callVocab": 0.5556,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.2,
+        "minLines": 13,
+        "minNodes": 90,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 77,
+      "label": "DIFF",
+      "a": "useSuppressEmail (apps/identity-gateway-ui/src/hooks/useEmails.ts:197)",
+      "b": "useDeleteOrganization (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:200)",
+      "signals": {
+        "kinds": 0.9658,
+        "exactCalls": 0.8,
+        "rename": 0.2,
+        "callVocab": 0.6364,
+        "opVocab": 0.6364,
+        "fnNameSim": 0.2,
+        "minLines": 14,
+        "minNodes": 141,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 78,
+      "label": "SAME",
+      "a": "useCreateOAuthClient (apps/identity-gateway-ui/src/hooks/useOAuthClients.ts:91)",
+      "b": "useCreateTeam (apps/identity-gateway-ui/src/hooks/useTeamMutations.ts:11)",
+      "signals": {
+        "kinds": 0.963,
+        "exactCalls": 0.6667,
+        "rename": 0.2857,
+        "callVocab": 0.5385,
+        "opVocab": 0.5833,
+        "fnNameSim": 0.4,
+        "minLines": 14,
+        "minNodes": 134,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 79,
+      "label": "SAME",
+      "a": "useOrganizationMembers (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:247)",
+      "b": "usePlatformCapacityTier (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:438)",
+      "signals": {
+        "kinds": 0.9818,
+        "exactCalls": 0.6667,
+        "rename": 0.3333,
+        "callVocab": 0.5556,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.1667,
+        "minLines": 13,
+        "minNodes": 108,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 80,
+      "label": "SAME",
+      "a": "useCellHealth (apps/identity-gateway-ui/src/hooks/useSystem.ts:94)",
+      "b": "useIGQueueDetail (apps/identity-gateway-ui/src/hooks/useSystem.ts:220)",
+      "signals": {
+        "kinds": 0.9804,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.1667,
+        "minLines": 13,
+        "minNodes": 102,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 81,
+      "label": "SAME",
+      "a": "useCellsStatus (apps/identity-gateway-ui/src/hooks/useSystem.ts:281)",
+      "b": "useAlerts (apps/identity-gateway-ui/src/hooks/useSystem.ts:352)",
+      "signals": {
+        "kinds": 0.9778,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.25,
+        "minLines": 13,
+        "minNodes": 88,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 82,
+      "label": "SAME",
+      "a": "useSystemHealth (apps/identity-gateway-ui/src/hooks/useSystem.ts:35)",
+      "b": "useIGQueues (apps/identity-gateway-ui/src/hooks/useSystem.ts:203)",
+      "signals": {
+        "kinds": 0.9778,
+        "exactCalls": 0.6667,
+        "rename": 0.5,
+        "callVocab": 0.7143,
+        "opVocab": 0.7143,
+        "fnNameSim": 0.2,
+        "minLines": 13,
+        "minNodes": 88,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 83,
+      "label": "DIFF",
+      "a": "useAddTeamMember (apps/identity-gateway-ui/src/hooks/useTeamMembers.ts:37)",
+      "b": "useRemoveTeamMember (apps/identity-gateway-ui/src/hooks/useTeamMembers.ts:60)",
+      "signals": {
+        "kinds": 0.9759,
+        "exactCalls": 0.8333,
+        "rename": 0.6667,
+        "callVocab": 0.8182,
+        "opVocab": 0.8,
+        "fnNameSim": 0.6,
+        "minLines": 16,
+        "minNodes": 164,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 84,
+      "label": "SAME",
+      "a": "sendOrganizationSuspendedEmail (apps/identity-gateway/src/services/logging-email.service.ts:168)",
+      "b": "sendBillingEmail (apps/identity-gateway/src/services/logging-email.service.ts:333)",
+      "signals": {
+        "kinds": 0.9634,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.4,
+        "minLines": 14,
+        "minNodes": 80,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 85,
+      "label": "SAME",
+      "a": "sendVerificationEmail (apps/identity-gateway/src/services/logging-email.service.ts:55)",
+      "b": "sendBillingEmail (apps/identity-gateway/src/services/logging-email.service.ts:333)",
+      "signals": {
+        "kinds": 0.9634,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.5,
+        "minLines": 14,
+        "minNodes": 80,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 86,
+      "label": "SAME",
+      "a": "useAssetBulkActions (apps/admin-ui/src/hooks/useAssetBulkActions.ts:78)",
+      "b": "useBulkActions (apps/admin-ui/src/hooks/useBulkActions.ts:76)",
+      "signals": {
+        "kinds": 0.9928,
+        "exactCalls": 0.7317,
+        "rename": 0.3788,
+        "callVocab": 0.9412,
+        "opVocab": 0.9259,
+        "fnNameSim": 0.75,
+        "minLines": 144,
+        "minNodes": 1104,
+        "nCalls": 41
+      }
+    },
+    {
+      "n": 87,
+      "label": "SAME",
+      "a": "AssetThumbnail (apps/admin-ui/src/pages/AssetList.tsx:53)",
+      "b": "AssetThumbnail (apps/admin-ui/src/components/pickers/AssetPicker.tsx:38)",
+      "signals": {
+        "kinds": 0.9959,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 65,
+        "minNodes": 489,
+        "nCalls": 17
+      }
+    },
+    {
+      "n": 88,
+      "label": "SAME",
+      "a": "getWorker (apps/api/src/lib/queues/audit-log-queue.ts:102)",
+      "b": "getWorker (apps/api/src/lib/queues/clone-queue.ts:91)",
+      "signals": {
+        "kinds": 0.9585,
+        "exactCalls": 0.8571,
+        "rename": 0.5,
+        "callVocab": 0.9091,
+        "opVocab": 0.875,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 254,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 89,
+      "label": "SAME",
+      "a": "close (apps/api/src/lib/queues/scheduled-queue.ts:143)",
+      "b": "close (apps/api/src/lib/queues/usage-queue.ts:248)",
+      "signals": {
+        "kinds": 0.9963,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 37,
+        "minNodes": 269,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 90,
+      "label": "SAME",
+      "a": "handleListConcepts (apps/api/src/routes/taxonomy.ts:200)",
+      "b": "handleListSchemes (apps/api/src/routes/taxonomy.ts:450)",
+      "signals": {
+        "kinds": 0.9643,
+        "exactCalls": 0.8571,
+        "rename": 0.6,
+        "callVocab": 0.8889,
+        "opVocab": 0.8571,
+        "fnNameSim": 0.5,
+        "minLines": 30,
+        "minNodes": 275,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 91,
+      "label": "SAME",
+      "a": "notifySpaceRenamed (apps/api/src/services/ig-client.ts:864)",
+      "b": "notifySpaceDeleted (apps/api/src/services/ig-client.ts:923)",
+      "signals": {
+        "kinds": 0.96,
+        "exactCalls": 0.8571,
+        "rename": 0.8761,
+        "callVocab": 0.8545,
+        "opVocab": 1,
+        "fnNameSim": 0.5,
+        "minLines": 48,
+        "minNodes": 360,
+        "nCalls": 14
+      }
+    },
+    {
+      "n": 92,
+      "label": "SAME",
+      "a": "reconcileOnStartup (apps/api/src/services/taxonomy-sync.service.ts:100)",
+      "b": "reconcileOnStartup (apps/api/src/services/teams-sync.service.ts:131)",
+      "signals": {
+        "kinds": 0.9965,
+        "exactCalls": 0.875,
+        "rename": 0.7143,
+        "callVocab": 0.8947,
+        "opVocab": 0.8333,
+        "fnNameSim": 1,
+        "minLines": 31,
+        "minNodes": 282,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 93,
+      "label": "SAME",
+      "a": "handleCreateConcept (apps/identity-gateway/src/routes/internal-taxonomy.ts:87)",
+      "b": "handleAddMember (apps/identity-gateway/src/routes/internal-teams.ts:203)",
+      "signals": {
+        "kinds": 0.9508,
+        "exactCalls": 0.7273,
+        "rename": 0.482,
+        "callVocab": 0.6538,
+        "opVocab": 0.6471,
+        "fnNameSim": 0.2,
+        "minLines": 31,
+        "minNodes": 314,
+        "nCalls": 11
+      }
+    },
+    {
+      "n": 94,
+      "label": "SAME",
+      "a": "handleUpsertConcept (apps/identity-gateway/src/routes/internal-taxonomy.ts:123)",
+      "b": "handleUpsertScheme (apps/identity-gateway/src/routes/internal-taxonomy.ts:278)",
+      "signals": {
+        "kinds": 0.9982,
+        "exactCalls": 0.9048,
+        "rename": 0.6571,
+        "callVocab": 0.9259,
+        "opVocab": 0.9,
+        "fnNameSim": 0.5,
+        "minLines": 75,
+        "minNodes": 568,
+        "nCalls": 21
+      }
+    },
+    {
+      "n": 95,
+      "label": "DIFF",
+      "a": "getSpaceUsage (apps/identity-gateway/src/services/cell-client.ts:593)",
+      "b": "runGCJob (apps/identity-gateway/src/services/cell-client.ts:755)",
+      "signals": {
+        "kinds": 0.9683,
+        "exactCalls": 0.7778,
+        "rename": 0.0333,
+        "callVocab": 0.6316,
+        "opVocab": 0.5625,
+        "fnNameSim": 0,
+        "minLines": 34,
+        "minNodes": 251,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 96,
+      "label": "SAME",
+      "a": "sendInvitationEmail (apps/identity-gateway/src/services/resend-email.service.ts:132)",
+      "b": "sendWelcomeEmail (apps/identity-gateway/src/services/resend-email.service.ts:173)",
+      "signals": {
+        "kinds": 0.9507,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.5,
+        "minLines": 29,
+        "minNodes": 328,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 97,
+      "label": "SAME",
+      "a": "sendOrganizationSuspendedEmail (apps/identity-gateway/src/services/resend-email.service.ts:315)",
+      "b": "sendSocialHintEmail (apps/identity-gateway/src/services/resend-email.service.ts:490)",
+      "signals": {
+        "kinds": 0.9726,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 30,
+        "minNodes": 319,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 98,
+      "label": "SAME",
+      "a": "sendPasswordChangedEmail (apps/identity-gateway/src/services/resend-email.service.ts:284)",
+      "b": "sendRecoveryCodeUsedEmail (apps/identity-gateway/src/services/resend-email.service.ts:453)",
+      "signals": {
+        "kinds": 0.9543,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 30,
+        "minNodes": 313,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 99,
+      "label": "SAME",
+      "a": "sendPasswordResetEmail (apps/identity-gateway/src/services/resend-email.service.ts:101)",
+      "b": "sendOrganizationUnsuspendedEmail (apps/identity-gateway/src/services/resend-email.service.ts:352)",
+      "signals": {
+        "kinds": 0.9726,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 30,
+        "minNodes": 319,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 100,
+      "label": "SAME",
+      "a": "sendTwoFactorDisabledEmail (apps/identity-gateway/src/services/resend-email.service.ts:422)",
+      "b": "sendSocialHintEmail (apps/identity-gateway/src/services/resend-email.service.ts:490)",
+      "signals": {
+        "kinds": 0.9812,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 30,
+        "minNodes": 313,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 101,
+      "label": "SAME",
+      "a": "sendVerificationEmail (apps/identity-gateway/src/services/resend-email.service.ts:70)",
+      "b": "sendOrganizationSuspendedEmail (apps/identity-gateway/src/services/resend-email.service.ts:315)",
+      "signals": {
+        "kinds": 0.9726,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.4,
+        "minLines": 30,
+        "minNodes": 319,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 102,
+      "label": "SAME",
+      "a": "sendWelcomeEmail (apps/identity-gateway/src/services/resend-email.service.ts:173)",
+      "b": "sendTwoFactorEnabledEmail (apps/identity-gateway/src/services/resend-email.service.ts:391)",
+      "signals": {
+        "kinds": 0.9543,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 29,
+        "minNodes": 313,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 103,
+      "label": "DIFF",
+      "a": "getDiffBgClass (apps/admin-ui/src/components/entry/VersionDiff.tsx:95)",
+      "b": "getStatusVariant (apps/admin-ui/src/pages/settings/EnvironmentSettings.tsx:31)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 0,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 12,
+        "minNodes": 43,
+        "nCalls": 0
+      }
+    },
+    {
+      "n": 104,
+      "label": "SAME",
+      "a": "mutationFn (apps/admin-ui/src/hooks/useUpdateApiKey.ts:20)",
+      "b": "mutationFn (apps/admin-ui/src/hooks/useUpdatePreviewApiKey.ts:20)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.3333,
+        "rename": 0.65,
+        "callVocab": 0.8333,
+        "opVocab": 0.8333,
+        "fnNameSim": 1,
+        "minLines": 11,
+        "minNodes": 79,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 105,
+      "label": "SAME",
+      "a": "hyperlink (apps/api/src/graphql/resolvers/richtext-link-resolvers.ts:224)",
+      "b": "hyperlink (apps/api/src/graphql/resolvers/richtext-link-resolvers.ts:266)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6667,
+        "rename": 0.5,
+        "callVocab": 0.75,
+        "opVocab": 0.75,
+        "fnNameSim": 1,
+        "minLines": 11,
+        "minNodes": 49,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 106,
+      "label": "SAME",
+      "a": "findByIds (apps/api/src/repositories/tag.repository.ts:25)",
+      "b": "findByIds (apps/api/src/repositories/workflow.repository.ts:34)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.25,
+        "rename": 0.8333,
+        "callVocab": 0.76,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 12,
+        "minNodes": 107,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 107,
+      "label": "SAME",
+      "a": "handleGetConcept (apps/api/src/routes/taxonomy.ts:236)",
+      "b": "handleGetScheme (apps/api/src/routes/taxonomy.ts:485)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.75,
+        "rename": 0.6,
+        "callVocab": 0.8182,
+        "opVocab": 0.75,
+        "fnNameSim": 0.3333,
+        "minLines": 10,
+        "minNodes": 104,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 108,
+      "label": "SAME",
+      "a": "parseDbFields (apps/api/src/services/content-type.service.ts:46)",
+      "b": "parseDbSharedFields (apps/api/src/services/entry.service.ts:117)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.75,
+        "minLines": 11,
+        "minNodes": 94,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 109,
+      "label": "SAME",
+      "a": "checkApiKeysPerSpace (apps/api/src/services/technical-limits.service.ts:171)",
+      "b": "checkLinksPerEntry (apps/api/src/services/technical-limits.service.ts:219)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 110,
+      "label": "SAME",
+      "a": "checkContentTypesPerEnvironment (apps/api/src/services/technical-limits.service.ts:81)",
+      "b": "checkWebhooksPerSpace (apps/api/src/services/technical-limits.service.ts:153)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 111,
+      "label": "SAME",
+      "a": "checkEnvironmentsPerSpace (apps/api/src/services/technical-limits.service.ts:139)",
+      "b": "checkUsersPerOrganization (apps/api/src/services/technical-limits.service.ts:249)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 112,
+      "label": "SAME",
+      "a": "checkFieldsPerContentType (apps/api/src/services/technical-limits.service.ts:53)",
+      "b": "checkUsersPerOrganization (apps/api/src/services/technical-limits.service.ts:249)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 113,
+      "label": "SAME",
+      "a": "checkLocalesPerEnvironment (apps/api/src/services/technical-limits.service.ts:95)",
+      "b": "checkEnvironmentsPerSpace (apps/api/src/services/technical-limits.service.ts:139)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 114,
+      "label": "SAME",
+      "a": "checkRolesPerSpace (apps/api/src/services/technical-limits.service.ts:185)",
+      "b": "checkAuditLogsPerSpace (apps/api/src/services/technical-limits.service.ts:316)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.5,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 115,
+      "label": "SAME",
+      "a": "checkTagsPerEntry (apps/api/src/services/technical-limits.service.ts:123)",
+      "b": "checkScheduledActionsPerEnvironment (apps/api/src/services/technical-limits.service.ts:263)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 116,
+      "label": "SAME",
+      "a": "checkTagsPerEnvironment (apps/api/src/services/technical-limits.service.ts:109)",
+      "b": "checkTaxonomyConceptsPerEntry (apps/api/src/services/technical-limits.service.ts:346)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 117,
+      "label": "SAME",
+      "a": "checkWebhooksPerSpace (apps/api/src/services/technical-limits.service.ts:153)",
+      "b": "checkLinksPerEntry (apps/api/src/services/technical-limits.service.ts:219)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 10,
+        "minNodes": 58,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 118,
+      "label": "DIFF",
+      "a": "useEnablePlan (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:373)",
+      "b": "useSetDefaultCapacityTier (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:507)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.75,
+        "rename": 0,
+        "callVocab": 0.5,
+        "opVocab": 0.6,
+        "fnNameSim": 0.1667,
+        "minLines": 11,
+        "minNodes": 115,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 119,
+      "label": "SAME",
+      "a": "handleGetOAuthClient (apps/identity-gateway/src/routes/oauth-clients.ts:77)",
+      "b": "handleGetClientPolicies (apps/identity-gateway/src/routes/oauth-clients.ts:240)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.75,
+        "rename": 0.4444,
+        "callVocab": 0.6667,
+        "opVocab": 0.5833,
+        "fnNameSim": 0.5,
+        "minLines": 12,
+        "minNodes": 100,
+        "nCalls": 4
+      }
+    },
+    {
+      "n": 120,
+      "label": "SAME",
+      "a": "addAttributes (apps/admin-ui/src/components/richtext/extensions/AssetHyperlink.tsx:48)",
+      "b": "addAttributes (apps/admin-ui/src/components/richtext/extensions/EntryHyperlink.tsx:48)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 16,
+        "minNodes": 88,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 121,
+      "label": "SAME",
+      "a": "useDraftKeys (apps/admin-ui/src/hooks/usePreviewApiKeys.ts:15)",
+      "b": "useSpaceRoles (apps/admin-ui/src/hooks/useSpaceRoles.ts:15)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6667,
+        "rename": 0.3333,
+        "callVocab": 0.5,
+        "opVocab": 0.5,
+        "fnNameSim": 0.2,
+        "minLines": 14,
+        "minNodes": 146,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 122,
+      "label": "SAME",
+      "a": "resolveEntryLinks (apps/api/src/graphql/resolvers/richtext-link-resolvers.ts:129)",
+      "b": "resolveAssetLinks (apps/api/src/graphql/resolvers/richtext-link-resolvers.ts:164)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6,
+        "rename": 0.6667,
+        "callVocab": 0.875,
+        "opVocab": 0.8571,
+        "fnNameSim": 0.5,
+        "minLines": 20,
+        "minNodes": 135,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 123,
+      "label": "SAME",
+      "a": "getQueue (apps/api/src/lib/queues/backup-queue.ts:69)",
+      "b": "getQueue (apps/api/src/lib/queues/clone-queue.ts:59)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 19,
+        "minNodes": 122,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 124,
+      "label": "SAME",
+      "a": "findVersion (apps/api/src/repositories/asset.repository.ts:120)",
+      "b": "findVersion (apps/api/src/repositories/entry.repository.ts:194)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.4444,
+        "rename": 0.8566,
+        "callVocab": 0.931,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 24,
+        "minNodes": 167,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 125,
+      "label": "SAME",
+      "a": "getBroader (apps/api/src/repositories/taxonomy-concept.repository.ts:760)",
+      "b": "getRelated (apps/api/src/repositories/taxonomy-concept.repository.ts:794)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.8,
+        "rename": 0.8947,
+        "callVocab": 0.8947,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 13,
+        "minNodes": 123,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 126,
+      "label": "SAME",
+      "a": "useEmailTemplates (apps/identity-gateway-ui/src/hooks/useEmails.ts:102)",
+      "b": "useAuditActions (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:267)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6667,
+        "rename": 0.3333,
+        "callVocab": 0.5556,
+        "opVocab": 0.5556,
+        "fnNameSim": 0.2,
+        "minLines": 13,
+        "minNodes": 96,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 127,
+      "label": "SAME",
+      "a": "usePlatformUser (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:39)",
+      "b": "usePlatformCapacityTier (apps/identity-gateway-ui/src/hooks/usePlatformAdmin.ts:438)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6667,
+        "rename": 0.4,
+        "callVocab": 0.625,
+        "opVocab": 0.625,
+        "fnNameSim": 0.4,
+        "minLines": 13,
+        "minNodes": 108,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 128,
+      "label": "SAME",
+      "a": "useCellSpaces (apps/identity-gateway-ui/src/hooks/useSystem.ts:128)",
+      "b": "useCellQueues (apps/identity-gateway-ui/src/hooks/useSystem.ts:145)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6667,
+        "rename": 0.6,
+        "callVocab": 0.75,
+        "opVocab": 0.75,
+        "fnNameSim": 0.5,
+        "minLines": 13,
+        "minNodes": 102,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 129,
+      "label": "SAME",
+      "a": "useSystemHealth (apps/identity-gateway-ui/src/hooks/useSystem.ts:35)",
+      "b": "useSystemUsage (apps/identity-gateway-ui/src/hooks/useSystem.ts:52)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.6667,
+        "rename": 0.5,
+        "callVocab": 0.7143,
+        "opVocab": 0.7143,
+        "fnNameSim": 0.5,
+        "minLines": 13,
+        "minNodes": 88,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 130,
+      "label": "SAME",
+      "a": "scheduleEmailCleanup (apps/identity-gateway/src/lib/queues/email-cleanup-queue.ts:125)",
+      "b": "scheduleUsageArchive (apps/identity-gateway/src/lib/queues/usage-archive-queue.ts:121)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.8333,
+        "rename": 0.3333,
+        "callVocab": 0.6923,
+        "opVocab": 0.6667,
+        "fnNameSim": 0.2,
+        "minLines": 21,
+        "minNodes": 137,
+        "nCalls": 6
+      }
+    },
+    {
+      "n": 131,
+      "label": "SAME",
+      "a": "extractVersion (apps/identity-gateway/src/routes/internal-taxonomy.ts:65)",
+      "b": "extractVersion (apps/identity-gateway/src/routes/internal-teams.ts:64)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 19,
+        "minNodes": 126,
+        "nCalls": 3
+      }
+    },
+    {
+      "n": 132,
+      "label": "SAME",
+      "a": "getSpaces (apps/identity-gateway/src/services/cell-client.ts:638)",
+      "b": "getSystemInfo (apps/identity-gateway/src/services/cell-client.ts:825)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.8571,
+        "rename": 0.1667,
+        "callVocab": 0.6923,
+        "opVocab": 0.6,
+        "fnNameSim": 0,
+        "minLines": 24,
+        "minNodes": 210,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 133,
+      "label": "SAME",
+      "a": "sendOrganizationSuspendedEmail (apps/identity-gateway/src/services/logging-email.service.ts:168)",
+      "b": "sendOrganizationUnsuspendedEmail (apps/identity-gateway/src/services/logging-email.service.ts:183)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.6,
+        "minLines": 14,
+        "minNodes": 82,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 134,
+      "label": "SAME",
+      "a": "sendPasswordResetEmail (apps/identity-gateway/src/services/logging-email.service.ts:70)",
+      "b": "sendRecoveryCodeUsedEmail (apps/identity-gateway/src/services/logging-email.service.ts:228)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 14,
+        "minNodes": 82,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 135,
+      "label": "SAME",
+      "a": "sendVerificationEmail (apps/identity-gateway/src/services/logging-email.service.ts:55)",
+      "b": "sendSocialHintEmail (apps/identity-gateway/src/services/logging-email.service.ts:243)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.4,
+        "minLines": 14,
+        "minNodes": 82,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 136,
+      "label": "SAME",
+      "a": "update (packages/internal-sdk/src/wrappers/capacity-tier.ts:101)",
+      "b": "update (packages/internal-sdk/src/wrappers/plan.ts:175)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 18,
+        "minNodes": 174,
+        "nCalls": 2
+      }
+    },
+    {
+      "n": 137,
+      "label": "SAME",
+      "a": "getWorker (apps/api/src/lib/queues/asset-queue.ts:113)",
+      "b": "getWorker (apps/api/src/lib/queues/clone-queue.ts:91)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.8571,
+        "rename": 0.5,
+        "callVocab": 0.9091,
+        "opVocab": 0.875,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 254,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 138,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/asset-queue.ts:160)",
+      "b": "shutdown (apps/api/src/lib/queues/clone-queue.ts:134)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 139,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/audit-log-queue.ts:146)",
+      "b": "shutdown (apps/api/src/lib/queues/backup-queue.ts:147)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 140,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/audit-log-queue.ts:146)",
+      "b": "shutdown (apps/api/src/lib/queues/upload-cleanup-queue.ts:170)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 141,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/backup-queue.ts:147)",
+      "b": "shutdown (apps/api/src/lib/queues/ig-notification-queue.ts:161)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 142,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/bulk-assign-queue.ts:139)",
+      "b": "shutdown (apps/api/src/lib/queues/ig-notification-queue.ts:161)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 143,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/clone-queue.ts:134)",
+      "b": "shutdown (apps/api/src/lib/queues/upload-cleanup-queue.ts:170)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 144,
+      "label": "SAME",
+      "a": "shutdown (apps/api/src/lib/queues/ig-notification-queue.ts:161)",
+      "b": "shutdown (apps/api/src/lib/queues/webhook-queue.ts:136)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 1,
+        "minLines": 32,
+        "minNodes": 255,
+        "nCalls": 10
+      }
+    },
+    {
+      "n": 145,
+      "label": "SAME",
+      "a": "listByEnvironment (apps/api/src/repositories/locale.repository.ts:106)",
+      "b": "query (apps/api/src/repositories/workflow.repository.ts:85)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.5714,
+        "rename": 0.7529,
+        "callVocab": 0.8537,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 28,
+        "minNodes": 255,
+        "nCalls": 14
+      }
+    },
+    {
+      "n": 146,
+      "label": "SAME",
+      "a": "handleUpdateDeliveryKey (apps/api/src/routes/api-keys.ts:251)",
+      "b": "handleUpdatePreviewKey (apps/api/src/routes/api-keys.ts:429)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.9091,
+        "rename": 0.5,
+        "callVocab": 0.9048,
+        "opVocab": 0.8889,
+        "fnNameSim": 0.6,
+        "minLines": 53,
+        "minNodes": 326,
+        "nCalls": 11
+      }
+    },
+    {
+      "n": 147,
+      "label": "SAME",
+      "a": "handleUpsertConcept (apps/api/src/routes/taxonomy.ts:284)",
+      "b": "handleUpsertScheme (apps/api/src/routes/taxonomy.ts:533)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.8462,
+        "rename": 0.6571,
+        "callVocab": 0.9333,
+        "opVocab": 0.9231,
+        "fnNameSim": 0.5,
+        "minLines": 45,
+        "minNodes": 298,
+        "nCalls": 13
+      }
+    },
+    {
+      "n": 148,
+      "label": "SAME",
+      "a": "getTaxonomy (apps/api/src/services/ig-client.ts:1106)",
+      "b": "getTeams (apps/api/src/services/ig-client.ts:1274)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 31,
+        "minNodes": 247,
+        "nCalls": 9
+      }
+    },
+    {
+      "n": 149,
+      "label": "SAME",
+      "a": "cleanupAssetJobs (apps/api/src/services/job-cleanup.service.ts:71)",
+      "b": "cleanupCloneJobs (apps/api/src/services/job-cleanup.service.ts:107)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 0.8571,
+        "rename": 0.6,
+        "callVocab": 0.8462,
+        "opVocab": 1,
+        "fnNameSim": 0.5,
+        "minLines": 32,
+        "minNodes": 220,
+        "nCalls": 7
+      }
+    },
+    {
+      "n": 150,
+      "label": "SAME",
+      "a": "closeAuditCleanupQueue (apps/identity-gateway/src/lib/queues/audit-cleanup-queue.ts:143)",
+      "b": "closeUsageArchiveQueue (apps/identity-gateway/src/lib/queues/usage-archive-queue.ts:143)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.3333,
+        "minLines": 32,
+        "minNodes": 202,
+        "nCalls": 8
+      }
+    },
+    {
+      "n": 151,
+      "label": "DIFF",
+      "a": "getAncestors (apps/identity-gateway/src/repositories/taxonomy-concept.repository.ts:607)",
+      "b": "getDescendants (apps/identity-gateway/src/repositories/taxonomy-concept.repository.ts:644)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0,
+        "minLines": 29,
+        "minNodes": 64,
+        "nCalls": 1
+      }
+    },
+    {
+      "n": 152,
+      "label": "SAME",
+      "a": "notifyPlanChanged (apps/identity-gateway/src/services/cell-client.ts:473)",
+      "b": "notifyCapacityChanged (apps/identity-gateway/src/services/cell-client.ts:519)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.5,
+        "minLines": 37,
+        "minNodes": 209,
+        "nCalls": 5
+      }
+    },
+    {
+      "n": 153,
+      "label": "SAME",
+      "a": "sendPasswordChangedEmail (apps/identity-gateway/src/services/resend-email.service.ts:284)",
+      "b": "sendTwoFactorEnabledEmail (apps/identity-gateway/src/services/resend-email.service.ts:391)",
+      "signals": {
+        "kinds": 1,
+        "exactCalls": 1,
+        "rename": 1,
+        "callVocab": 1,
+        "opVocab": 1,
+        "fnNameSim": 0.2857,
+        "minLines": 30,
+        "minNodes": 313,
+        "nCalls": 9
+      }
+    }
+  ]
+}
