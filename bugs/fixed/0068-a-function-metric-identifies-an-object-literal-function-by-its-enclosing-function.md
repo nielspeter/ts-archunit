@@ -311,6 +311,12 @@ three identical `qualifiedName` edits split into three rows.
 - **Adopter baselines move for `functions()` metrics** — object-literal functions and class methods
   alike. Same class as 0064/0065; the changelog carries a preview command that names every moving entry
   before upgrade.
+- **A literal passed as a call argument has no scope to qualify by**, so two in one file sharing a key
+  name still collide. Measured identical on 0.57.0, so this is a pre-existing limit this fix narrows
+  around rather than a regression — filed as
+  [bug 0070](../0070-an-object-literal-in-a-call-argument-has-no-scope-so-siblings-share-an-identity.md)
+  rather than left in a docblock, because a known limit that lives only in a code comment is a
+  hand-maintained claim nobody derives.
 - **Two classes in one file with a same-named method** — this report's second unmeasured item. The
   scope-qualified identity now separates them under a `functions()` metric (`Repo.save` vs `Other.save`
   are already distinct own names), but the case was not probed directly.

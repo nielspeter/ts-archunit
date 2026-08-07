@@ -31,6 +31,14 @@ its own fix had touched.
   `element` now carries the qualified name — it is what the terminal prints, what JSON reports, and one
   of three fields string-form `.excluding()` matches by exact membership, so the disagreement also made
   an exclusion written against the printed name silently miss.
+
+  **One shape is not covered, and was not covered before either:** an object literal passed as a **call
+  argument** at module level (`register({ handler: … })`) has no enclosing declaration to qualify by, so
+  two of them in one file sharing a key name still share an identity — measured identical in 0.57.0 and
+  0.58.0 alike. Filed as
+  [bug 0070](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0070-an-object-literal-in-a-call-argument-has-no-scope-so-siblings-share-an-identity.md);
+  nothing stable distinguishes them, so it may end as a documented limit with a warning rather than a
+  fix.
   ([bug 0068](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0068-a-function-metric-identifies-an-object-literal-function-by-its-enclosing-function.md))
 
   ⚠️ **Regenerate the baseline for `functions()` metric rules.** Identities move for object-literal
