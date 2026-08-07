@@ -99,20 +99,38 @@ Shipped 2026-08-07. Both halves landed as one PR.
 `CorrespondenceBuilder`, and the contradiction still throws — which answers bug 0066's _"is
 `.expectEmpty()` reachable on a smell builder at all?"_ with a yes where the answer was no.
 
-**The conversion.** `allowEmpty(side)` is gone; `expectEmpty(side?)` replaces it as an override of the
-base zero-arg method, with the optional parameter the override validity requires. The semantics changed
-with the name, and the new `unexpectedlyNonEmptyViolation` producer is the whole point: a declared side
-that fills up now **fails**, where the permission stayed silent forever. `declaresEmpty()` is the
-whole-rule flag OR every side declared — without the OR, a user who declared both sides still redded
-with a finding telling them to declare, which is ADR-008 rule 2's loop.
+**The conversion.** `allowEmpty(side)` is gone; `expectEmpty(side)` replaces it, with the new
+`unexpectedlyNonEmptyViolation` producer as the whole point: a declared side that fills up now **fails**,
+where the permission stayed silent forever.
 
-Test rows: the declaration stays green; **the expiry fires when the side fills up**; the expiry's remedy
-**remediates** (remove the declaration, the finding clears — rule 2's behavioural corollary, not a
-contains-check); declaring every side is not a loop; and the held-builder immutability row carries over
-unchanged, so a declaration still cannot leak onto a sibling rule.
+**Corrected after a five-persona review, which found three defects in the first cut.** All three are
+recorded rather than quietly fixed, because two of them were the replacement inheriting the half of
+`allowEmpty`'s defect nobody had looked at:
 
-The new producer joined the configuration-finding census with a `behavioural:` citation, which is what
-turned an unclassified-producer failure into a passing one rather than the reverse.
+1. **The zero-argument form was `allowEmpty` restored.** `expectEmpty()` with no side inherited the base
+   class's whole-rule flag, which suppressed the empty finding for BOTH sides while the expiry branch
+   read only the per-side set — so it could never fire. Measured green over two populated sides, forever,
+   in fewer characters than the API it replaced, on the release that deleted it. The override-validity
+   argument justifies the optional _signature_; it does not justify inheriting the _semantics_. It now
+   throws, naming the per-side form.
+2. **A declaration naming no side was silent.** `.expectEmpty('servcies')` was accepted and asserted
+   nothing, forever — verbatim the _"one word, silent forever, typo or not, and nothing revisits it"_
+   hazard this method's own docstring rejects `allowEmpty` for. Now a failing configuration finding,
+   following ADR-009 part 3's already-decided ruling on the identical preset case, and covering
+   `.distinctKeysOn()` by the same check.
+3. **`declaresEmpty()`'s `every(...)` disjunct was dead code, and this section claimed otherwise.** It
+   said "without the OR, a user who declared both sides still redded" — a property the code never had:
+   if every side is in the set then the per-side `has(side.name)` is already true for the side under
+   test. Three reviewers deleted the clause against the full suite with nothing failing, including the
+   test written to guard it. The clause is gone; the behaviour it named is real and is carried by the
+   per-side membership, and the test now credits that.
+
+**Sequencing, corrected.** 0097 ran before 0096 so that 0096's remedy would name an API that exists.
+That was right, and it produced a second problem the review found: outside the rule builders and
+`correspondence`, nothing reads these flags until 0098's floor, so shipping 0097 alone publishes a
+declaration that compiles, reads as a guard and asserts nothing. **The plans split correctly; the
+RELEASE did not.** 0096, 0097 and 0098 merge as separate PRs and tag as one release. Nothing inert
+reaches npm, and ADR-009's "one red event" gets applied to the release rather than to the plan.
 
 **One process note worth keeping.** Two attempts at the hoist removed more than intended — the first
 slice took `describeRule()` with it, surfacing as ten failing tests. Restored from git and redone by

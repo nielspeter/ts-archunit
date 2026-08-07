@@ -142,6 +142,50 @@ describe('correspondence()', () => {
       }).not.toThrow()
     })
 
+    it('the zero-argument form is refused at build time — plan 0097', () => {
+      // It used to inherit TerminalBuilder's whole-rule flag, which suppressed
+      // the empty finding for BOTH sides and which the expiry branch never
+      // read: `allowEmpty` restored, permanent and silent, in fewer characters
+      // than before, on the release that deleted it. A correspondence compares
+      // two named sides, so "this rule is empty" has no per-rule meaning.
+      expect(() => correspondence(stubProject).side('a', []).side('b', []).expectEmpty()).toThrow(
+        TypeError,
+      )
+    })
+
+    it('a declaration naming no side is a failing finding, not a silent no-op', () => {
+      // The typo case. ADR-009 part 3 rules the identical preset case a FAILING
+      // finding, never a warning — a declaration that binds to nothing asserts
+      // nothing, and saying so is the whole difference from `allowEmpty`.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('servcies') // typo
+        .beComplete()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.message).toContain("sides are 'services' and 'registry'")
+      expect(v[0]!.bypassFilters).toBe(true)
+      // The remedy remediates: spell it correctly and the finding clears.
+      const fixed = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('services')
+        .beComplete()
+        .violations()
+      expect(fixed.filter((x) => x.message.includes('binds to nothing'))).toEqual([])
+    })
+
+    it('distinctKeysOn() with an unbound name is caught by the same check', () => {
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .distinctKeysOn('registrees') // typo
+        .beComplete()
+        .violations()
+      expect(v.map((x) => x.element)).toEqual(['registrees'])
+    })
+
     it('.expectEmpty(side) FAILS the day that side fills up — plan 0097', () => {
       // The property that makes it an assertion rather than `allowEmpty()`'s
       // permission, which had no failing state and so stayed green forever.
@@ -168,8 +212,11 @@ describe('correspondence()', () => {
     })
 
     it('declaring EVERY side is not a loop: it does not red asking to declare', () => {
-      // Without the OR in declaresEmpty(), a user who declared both sides still
-      // got a finding telling them to declare — the stated remedy already done.
+      // Per-side membership carries this on its own — a `declaresEmpty()` helper
+      // with an `every(...)` disjunct stood here and was unreachable, and this
+      // test passed with it deleted. Kept because the BEHAVIOUR is what matters
+      // (a user who declared everything must not be told to declare), but the
+      // credit now goes to the mechanism that actually provides it.
       const emptyA = new TestRuleBuilder(stubProject, elements)
         .that()
         .withPredicate(nameMatches(/^NothingMatches$/))

@@ -11,7 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The declared-empty grammar reaches every family.** `.expectEmpty()` and `.expectNonEmpty()` moved
   from `RuleBuilder<T>` to `TerminalBuilder`, so the smell detectors, `correspondence` and the GraphQL
-  builders can declare an empty state at all. Bug 0066 listed _"is `.expectEmpty()` reachable on a smell
+  builders can declare an empty state at all.
+
+  **The grammar and the floor that reads it ship in the same release.** Outside the rule builders and
+  `correspondence`, nothing consumes these flags until the evidence seam lands — so on its own this is
+  a method that compiles, reads as a guard and asserts nothing, which is the shape this project exists
+  to make unrepresentable. It is not being released on its own for exactly that reason. Bug 0066 listed _"is `.expectEmpty()` reachable on a smell
   builder?"_ under **Not measured**; the answer was no. Additive — no existing call changes meaning.
   ([plan 0097](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0097-the-declared-empty-grammar.md),
   also [ADR-010](https://github.com/nielspeter/ts-archunit/blob/main/adr/010-the-extension-surface-is-a-contract.md) rule 3(a))
@@ -37,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
   Declaring **every** side is not a loop: the rule counts as declared and stays green. Declaring only
   some sides does not.
+
+  Two shapes are refused rather than accepted quietly. **The zero-argument `.expectEmpty()` throws** on
+  a correspondence: a rule that compares two named sides has no per-rule notion of "empty", and
+  inheriting one gave back a whole-rule flag that suppressed both sides and expired on neither —
+  `allowEmpty` restored, in fewer characters, on the release that removed it. And **a declaration
+  naming a side the rule does not have is a failing finding**, not a silent no-op; `.distinctKeysOn()`
+  is covered by the same check. That is the _"one word, silent forever, typo or not"_ hazard this
+  change is otherwise written against, and leaving it would have been the replacement inheriting the
+  half of the defect nobody looked at.
 
 ### Added
 

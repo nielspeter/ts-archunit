@@ -266,7 +266,7 @@ classes(p)
   .check()
 ```
 
-`.expectEmpty()` is an **assertion, not a silencer**: it fails the day the selector matches something, so an intent that expires reports itself instead of going quiet forever. That is the whole difference from `.allowEmpty()`, which `correspondence()` shipped until 0.59.0 and which plan 0097 converted for exactly this reason — one word, silent forever, typo or not, and nothing revisits it. `.expectEmpty()` is now reachable on every family, not only the rule builders. Declaring `.expectEmpty()` and `.expectNonEmpty()` on the same rule is a contradiction and throws when the rule is built.
+`.expectEmpty()` is an **assertion, not a silencer**: it fails the day the selector matches something, so an intent that expires reports itself instead of going quiet forever. That is the whole difference from `.allowEmpty()`, which `correspondence()` shipped until plan 0097 converted it for exactly this reason — one word, silent forever, typo or not, and nothing revisits it. `.expectEmpty()` is now reachable on every family, not only the rule builders. Declaring `.expectEmpty()` and `.expectNonEmpty()` on the same rule is a contradiction and throws when the rule is built.
 
 `.expectNonEmpty()` still exists and is still legal. It is now redundant, because it asks for the default.
 

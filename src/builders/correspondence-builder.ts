@@ -177,7 +177,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   }
 
   /**
-   * Declare that a side is empty — plan 0097, replacing `allowEmpty()`.
+   * Declare that a NAMED side is empty — plan 0097, replacing `allowEmpty()`.
    *
    * The difference is the whole point, and it is not a rename. `allowEmpty()`
    * PERMITTED a side to be empty and never spoke again: a permanent, silent
@@ -188,32 +188,35 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * appendix rejected the permanent form for the rule family with receipts; a
    * sibling family had it shipped and documented.
    *
-   * The parameter is OPTIONAL because this overrides `TerminalBuilder`'s
-   * zero-arg `expectEmpty()`, and a required parameter is not a valid override.
-   * With a side it is the per-side assertion; without, the whole-rule
-   * declaration the base class means.
+   * **The zero-argument form throws here**, and that is the correction of a
+   * defect this method shipped with. The parameter has to be optional — a
+   * required one is not a valid override of `TerminalBuilder`'s zero-arg
+   * `expectEmpty()` — but the OVERRIDE VALIDITY argument justifies the
+   * signature, not the semantics. Inheriting the base meaning gave
+   * `correspondence().expectEmpty()` a whole-rule flag that suppressed the
+   * empty-side finding for BOTH sides and that the expiry branch never read:
+   * `allowEmpty` restored, permanent and silent, in fewer characters than
+   * before, on the release that deleted it. Measured green over two populated
+   * sides, forever.
+   *
+   * A correspondence compares two named sides, so "this rule is empty" has no
+   * meaning that is not per-side. Refusing at build time is the same answer
+   * this class already gives a contradiction, and it is loud where the
+   * inherited semantics were silent.
    */
   override expectEmpty(side?: string): this {
-    if (side === undefined) return super.expectEmpty()
+    if (side === undefined) {
+      throw new TypeError(
+        'correspondence() declares emptiness per side: call .expectEmpty(sideName) for each side ' +
+          'you expect to be empty. A correspondence compares two named sides, so a whole-rule ' +
+          'declaration would suppress both and expire on neither.',
+      )
+    }
     const next = this.copy()
     next._expectEmptySides.add(side)
     return next
   }
 
-  /**
-   * True when this rule's emptiness is declared — plan 0097.
-   *
-   * All sides individually, or the whole-rule flag. The OR matters: without it
-   * a user who declared EVERY side still reds, with a finding telling them to
-   * declare — ADR-008 rule 2's loop shape, where the stated remedy is the thing
-   * already done. Declaring only SOME sides does not set it.
-   */
-  private declaresEmpty(): boolean {
-    return (
-      this._expectEmpty ||
-      (this._sides.length > 0 && this._sides.every((s) => this._expectEmptySides.has(s.name)))
-    )
-  }
   /** Fail if a side maps two distinct subjects to one key (over-normalization guard). */
   distinctKeysOn(sideName: string): this {
     const next = this.copy()
@@ -286,6 +289,26 @@ export class CorrespondenceBuilder extends TerminalBuilder {
 
     const sideA = this._sides[0]!
     const sideB = this._sides[1]!
+
+    // A declaration that binds to no side is a configuration finding, not a
+    // no-op — plan 0097, correcting the same defect the shipped version had.
+    // `.expectEmpty('servcies')` was accepted silently and asserted nothing
+    // forever: the exact hazard this method's own docstring rejects the
+    // permanent form for ("one word, silent forever, TYPO OR NOT, and nothing
+    // revisits it"), inherited whole by the replacement.
+    //
+    // ADR-009 part 3 already ruled the structurally identical preset case — a
+    // declaration binding to no constructed rule is a FAILING finding, never a
+    // warning — so this follows settled precedent rather than deciding anew.
+    //
+    // Here rather than in the setter: `.expectEmpty(name)` may legally precede
+    // `.side(name, …)`, so the setter cannot know yet.
+    const declaredNames = [...this._expectEmptySides, ...this._distinctKeys]
+    const unbound = declaredNames.filter((n) => n !== sideA.name && n !== sideB.name)
+    if (unbound.length > 0) {
+      return unbound.map((name) => this.unboundSideViolation(name, [sideA.name, sideB.name]))
+    }
+
     const aKeyed = sideA.materialize()
     const bKeyed = sideB.materialize()
 
@@ -302,12 +325,18 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     // Non-vacuity (ADR-008 / proposal 014): an empty side certifies nothing, so
     // it is the root cause — report it and skip the derived coverage flood.
     const emptyFindings: ArchViolation[] = []
-    const declared = this.declaresEmpty()
     for (const [side, isEmpty] of [
       [sideA, result.aEmpty],
       [sideB, result.bEmpty],
     ] as const) {
-      const sideDeclared = declared || this._expectEmptySides.has(side.name)
+      // Per-side only. A `declaresEmpty()` helper stood here with an
+      // `_expectEmpty || every(side => declared)` body; the `every` half was
+      // unreachable — if every side is in the set then `has(side.name)` is
+      // already true for the side under test — and three reviewers deleted it
+      // against the full suite with nothing failing. Its stated rationale
+      // ("without the OR a user who declared both sides still redded") was a
+      // property the code never had.
+      const sideDeclared = this._expectEmptySides.has(side.name)
       if (isEmpty && !sideDeclared) {
         emptyFindings.push(this.emptyViolation(side.name, meta))
       }
@@ -399,6 +428,35 @@ export class CorrespondenceBuilder extends TerminalBuilder {
       }
       return this.baseViolation(key, '', 0, message, meta)
     })
+  }
+
+  /**
+   * A declaration names a side this rule does not have — plan 0097.
+   *
+   * Covers `.expectEmpty(name)` and `.distinctKeysOn(name)` alike, because both
+   * are membership tests against side names and both were silent on a typo. The
+   * remedy is mechanical and names the sides that DO exist, so the reader does
+   * not have to go and look.
+   */
+  private unboundSideViolation(name: string, actual: readonly string[]): ArchViolation {
+    const known = actual.map((s) => `'${s}'`).join(' and ')
+    return {
+      ...this.baseViolation(
+        name,
+        '',
+        0,
+        `this rule declares something about a side named '${name}', but its sides are ${known} — ` +
+          `so the declaration binds to nothing and asserts nothing.`,
+        {
+          rule: `correspondence [${actual.join(' <-> ')}]`,
+          because: this._reason,
+          ruleId: this._metadata?.id,
+        },
+      ),
+      suggestion: `Correct the side name to one of ${known}, or remove the declaration.`,
+      docs: undefined,
+      bypassFilters: true,
+    }
   }
 
   /**
