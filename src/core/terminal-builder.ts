@@ -42,6 +42,24 @@ import { UNSUPPRESSABLE } from './unsuppressable.js'
 export const ASSERTION_DOCS =
   'https://nielspeter.github.io/ts-archunit/violation-reporting#a-rule-must-assert-something'
 
+/**
+ * Declaring both emptiness assertions is a contradiction, and 0069's appendix
+ * says it "must fail at build time, not silently pick one".
+ *
+ * Thrown when the chain is built rather than reported as a finding: this is not
+ * a property of the codebase under test, it is a rule that cannot be evaluated,
+ * and the author is standing right there.
+ *
+ * `TypeError`, following `combinators.ts`'s "cannot mix Predicate objects and
+ * TypeMatcher functions" — the same class of build-time misuse. A bare `Error`
+ * was written first and this project's own `quality/typed-errors` rule rejected
+ * it, which is the third time in this plan's implementation that the dogfooding
+ * caught the new code.
+ */
+const CONTRADICTION =
+  '.expectEmpty() and .expectNonEmpty() on the same rule contradict each other — ' +
+  'a selection cannot be required to be both empty and non-empty. Keep the one you mean.'
+
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
@@ -52,6 +70,98 @@ export abstract class TerminalBuilder {
   // kept `globs()` concrete rather than abstract.
   protected _exclusions: (string | RegExp)[] = []
   protected _silentIndices: Set<number> = new Set()
+  /**
+   * The declared-empty grammar — plan 0097, and [ADR-010](../../adr/010-the-extension-surface-is-a-contract.md)
+   * rule 3(a).
+   *
+   * These lived on `RuleBuilder<T>`, so the smell family — the one bug 0066 is
+   * filed against — could not reach them: that bug listed "is `.expectEmpty()`
+   * reachable on a smell builder at all?" under Not measured, and the answer was
+   * no. ADR-009 part 3 requires every family's grammar to expose a declaration
+   * path, so they belong on the root every family shares.
+   *
+   * Booleans rather than registry membership, deliberately. `shallowClone` in
+   * `copy()` carries an own property for free on every chain step, where a
+   * `WeakSet` keyed on the builder would be lost at the first `copy()` — and the
+   * threat model differs from the one that forced the cardinality registry,
+   * which guards user-CONSTRUCTIBLE condition objects. These sit behind a
+   * sanctioned method on a class whose only other audience is ADR-010's
+   * contract.
+   */
+  protected _requireNonEmpty = false
+  protected _expectEmpty = false
+
+  /**
+   * Assert that the predicate chain matches at least one subject. If the
+   * filtered subject set is empty, the rule FAILS with a config-level
+   * meta-finding instead of passing vacuously — the "0 === 0" false-green
+   * ADR-008 forbids. Opt-in: legitimately-empty selections (e.g. "no
+   * repositories yet") stay green without it. Built on the materialized
+   * subject set (plan 0064); the finding bypasses diff/baseline (plan 0067).
+   */
+  expectNonEmpty(): this {
+    if (this._expectEmpty) throw new TypeError(CONTRADICTION)
+    const next = this.copy()
+    next._requireNonEmpty = true
+    return next
+  }
+
+  /**
+   * Assert that this selector matches **nothing**, and fail the day it matches
+   * something.
+   *
+   * Plan 0074 (R3b). Since an empty selection is now a failure by default, a
+   * rule whose selection is legitimately empty needs a way to say so — and
+   * 0069's appendix rejected `.allowEmpty()` for being "one word, silent
+   * forever, typo or not, and nothing revisits it". This is the shape that
+   * survived review, and the difference is that it is an **assertion**:
+   *
+   * ```ts
+   * classes(p).that().haveDecorator('Deprecated')
+   *   .expectEmpty()          // nothing is deprecated yet
+   *   .should().beExported()
+   *
+   * // the day someone deprecates a class:
+   * //   FAIL: .expectEmpty() asserted 0 subjects, found 1
+   * ```
+   *
+   * An agent that reaches for this to silence a real typo gets a different
+   * failure the moment the typo is fixed, and until then the intent is stated
+   * in the rule where a reader sees it — rather than in a baseline, or nowhere.
+   *
+   * Symmetric with {@link expectNonEmpty} for the rule builders. A family may **refuse** the zero-arg form where a whole-rule notion of empty has no meaning — `CorrespondenceBuilder` throws, because it declares per side — so a consumer walking `TerminalBuilder[]` must not call it unguarded. Exactly symmetric, and the two together mean
+   * the empty/non-empty question is always answerable from the rule text.
+   * Declaring both is a contradiction and throws here rather than silently
+   * picking one.
+   */
+  expectEmpty(): this {
+    if (this._requireNonEmpty) throw new TypeError(CONTRADICTION)
+    const next = this.copy()
+    next._expectEmpty = true
+    return next
+  }
+
+  /**
+   * True when this rule's emptiness is DECLARED — plan 0097, consumed by 0098.
+   *
+   * The base answer is the whole-rule flag. It is `protected` and overridable
+   * because a family whose declaration is not whole-rule must be able to say so:
+   * `CorrespondenceBuilder` declares per SIDE and refuses the zero-arg form
+   * entirely, so `_expectEmpty` is unreachable there and this default would
+   * answer `false` for a rule whose every side the author declared — reporting a
+   * finding that tells them to declare what they declared, which is ADR-008
+   * rule 2's loop.
+   *
+   * It exists now, ahead of the floor that reads it, for a reason worth stating:
+   * a private version of this lived on `CorrespondenceBuilder` and was deleted
+   * as dead code, correctly — but the deletion also removed the only expression
+   * of the concept, so the override 0098 needs would have gone missing SILENTLY
+   * rather than as the compile error a narrowed-visibility clash would have
+   * produced. Declaring it here makes the coupling loud again.
+   */
+  protected declaresEmpty(): boolean {
+    return this._expectEmpty
+  }
 
   /**
    * Attach a human-readable rationale to the rule.

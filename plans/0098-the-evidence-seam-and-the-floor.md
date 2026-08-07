@@ -2,7 +2,7 @@
 
 **Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
 **Depends on:** [0096](./0096-evidence-at-every-seam.md) (families must produce the evidence before the
-seam can require it), [0097](./0097-the-declared-empty-grammar.md) (the floor reads the mint it lifts),
+seam can require it), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor reads the mint it lifts),
 [0089](./0089-presets-forward-their-options.md) (preset declarations need somewhere to be threaded), and
 **ADR-010 ratified** — Phase 2a retypes its rule 1 contract member.
 **Carries** the fix for [bug 0066](../bugs/0066-a-smell-detector-over-zero-files-passes.md), deliberately:
@@ -95,6 +95,12 @@ tiny), `bugs/0066-*.md` → `bugs/fixed/`; this plan moves to `plans/completed/`
 
 ## Test inventory
 
+- **`.expectEmpty()` is EFFECTIVE, not merely reachable** — moved here from 0097, whose hoist made it
+  callable on every family while nothing read the flag. A smell detector that declares empty over a
+  zero-subject corpus passes; one that declares empty and then examines something fails. And
+  `CorrespondenceBuilder.declaresEmpty()` is overridden per side, so a rule whose every side is
+  declared does **not** red at the floor asking the author to declare — ADR-008 rule 2's loop, which
+  the base implementation would produce because that class refuses the whole-rule form.
 - **Per family, the triple-route shape**: the zero-units finding asserted through `violations()` **and**
   `check()` **and** `.warn()`, with `bypassFilters` read off the `violations()` result. That is the row
   that catches the two non-equivalent mis-wirings — the floor inside one terminal only, or the finding

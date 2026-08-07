@@ -104,7 +104,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   private _sides: Side[] = []
   private _checkComplete = false
   private _checkNoOrphans = false
-  private _allowEmpty = new Set<string>()
+  private _expectEmptySides = new Set<string>()
   private _distinctKeys = new Set<string>()
 
   // `_project` is accepted for API symmetry with the other entry points
@@ -136,14 +136,14 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * An independent copy, carrying the sides and both opt-out sets.
    *
    * `collectViolations` throws unless there are exactly two sides, so a leaked
-   * `_sides` push does not fail silently here — but a leaked `_allowEmpty`
-   * does: it is the opt-out from the empty-side guard, and inheriting it turns
-   * a later rule's vacuous side green.
+   * `_sides` push does not fail silently here — but a leaked declaration does:
+   * it is what stands between a vacuous side and a finding, and inheriting it
+   * turns a later rule's empty side green.
    */
   protected override copy(): this {
     const clone = super.copy()
     clone._sides = [...this._sides]
-    clone._allowEmpty = new Set(this._allowEmpty)
+    clone._expectEmptySides = new Set(this._expectEmptySides)
     clone._distinctKeys = new Set(this._distinctKeys)
     return clone
   }
@@ -176,12 +176,69 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     return next
   }
 
-  /** Permit a named side to be empty (opt out of the non-vacuity guard). */
-  allowEmpty(sideName: string): this {
+  /**
+   * Declare that a NAMED side is empty — plan 0097, replacing `allowEmpty()`.
+   *
+   * The difference is the whole point, and it is not a rename. `allowEmpty()`
+   * PERMITTED a side to be empty and never spoke again: a permanent, silent
+   * opt-out that stayed green the day the side filled up and the rule started
+   * certifying nothing about it. This ASSERTS the side is empty, and fails the
+   * day it stops being — an intent that expires and reports itself, which is
+   * the property ADR-009 part 3 requires of every declaration. Plan 0069's
+   * appendix rejected the permanent form for the rule family with receipts; a
+   * sibling family had it shipped and documented.
+   *
+   * **The zero-argument form throws here**, and that is the correction of a
+   * defect this method shipped with. The parameter has to be optional — a
+   * required one is not a valid override of `TerminalBuilder`'s zero-arg
+   * `expectEmpty()` — but the OVERRIDE VALIDITY argument justifies the
+   * signature, not the semantics. Inheriting the base meaning gave
+   * `correspondence().expectEmpty()` a whole-rule flag that suppressed the
+   * empty-side finding for BOTH sides and that the expiry branch never read:
+   * `allowEmpty` restored, permanent and silent, in fewer characters than
+   * before, on the release that deleted it. Measured green over two populated
+   * sides, forever.
+   *
+   * A correspondence compares two named sides, so "this rule is empty" has no
+   * meaning that is not per-side. Refusing at build time is the same answer
+   * this class already gives a contradiction, and it is loud where the
+   * inherited semantics were silent.
+   */
+  override expectEmpty(side?: string): this {
+    if (side === undefined) {
+      throw new TypeError(
+        'correspondence() declares emptiness per side: call .expectEmpty(sideName) for each side ' +
+          'you expect to be empty. A correspondence compares two named sides, so a whole-rule ' +
+          'declaration would suppress both and expire on neither.',
+      )
+    }
     const next = this.copy()
-    next._allowEmpty.add(sideName)
+    next._expectEmptySides.add(side)
     return next
   }
+
+  /**
+   * Declared when EVERY side is — plan 0097.
+   *
+   * The base implementation reads the whole-rule flag, which this class refuses
+   * to let anyone set. Without this override, 0098's floor would red a rule
+   * whose every side the author declared, with a finding telling them to
+   * declare. The per-side loop in `collectViolations` does not need this — its
+   * membership test covers each side directly — which is exactly why the
+   * previous private version was dead code and was removed. This one is for
+   * the root, which asks the question about the rule rather than about a side.
+   *
+   * **Unobservable until 0098, and recorded as such rather than guarded.** No
+   * shipped code reads `declaresEmpty()` yet, so reverting this override to the
+   * base body changes no output and no test fails — measured. ADR-008's
+   * split-row corollary says to record an equivalence rather than invent a guard
+   * for it; the row that makes it observable is in 0098's inventory, where the
+   * floor that calls it lands.
+   */
+  protected override declaresEmpty(): boolean {
+    return this._sides.length > 0 && this._sides.every((s) => this._expectEmptySides.has(s.name))
+  }
+
   /** Fail if a side maps two distinct subjects to one key (over-normalization guard). */
   distinctKeysOn(sideName: string): this {
     const next = this.copy()
@@ -254,8 +311,6 @@ export class CorrespondenceBuilder extends TerminalBuilder {
 
     const sideA = this._sides[0]!
     const sideB = this._sides[1]!
-    const aKeyed = sideA.materialize()
-    const bKeyed = sideB.materialize()
 
     const meta: ViolationMeta = {
       rule: `correspondence [${sideA.name} <-> ${sideB.name}]`,
@@ -265,16 +320,58 @@ export class CorrespondenceBuilder extends TerminalBuilder {
       docs: this._metadata?.docs,
     }
 
+    // A declaration that binds to no side is a configuration finding, not a
+    // no-op — plan 0097, correcting the same defect the shipped version had.
+    // `.expectEmpty('servcies')` was accepted silently and asserted nothing
+    // forever: the exact hazard this method's own docstring rejects the
+    // permanent form for ("one word, silent forever, TYPO OR NOT, and nothing
+    // revisits it"), inherited whole by the replacement.
+    //
+    // ADR-009 part 3 already ruled the structurally identical preset case — a
+    // declaration binding to no constructed rule is a FAILING finding, never a
+    // warning — so this follows settled precedent rather than deciding anew.
+    //
+    // Here rather than in the setter: `.expectEmpty(name)` may legally precede
+    // `.side(name, …)`, so the setter cannot know yet.
+    // A Set, not a concatenation: a name in BOTH sets produced two findings with
+    // identical element, message, file and line — the identity shape bugs 0064,
+    // 0065 and 0067 were filed for. And membership by the side LIST rather than
+    // two name comparisons, so it cannot rot if arity ever changes.
+    const declaredNames = new Set([...this._expectEmptySides, ...this._distinctKeys])
+    const unbound = [...declaredNames].filter((n) => !this._sides.some((side) => side.name === n))
+    if (unbound.length > 0) {
+      return unbound.map((name) => this.unboundSideViolation(name, meta, [sideA.name, sideB.name]))
+    }
+
+    const aKeyed = sideA.materialize()
+    const bKeyed = sideB.materialize()
+
     const result = setCorrespondence(aKeyed.keys(), bKeyed.keys())
 
     // Non-vacuity (ADR-008 / proposal 014): an empty side certifies nothing, so
     // it is the root cause — report it and skip the derived coverage flood.
     const emptyFindings: ArchViolation[] = []
-    if (result.aEmpty && !this._allowEmpty.has(sideA.name)) {
-      emptyFindings.push(this.emptyViolation(sideA.name, meta))
-    }
-    if (result.bEmpty && !this._allowEmpty.has(sideB.name)) {
-      emptyFindings.push(this.emptyViolation(sideB.name, meta))
+    for (const [side, isEmpty] of [
+      [sideA, result.aEmpty],
+      [sideB, result.bEmpty],
+    ] as const) {
+      // Per-side only. A `declaresEmpty()` helper stood here with an
+      // `_expectEmpty || every(side => declared)` body; the `every` half was
+      // unreachable — if every side is in the set then `has(side.name)` is
+      // already true for the side under test — and three reviewers deleted it
+      // against the full suite with nothing failing. Its stated rationale
+      // ("without the OR a user who declared both sides still redded") was a
+      // property the code never had.
+      const sideDeclared = this._expectEmptySides.has(side.name)
+      if (isEmpty && !sideDeclared) {
+        emptyFindings.push(this.emptyViolation(side.name, meta))
+      }
+      // The expiry half, and the reason this is an assertion rather than a
+      // permission: a declared-empty side that filled up is the intent
+      // reporting itself, where `allowEmpty()` stayed silent forever.
+      if (!isEmpty && this._expectEmptySides.has(side.name)) {
+        emptyFindings.push(this.unexpectedlyNonEmptyViolation(side.name, meta))
+      }
     }
     if (emptyFindings.length > 0) return emptyFindings
 
@@ -359,6 +456,68 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     })
   }
 
+  /**
+   * A declaration names a side this rule does not have — plan 0097.
+   *
+   * Covers `.expectEmpty(name)` and `.distinctKeysOn(name)` alike, because both
+   * are membership tests against side names and both were silent on a typo. The
+   * remedy is mechanical and names the sides that DO exist, so the reader does
+   * not have to go and look.
+   */
+  private unboundSideViolation(
+    name: string,
+    meta: ViolationMeta,
+    actual: readonly string[],
+  ): ArchViolation {
+    const known = actual.map((s) => `'${s}'`).join(' and ')
+    return {
+      ...this.baseViolation(
+        name,
+        '',
+        0,
+        `this rule declares something about a side named '${name}', but its sides are ${known} — ` +
+          `so the declaration binds to nothing and asserts nothing.`,
+        {
+          rule: `correspondence [${actual.join(' <-> ')}]`,
+          because: this._reason,
+          ruleId: this._metadata?.id,
+        },
+      ),
+      suggestion: `Correct the side name to one of ${known}, or remove the declaration.`,
+      docs: undefined,
+      bypassFilters: true,
+    }
+  }
+
+  /**
+   * The declared side filled up — plan 0097.
+   *
+   * This finding is why `.expectEmpty(side)` replaced `allowEmpty(side)`: the
+   * permission had no failing state, so a side that gained keys silently kept a
+   * rule green that was certifying nothing about them. An assertion that expires
+   * reports itself; a permission never does.
+   *
+   * Its remedy is mechanical and is the one ADR-008 rule 2 asks be verified:
+   * remove the declaration, and the finding clears.
+   */
+  private unexpectedlyNonEmptyViolation(sideName: string, meta: ViolationMeta): ArchViolation {
+    return {
+      ...this.baseViolation(
+        sideName,
+        '',
+        0,
+        `correspondence side '${sideName}' was declared empty with .expectEmpty('${sideName}'), ` +
+          `and now matches subjects — so the declaration no longer describes this rule.`,
+        meta,
+      ),
+      suggestion:
+        `Remove .expectEmpty('${sideName}') so the side is compared like any other, or narrow ` +
+        `the '${sideName}' selector if it was meant to stay empty.`,
+      docs: undefined,
+      bypassFilters: true,
+    }
+  }
+
   private emptyViolation(sideName: string, meta: ViolationMeta): ArchViolation {
     return {
       ...this.baseViolation(
@@ -366,7 +525,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
         '',
         0,
         `correspondence side '${sideName}' matched 0 subjects — a correspondence over an ` +
-          `empty side certifies nothing. Fix the selector, or call .allowEmpty('${sideName}') ` +
+          `empty side certifies nothing. Fix the selector, or call .expectEmpty('${sideName}') ` +
           `if an empty side is valid here.`,
         meta,
       ),
@@ -376,7 +535,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
       // here, and the guard in `execute-rule.ts` cannot reach it.
       suggestion:
         `Fix the '${sideName}' selector so it matches at least one subject, or call ` +
-        `.allowEmpty('${sideName}') if an empty side is valid here.`,
+        `.expectEmpty('${sideName}') if an empty side is the point — that asserts it, and fails the day the side fills up.`,
       docs: undefined,
       // Config-level meta-finding: no source file to attribute to, so it must
       // survive diff-aware/baseline or the guard re-greens under standard CI.

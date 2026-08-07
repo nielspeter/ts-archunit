@@ -81,6 +81,6 @@ The five family files above, `src/core/diagnose.ts`, `src/cli/commands/doctor.ts
 ## Out of scope
 
 The seam retype and anything that changes `check()` — [0098](./0098-the-evidence-seam-and-the-floor.md).
-The declared-empty grammar — [0097](./0097-the-declared-empty-grammar.md). Evidence inside a
+The declared-empty grammar — [0097](./completed/0097-the-declared-empty-grammar.md). Evidence inside a
 user-written `defineCondition` body: ADR-009's named residue, invisible to a seam that counts what was
 handed to it.

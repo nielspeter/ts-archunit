@@ -1,9 +1,9 @@
 # Plan 0097 — the declared-empty grammar
 
-**Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 2c/2f.
+**Status:** **DONE 2026-08-07.** Filed 2026-08-07, split out of plan 0095's Phase 2c/2f.
 **Depends on:** nothing in code — it is additive and can land any time. It **must precede**
-[0098](./0098-the-evidence-seam-and-the-floor.md), whose floor reads the mint this plan lifts.
-**Executes** [ADR-010](../adr/010-the-extension-surface-is-a-contract.md) rule 3(a), accepted there from
+[0098](../0098-the-evidence-seam-and-the-floor.md), whose floor reads the mint this plan lifts.
+**Executes** [ADR-010](../../adr/010-the-extension-surface-is-a-contract.md) rule 3(a), accepted there from
 the consumer's side. One mechanism, two documents served — which is why it is its own plan rather than a
 line inside another.
 **Priority:** High, and cheap. It is the only prerequisite 0098 has that is entirely in our hands.
@@ -13,7 +13,7 @@ it is on the extension contract's root, so ADR-010's process applies. Top row of
 
 ## Problem
 
-[ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) part 3 rules that empty is legitimate only
+[ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) part 3 rules that empty is legitimate only
 by **declaration**, and that every family's grammar must expose a declaration path. Two things stand in
 the way, and they pull in opposite directions:
 
@@ -71,8 +71,10 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 
 ## Test inventory
 
-- `.expectEmpty()` reachable **and effective** on `SmellBuilder` — bug 0066's unmeasured item, now
-  asserted rather than assumed.
+- `.expectEmpty()` **reachable** on `SmellBuilder` — bug 0066's unmeasured item, answered: it was
+  unreachable, and now is not. The **effectiveness** half moved to
+  [0098](../0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor that reads the flag
+  lands; claiming it here would be a row nothing can satisfy in this plan's scope.
 - the contradiction guard with `.expectNonEmpty()` still throws after the hoist.
 - `expectEmpty(side?)` rows: some-sides-declared → still reds; **all-sides-declared → passes**;
   one-side declared and that side gains a key → expires.
@@ -84,6 +86,59 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 ## Out of scope
 
 The floor that consumes these declarations, and the precedence ruling that an empty **project** outranks
-them — [0098](./0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
-[0089](./0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
+them — [0098](../0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
+[0089](../0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
 mechanism and is the right home for it.
+
+---
+
+## Outcome
+
+Shipped 2026-08-07. Both halves landed as one PR.
+
+**The hoist.** `.expectEmpty()` / `.expectNonEmpty()`, their contradiction guard and both flags moved to
+`TerminalBuilder`. Measured after the move: both are functions on `SmellBuilder` and
+`CorrespondenceBuilder`, and the contradiction still throws — which answers bug 0066's _"is
+`.expectEmpty()` reachable on a smell builder at all?"_ with a yes where the answer was no.
+
+**The conversion.** `allowEmpty(side)` is gone; `expectEmpty(side)` replaces it, with the new
+`unexpectedlyNonEmptyViolation` producer as the whole point: a declared side that fills up now **fails**,
+where the permission stayed silent forever.
+
+**Corrected after a five-persona review, which found three defects in the first cut.** All three are
+recorded rather than quietly fixed, because two of them were the replacement inheriting the half of
+`allowEmpty`'s defect nobody had looked at:
+
+1. **The zero-argument form was `allowEmpty` restored.** `expectEmpty()` with no side inherited the base
+   class's whole-rule flag, which suppressed the empty finding for BOTH sides while the expiry branch
+   read only the per-side set — so it could never fire. Measured green over two populated sides, forever,
+   in fewer characters than the API it replaced, on the release that deleted it. The override-validity
+   argument justifies the optional _signature_; it does not justify inheriting the _semantics_. It now
+   throws, naming the per-side form.
+2. **A declaration naming no side was silent.** `.expectEmpty('servcies')` was accepted and asserted
+   nothing, forever — verbatim the _"one word, silent forever, typo or not, and nothing revisits it"_
+   hazard this method's own docstring rejects `allowEmpty` for. Now a failing configuration finding,
+   following ADR-009 part 3's already-decided ruling on the identical preset case, and covering
+   `.distinctKeysOn()` by the same check.
+3. **`declaresEmpty()`'s `every(...)` disjunct was dead code, and this section claimed otherwise.** It
+   said "without the OR, a user who declared both sides still redded" — a property the code never had:
+   if every side is in the set then the per-side `has(side.name)` is already true for the side under
+   test. Three reviewers deleted the clause against the full suite with nothing failing, including the
+   test written to guard it. The clause is gone; the behaviour it named is real and is carried by the
+   per-side membership, and the test now credits that.
+
+**Sequencing, corrected.** 0097 ran before 0096 so that 0096's remedy would name an API that exists.
+That was right, and it produced a second problem the review found: outside the rule builders and
+`correspondence`, nothing reads these flags until 0098's floor, so shipping 0097 alone publishes a
+declaration that compiles, reads as a guard and asserts nothing. **The plans split correctly; the
+RELEASE did not.** 0096, 0097 and 0098 merge as separate PRs and tag as one release. Nothing inert
+reaches npm, and ADR-009's "one red event" gets applied to the release rather than to the plan.
+
+**One process note worth keeping.** Two attempts at the hoist removed more than intended — the first
+slice took `describeRule()` with it, surfacing as ten failing tests. Restored from git and redone by
+walking JSDoc/brace boundaries instead of slicing on marker strings. For structural edits to source,
+walk the syntax; do not cut on text landmarks.
+
+**Not in scope and not done:** preset-level declaration threading, which belongs to
+[0089](../0089-presets-forward-their-options.md) because that plan exists to give presets an
+options-forwarding mechanism.

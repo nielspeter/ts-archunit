@@ -128,7 +128,7 @@ describe('correspondence()', () => {
       expect(v[0]!.element).toBe('registry')
     })
 
-    it('.allowEmpty() opts a side out of the non-vacuity guard', () => {
+    it('.expectEmpty(side) declares an empty side, and it stays green', () => {
       const emptySel = new TestRuleBuilder(stubProject, elements)
         .that()
         .withPredicate(nameMatches(/^NothingMatches$/))
@@ -136,7 +136,149 @@ describe('correspondence()', () => {
         correspondence(stubProject)
           .side('services', emptySel, byNameKey)
           .side('registry', ['UserService'])
-          .allowEmpty('services')
+          .expectEmpty('services')
+          .beComplete()
+          .check()
+      }).not.toThrow()
+    })
+
+    it('the zero-argument form is refused at build time — plan 0097', () => {
+      // It used to inherit TerminalBuilder's whole-rule flag, which suppressed
+      // the empty finding for BOTH sides and which the expiry branch never
+      // read: `allowEmpty` restored, permanent and silent, in fewer characters
+      // than before, on the release that deleted it. A correspondence compares
+      // two named sides, so "this rule is empty" has no per-rule meaning.
+      expect(() => correspondence(stubProject).side('a', []).side('b', []).expectEmpty()).toThrow(
+        TypeError,
+      )
+    })
+
+    it('a declaration naming no side is a failing finding, not a silent no-op', () => {
+      // The typo case. ADR-009 part 3 rules the identical preset case a FAILING
+      // finding, never a warning — a declaration that binds to nothing asserts
+      // nothing, and saying so is the whole difference from `allowEmpty`.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('servcies') // typo
+        .beComplete()
+        .violations()
+      // NOT the length — under an inverted filter the typo case also yields
+      // exactly one violation (the real `beComplete` finding), so `1 === 1`
+      // passes on that sabotage. The substring is what carries this row.
+      expect(v[0]!.message).toContain("sides are 'services' and 'registry'")
+      expect(v[0]!.bypassFilters).toBe(true)
+      // The remedy names the ACTION, and is pinned separately from the message,
+      // which names the facts. The census proves whose remedy it is; only this
+      // proves what it says — and an agent handed facts with no imperative
+      // invents one.
+      expect(v[0]!.suggestion).toContain(
+        "Correct the side name to one of 'services' and 'registry'",
+      )
+
+      // Applying the stated remedy: spell it correctly. The unbound finding
+      // clears — and the rule is still red, with a DIFFERENT finding, because
+      // `services` genuinely is not empty so the corrected declaration has
+      // genuinely expired. Asserted rather than filtered, because a filtered
+      // empty list would also pass if `violations()` returned nothing at all.
+      const fixed = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('services')
+        .beComplete()
+        .violations()
+      expect(fixed).toHaveLength(1)
+      expect(fixed[0]!.message).toContain('was declared empty')
+
+      // The remedy's OTHER branch — remove the declaration — is the one an
+      // agent takes, and it clears everything.
+      const removed = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .beComplete()
+        .violations()
+      expect(removed.filter((x) => x.message.includes('binds to nothing'))).toEqual([])
+      expect(removed.filter((x) => x.message.includes('was declared empty'))).toEqual([])
+    })
+
+    it('one bad name in BOTH declaration sets is ONE finding', () => {
+      // Concatenating the two sets produced two findings with identical element,
+      // message, file and line — the identity shape bugs 0064, 0065 and 0067 were
+      // filed for, where `hashViolation` keys both to one baseline entry and the
+      // terminal prints the same sentence twice.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('typo')
+        .distinctKeysOn('typo')
+        .beComplete()
+        .violations()
+      expect(v.map((x) => x.element)).toEqual(['typo'])
+    })
+
+    it('two unbound names report two findings, by identity', () => {
+      // The `.map()`'s identity property: one finding per bad name, not one
+      // per rule. Catches a future "report only the first" simplification.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('servcies')
+        .distinctKeysOn('registrees')
+        .beComplete()
+        .violations()
+      expect(v.map((x) => x.element)).toEqual(['servcies', 'registrees'])
+    })
+
+    it('distinctKeysOn() with an unbound name is caught by the same check', () => {
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .distinctKeysOn('registrees') // typo
+        .beComplete()
+        .violations()
+      expect(v.map((x) => x.element)).toEqual(['registrees'])
+    })
+
+    it('.expectEmpty(side) FAILS the day that side fills up — plan 0097', () => {
+      // The property that makes it an assertion rather than `allowEmpty()`'s
+      // permission, which had no failing state and so stayed green forever.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('services')
+        .beComplete()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.message).toContain('was declared empty')
+      expect(v[0]!.bypassFilters).toBe(true)
+    })
+
+    it('the expiry remedy remediates: removing the declaration clears it', () => {
+      // ADR-008 rule 2's behavioural corollary — apply the stated fix and assert
+      // the finding clears, rather than asserting the sentence reads well.
+      const withoutDeclaration = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .beComplete()
+        .violations()
+      expect(withoutDeclaration.filter((x) => x.message.includes('was declared empty'))).toEqual([])
+    })
+
+    it('declaring EVERY side is not a loop: it does not red asking to declare', () => {
+      // Per-side membership carries this on its own — a `declaresEmpty()` helper
+      // with an `every(...)` disjunct stood here and was unreachable, and this
+      // test passed with it deleted. Kept because the BEHAVIOUR is what matters
+      // (a user who declared everything must not be told to declare), but the
+      // credit now goes to the mechanism that actually provides it.
+      const emptyA = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+      expect(() => {
+        correspondence(stubProject)
+          .side('a', emptyA, byNameKey)
+          .side('b', [])
+          .expectEmpty('a')
+          .expectEmpty('b')
           .beComplete()
           .check()
       }).not.toThrow()
@@ -164,7 +306,7 @@ describe('correspondence()', () => {
       const v = correspondence(stubProject)
         .side('a', services(), () => [])
         .side('b', ['UserService'])
-        .allowEmpty('a') // a produced no keys — permitted here
+        .expectEmpty('a') // a produced no keys — declared, so not a finding
         .haveNoOrphans()
         .violations()
       // a is empty; b's only key has no source in a → one orphan
