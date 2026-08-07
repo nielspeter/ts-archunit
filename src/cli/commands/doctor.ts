@@ -11,7 +11,12 @@ export interface DoctorArgs {
 }
 
 /**
- * Report what each rule cannot enforce, without running any of them.
+ * Report what each rule cannot enforce, without evaluating their conditions.
+ *
+ * It DOES materialize each rule's selection, as of plan 0096: "this rule examined
+ * nothing" is a fact about the selection, and the preview for 0098's floor has to
+ * read the same computation the floor will. The docstring used to say "without
+ * running any of them" and that stopped being true.
  *
  * **Supported and scoped** since plan 0077, which settled the keep-or-retire
  * question 0069 left open. It diagnoses rule files the CLI can **load** — the

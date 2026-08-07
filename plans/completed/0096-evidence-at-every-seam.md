@@ -1,14 +1,14 @@
 # Plan 0096 — evidence at every seam, and the preview that reads it
 
-**Status:** Open, **amended 2026-08-07** after a five-persona review of a first attempt (branch
+**Status:** **DONE 2026-08-07.** Amended 2026-08-07 after a five-persona review of a first attempt (branch
 `feat/0096-evidence-at-every-seam`, one WIP commit, no PR). The amendment is structural, not a fix list:
 the first attempt built evidence as a **second derivation** parallel to the one 0098 will create, and
 that drift is already measurable inside its single commit. Rework against this text, do not patch that
 branch. Filed 2026-08-07, split out of plan 0095's Phase 1.
-**Depends on:** [0095](./completed/0095-the-vacuity-matrix-and-the-conformance-audit.md) — its truth table names
+**Depends on:** [0095](./0095-the-vacuity-matrix-and-the-conformance-audit.md) — its truth table names
 which families need wiring, and the matrix is what independently checks this plan's work.
 **Priority:** High. It is the diagnostic-first half of the migration
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1's corollary requires: the release that
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 1's corollary requires: the release that
 previews the flip has to ship before the release that flips.
 **Effort:** Medium. Five families, one accessor, one diagnostic kind.
 **Blast radius:** **Published API, additive** — `check()` behaviour does not change, but `diagnose()`
@@ -17,9 +17,9 @@ rule 6, with one top-row edge: `DiagnosticFinding['kind']` is a documented JSON 
 
 ## Problem
 
-[ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) requires a passing verdict to be constructed
+[ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) requires a passing verdict to be constructed
 from evidence of examination. Nothing computes that evidence today. Before the seam can require it
-([0098](./0098-the-evidence-seam-and-the-floor.md)), every family has to produce it — and the consumer
+([0098](../0098-the-evidence-seam-and-the-floor.md)), every family has to produce it — and the consumer
 has to be able to see what the flip will do to them before it happens.
 
 ## The work
@@ -180,7 +180,70 @@ rule file — a rule file with ten smell rules paid ~2s to compute ten integers.
 
 ## Out of scope
 
-The seam retype and anything that changes `check()` — [0098](./0098-the-evidence-seam-and-the-floor.md).
-The declared-empty grammar — [0097](./completed/0097-the-declared-empty-grammar.md). Evidence inside a
+The seam retype and anything that changes `check()` — [0098](../0098-the-evidence-seam-and-the-floor.md).
+The declared-empty grammar — [0097](./0097-the-declared-empty-grammar.md). Evidence inside a
 user-written `defineCondition` body: ADR-009's named residue, invisible to a seam that counts what was
 handed to it.
+
+---
+
+## Outcome
+
+Reworked clean from `main` — the amendment said rework, not patch, and the first attempt's branch was
+kept only as a record of what was measured.
+
+**The structural requirement holds, and proved itself without a new test.** Each family extracts the set
+its conditions receive into one `selected()`, called by both `collectViolations()` and `examinedUnits()`.
+Reverting `resolvers` to its pre-predicate form is caught by the **existing graphql violation tests** —
+because both readers see the change. That is the difference between "the preview derives from the same
+computation the gate uses" being structural and being a claim, and it is the whole reason for the
+amendment.
+
+**Memoized through a WeakMap keyed on the builder, not an instance field**, because a field would have
+been _wrong_: `shallowClone` is `Object.assign` over own properties, so a memo is copied onto a builder
+that was just given a different filter, and the clone answers with its parent's selection. Plausible
+number, stale evidence. A clone is a different key, so the hazard cannot arise — and the row that pins
+it materializes a parent, narrows it, and checks the parent is unchanged.
+
+**All three rulings landed as written**: not gated on `target` (the two families with no project had no
+preview at all); emitted last and only when nothing else explained the emptiness; advice that names the
+narrowing without claiming the author wrote it.
+
+**Two `diagnose()` tests were fixed by changing the fixture, not the assertion.** `**/domain/**` held no
+body over the default `minLines(5)`, so a detector scoped there examined zero and could never fire —
+those tests had been pinning glob liveness through a vacuous detector, which is precisely what this plan
+exists to surface. `diagnose.test.ts` forbids the alternative in writing.
+
+### The sabotage matrix, and why the first run was void
+
+5 rows, verdicts by exit code, green baseline both ends: precedence removed → caught; the no-project
+branch skipped → caught; fires regardless of the count → caught; never fires → caught; `resolvers`
+reverted to pre-predicate → caught.
+
+**The first run scored 5 of 5 and was meaningless.** zsh does not word-split unquoted parameters, so the
+file list reached vitest as one nonexistent filename, no files were collected, and every row exited 1 —
+**including the baseline**. That is the literal failure ADR-008 rule 5 records, reproduced while building
+an ADR-009 instrument, and the green-baseline assertion is the only reason it was caught rather than
+published. Re-run with the list inlined.
+
+### Deferred, and named
+
+- **The effectiveness half of `.expectEmpty()` on `SmellBuilder`** stays in
+  [0098](../0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor makes it possible. This
+  plan makes it _reachable_; nothing reads the flag yet outside the rule builders and `correspondence`.
+- **A boundary row for `duplicateBodies` at exactly one examined body.** The unit is "bodies entering
+  pairwise comparison" and one body enters no pair, so a floor gating on `> 0` would let a provably
+  unfireable rule through. `inconsistentSiblings` already applies `>= 2` at the folder level. The two
+  smell families should agree, and 0098 is where the floor decides it.
+- **An error boundary.** `examinedUnits()` now runs user code — a `correspondence` `keyFn`, full AST
+  walks — and `diagnose()` has no catch, so a throwing `keyFn` gives a stack rather than a report. In
+  `doctor` it lands in the load-failure catch and is described as a rule file that could not be loaded,
+  which is a false cause. Filed rather than fixed here because the right shape is a decision about
+  `diagnose()`'s contract, not a `try` in this plan.
+
+### Independence, stated rather than implied
+
+The 0095 matrix is **not** an independent check for this change: it probes `check()`/`warn()` over a
+zero-file corpus, and this plan changes neither. For this release the evidence has only same-derivation
+guards. Rule 5 permits that where it is stated; the first attempt claimed the matrix and that claim was
+wrong.

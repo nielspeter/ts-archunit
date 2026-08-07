@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`diagnose()` and `doctor` report `zero-subjects`** — a rule whose project loaded files but whose
+  own narrowing left it **nothing to examine**, so it can never fail. Five families now count the units
+  they examined: both smell detectors, `correspondence`, and both GraphQL builders.
+
+  This is the **preview**. From the release that lands the evidence floor, the same state is a failing
+  configuration finding — so `doctor`, or `expect(diagnose(rules)).toEqual([])` inside your own suite,
+  tells you now what will go red then. It lands in `diagnose()` rather than only in `doctor` for that
+  reason: `doctor` cannot load a rule file that imports a test runner, which is the primary documented
+  way to write rules.
+
+  It reports **last**, and only when nothing else already explained the emptiness. A dead glob, a
+  missing assertion or an empty project each names its own cause with its own remedy; adding "your
+  narrowing removed everything" beside one of them would print the derived symptom above the root
+  cause. And it never says _"your filters"_ — the commonest trigger is a default you did not write
+  (`duplicateBodies` applies `minLines(5)` unless told otherwise).
+
+  ⚠️ **`DiagnosticFinding['kind']` gains a member**, which is source-breaking for an exhaustive
+  `switch`. The documented contract in `docs/api-reference.md` said four values and listed four; it is
+  now six — `orphan-exclusion` had been missing since 0.43.0 as well.
+
+  ⚠️ **`doctor` exits non-zero on anything it reports**, so a pipeline running it goes red for rules
+  that are green today. That is the point of a preview, but it arrives a release before `check()`
+  changes.
+
+  **`diagnose()` no longer reports "without running any of them".** It does not evaluate conditions,
+  but it does materialize each rule's selection — "this rule examined nothing" is a fact about the
+  selection, and the preview has to read the same computation the floor will. Six documentation sites
+  said otherwise and are corrected. Selections are memoized per builder, so a `diagnose()` followed by
+  a `check()` does the work once.
+
 ### Changed (⚠️ BREAKING — `correspondence().allowEmpty()` is now `.expectEmpty()`)
 
 - **The declared-empty grammar reaches every family.** `.expectEmpty()` and `.expectNonEmpty()` moved

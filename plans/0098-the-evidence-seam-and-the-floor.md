@@ -1,7 +1,7 @@
 # Plan 0098 — the evidence seam, and the floor no family can be born below
 
 **Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
-**Depends on:** [0096](./0096-evidence-at-every-seam.md) (families must produce the evidence before the
+**Depends on:** [0096](./completed/0096-evidence-at-every-seam.md) (families must produce the evidence before the
 seam can require it), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor reads the mint it lifts),
 [0089](./0089-presets-forward-their-options.md) (preset declarations need somewhere to be threaded), and
 **ADR-010 ratified** — Phase 2a retypes its rule 1 contract member.
