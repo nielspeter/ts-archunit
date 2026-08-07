@@ -150,7 +150,9 @@ demo/duplicates
   zero-subjects: this rule examined 0 subjects, so it can never fail. Its own
   narrowing removed everything the project loaded — including any default it
   applies that you did not write. Widen it, or declare the empty state with
-  .expectEmpty() if that is the point
+  .expectEmpty() if that is the point. In this same release it is a failing
+  configuration finding at check time; here it is a preview you can run before
+  your build does
 ```
 
 `zero-subjects` reports **last**, and only when nothing else already explained the emptiness —

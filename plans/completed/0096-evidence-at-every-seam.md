@@ -192,8 +192,12 @@ handed to it.
 Reworked clean from `main` — the amendment said rework, not patch, and the first attempt's branch was
 kept only as a record of what was measured.
 
-**The structural requirement holds, and proved itself without a new test.** Each family extracts the set
-its conditions receive into one `selected()`, called by both `collectViolations()` and `examinedUnits()`.
+**The structural requirement holds — for four families on the first pass, and for the fifth only after
+review.** Each family extracts the set its conditions receive into one `selected()`, called by both
+`collectViolations()` and `examinedUnits()`. `inconsistentSiblings` shipped the accessor and left
+`detect()` re-deriving the same threshold inline: two derivations of one number, in the family the
+amendment was written to prevent, and a reviewer rewrote its `selected()` to `sourceFiles.length` with
+the whole suite still green. `detect()` now iterates the shared set.
 Reverting `resolvers` to its pre-predicate form is caught by the **existing graphql violation tests** —
 because both readers see the change. That is the difference between "the preview derives from the same
 computation the gate uses" being structural and being a claim, and it is the whole reason for the
@@ -205,26 +209,59 @@ that was just given a different filter, and the clone answers with its parent's 
 number, stale evidence. A clone is a different key, so the hazard cannot arise — and the row that pins
 it materializes a parent, narrows it, and checks the parent is unchanged.
 
-**All three rulings landed as written**: not gated on `target` (the two families with no project had no
-preview at all); emitted last and only when nothing else explained the emptiness; advice that names the
-narrowing without claiming the author wrote it.
+**Two of the three rulings landed as written; the third landed by halves and was corrected.** Not gated
+on `target` — right first time, and proved through `diagnose()`. Advice that names the narrowing without
+claiming the author wrote it — right first time. **Precedence** landed for `dead-glob` and
+`project-empty` and NOT for `no-condition`, because `const before` was captured after that push, so the
+tail could never see a missing assertion — while the comment on the tail claimed it did. The code
+contradicted its own comment, and the plan had pre-registered `['no-condition']` alone as a required row.
+The no-project branch was ungated for the same reason.
+
+**A fourth thing the plan required and the first pass did not do: the advice must remediate.**
+`zeroSubjectsFinding` never consulted `declaresEmpty()` — the hook 0097 created for exactly this
+question, whose docstring says it exists "ahead of the floor that reads it". 0096 was its first reader
+and did not read it, so a rule that declared the empty state was still reported, and the printed remedy
+was one the reader had already applied. On `correspondence` the remedy as literally written throws,
+which this plan warned about in its own text. `declaresEmpty()` is now public — the same structural
+forcing that made `assertsSomething()` public — and the row that guards it applies the advice and
+asserts the finding clears, rather than asserting the advice's text.
 
 **Two `diagnose()` tests were fixed by changing the fixture, not the assertion.** `**/domain/**` held no
 body over the default `minLines(5)`, so a detector scoped there examined zero and could never fire —
 those tests had been pinning glob liveness through a vacuous detector, which is precisely what this plan
 exists to surface. `diagnose.test.ts` forbids the alternative in writing.
 
-### The sabotage matrix, and why the first run was void
+### What the review round changed, and what it says about the matrix
+
+Three reviewers, three criticals, all measured and all things this Outcome had claimed landed. The
+testing reviewer's matrix was 34 rows split per call site against my 5, and scored **12 caught by
+nothing** against my 5-of-5 — including every row touching `inconsistentSiblings`, the family my matrix
+had no row for. Four of my positive rows used `toContain`, which `diagnose.test.ts` bans in writing as
+"the cheap green the plan bans", and the two rules I chose to prove the no-project fix were exactly the
+two that co-reported `['no-condition','zero-subjects']` — so the assertions could not see it. The test
+file's header also claimed every family was reached through `diagnose()`; it was three of five.
+
+Corrected: rows are `toEqual`, the no-project rows use assertion-complete rules, and the missing rows
+exist — `['no-condition']` alone, the declaration clearing the finding, resolvers through `diagnose()`,
+and `inconsistentSiblings` at a folder of exactly one file, which is the only shape where its threshold
+is semantic rather than an optimisation.
+
+### The sabotage matrix, and why TWO runs were void
 
 5 rows, verdicts by exit code, green baseline both ends: precedence removed → caught; the no-project
 branch skipped → caught; fires regardless of the count → caught; never fires → caught; `resolvers`
 reverted to pre-predicate → caught.
 
-**The first run scored 5 of 5 and was meaningless.** zsh does not word-split unquoted parameters, so the
-file list reached vitest as one nonexistent filename, no files were collected, and every row exited 1 —
-**including the baseline**. That is the literal failure ADR-008 rule 5 records, reproduced while building
-an ADR-009 instrument, and the green-baseline assertion is the only reason it was caught rather than
-published. Re-run with the list inlined.
+**Two runs were void, for two different harness faults, and both were caught by an assertion rather than
+by a verdict.** The first: zsh does not word-split unquoted parameters, so the file list reached vitest
+as one nonexistent filename and every row exited 1 — **including the baseline**, which is the literal
+failure ADR-008 rule 5 records, reproduced while building an ADR-009 instrument. The second, after the
+review: a shell helper did not forward its arguments to `python3 -c`, so **no patch applied at all** and
+every row would have scored "caught by nothing" had the tracebacks not been visible.
+
+The lesson is not "be careful with shells". It is that a sabotage harness needs the same two assertions
+it demands of the code it audits: a **green baseline** and a **patch that provably applied**. Both faults
+were invisible in the verdicts and obvious in the assertions.
 
 ### Deferred, and named
 

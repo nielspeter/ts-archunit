@@ -8,7 +8,10 @@
  * passed while the preview was **inert for those two families** — they return `undefined` from
  * `getProject()`, so `diagnose()` hit its `if (!target) … continue` and never reached the check.
  * A row that calls the accessor proves the accessor; only a row that calls `diagnose()` proves the
- * feature. Every family below is reached the second way.
+ * feature. Both kinds appear below and they are labelled: the first `describe` is accessor-level and
+ * proves the SEAM, the second is `diagnose()`-level and proves the FEATURE. An earlier version of this
+ * header claimed every family was reached the second way; it was three of five, which is an affirmative
+ * false claim in the documentation of the file written to prevent exactly that.
  *
  * ## What each fixture holds
  *
@@ -23,6 +26,7 @@ import path from 'node:path'
 import { project } from '../../src/core/project.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { smells } from '../../src/smells/index.js'
+import { call } from '../../src/index.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
 import { resolvers, schemaFromSDL } from '../../src/graphql/index.js'
 
@@ -99,9 +103,13 @@ describe('a family counts what it examined (plan 0096)', () => {
 
 describe('the preview reports it, with the gate’s precedence (plan 0096)', () => {
   it('fires when the project loaded files and the family examined none', () => {
-    expect(kindsOf(smells.duplicateBodies(loaded).minLines(9999), loaded)).toContain(
+    // toEqual, not toContain. `diagnose.test.ts` bans the weaker form in writing —
+    // "the cheap green the plan bans: it would stop pinning that no third finding
+    // appears" — and on the first pass every positive row here used it, which is
+    // exactly why a ['no-condition','zero-subjects'] double-report went unseen.
+    expect(kindsOf(smells.duplicateBodies(loaded).minLines(9999), loaded)).toEqual([
       'zero-subjects',
-    )
+    ])
   })
 
   it('reaches a family with NO project — the case that was inert', () => {
@@ -109,10 +117,69 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     // never had one, so both answer `undefined` from `getProject()`. The first
     // attempt gated the evidence check on that and gave these families no preview
     // at all — while its tests passed, because they called the accessor instead.
-    expect(kindsOf(correspondence(loaded).side('a', []).side('b', []))).toContain('zero-subjects')
-    expect(kindsOf(schemaFromSDL('type Query { a: String }').that().mutations())).toContain(
+    // ASSERTION-COMPLETE rules. The first pass used bare selections, which are
+    // also condition-less — so the rows passed under `toContain` while actually
+    // reporting ['no-condition','zero-subjects'], conflating the fault they mean
+    // to prove with a different one.
+    expect(kindsOf(correspondence(loaded).side('a', []).side('b', []).beComplete())).toEqual([
       'zero-subjects',
-    )
+    ])
+    expect(
+      kindsOf(
+        schemaFromSDL('type Query { a: String }').that().mutations().should().haveFields('x'),
+      ),
+    ).toEqual(['zero-subjects'])
+  })
+
+  it('yields to a missing assertion — ["no-condition"] alone', () => {
+    // The plan pre-registered this row and the first pass shipped without it,
+    // because `const before` was captured AFTER the no-condition push so the tail
+    // could never suppress on it.
+    expect(kindsOf(correspondence(loaded).side('a', []).side('b', []))).toEqual(['no-condition'])
+  })
+
+  it('yields to a declaration — the advice must not tell you to do what you did', () => {
+    // ADR-008 rule 2, behaviourally: apply the stated remedy and assert the
+    // finding clears. The first pass asserted the advice's TEXT and never that
+    // following it worked — and it did not, because nothing consulted
+    // `declaresEmpty()`, the hook 0097 created for exactly this question.
+    expect(kindsOf(smells.duplicateBodies(loaded).minLines(9999), loaded)).toEqual([
+      'zero-subjects',
+    ])
+    expect(kindsOf(smells.duplicateBodies(loaded).minLines(9999).expectEmpty(), loaded)).toEqual([])
+  })
+
+  it('resolvers reports through diagnose(), not only through the accessor', () => {
+    // The family the first attempt counted pre-predicate. Its accessor row lives
+    // above; this proves the preview actually reaches it.
+    const p = project(fixture('graphql'))
+    const narrowed = resolvers(p, '**/*.ts')
+      .that()
+      .resolveFieldReturning(/ZZZ_NOTHING_MATCHES/)
+      .should()
+      .contain(call('nothing.atAll'))
+    expect(kindsOf(narrowed, p)).toEqual(['zero-subjects'])
+  })
+
+  it('inconsistentSiblings reports through diagnose() too — the fifth family', () => {
+    // Absent from the first pass, and it was the family whose `detect()` never
+    // called `selected()` — so its evidence was a second derivation that a
+    // reviewer rewrote to `sourceFiles.length` with the whole suite still green.
+    const modules = project(fixture('modules'))
+    // A folder holding exactly ONE file. That is where the `>= 2` threshold is
+    // semantic rather than an optimisation: `detect()` would skip it anyway via
+    // its downstream majority guards, so only the COUNT distinguishes. Without
+    // this row, dropping the threshold is caught by nothing — measured.
+    const single = smells
+      .inconsistentSiblings(modules)
+      .inFolder('**/vendor/nested/src/domain/**')
+      .forPattern(call('x'))
+    expect(single.examinedUnits()).toBe(0)
+
+    // And the same detector over folders that ARE comparable counts them, so the
+    // row above is not green merely because the glob matched nothing.
+    const comparable = smells.inconsistentSiblings(modules).forPattern(call('x'))
+    expect(comparable.examinedUnits()).toBeGreaterThan(1)
   })
 
   it('does NOT fire beside project-empty — one fault, one finding', () => {
@@ -132,9 +199,7 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
 
   it('stays silent when the family examined something', () => {
     // Non-vacuity: every row above holds if the finding fired always, or never.
-    expect(kindsOf(smells.duplicateBodies(loaded).minLines(1), loaded)).not.toContain(
-      'zero-subjects',
-    )
+    expect(kindsOf(smells.duplicateBodies(loaded).minLines(1), loaded)).toEqual([])
   })
 
   it('the remedy names the narrowing, and never claims the author wrote it', () => {

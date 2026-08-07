@@ -271,7 +271,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * for it; the row that makes it observable is in 0098's inventory, where the
    * floor that calls it lands.
    */
-  protected override declaresEmpty(): boolean {
+  override declaresEmpty(): boolean {
     return this._sides.length > 0 && this._sides.every((s) => this._expectEmptySides.has(s.name))
   }
 

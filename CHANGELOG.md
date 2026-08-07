@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   own narrowing left it **nothing to examine**, so it can never fail. Five families now count the units
   they examined: both smell detectors, `correspondence`, and both GraphQL builders.
 
-  This is the **preview**. From the release that lands the evidence floor, the same state is a failing
-  configuration finding — so `doctor`, or `expect(diagnose(rules)).toEqual([])` inside your own suite,
-  tells you now what will go red then. It lands in `diagnose()` rather than only in `doctor` for that
-  reason: `doctor` cannot load a rule file that imports a test runner, which is the primary documented
-  way to write rules.
+  This is the **preview surface for the same release's gate**. `doctor`, or
+  `expect(diagnose(rules)).toEqual([])` inside your own suite, answers the question _before_ your build
+  does — you can run it on the rules you have and see the list, rather than discovering it from a red
+  CI job. It lands in `diagnose()` rather than only in `doctor` for that reason: `doctor` cannot load a
+  rule file that imports a test runner, which is the primary documented way to write rules.
 
   It reports **last**, and only when nothing else already explained the emptiness. A dead glob, a
   missing assertion or an empty project each names its own cause with its own remedy; adding "your
@@ -30,8 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   now six — `orphan-exclusion` had been missing since 0.43.0 as well.
 
   ⚠️ **`doctor` exits non-zero on anything it reports**, so a pipeline running it goes red for rules
-  that are green today. That is the point of a preview, but it arrives a release before `check()`
-  changes.
+  that are green today — in the same release that makes `check()` red on them. The value is that
+  `diagnose()`/`doctor` can be run on demand, against your rules, without waiting for CI.
+
+  A rule that **declared** the empty state with `.expectEmpty()` is not reported. The preview honours
+  the same declaration the gate does, which is why the grammar shipped alongside it rather than after.
 
   **`diagnose()` no longer reports "without running any of them".** It does not evaluate conditions,
   but it does materialize each rule's selection — "this rule examined nothing" is a fact about the

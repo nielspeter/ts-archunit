@@ -60,6 +60,14 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * with this plan, in the docs as well as here.
    */
   examinedUnits?: () => number
+  /**
+   * Whether this rule's emptiness was DECLARED — plan 0097, read here by 0096.
+   *
+   * Public for the same structural reason as `assertsSomething()`. Without it
+   * the preview reports a finding on a rule the gate will accept, and tells the
+   * reader to do the thing they already did.
+   */
+  declaresEmpty?: () => boolean
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -135,7 +143,12 @@ export interface DiagnosticFinding {
 }
 
 /**
- * Report what each rule cannot enforce, without running any of them.
+ * Report what each rule cannot enforce, without evaluating their conditions.
+ *
+ * It DOES materialize each rule's selection, as of plan 0096 — "this rule
+ * examined nothing" is a fact about the selection. The docstring said "without
+ * running any of them" and that stopped being true; it is the IDE-hover contract
+ * for an exported function, so it is corrected here and not only in `docs/`.
  *
  * The in-process half of `doctor`. It exists because rules written inside
  * vitest are a co-equal documented path (`docs/running-in-tests.md`), and a
@@ -181,6 +194,19 @@ export function diagnose(
     // was ever needed for.
     const target = rule.getProject?.() ?? project
 
+    // Where this rule's findings begin, so the tail can ask whether anything
+    // else already explained an empty examination (plan 0096's precedence
+    // ruling). The gate has the same shape at `terminal-builder.ts` — each fault
+    // REPLACES what follows — and `diagnose()` must mirror it or the preview
+    // disagrees with the thing it previews.
+    //
+    // ABOVE the `no-condition` push, deliberately. It sat below on the first
+    // pass, so the tail could never see a missing assertion and measured
+    // ['no-condition','zero-subjects'] on three shapes — while the comment on
+    // the tail claimed a missing assertion already named a cause. The code
+    // contradicted its own comment.
+    const before = findings.length
+
     // A rule with a selector and no condition asserts nothing about what it
     // selected. Reported here so that R3b's gate can see proposal 019 at all:
     // a doctor that reported only glob faults would pass while 019's blast
@@ -205,12 +231,6 @@ export function diagnose(
       })
     }
 
-    // Where this rule's findings begin, so the tail can ask whether anything
-    // else already explained an empty examination (plan 0096's precedence
-    // ruling). The gate has the same shape at `terminal-builder.ts` — each
-    // fault REPLACES what follows — and `diagnose()` must mirror it, or the
-    // preview disagrees with the thing it previews.
-    const before = findings.length
     const trees = rule.globs?.() ?? []
 
     // Silence here would be a false green in the tool built to remove false
@@ -240,10 +260,15 @@ export function diagnose(
         // reported here rather than held back for a run that may never happen.
         findings.push(...syntacticFindings(name, trees))
       }
-      // Evidence is a fact about the FAMILY, not about whether we could name
-      // its project — so this branch reports it too.
-      const noProjectEvidence = zeroSubjectsFinding(rule, name)
-      if (noProjectEvidence !== undefined) findings.push(noProjectEvidence)
+      // Evidence is a fact about the FAMILY, not about whether we could name its
+      // project — so this branch reports it too. Under the SAME gate as the tail:
+      // pushed unconditionally it produced ['project-unknown','dead-glob',
+      // 'zero-subjects'], the very shape this plan condemns, on the one path the
+      // ruling had not been extended to.
+      if (findings.length === before) {
+        const noProjectEvidence = zeroSubjectsFinding(rule, name)
+        if (noProjectEvidence !== undefined) findings.push(noProjectEvidence)
+      }
       continue
     }
 
@@ -339,6 +364,11 @@ export function diagnose(
 function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFinding | undefined {
   if (rule.examinedUnits === undefined) return undefined
   if (rule.examinedUnits() !== 0) return undefined
+  // The author said empty is the point. Reporting anyway would make the advice
+  // below a remedy the reader has already applied — ADR-008 rule 2's loop — and
+  // would over-report against 0098's floor, which honours the same mint. That
+  // the mint exists at all is why 0097 shipped first; this is its first reader.
+  if (rule.declaresEmpty?.() === true) return undefined
   return {
     kind: 'zero-subjects',
     rule: name,
@@ -351,7 +381,7 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
       'this rule examined 0 subjects, so it can never fail. Its own narrowing removed ' +
       'everything the project loaded — including any default it applies that you did not ' +
       'write. Widen it, or declare the empty state with .expectEmpty() if that is the ' +
-      'point. From a later minor this becomes a failing configuration finding.',
+      'point. In this same release it is a failing configuration finding at check time; here it is a preview you can run before your build does.',
   }
 }
 
