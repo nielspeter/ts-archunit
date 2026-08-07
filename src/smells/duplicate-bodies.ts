@@ -1,5 +1,6 @@
 import picomatch from 'picomatch'
 import path from 'node:path'
+import { selectionMemo } from '../core/selection-memo.js'
 import { SmellBuilder } from './smell-builder.js'
 import { collectFunctions } from '../models/arch-function.js'
 import { buildFingerprint, computeSimilarity } from './fingerprint.js'
@@ -18,6 +19,8 @@ interface FingerprintedFunction {
 /** Test file patterns for ignoreTests(). */
 const TEST_PATTERNS = ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**']
 
+const selectionOf = selectionMemo<ArchFunction>()
+
 export class DuplicateBodiesBuilder extends SmellBuilder {
   private _minSimilarity = 0.85
 
@@ -33,7 +36,7 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
   }
 
   protected detect(): ArchViolation[] {
-    const functions = this.collectFilteredFunctions()
+    const functions = this.selected()
     const fingerprinted = this.fingerprintAll(functions)
     const pairs = this.findSimilarPairs(fingerprinted)
     return this.buildViolations(pairs)
@@ -71,6 +74,29 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
   }
 
   /** Collect all functions matching folder/path/test filters. */
+  /**
+   * Bodies entering pairwise comparison — plan 0096, and the ONE method both
+   * readers call.
+   *
+   * The seam is AFTER `minLines` and the path filters: a project can load 300
+   * files while every body sits under the threshold, and the count that notices
+   * has to be taken where the comparison receives its input, not where the files
+   * were read.
+   *
+   * No fingerprinting to count. `meetsMinLines` already returns false for a
+   * bodyless function, so `fingerprintAll(xs).length === xs.length` **always** —
+   * fingerprinting to answer "is it zero" is a full AST pass of dead work on
+   * what becomes the hot path of every consumer's `diagnose()` call.
+   */
+  private selected(): ArchFunction[] {
+    return selectionOf(this, () => this.collectFilteredFunctions())
+  }
+
+  /** Units this detector examined — plan 0096. */
+  examinedUnits(): number {
+    return this.selected().length
+  }
+
   private collectFilteredFunctions(): ArchFunction[] {
     const sourceFiles = this.project.getSourceFiles()
     const folderMatchers = this._folders.map((g) => picomatch(g))

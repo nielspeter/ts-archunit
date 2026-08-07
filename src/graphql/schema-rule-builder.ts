@@ -4,6 +4,7 @@ import type { Condition, ConditionContext } from '../core/condition.js'
 import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { Predicate } from '../core/predicate.js'
 import type { LoadedSchema, GraphQLObjectTypeLike, GraphQLTypeLike } from './schema-loader.js'
+import { selectionMemo } from '../core/selection-memo.js'
 import type { SchemaElement } from './schema-predicates.js'
 import {
   queries as queriesPredicate,
@@ -45,6 +46,8 @@ function isObjectType(type: GraphQLTypeLike): type is GraphQLObjectTypeLike {
  *   .check()
  * ```
  */
+const selectionOf = selectionMemo<SchemaElement>()
+
 export class SchemaRuleBuilder extends TerminalBuilder {
   private _predicates: Predicate<SchemaElement>[] = []
   private _conditions: Condition<SchemaElement>[] = []
@@ -189,12 +192,25 @@ export class SchemaRuleBuilder extends TerminalBuilder {
     }
   }
 
-  protected collectViolations(): ArchViolation[] {
-    const allElements = this.getElements()
-
-    const filtered = allElements.filter((element) =>
-      this._predicates.every((predicate) => predicate.test(element)),
+  /**
+   * The set the conditions receive — plan 0096, and the ONE method both readers
+   * call. See `ResolverRuleBuilder.selected()` for why sharing it is the point.
+   */
+  private selected(): SchemaElement[] {
+    return selectionOf(this, () =>
+      this.getElements().filter((element) =>
+        this._predicates.every((predicate) => predicate.test(element)),
+      ),
     )
+  }
+
+  /** Units this rule examined — plan 0096. */
+  examinedUnits(): number {
+    return this.selected().length
+  }
+
+  protected collectViolations(): ArchViolation[] {
+    const filtered = this.selected()
 
     if (filtered.length === 0) {
       return []

@@ -2,6 +2,7 @@ import type { RuleDescription } from '../core/rule-description.js'
 import picomatch from 'picomatch'
 import path from 'node:path'
 import type { SourceFile } from 'ts-morph'
+import { selectionMemo } from '../core/selection-memo.js'
 import { SmellBuilder } from './smell-builder.js'
 import { collectFunctions } from '../models/arch-function.js'
 import { searchFunctionBody } from '../helpers/body-traversal.js'
@@ -14,6 +15,8 @@ const MAJORITY_THRESHOLD = 0.6
 
 /** Test file patterns for ignoreTests(). */
 const TEST_PATTERNS = ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**']
+
+const selectionOf = selectionMemo<SourceFile>()
 
 export class InconsistentSiblingsBuilder extends SmellBuilder {
   private _pattern?: ExpressionMatcher
@@ -50,6 +53,30 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
   }
 
   /** Partition files into matching and non-matching based on the pattern. */
+  /**
+   * Sibling files in folders large enough to be compared — plan 0096, and the
+   * ONE method both readers call.
+   *
+   * A folder of one is never compared, and `detect()` skips it at the same
+   * threshold. Counted in units ITERATED, never in pattern matches: a tripwire
+   * that examines every sibling and matches none has non-empty evidence, which
+   * is the 0.34.0 carve-out this must not break.
+   */
+  private selected(): SourceFile[] {
+    return selectionOf(this, () => {
+      const comparable: SourceFile[] = []
+      for (const [, files] of this.groupFilesByFolder()) {
+        if (files.length >= 2) comparable.push(...files)
+      }
+      return comparable
+    })
+  }
+
+  /** Units this detector examined — plan 0096. */
+  examinedUnits(): number {
+    return this.selected().length
+  }
+
   private partitionByPattern(
     files: SourceFile[],
     pattern: ExpressionMatcher,
