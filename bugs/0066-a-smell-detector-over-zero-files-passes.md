@@ -164,3 +164,39 @@ before choosing the wider form.
 - Whether `.expectEmpty()` is reachable on a smell builder at all.
 - Whether the CLI's `check` command surfaces the empty project by some other path than the rule. The
   measurement above is the programmatic API only.
+
+## The conformance audit — measured 2026-08-07, plan 0095
+
+`tests/matrix/` now runs **every published check-constructor over a corpus of zero subjects** and
+records what it does. It is the first time this surface has been measured whole rather than a family
+at a time, and it changes two things this report says.
+
+| cell                                                                   | verdict at `.check()` and `.warn()`                                           |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `classes` `functions` `modules` `types` `slices` `calls` `jsxElements` | configuration finding — guarded                                               |
+| `correspondence` `crossLayer` `graphql:resolvers`                      | configuration finding — guarded                                               |
+| `presets:recommended` `presets:layeredArchitecture`                    | configuration finding — guarded                                               |
+| `graphql:schema`                                                       | throws at the loader — fails **closed**, by its own instrument                |
+| **`smells.duplicateBodies`**                                           | **fail-open** — this bug                                                      |
+| **`smells.inconsistentSiblings`**                                      | **fail-open** — expected by this report, **measured here for the first time** |
+| **`presets:agentGuardrails`** with `{ src, noCopyPaste: true }`        | **fail-open**                                                                 |
+| **`presets:strictBoundaries`** with `{ folders, noCopyPaste: true }`   | **fail-open**                                                                 |
+| `presets:dataLayerIsolation` with `{ repositories }`                   | **constructs zero rules** — vacuity one level up                              |
+| `tsconfig`, `graphql:schemaFromSDL`                                    | no corpus to be empty of; classified, not probed                              |
+
+**The preset claim in this report is too narrow, and this is the correction.** It says the silent path
+is "a smell-only rule file or the direct API" because six of seven `agentGuardrails` rules throw on a
+zero-file project. True — but only when those rules are **enabled**. A user who enables `noCopyPaste`
+and nothing else gets one rule, and that rule fails open. Both shipped presets do it. The documented
+preset path is therefore a silent path too, for a configuration the options make one line to reach.
+
+**And `dataLayerIsolation` returns an empty array** from a valid option, so a user who configures it
+gets zero rules and a green build — a different vacuity, above the one this bug is about, and not
+covered by the fix. Filed as its own row in the matrix rather than folded in here.
+
+`inconsistentSiblings` is no longer "expected to, but was not probed": it is measured, with the
+deviation recorded that its bare construction reds on the assertion gate before the vacuity cell is
+reachable, so the probe carries `.forPattern(…)`.
+
+The fix for all of it is [plan 0098](../plans/0098-the-evidence-seam-and-the-floor.md), which empties
+the matrix's `KNOWN_FAIL_OPEN` in the same commit that retypes the seam.

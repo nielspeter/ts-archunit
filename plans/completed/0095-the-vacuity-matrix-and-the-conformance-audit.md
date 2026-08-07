@@ -1,15 +1,15 @@
 # Plan 0095 — the vacuity matrix, and the ADR-008 conformance audit
 
-**Status:** Open, not started. Filed 2026-08-06, **re-cut 2026-08-07**: the original spanned two releases
+**Status:** **DONE 2026-08-07.** Filed 2026-08-06, re-cut 2026-08-07: the original spanned two releases
 and three phases, which is not a plan under this repo's rule that a plan is completed — and moved to
-`completed/` — in the PR that does its work. Split into 0095 (this), [0096](./0096-evidence-at-every-seam.md),
-[0097](./0097-the-declared-empty-grammar.md) and [0098](./0098-the-evidence-seam-and-the-floor.md).
+`completed/` — in the PR that does its work. Split into 0095 (this), [0096](../0096-evidence-at-every-seam.md),
+[0097](../0097-the-declared-empty-grammar.md) and [0098](../0098-the-evidence-seam-and-the-floor.md).
 **Priority:** High, and **first** — it is the only piece with no dependencies, and its deliverable is the
-evidence [ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) is ratified on.
+evidence [ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) is ratified on.
 **Effort:** Medium. The classification is dozens of reviewed entries across twelve subpaths; the test is
 small.
 **Blast radius:** **An internal check over a corpus we control** — no shipped behaviour changes here.
-Bottom row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6: prove each detector fires and
+Bottom row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6: prove each detector fires and
 stop. The matrix's own controls are that proof.
 
 ## Problem
@@ -76,7 +76,7 @@ type Entry =
 
 ## Deliverable
 
-The completed truth table, appended to [bug 0066](../bugs/0066-a-smell-detector-over-zero-files-passes.md)
+The completed truth table, appended to [bug 0066](../../bugs/0066-a-smell-detector-over-zero-files-passes.md)
 and to this plan, and **linked from the changelog** — it is the falsifiable backing for the claim the
 later plans will make. `KNOWN_FAIL_OPEN` records what it finds, bounded by a dated `AUDIT_2026_08`
 constant it may only shrink from, and expires (the matrix reds if the list is non-empty once the package
@@ -104,4 +104,39 @@ data); `vitest.config.ts`; `package.json`; `.github/workflows/ci.yml`; `.github/
 
 Fixing anything the matrix finds. This plan **measures**; 0096–0098 change behaviour. A cell that comes
 back fail-open is recorded, not repaired — including bug 0066's, whose fix belongs to
-[0098](./0098-the-evidence-seam-and-the-floor.md) so the seam and the smell family land as one red event.
+[0098](../0098-the-evidence-seam-and-the-floor.md) so the seam and the smell family land as one red event.
+
+---
+
+## Outcome
+
+Built and measured 2026-08-07. `tests/matrix/` — enumeration from the exports map, a classification
+of all 328 published bindings, twenty probed constructors, three controls — plus post-build steps in
+`ci.yml` and `publish.yml`, and `npm run test:matrix`. The full table is appended to
+[bug 0066](../../bugs/0066-a-smell-detector-over-zero-files-passes.md).
+
+**ADR-009's premise holds.** Four families fail open — `smells.duplicateBodies`,
+`smells.inconsistentSiblings`, and both shipped presets when a smell rule is the only one enabled.
+Ten cells are guarded, and `graphql:schema` fails **closed** by its own loader.
+
+Three things the measurement found that no reading had:
+
+1. **Both presets fail open**, which corrects bug 0066's own claim that the silent path is "a
+   smell-only rule file or the direct API". Its six-of-seven measurement was of rules that were
+   **enabled**; enable only `noCopyPaste` and the preset has one rule, and it fails open.
+2. **`dataLayerIsolation` constructs zero rules** from a valid option — vacuity one level above the
+   one this matrix probes, and not covered by 0098's fix.
+3. **Three of my own twenty recipes were wrong**, and would have been published as findings. Two used
+   `.notExist()` — the sanctioned cardinality exemption — so the cell passed because the assertion was
+   satisfied, not because it was vacuous; two more asked the question of families with no corpus. That
+   is why the recipes carry a required `deviation` field and why `NO_CORPUS` is a written category
+   rather than an omission: the hand-maintained part of this instrument is where its errors live.
+
+**Guarding the guard.** Sabotage: flipping one recorded verdict reds 2 tests; deleting one export from
+the classification reds 1. The three control fakes prove the probe distinguishes all three verdicts —
+two would not, since a probe that never returns `config-finding` satisfies both of the others.
+
+**Deferred, deliberately:** the migration of `assertion-gate.test.ts` onto `SUBPATHS`. The shared
+enumeration exists and is exported for it, but that test is green and untouched, and rewriting a
+working census is not this plan's work. `enumerate.ts`'s `SUBPATHS` is importable without a build
+precisely so that migration stays cheap.

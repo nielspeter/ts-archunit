@@ -1,13 +1,31 @@
 # ts-archunit Roadmap
 
-**Version:** 0.56.0 · **Tests:** 3165 across 232 files · **Updated:** 2026-08-05
+**Version:** 0.58.0 · **Tests:** 3195 across 235 files, plus 42 in `tests/matrix/` (post-build) · **Updated:** 2026-08-07
 **Spec:** `../ts-archunit-spec.md` · **Direction:** `ai-era-product-direction.md`
-**Plans:** 77 completed (`completed/`) · 12 open (files in `plans/`) · proposals in `../proposals/` ·
+**Plans:** 78 completed (`completed/`) · 14 open (files in `plans/`) · proposals in `../proposals/` ·
 open defects and their priority order in [`../bugs/BUGS.md`](../bugs/BUGS.md)
 
 > Conventions: a plan is **READY** when its design is settled and it can be built as
 > written; **PROPOSED** when the design is reviewed but nobody has decided to build
 > it; **PARTIAL** when some phases shipped and the rest were deliberately deferred.
+
+---
+
+## The fail-closed programme (ADR-009)
+
+Four plans, in dependency order. Each is one PR that leaves `main` green; a _release_ bundles
+several, so ADR-009's "one red event" holds while the plans stay individually completable.
+
+| Plan                                                                                                                    | State                                                                                                                                                                                                                       | Blocked on                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [0095](./completed/0095-the-vacuity-matrix-and-the-conformance-audit.md) — the vacuity matrix and the conformance audit | **DONE 2026-08-07.** Measured the whole published surface for the first time: 4 families fail open, 1 preset constructs zero rules, 1 fails closed by its own instrument, the rest guarded. The truth table is in bug 0066. | done                                                                              |
+| [0096](./0096-evidence-at-every-seam.md) — evidence at every seam, and the preview                                      | **OPEN, high.** Five families count their examined units; `zero-subjects` lands in `diagnose()` so test-runner users get a preview at all. Additive; ships first.                                                           | 0095 — done                                                                       |
+| [0097](./0097-the-declared-empty-grammar.md) — the declared-empty grammar                                               | **OPEN, high and cheap.** Hoists `expectEmpty`/`expectNonEmpty` to `TerminalBuilder` (also ADR-010 rule 3(a)) and converts `correspondence().allowEmpty()`.                                                                 | nothing                                                                           |
+| [0098](./0098-the-evidence-seam-and-the-floor.md) — the evidence seam and the floor                                     | **OPEN, high.** Retypes `collectViolations()`, adds the floor, carries bug 0066's fix. The one red event.                                                                                                                   | 0096, 0097, [0089](./0089-presets-forward-their-options.md), **ADR-010 ratified** |
+
+[ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) is **Proposed** and goes to Accepted on
+0095's measurement — which is why 0095 ran first: an ADR ratified on two measured cells is an argument,
+and the table is what makes it a measurement.
 
 ---
 

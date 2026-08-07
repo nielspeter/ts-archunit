@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The vacuity matrix** (`tests/matrix/`) — every published check-constructor run over a corpus of
+  **zero subjects**, asserting the recorded truth table exactly, so a silent regression and a silent
+  fix are equally loud. Enumerated from the `package.json` **exports map**: the one list a published
+  entry point cannot avoid joining. No shipped behaviour changes; this measures.
+
+  It is the ADR-008 conformance audit, and the first time this surface has been measured whole rather
+  than a family at a time. **Ten cells are guarded; `graphql:schema` fails closed by its own loader;
+  four fail open** — `smells.duplicateBodies`, `smells.inconsistentSiblings`, and **both shipped
+  presets** when a smell rule is the only one enabled. A fifth, `dataLayerIsolation`, constructs zero
+  rules from a valid option. Full table in
+  [bug 0066](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0066-a-smell-detector-over-zero-files-passes.md);
+  the fixes are [plan 0098](https://github.com/nielspeter/ts-archunit/blob/main/plans/0098-the-evidence-seam-and-the-floor.md).
+
+  Runs post-build in CI and publish, and via `npm run test:matrix`. It imports `dist` on purpose — the
+  shipped artifact is what adopters run — which is why it is excluded from `npm run test`, where the
+  suite executes before the build.
+  ([plan 0095](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0095-the-vacuity-matrix-and-the-conformance-audit.md))
+
 ## [0.58.0] - 2026-08-06
 
 Two messages that named the wrong thing. Both were found by a measurement taken for another purpose,
@@ -81,7 +103,7 @@ Also landed (docs only):
 [ADR-009](https://github.com/nielspeter/ts-archunit/blob/main/adr/009-a-pass-is-constructed-from-evidence.md)
 — a pass is constructed from evidence of examination — with
 [ADR-010](https://github.com/nielspeter/ts-archunit/blob/main/adr/010-the-extension-surface-is-a-contract.md)
-and [plan 0095](https://github.com/nielspeter/ts-archunit/blob/main/plans/0095-the-vacuity-matrix-and-the-conformance-audit.md).
+and [plan 0095](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0095-the-vacuity-matrix-and-the-conformance-audit.md).
 Both ADRs are Proposed; no behaviour follows from them yet.
 
 ## [0.57.0] - 2026-08-05
