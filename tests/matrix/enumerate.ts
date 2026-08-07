@@ -20,9 +20,6 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 
-/** A `package.json` `exports` entry, as far as this file needs to understand one. */
-type ExportsEntry = string | { import?: string | { default?: string }; default?: string }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -83,9 +80,15 @@ export async function loadPublishedExports(): Promise<PublishedExport[]> {
     // Self-reference, so the exports map itself is under test rather than bypassed.
     const specifier =
       subpath === '.' ? '@nielspeter/ts-archunit' : `@nielspeter/ts-archunit/${subpath.slice(2)}`
-    const loaded: unknown = await import(specifier).catch(
-      async () => import(path.join(repoRoot, dist)),
-    )
+    // The self-reference is the point — it exercises the exports map rather than bypassing it.
+    // The relative fallback exists only for a tree whose package name is not yet linked; both
+    // are widened to `unknown` here rather than inheriting `any` from a dynamic import.
+    let loaded: unknown
+    try {
+      loaded = await import(specifier)
+    } catch {
+      loaded = await import(path.join(repoRoot, dist))
+    }
     if (!isRecord(loaded)) throw new Error(`${subpath} did not load as a module namespace`)
     for (const [name, value] of Object.entries(loaded)) {
       found.push({ key: `${subpath}:${name}`, subpath, name, value })
