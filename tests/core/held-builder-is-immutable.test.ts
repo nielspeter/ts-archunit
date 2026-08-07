@@ -358,11 +358,11 @@ describe('a held builder is immutable — behavioural', () => {
       .haveNameMatching(/^nothingMatchesThis$/)
     const held = correspondence(p).side('a', empty, byName()).side('b', ['x'])
 
-    // Not opted out: the empty side is the reported root cause.
+    // Not declared: the empty side is the reported root cause.
     expect(() => held.beComplete().check()).toThrow(ArchRuleError)
-    // Opted out on a derived rule only.
-    expect(() => held.allowEmpty('a').beComplete().check()).not.toThrow()
-    // The held builder must still fail. Under the bug the opt-out leaked and
+    // Declared on a derived rule only (plan 0097 renamed this from allowEmpty).
+    expect(() => held.expectEmpty('a').beComplete().check()).not.toThrow()
+    // The held builder must still fail. Under the bug the declaration leaked and
     // every later rule off this selection accepted an empty side.
     expect(() => held.beComplete().check()).toThrow(ArchRuleError)
   })

@@ -373,14 +373,14 @@ See [Cross-Layer Validation](/cross-layer) for usage examples.
 
 `correspondence(p)` asserts that two independently-derived key sets correspond — "every X has a matching Y" (ADR-008 Rule 5 as a primitive). Compares by **identity, never count**; an empty side **fails** (non-vacuity). Call `.side()` twice, then an assertion.
 
-| Method              | Signature                                                                                                                 | Description                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `.side()`           | `.side(name, selection: RuleBuilder<T>, keyFn: KeyFn<T>)` · `.side(name, keys: readonly string[] \| ReadonlySet<string>)` | Add a side — a selection keyed by `keyFn`, or a pre-derived key set. Call twice. |
-| `.beComplete()`     | `.beComplete(): this`                                                                                                     | Every key of the first side has a match in the second (A ⊆ B).                   |
-| `.haveNoOrphans()`  | `.haveNoOrphans(): this`                                                                                                  | Every key of the second side has a source in the first (B ⊆ A).                  |
-| `.beBijective()`    | `.beBijective(): this`                                                                                                    | Both directions — the key sets are identical.                                    |
-| `.allowEmpty()`     | `.allowEmpty(sideName: string): this`                                                                                     | Opt a named side out of the non-vacuity guard.                                   |
-| `.distinctKeysOn()` | `.distinctKeysOn(sideName: string): this`                                                                                 | Fail if a side maps two distinct subjects to one key (over-normalization).       |
+| Method              | Signature                                                                                                                 | Description                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `.side()`           | `.side(name, selection: RuleBuilder<T>, keyFn: KeyFn<T>)` · `.side(name, keys: readonly string[] \| ReadonlySet<string>)` | Add a side — a selection keyed by `keyFn`, or a pre-derived key set. Call twice.                                                  |
+| `.beComplete()`     | `.beComplete(): this`                                                                                                     | Every key of the first side has a match in the second (A ⊆ B).                                                                    |
+| `.haveNoOrphans()`  | `.haveNoOrphans(): this`                                                                                                  | Every key of the second side has a source in the first (B ⊆ A).                                                                   |
+| `.beBijective()`    | `.beBijective(): this`                                                                                                    | Both directions — the key sets are identical.                                                                                     |
+| `.expectEmpty()`    | `.expectEmpty(sideName?: string): this`                                                                                   | **Declare** a side empty. An assertion, not a permission: it fails the day the side fills up. Replaced `.allowEmpty()` in 0.59.0. |
+| `.distinctKeysOn()` | `.distinctKeysOn(sideName: string): this`                                                                                 | Fail if a side maps two distinct subjects to one key (over-normalization).                                                        |
 
 Extends `TerminalBuilder`, so `.rule()` / `.excluding()` / `.check()` / `.warn()` / `.violations()` also apply.
 

@@ -151,7 +151,7 @@ describe('a config finding carries its own remedy, not the author’s (bug 0021)
       // `baseViolation` is shared with real violations, so this one is fixed by an
       // override at the producer — the execute-rule guard cannot reach it.
       expect(f.suggestion).not.toBe(AUTHOR.suggestion)
-      expect(f.suggestion).toContain('.allowEmpty(')
+      expect(f.suggestion).toContain('.expectEmpty(')
       expect(f.docs).not.toBe(AUTHOR.docs)
       expect(f.ruleId).toBe('arch/example')
     }

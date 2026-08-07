@@ -1,9 +1,9 @@
 # Plan 0097 — the declared-empty grammar
 
-**Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 2c/2f.
+**Status:** **DONE 2026-08-07.** Filed 2026-08-07, split out of plan 0095's Phase 2c/2f.
 **Depends on:** nothing in code — it is additive and can land any time. It **must precede**
-[0098](./0098-the-evidence-seam-and-the-floor.md), whose floor reads the mint this plan lifts.
-**Executes** [ADR-010](../adr/010-the-extension-surface-is-a-contract.md) rule 3(a), accepted there from
+[0098](../0098-the-evidence-seam-and-the-floor.md), whose floor reads the mint this plan lifts.
+**Executes** [ADR-010](../../adr/010-the-extension-surface-is-a-contract.md) rule 3(a), accepted there from
 the consumer's side. One mechanism, two documents served — which is why it is its own plan rather than a
 line inside another.
 **Priority:** High, and cheap. It is the only prerequisite 0098 has that is entirely in our hands.
@@ -13,7 +13,7 @@ it is on the extension contract's root, so ADR-010's process applies. Top row of
 
 ## Problem
 
-[ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) part 3 rules that empty is legitimate only
+[ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) part 3 rules that empty is legitimate only
 by **declaration**, and that every family's grammar must expose a declaration path. Two things stand in
 the way, and they pull in opposite directions:
 
@@ -84,6 +84,41 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 ## Out of scope
 
 The floor that consumes these declarations, and the precedence ruling that an empty **project** outranks
-them — [0098](./0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
-[0089](./0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
+them — [0098](../0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
+[0089](../0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
 mechanism and is the right home for it.
+
+---
+
+## Outcome
+
+Shipped 2026-08-07. Both halves landed as one PR.
+
+**The hoist.** `.expectEmpty()` / `.expectNonEmpty()`, their contradiction guard and both flags moved to
+`TerminalBuilder`. Measured after the move: both are functions on `SmellBuilder` and
+`CorrespondenceBuilder`, and the contradiction still throws — which answers bug 0066's _"is
+`.expectEmpty()` reachable on a smell builder at all?"_ with a yes where the answer was no.
+
+**The conversion.** `allowEmpty(side)` is gone; `expectEmpty(side?)` replaces it as an override of the
+base zero-arg method, with the optional parameter the override validity requires. The semantics changed
+with the name, and the new `unexpectedlyNonEmptyViolation` producer is the whole point: a declared side
+that fills up now **fails**, where the permission stayed silent forever. `declaresEmpty()` is the
+whole-rule flag OR every side declared — without the OR, a user who declared both sides still redded
+with a finding telling them to declare, which is ADR-008 rule 2's loop.
+
+Test rows: the declaration stays green; **the expiry fires when the side fills up**; the expiry's remedy
+**remediates** (remove the declaration, the finding clears — rule 2's behavioural corollary, not a
+contains-check); declaring every side is not a loop; and the held-builder immutability row carries over
+unchanged, so a declaration still cannot leak onto a sibling rule.
+
+The new producer joined the configuration-finding census with a `behavioural:` citation, which is what
+turned an unclassified-producer failure into a passing one rather than the reverse.
+
+**One process note worth keeping.** Two attempts at the hoist removed more than intended — the first
+slice took `describeRule()` with it, surfacing as ten failing tests. Restored from git and redone by
+walking JSDoc/brace boundaries instead of slicing on marker strings. For structural edits to source,
+walk the syntax; do not cut on text landmarks.
+
+**Not in scope and not done:** preset-level declaration threading, which belongs to
+[0089](../0089-presets-forward-their-options.md) because that plan exists to give presets an
+options-forwarding mechanism.

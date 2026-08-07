@@ -66,6 +66,11 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     remedy: 'own',
     verified: 'behavioural: correspondence-builder.test.ts — adding .beComplete() clears it',
   },
+  'src/builders/correspondence-builder.ts::unexpectedlyNonEmptyViolation': {
+    remedy: 'own',
+    verified:
+      'behavioural: correspondence-builder.test.ts — removing .expectEmpty(side) clears it (plan 0097)',
+  },
   'src/builders/slice-rule-builder.ts::metaViolation': {
     remedy: 'own',
     verified:

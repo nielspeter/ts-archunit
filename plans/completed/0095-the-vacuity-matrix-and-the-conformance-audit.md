@@ -3,7 +3,7 @@
 **Status:** **DONE 2026-08-07.** Filed 2026-08-06, re-cut 2026-08-07: the original spanned two releases
 and three phases, which is not a plan under this repo's rule that a plan is completed — and moved to
 `completed/` — in the PR that does its work. Split into 0095 (this), [0096](../0096-evidence-at-every-seam.md),
-[0097](../0097-the-declared-empty-grammar.md) and [0098](../0098-the-evidence-seam-and-the-floor.md).
+[0097](./0097-the-declared-empty-grammar.md) and [0098](../0098-the-evidence-seam-and-the-floor.md).
 **Priority:** High, and **first** — it is the only piece with no dependencies, and its deliverable is the
 evidence [ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) is ratified on.
 **Effort:** Medium. The classification is dozens of reviewed entries across twelve subpaths; the test is

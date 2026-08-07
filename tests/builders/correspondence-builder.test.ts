@@ -128,7 +128,7 @@ describe('correspondence()', () => {
       expect(v[0]!.element).toBe('registry')
     })
 
-    it('.allowEmpty() opts a side out of the non-vacuity guard', () => {
+    it('.expectEmpty(side) declares an empty side, and it stays green', () => {
       const emptySel = new TestRuleBuilder(stubProject, elements)
         .that()
         .withPredicate(nameMatches(/^NothingMatches$/))
@@ -136,7 +136,49 @@ describe('correspondence()', () => {
         correspondence(stubProject)
           .side('services', emptySel, byNameKey)
           .side('registry', ['UserService'])
-          .allowEmpty('services')
+          .expectEmpty('services')
+          .beComplete()
+          .check()
+      }).not.toThrow()
+    })
+
+    it('.expectEmpty(side) FAILS the day that side fills up — plan 0097', () => {
+      // The property that makes it an assertion rather than `allowEmpty()`'s
+      // permission, which had no failing state and so stayed green forever.
+      const v = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .expectEmpty('services')
+        .beComplete()
+        .violations()
+      expect(v).toHaveLength(1)
+      expect(v[0]!.message).toContain('was declared empty')
+      expect(v[0]!.bypassFilters).toBe(true)
+    })
+
+    it('the expiry remedy remediates: removing the declaration clears it', () => {
+      // ADR-008 rule 2's behavioural corollary — apply the stated fix and assert
+      // the finding clears, rather than asserting the sentence reads well.
+      const withoutDeclaration = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService'])
+        .beComplete()
+        .violations()
+      expect(withoutDeclaration.filter((x) => x.message.includes('was declared empty'))).toEqual([])
+    })
+
+    it('declaring EVERY side is not a loop: it does not red asking to declare', () => {
+      // Without the OR in declaresEmpty(), a user who declared both sides still
+      // got a finding telling them to declare — the stated remedy already done.
+      const emptyA = new TestRuleBuilder(stubProject, elements)
+        .that()
+        .withPredicate(nameMatches(/^NothingMatches$/))
+      expect(() => {
+        correspondence(stubProject)
+          .side('a', emptyA, byNameKey)
+          .side('b', [])
+          .expectEmpty('a')
+          .expectEmpty('b')
           .beComplete()
           .check()
       }).not.toThrow()
@@ -164,7 +206,7 @@ describe('correspondence()', () => {
       const v = correspondence(stubProject)
         .side('a', services(), () => [])
         .side('b', ['UserService'])
-        .allowEmpty('a') // a produced no keys — permitted here
+        .expectEmpty('a') // a produced no keys — declared, so not a finding
         .haveNoOrphans()
         .violations()
       // a is empty; b's only key has no source in a → one orphan

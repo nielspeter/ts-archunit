@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed (⚠️ BREAKING — `correspondence().allowEmpty()` is now `.expectEmpty()`)
+
+- **The declared-empty grammar reaches every family.** `.expectEmpty()` and `.expectNonEmpty()` moved
+  from `RuleBuilder<T>` to `TerminalBuilder`, so the smell detectors, `correspondence` and the GraphQL
+  builders can declare an empty state at all. Bug 0066 listed _"is `.expectEmpty()` reachable on a smell
+  builder?"_ under **Not measured**; the answer was no. Additive — no existing call changes meaning.
+  ([plan 0097](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0097-the-declared-empty-grammar.md),
+  also [ADR-010](https://github.com/nielspeter/ts-archunit/blob/main/adr/010-the-extension-surface-is-a-contract.md) rule 3(a))
+
+- **`correspondence().allowEmpty(side)` → `.expectEmpty(side)`, and the semantics changed with the
+  name.** `allowEmpty` **permitted** a side to be empty and never spoke again — a permanent, silent
+  opt-out that stayed green the day the side filled up and the rule began certifying nothing about it.
+  `.expectEmpty(side)` **asserts** the side is empty and **fails the day it stops being**, so the intent
+  expires and reports itself.
+
+  ⚠️ **Migration is two-branched, not a rename:**
+
+  | your side today | do this                                                  |
+  | --------------- | -------------------------------------------------------- |
+  | empty           | `.expectEmpty(side)`                                     |
+  | has keys        | **delete the call** — it was silencing a real comparison |
+
+  And a third intent is **removed, not renamed**: _"may be empty sometimes, silently"_ is no longer
+  expressible. That is deliberate ([ADR-009](https://github.com/nielspeter/ts-archunit/blob/main/adr/009-a-pass-is-constructed-from-evidence.md)
+  Alternatives rejects it — a check that can never fail on the corpus going quietly unmeasured is the
+  shape the whole programme exists to make unrepresentable). Branch the rule in code, or accept the
+  expiry churn.
+
+  Declaring **every** side is not a loop: the rule counts as declared and stays green. Declaring only
+  some sides does not.
+
 ### Added
 
 - **The vacuity matrix** (`tests/matrix/`) — every published check-constructor run over a corpus of
