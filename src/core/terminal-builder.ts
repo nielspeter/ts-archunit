@@ -171,6 +171,23 @@ export abstract class TerminalBuilder {
   }
 
   /**
+   * How THIS family spells the declaration, for a remedy that names a real call.
+   *
+   * The sibling of `assertionAdvice()`, and it exists for the same reason: a
+   * remedy is only verified to remediate if following it works, and the generic
+   * `.expectEmpty()` is a `TypeError` on `CorrespondenceBuilder`, which declares
+   * per side. Advice that names the one form the reader cannot call is ADR-008
+   * rule 2's failure with extra confidence.
+   *
+   * Overriding `expectEmpty()` and not this leaves a remedy that throws, so the
+   * classification census in `evidence-at-every-seam.test.ts` requires both
+   * together rather than trusting the next author to remember.
+   */
+  emptyDeclarationAdvice(): string {
+    return '.expectEmpty()'
+  }
+
+  /**
    * Attach a human-readable rationale to the rule.
    * Included in violation messages when `.check()` throws.
    */

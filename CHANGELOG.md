@@ -30,11 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   now six — `orphan-exclusion` had been missing since 0.43.0 as well.
 
   ⚠️ **`doctor` exits non-zero on anything it reports**, so a pipeline running it goes red for rules
-  that are green today — in the same release that makes `check()` red on them. The value is that
-  `diagnose()`/`doctor` can be run on demand, against your rules, without waiting for CI.
+  that are green today, while `check()` still passes them. That gap is the point — you can run
+  `diagnose()`/`doctor` on demand and see the list before a later release makes the same state fail.
+
+  The runtime advice deliberately does **not** name the release that flips it. An earlier draft said
+  "in this same release", which was measured false for four of the five families it can print for —
+  a string the library prints cannot assert the contents of a plan that has not started.
 
   A rule that **declared** the empty state with `.expectEmpty()` is not reported. The preview honours
   the same declaration the gate does, which is why the grammar shipped alongside it rather than after.
+  The remedy names the form **that family** accepts: `correspondence` declares per side and throws on
+  the zero-arg call, so advice naming `.expectEmpty()` there would be a remedy the reader cannot follow.
+
+  ⚠️ **`TerminalBuilder.declaresEmpty()` is public, and `emptyDeclarationAdvice()` is new** — both on
+  the root that ADR-010 rule 1 names as contract. Free
+  today (neither existed in a released version), listed because that is where the ⚠️ list is read.
+  A family overriding `expectEmpty()` must override both; a classification test enforces it rather
+  than leaving it to the next author, since forgetting either fails silently and in opposite
+  directions — no preview at all, or a preview that tells an author to declare what they declared.
 
   **`diagnose()` no longer reports "without running any of them".** It does not evaluate conditions,
   but it does materialize each rule's selection — "this rule examined nothing" is a fact about the

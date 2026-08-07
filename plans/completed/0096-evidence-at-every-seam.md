@@ -278,6 +278,51 @@ were invisible in the verdicts and obvious in the assertions.
   which is a false cause. Filed rather than fixed here because the right shape is a decision about
   `diagnose()`'s contract, not a `try` in this plan.
 
+### What the DELTA review changed — a fix commit that reintroduced the bug it fixed
+
+The delta round found one critical, and it was **mine, in the fix**. Correcting the advice string, I
+replaced "from a later minor this becomes a failing finding" — true under every ordering — with "in this
+same release it is a failing configuration finding". Measured: four of the five families it can print
+for **pass green** at `check()` with zero examined, and the fifth fails only via its own pre-existing
+per-side finding. The floor is 0098, whose header still reads _Open, not started_ and lists ADR-010
+ratification as a dependency. So the commit that fixed a false remedy shipped a false remedy on the same
+ADR-008 rule 2 axis, in a string the library prints, guarded by nothing — the row asserts `'0 subjects'`
+and `'did not write'`, so the claim could rot silently. Reverted to release-agnostic wording; the
+CHANGELOG carries the sequencing note, where a slip is cheap to correct.
+
+**A recorded equivalence expired one commit after it was written.** `CorrespondenceBuilder.declaresEmpty()`
+carried an ADR-008 split-row note — "unobservable until 0098, recorded rather than guarded, no shipped
+code reads it, measured". This plan's fix made `diagnose()` its first reader, which ended that
+equivalence, and the docstring still asserted it. Reverting the override to the base body left all 3219
+tests green. The lesson generalises: **a recorded equivalence is a claim with a lifetime**, and the
+commit that gives it a reader is the commit that must retire it.
+
+**Three items the review had raised and the fix had not applied were closed rather than deferred**, all
+because 0098 needs each of them anyway:
+
+- `selectionMemo` now registers with `cache-registry.ts`, like `element-cache.ts`. The hazard is worse
+  here than there: **both** readers go through this memo, so a stale entry is a stale verdict and a
+  stale count that agree with each other.
+- A classification census forces the hooks. `examinedUnits?` and `declaresEmpty?` are optional on
+  `DiagnosableRule` and fail in **opposite** silent directions — forget the first and the family gets no
+  preview at all; forget the second and a per-side family inherits `_expectEmpty`, which is always false
+  there, so the preview tells an author to declare what they declared. That second one is the defect
+  this plan had just fixed for `correspondence`, reachable again for the next family.
+- The remedy is now per family. `emptyDeclarationAdvice()` joins `assertionAdvice()` as a sibling on the
+  same root rather than becoming a third bare optional, and the row **calls what the advice names** and
+  asserts the finding clears — `.expectEmpty()` is a `TypeError` on `correspondence`.
+
+Sabotage on the delta: 7 rows, exit codes, green baseline both ends, patch-application asserted — all 7
+caught. **One row was not caught on the first run, and the cause was the fix itself never applying**: a
+`python` replace matched a block prettier had since collapsed to one line, wrote nothing, and I read
+"16 passed" as success when 16 was also the count before. The same class as the two void sabotage runs
+above, one layer up: I had been asserting that _sabotage_ patches applied while not asserting that the
+_fix_ did. Every edit in this round now asserts its own application.
+
+**Left for the user, not done here:** ADR-010 rule 1's table names four contract members and should name
+`declaresEmpty()` and `emptyDeclarationAdvice()`. An ADR is a decision, and 010 is Proposed and awaiting
+joint ratification — so this is recorded for that moment rather than edited in.
+
 ### Independence, stated rather than implied
 
 The 0095 matrix is **not** an independent check for this change: it probes `check()`/`warn()` over a

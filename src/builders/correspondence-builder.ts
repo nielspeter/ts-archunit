@@ -264,13 +264,18 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * previous private version was dead code and was removed. This one is for
    * the root, which asks the question about the rule rather than about a side.
    *
-   * **Unobservable until 0098, and recorded as such rather than guarded.** No
-   * shipped code reads `declaresEmpty()` yet, so reverting this override to the
-   * base body changes no output and no test fails — measured. ADR-008's
-   * split-row corollary says to record an equivalence rather than invent a guard
-   * for it; the row that makes it observable is in 0098's inventory, where the
-   * floor that calls it lands.
+   * **This was recorded as unobservable-until-0098, and that equivalence EXPIRED**
+   * the moment plan 0096 made `diagnose()` its first reader. Reverting this
+   * override to the base body — which for this class can never be true, since the
+   * zero-arg `expectEmpty()` throws — makes a rule whose every side is declared
+   * report `zero-subjects` again, telling the author to declare what they
+   * declared. A recorded equivalence is a claim with a lifetime, and this one's
+   * ended one commit after it was written; it is guarded now.
    */
+  override emptyDeclarationAdvice(): string {
+    return '.expectEmpty(sideName) for each side'
+  }
+
   override declaresEmpty(): boolean {
     return this._sides.length > 0 && this._sides.every((s) => this._expectEmptySides.has(s.name))
   }

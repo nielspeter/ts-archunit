@@ -68,6 +68,13 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * reader to do the thing they already did.
    */
   declaresEmpty?: () => boolean
+
+  /**
+   * How this family spells the declaration. Absent means the generic
+   * `.expectEmpty()`, which is a `TypeError` on `correspondence` — see
+   * `TerminalBuilder.emptyDeclarationAdvice()`.
+   */
+  emptyDeclarationAdvice?: () => string
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -380,8 +387,10 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
     advice:
       'this rule examined 0 subjects, so it can never fail. Its own narrowing removed ' +
       'everything the project loaded — including any default it applies that you did not ' +
-      'write. Widen it, or declare the empty state with .expectEmpty() if that is the ' +
-      'point. In this same release it is a failing configuration finding at check time; here it is a preview you can run before your build does.',
+      'write. Widen it, or declare the empty state with ' +
+      (rule.emptyDeclarationAdvice?.() ?? '.expectEmpty()') +
+      ' if that is the point. A later release makes this state fail at check time; ' +
+      'this surface is how you find it first.',
   }
 }
 

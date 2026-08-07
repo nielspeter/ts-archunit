@@ -1,3 +1,5 @@
+import { registerCacheReset } from './cache-registry.js'
+
 /**
  * Memoize a builder's materialized selection — plan 0096.
  *
@@ -44,7 +46,17 @@
  * }
  */
 export function selectionMemo<T>(): (owner: object, compute: () => T[]) => T[] {
-  const cache = new WeakMap<object, T[]>()
+  let cache = new WeakMap<object, T[]>()
+  // Same staleness profile as `element-cache.ts`, so the same escape hatch — a
+  // consumer holding a builder across a mutation of the underlying ts-morph
+  // project gets the pre-mutation selection back, and identity has not changed
+  // so nothing else can notice. That is worse here than in the element cache:
+  // BOTH readers go through this memo, so a stale entry is a stale VERDICT and
+  // a stale count that agree with each other. Reasoning about the clone hazard
+  // and stopping one short of this one would read as "considered and safe".
+  registerCacheReset(() => {
+    cache = new WeakMap<object, T[]>()
+  })
   return (owner, compute) => {
     const cached = cache.get(owner)
     if (cached !== undefined) return cached

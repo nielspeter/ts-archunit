@@ -52,15 +52,15 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     return false
   }
 
-  /** Partition files into matching and non-matching based on the pattern. */
   /**
    * Sibling files in folders large enough to be compared — plan 0096, and the
    * ONE method both readers call.
    *
-   * A folder of one is never compared, and `detect()` skips it at the same
-   * threshold. Counted in units ITERATED, never in pattern matches: a tripwire
-   * that examines every sibling and matches none has non-empty evidence, which
-   * is the 0.34.0 carve-out this must not break.
+   * The `>= 2` threshold lives HERE rather than in `detect()`'s loop, which is
+   * what makes this a shared derivation instead of two that agree by luck.
+   * Filtering before the caller's sort is safe: `groupFilesByFolder()` returns
+   * insertion order and `detect()` sorts by folder name, a total order, so
+   * removing entries cannot reorder the survivors.
    */
   private selected(): [string, SourceFile[]][] {
     return selectionOf(this, () =>
@@ -80,6 +80,7 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     return this.selected().reduce((total, [, files]) => total + files.length, 0)
   }
 
+  /** Partition files into matching and non-matching based on the pattern. */
   private partitionByPattern(
     files: SourceFile[],
     pattern: ExpressionMatcher,
@@ -169,6 +170,9 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     // derivation of the same threshold: reviewers rewrote `selected()` to
     // `sourceFiles.length` and the whole suite stayed green. Both readers now
     // take the comparable folders from one place.
+    // The spread COPIES before the sort below. `selected()` returns the memoized
+    // array itself, and `.sort()` is in-place — sorting it would reorder shared
+    // evidence for every later reader (`element-cache.ts` states this as a rule).
     const folderEntries = [...this.selected()]
     if (this._groupByFolder) {
       folderEntries.sort((a, b) => a[0].localeCompare(b[0]))

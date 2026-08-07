@@ -23,12 +23,16 @@
  */
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
-import { project } from '../../src/core/project.js'
+import { Project } from 'ts-morph'
+import { project, resetProjectCache } from '../../src/core/project.js'
+import type { ArchProject } from '../../src/core/project.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { smells } from '../../src/smells/index.js'
 import { call } from '../../src/index.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
 import { resolvers, schemaFromSDL } from '../../src/graphql/index.js'
+import * as rootExports from '../../src/index.js'
+import * as graphqlExports from '../../src/graphql/index.js'
 
 const fixture = (name: string): string =>
   path.resolve(import.meta.dirname, `../fixtures/${name}/tsconfig.json`)
@@ -149,6 +153,22 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     expect(kindsOf(smells.duplicateBodies(loaded).minLines(9999).expectEmpty(), loaded)).toEqual([])
   })
 
+  it('correspondence declares PER SIDE, and one side is not enough', () => {
+    // The override that makes `declaresEmpty()` mean something different here:
+    // `_expectEmpty` can never be true on this class, because the zero-arg form
+    // throws. Its docstring recorded the override as unobservable-until-0098 —
+    // an ADR-008 split-row equivalence — and that equivalence EXPIRED the moment
+    // `diagnose()` became its first reader, one commit later. Reverting the
+    // override to the base body left the whole suite green until this row.
+    const base = correspondence(loaded).side('a', []).side('b', []).beComplete()
+    expect(kindsOf(base)).toEqual(['zero-subjects'])
+    // One of two sides is not a declaration about the rule.
+    expect(kindsOf(base.expectEmpty('a'))).toEqual(['zero-subjects'])
+    // Both is — and the base body would report here, telling an author who
+    // declared both sides to go and declare them.
+    expect(kindsOf(base.expectEmpty('a').expectEmpty('b'))).toEqual([])
+  })
+
   it('resolvers reports through diagnose(), not only through the accessor', () => {
     // The family the first attempt counted pre-predicate. Its accessor row lives
     // above; this proves the preview actually reaches it.
@@ -175,6 +195,11 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
       .inFolder('**/vendor/nested/src/domain/**')
       .forPattern(call('x'))
     expect(single.examinedUnits()).toBe(0)
+    // The row above is 0 for TWO different reasons, and only one of them is the
+    // threshold: rename that folder and the glob goes dead, `examinedUnits()`
+    // stays 0, and the row passes while guarding nothing. `diagnose()` tells the
+    // two apart — a dead glob reports ['dead-glob'] and yields, so this reds.
+    expect(kindsOf(single, modules)).toEqual(['zero-subjects'])
 
     // And the same detector over folders that ARE comparable counts them, so the
     // row above is not green merely because the glob matched nothing.
@@ -202,6 +227,21 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     expect(kindsOf(smells.duplicateBodies(loaded).minLines(1), loaded)).toEqual([])
   })
 
+  it('the remedy names a call the reader can actually make', () => {
+    // ADR-008 rule 2, at its strictest: take the advice string, call what it
+    // names, and assert the finding clears. The generic `.expectEmpty()` is a
+    // TypeError on correspondence, so an advice string shared across families
+    // would send this reader into an exception — verified, not assumed.
+    const rule = correspondence(loaded).side('a', []).side('b', []).beComplete()
+    const [finding] = diagnose([rule]).filter((f) => f.kind === 'zero-subjects')
+    expect(finding?.advice).toContain('.expectEmpty(sideName)')
+    expect(finding?.advice).not.toContain('with .expectEmpty() if')
+    // And the zero-arg form the generic advice WOULD have named does throw here,
+    // so the distinction is real rather than cosmetic.
+    expect(() => rule.expectEmpty()).toThrow(TypeError)
+    expect(kindsOf(rule.expectEmpty('a').expectEmpty('b'))).toEqual([])
+  })
+
   it('the remedy names the narrowing, and never claims the author wrote it', () => {
     // ADR-008 rule 2. The commonest trigger is a DEFAULT — `minLines` is 5 — so
     // "fix your filters" sends a reader who wrote none looking for filters that do
@@ -213,5 +253,164 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     expect(finding?.advice).toContain('0 subjects')
     expect(finding?.advice).toContain('did not write')
     expect(finding?.advice).not.toContain('glob')
+  })
+})
+
+/**
+ * Nothing forces a family to implement either hook — plan 0096's review, item I5.
+ *
+ * `examinedUnits?` and `declaresEmpty?` are both OPTIONAL on `DiagnosableRule`,
+ * and the two failure modes are asymmetric and both silent:
+ *
+ *   forget `examinedUnits`  -> no preview at all for that family (fails open)
+ *   forget `declaresEmpty`  -> inherit `_expectEmpty`, which for a family whose
+ *                              declaration is per-side is ALWAYS false, so the
+ *                              preview tells an author to declare what they
+ *                              declared (over-reports)
+ *
+ * The second one is the defect this plan's fix commit repaired for
+ * `correspondence`, and it is reachable again for the next family. Modelled on
+ * `assertion-gate.test.ts`'s prototype census, which exists for the same reason
+ * about `assertsSomething()`.
+ */
+describe('classification of the evidence hooks (plan 0096)', () => {
+  // A family that narrows on its OWN seam, past what the generic subject
+  // machinery can see, must count there. This is the list ADR-010 rule 1's
+  // table should name.
+  const COUNTS_AT_ITS_OWN_SEAM: readonly string[] = [
+    'DuplicateBodiesBuilder', // post-minLines, post-glob
+    'InconsistentSiblingsBuilder', // folders of >= 2, not files
+    'CorrespondenceBuilder', // materialized sides, and it has no project
+    'SchemaRuleBuilder', // post-predicate fields; no project either
+    'ResolverRuleBuilder', // post-predicate resolvers
+  ]
+
+  /**
+   * The class in the chain that DEFINES `method`, by name — undefined if nobody
+   * does. Prototype walk rather than a `.d.ts` read, matching the precedent in
+   * `assertion-gate.test.ts`; bug 0071 records what that cannot see.
+   */
+  const ownerOf = (cls: unknown, method: string): string | undefined => {
+    if (typeof cls !== 'function') return undefined
+    const start: unknown = cls.prototype
+    let proto: object | null = typeof start === 'object' && start !== null ? start : null
+    while (proto) {
+      if (Object.hasOwn(proto, method)) {
+        const ctor: unknown = Object.getOwnPropertyDescriptor(proto, 'constructor')?.value
+        return typeof ctor === 'function' ? ctor.name : undefined
+      }
+      const next: unknown = Object.getPrototypeOf(proto)
+      proto = typeof next === 'object' && next !== null ? next : null
+    }
+    return undefined
+  }
+
+  const named = new Map<string, unknown>()
+  for (const mod of [rootExports, graphqlExports]) {
+    for (const [name, value] of Object.entries(mod)) {
+      if (typeof value === 'function') named.set(name, value)
+    }
+  }
+
+  it('CONTROL: the census actually found these classes', () => {
+    // Without this, every `continue` below turns the block into [].filter().
+    const missing = COUNTS_AT_ITS_OWN_SEAM.filter((n) => !named.has(n))
+    expect(missing, 'listed families that are no longer exported by name').toEqual([])
+  })
+
+  it('every listed family implements examinedUnits() on its own hierarchy', () => {
+    // Deleting `DuplicateBodiesBuilder.examinedUnits` makes `diagnose()` return
+    // [] for it — a family with no preview, silently. This reds instead.
+    const inherited = COUNTS_AT_ITS_OWN_SEAM.filter(
+      (n) => ownerOf(named.get(n), 'examinedUnits') !== n,
+    )
+    expect(inherited, 'must count at its own seam, not inherit or omit').toEqual([])
+  })
+
+  it('a family that redefines expectEmpty() must redefine BOTH readers of it', () => {
+    // THE structural link, and the one that was missing. If you change what
+    // declaring means — correspondence declares per SIDE, so the zero-arg form
+    // throws and `_expectEmpty` can never be true — then the base answer to
+    // "did they declare?" is wrong for you, and wrong in the over-reporting
+    // direction. Reverting the override alone kept 3219 tests green.
+    // Two readers, and forgetting EITHER is silent. `declaresEmpty()` is how the
+    // gate reads the declaration; `emptyDeclarationAdvice()` is how the remedy
+    // spells it, and a family that redefines the call but not the advice ships a
+    // remedy that throws when followed.
+    const offenders = [...named.keys()].filter(
+      (n) =>
+        ownerOf(named.get(n), 'expectEmpty') === n &&
+        (ownerOf(named.get(n), 'declaresEmpty') !== n ||
+          ownerOf(named.get(n), 'emptyDeclarationAdvice') !== n),
+    )
+    expect(offenders, 'redefines what declaring means but not how it is read').toEqual([])
+  })
+
+  it('CONTROL: that link is a real constraint, not a claim about an empty set', () => {
+    // The row above is [] if no builder overrides `expectEmpty` at all. One does.
+    const redefiners = [...named.keys()].filter((n) => ownerOf(named.get(n), 'expectEmpty') === n)
+    expect(redefiners).toContain('CorrespondenceBuilder')
+  })
+})
+
+/**
+ * The memo's staleness escape hatch — plan 0096's review, item I4.
+ *
+ * `selection-memo.ts` reasons carefully about ONE staleness hazard (a clone
+ * inheriting its parent's selection, solved by keying on object identity) and
+ * used to stop one short of the other: a builder held across a mutation of the
+ * underlying ts-morph project keeps answering with the pre-mutation selection,
+ * because identity has not changed. `element-cache.ts` has exactly this profile
+ * and solves it by registering with `cache-registry.ts`; a second memo with a
+ * second, different answer would be two mechanisms for one state.
+ *
+ * It is worse here than in the element cache, which is why it is guarded rather
+ * than disclaimed: both readers — the gate and the evidence count — go through
+ * this memo, so a stale entry is a stale VERDICT and a stale count that agree
+ * with each other. That is the failure mode plan 0096 exists to remove.
+ */
+describe('the selection memo yields to resetProjectCache() (plan 0096)', () => {
+  const heldProject = (): ArchProject => {
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    // Two identical bodies, comfortably over minLines — one duplicate pair.
+    for (const name of ['a', 'b']) {
+      tsMorphProject.createSourceFile(
+        `/src/${name}.ts`,
+        `export function ${name}() {\n  const x = 1\n  const y = 2\n  const z = 3\n  return x + y + z\n}\n`,
+      )
+    }
+    return {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsMorphProject,
+      getSourceFiles: () => tsMorphProject.getSourceFiles(),
+    }
+  }
+
+  it('is frozen for a builder held across a mutation — stated, not hidden', () => {
+    const held = heldProject()
+    const rule = smells.duplicateBodies(held).minLines(3)
+    const before = rule.examinedUnits()
+    expect(before).toBe(2)
+
+    held._project.createSourceFile('/src/c.ts', 'export function c() {\n  return 1\n}\n')
+    // Same builder object, so the same memo key. The new file is invisible.
+    expect(rule.examinedUnits()).toBe(before)
+  })
+
+  it('sees the mutation after resetProjectCache()', () => {
+    const held = heldProject()
+    const rule = smells.duplicateBodies(held).minLines(3)
+    expect(rule.examinedUnits()).toBe(2)
+
+    held._project.createSourceFile(
+      '/src/c.ts',
+      'export function c() {\n  const x = 1\n  const y = 2\n  const z = 3\n  return x + y + z\n}\n',
+    )
+    resetProjectCache()
+
+    // Removing `registerCacheReset` from `selection-memo.ts` reds this and
+    // nothing else — measured. The element cache alone does not cover it,
+    // because the memo caches POST-filter and holds its own copy.
+    expect(rule.examinedUnits()).toBe(3)
   })
 })
