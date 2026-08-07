@@ -154,10 +154,16 @@ describe('class metrics report a qualified element (bug 0068)', () => {
   })
 
   it('the identity is unchanged, so no class-metric baseline entry moves', () => {
-    // The identity already carried the qualified name before this release; only
-    // `element` moved. An adopter ratcheting class metrics regenerates nothing.
-    for (const v of maxMethodLines(1).evaluate([findClass('ComplexService')], context)) {
-      expect(v.identity).toContain(`::${String(v.element)}::lines`)
-    }
+    // A LITERAL pin, not `identity contains element`: both fields now come from
+    // `getMemberName`, so comparing them stays green under any change that moves
+    // both together — which would invalidate every class-metric baseline entry
+    // while the release notes promise they are byte-identical. The claim is about
+    // stability across 0.57.0 → 0.58.0, so the expected value has to be written
+    // down, not derived from the thing under test.
+    const names = maxMethodLines(1)
+      .evaluate([findClass('ComplexService')], context)
+      .map((v) => String(v.identity).split('::')[1] ?? '')
+      .sort()
+    expect(names).toEqual(['ComplexService.complex', 'ComplexService.simple'])
   })
 })

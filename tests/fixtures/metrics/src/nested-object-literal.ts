@@ -13,8 +13,14 @@
  *    functions with the SAME own name in one file. `owningBindingName` refuses to
  *    prefix a literal returned from a factory, so both are named `build`; only the
  *    scope tells them apart.
- * 4. `anonymousDefault` has no name at all, so the message says `<anonymous>`
- *    while any AST-derived name says something else.
+ * 4. `makeDelta` + `makeEpsilon` return `{ build() {} }` in METHOD SHORTHAND.
+ *    A shorthand is a `MethodDeclaration`, which HAS its own name — so
+ *    `getElementName` returns `build` rather than walking to an ancestor, and a
+ *    scope derived from it skipped the prefix. The arrow spelling above was
+ *    guarded and this one was not: same code, two spellings, one guarded.
+ * 5. `save` returns `{ save: … }` — an inner function whose name EQUALS its
+ *    enclosing function's. An `own === scope` short-circuit reads that as "the
+ *    scope is me" and drops the prefix, re-creating the original collision.
  */
 export function makeAlpha(
   a: number,
@@ -66,6 +72,39 @@ export function makeGamma(): { build: (n: number) => string } {
       const two = one + 'a'
       const three = two + 'm'
       return three + 'ma'
+    },
+  }
+}
+
+export function makeDelta(): { build: (n: number) => string } {
+  return {
+    build(n: number): string {
+      const one = String(n) + 'd'
+      const two = one + 'e'
+      const three = two + 'l'
+      return three + 'ta'
+    },
+  }
+}
+
+export function makeEpsilon(): { build: (n: number) => string } {
+  return {
+    build(n: number): string {
+      const one = String(n) + 'e'
+      const two = one + 'p'
+      const three = two + 's'
+      return three + 'ilon'
+    },
+  }
+}
+
+export function save(): { save: (n: number) => string } {
+  return {
+    save: (n: number): string => {
+      const one = String(n) + 's'
+      const two = one + 'a'
+      const three = two + 'v'
+      return three + 'e'
     },
   }
 }

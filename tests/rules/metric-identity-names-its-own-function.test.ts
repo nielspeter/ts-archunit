@@ -68,12 +68,22 @@ describe('a function metric identifies the function its message names (bug 0068)
   // `getElementName(fn.getNode())` reds exactly this test and the identity rows.)
   it('CONTROL: the fixture produces the elements this file reasons about', () => {
     expect(new Set(namesIn(maxFunctionLines(3).evaluate(subjects, context)))).toEqual(
-      new Set(['makeAlpha', 'errorResponseBuilder', 'takesFive', 'makeBeta', 'makeGamma', 'build']),
+      new Set([
+        'makeAlpha',
+        'errorResponseBuilder',
+        'takesFive',
+        'makeBeta',
+        'makeGamma',
+        'makeDelta',
+        'makeEpsilon',
+        'save',
+        'build',
+      ]),
     )
-    // `build` twice — makeBeta's and makeGamma's — which is the collision case.
+    // `build` four times — two arrow spellings and two METHOD SHORTHAND ones.
     expect(
       namesIn(maxFunctionLines(3).evaluate(subjects, context)).filter((n) => n === 'build'),
-    ).toHaveLength(2)
+    ).toHaveLength(4)
     expect(new Set(namesIn(maxFunctionParameters(4).evaluate(subjects, context)))).toEqual(
       new Set(['makeAlpha', 'manyParams', 'takesFive']),
     )
@@ -110,7 +120,27 @@ describe('a function metric identifies the function its message names (bug 0068)
     // exactly that, and a `#N` keys a ratchet ceiling to a slot rather than to a
     // function, which is the fail-open bug 0068's severity rests on.
     const names = builds.map((v) => String(v.identity).split('::')[1] ?? '').sort()
-    expect(names).toEqual(['makeBeta.build', 'makeGamma.build'])
+    // All FOUR spellings. `makeDelta`/`makeEpsilon` use method shorthand, which is
+    // a MethodDeclaration and therefore HAS its own name — so a scope taken from
+    // `getElementName` returned `build` and skipped the prefix. The arrow rows
+    // passed while these collided: same code, two spellings, one guarded.
+    expect(names).toEqual([
+      'makeBeta.build',
+      'makeDelta.build',
+      'makeEpsilon.build',
+      'makeGamma.build',
+    ])
+  })
+
+  it('a nested function whose name equals its enclosing function stays distinct', () => {
+    // The `own === scope` short-circuit read this as "the scope is me" and dropped
+    // the prefix, so `save`'s own finding and the `save` it returns shared one
+    // identity — bug 0068's exact shape, surviving inside its own fix.
+    const saves = maxFunctionLines(3)
+      .evaluate(subjects, context)
+      .filter((v) => v.element === 'save')
+    const names = saves.map((v) => String(v.identity).split('::')[1] ?? '').sort()
+    expect(names).toEqual(['save', 'save.save'])
   })
 
   it('the identity and element name the function the message names', () => {
@@ -153,9 +183,11 @@ describe('a function metric identifies the function its message names (bug 0068)
     ]
 
     const project = new Project({ compilerOptions: { allowJs: false } })
-    const roots = ['src/rules', 'src/conditions'].map((d) =>
-      path.resolve(import.meta.dirname, '../../', d),
-    )
+    // All of `src`, not two chosen folders: a metric producer added under
+    // `src/smells/` or `src/builders/` would otherwise ship the same defect with
+    // the census green, and "derived, not listed" would hold only where someone
+    // remembered to look.
+    const roots = [path.resolve(import.meta.dirname, '../../src')]
     const files = roots.flatMap((abs) =>
       fs
         .readdirSync(abs, { recursive: true, encoding: 'utf8' })
@@ -167,7 +199,12 @@ describe('a function metric identifies the function its message names (bug 0068)
     const parsed: { where: string; passes: boolean }[] = []
     for (const file of files) {
       const text = fs.readFileSync(file, 'utf8')
-      textualOccurrences += text.split('metricViolation(').length - 1
+      // CALLS only. Widening the scan to all of `src` brought in the function's
+      // own declaration (`export function metricViolation(`), and the vacuity
+      // guard below caught the 10-vs-9 mismatch rather than letting the census
+      // quietly under-count — which is the whole point of asserting the
+      // population before asserting anything about it.
+      textualOccurrences += [...text.matchAll(/(?<!function\s)metricViolation\(/g)].length
       const sf = project.createSourceFile(file, text, { overwrite: true })
       for (const callNode of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
         if (callNode.getExpression().getText() !== 'metricViolation') continue

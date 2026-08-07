@@ -1,6 +1,6 @@
 import type { Node } from 'ts-morph'
 import type { ArchViolation } from './violation.js'
-import { createViolation, getElementName } from './violation.js'
+import { createViolation, enclosingScopeName, getElementName } from './violation.js'
 
 /**
  * A finding whose message states a **measurement** — bug 0012.
@@ -110,36 +110,48 @@ export function metricViolation(
 }
 
 /**
- * The name segment of a metric identity: the subject's own name, **scope-qualified
- * when its own name is not unique within the file**.
+ * The name segment of a metric identity: the subject's own name, **prefixed by the
+ * name of whatever encloses it**, so that two subjects sharing a name in one file
+ * are still two identities.
  *
- * Two names are available and neither is sufficient alone — measured across every
- * function shape:
+ * Measured, across every function shape — neither name alone is sufficient:
  *
- * | shape                          | own name (`qualifiedName`) | scope (`getElementName`) |
- * | ------------------------------ | -------------------------- | ------------------------ |
- * | two factories returning `{build}` | `build`, `build` — COLLIDE | `makeAlpha`, `makeBeta` |
- * | an arrow inside a named function  | `errorResponseBuilder`     | `makeAlpha` — COLLIDES with the enclosing function's own finding |
- * | a bound literal `resolvers.top`   | `resolvers.top`            | `ArrowFunction` — no real scope |
+ * | shape                                | own name            | enclosing scope | identity segment          |
+ * | ------------------------------------ | ------------------- | --------------- | ------------------------- |
+ * | two factories returning `{build}`    | `build`, `build`    | `makeBeta`, `makeGamma` | `makeBeta.build`, … |
+ * | an arrow inside a named function     | `errorResponseBuilder` | `makeAlpha`  | `makeAlpha.errorResponseBuilder` |
+ * | a top-level `function takesFive`     | `takesFive`         | none            | `takesFive` — unchanged   |
+ * | a class method via `functions()`     | `Repo.save`         | `Repo`          | `Repo.save` — already carries it |
  *
- * The own name alone was bug 0068's first fix and it moved the collision rather
- * than closing it: `owningBindingName` deliberately refuses to prefix a literal
- * that is returned from a factory or passed as an argument ("inventing one from a
- * distant ancestor would be a guess"), so both `build`s are just `build`. That
- * refusal is right for a **display name**, which is what it governs. An identity
- * is an opaque key, not a claim about what the thing is called, so qualifying it
- * by scope is not a guess — and the display name, the message and
- * `haveNameMatching` are all left exactly as they were.
+ * Two mistakes are recorded here because both shipped and both were found by
+ * review rather than by reasoning:
  *
- * The scope is only used when it is a real name: `getElementName` falls back to
- * the node's kind (`ArrowFunction`) when no named ancestor exists, and a kind is
- * not a scope.
+ * 1. **The own name alone** (bug 0068's first fix) moved the collision instead of
+ *    closing it: `owningBindingName` deliberately declines to prefix a literal
+ *    returned from a factory, so both `build`s are just `build`.
+ * 2. **`getElementName` is not a scope.** It returns the node's OWN name when the
+ *    node has one and only walks ancestors otherwise — so for method shorthand
+ *    (`{ build() {} }`, a `MethodDeclaration`) it returned `build`, the prefix was
+ *    skipped, and the fix worked for the arrow spelling of the same code and not
+ *    for this one. The scope now comes from `enclosingScopeName`, which always
+ *    walks from the parent.
+ *
+ * There is deliberately **no `own === scope` short-circuit**: a nested function
+ * whose name equals its enclosing function's (`function save() { return { save:
+ * … } }`) is exactly the case that needs the prefix, and equality of strings
+ * cannot tell "the scope is me" from "the scope happens to share my name".
+ *
+ * Known limit, stated rather than papered over: a literal in a **call argument**
+ * at module level (`register({ handler: … })`) has no enclosing named
+ * declaration, so two of them in one file still share an identity. Nothing stable
+ * distinguishes them — that is bug 0067's territory ("there is no right name
+ * yet"), not this one's.
  */
 function identityName(node: Node, qualifiedName: string | undefined): string {
-  const scope = getElementName(node)
-  const own = qualifiedName ?? scope
-  const scopeIsRealName = scope !== node.getKindName()
-  const alreadyCarriesScope = own.startsWith(`${scope}.`) || own.endsWith(`.${scope}`)
-  if (!scopeIsRealName || own === scope || alreadyCarriesScope) return own
+  const own = qualifiedName ?? getElementName(node)
+  const scope = enclosingScopeName(node)
+  if (scope === undefined) return own
+  // Already carries it — a class method's `Repo.save` under scope `Repo`.
+  if (own.startsWith(`${scope}.`) || own.endsWith(`.${scope}`)) return own
   return `${scope}.${own}`
 }
