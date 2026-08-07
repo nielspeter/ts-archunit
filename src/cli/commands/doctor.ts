@@ -179,6 +179,9 @@ const HAS_GLOB: Readonly<Record<DiagnosticFinding['kind'], boolean>> = {
   'no-condition': false,
   'project-unknown': false,
   'project-empty': false,
+  // No glob: the fault is the family's own filters emptying the set, so there
+  // is no glob text to point at (plan 0096).
+  'zero-subjects': false,
   // No glob: the subject is a comment in a source file, and the identity is the
   // rule id it names plus where it sits. That is why this kind carries `line`.
   'orphan-exclusion': false,

@@ -44,6 +44,22 @@ export interface DiagnosableRule extends RuleBuilderLike {
   assertionAdvice?: () => string
   /** The project this rule was built against. */
   getProject?: () => ArchProject | undefined
+  /**
+   * How many units this rule's family examined — plan 0096.
+   *
+   * PUBLIC because `DiagnosableRule` is structural: a protected member cannot
+   * satisfy it, which is the recorded reason `assertsSomething()` is public.
+   *
+   * The unit differs per family and each names its own (ADR-009 part 1), but
+   * every family answers it from the SAME method its `collectViolations()` uses
+   * — not a parallel derivation. A first attempt at this plan let the two
+   * diverge and they disagreed within one commit.
+   *
+   * Calling it RUNS that materialization. `diagnose()` and `doctor` used to
+   * promise they reported "without running any of them"; that sentence changed
+   * with this plan, in the docs as well as here.
+   */
+  examinedUnits?: () => number
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -60,6 +76,21 @@ export interface DiagnosticFinding {
     | 'no-condition'
     | 'project-unknown'
     | 'project-empty'
+    /**
+     * A rule that examined **zero units** while its project loaded files, and
+     * for which nothing else explained the emptiness — plan 0096.
+     *
+     * The preview for plan 0098, which makes the same state FAIL. Distinct from
+     * `'project-empty'` (the instrument loaded nothing) and from `'dead-glob'`
+     * (a glob the author wrote matches nothing): this is the family's OWN
+     * filters removing everything, including defaults the author never wrote.
+     *
+     * It lands in `diagnose()` rather than in `doctor` so that a rule file
+     * importing a test runner — which `doctor` cannot load, ADR-008 rule 1's
+     * corollary — still gets a preview: `expect(diagnose(rules)).toEqual([])`
+     * runs inside the consumer's own suite.
+     */
+    | 'zero-subjects'
     /**
      * An inline `// ts-archunit-exclude` comment naming a rule id no rule
      * declares, so it suppresses nothing — [bug 0044](../../bugs/fixed/0044-an-inline-exclusion-comment-has-no-feedback-channel.md).
@@ -174,6 +205,12 @@ export function diagnose(
       })
     }
 
+    // Where this rule's findings begin, so the tail can ask whether anything
+    // else already explained an empty examination (plan 0096's precedence
+    // ruling). The gate has the same shape at `terminal-builder.ts` — each
+    // fault REPLACES what follows — and `diagnose()` must mirror it, or the
+    // preview disagrees with the thing it previews.
+    const before = findings.length
     const trees = rule.globs?.() ?? []
 
     // Silence here would be a false green in the tool built to remove false
@@ -203,6 +240,10 @@ export function diagnose(
         // reported here rather than held back for a run that may never happen.
         findings.push(...syntacticFindings(name, trees))
       }
+      // Evidence is a fact about the FAMILY, not about whether we could name
+      // its project — so this branch reports it too.
+      const noProjectEvidence = zeroSubjectsFinding(rule, name)
+      if (noProjectEvidence !== undefined) findings.push(noProjectEvidence)
       continue
     }
 
@@ -264,8 +305,54 @@ export function diagnose(
         findings.push(describe(site, name, universe, target))
       }
     }
+
+    // LAST, and only if nothing else spoke for this rule. A dead glob, a missing
+    // assertion or an empty project each already names a cause with its own
+    // remedy; adding "your narrowing removed everything" beside one of them
+    // prints the derived symptom above the root cause, with advice that is false
+    // on that path. The first attempt emitted this first and unconditionally,
+    // which measured as ['zero-subjects','dead-glob'] for a single typo and
+    // broke the invariant bug 0040 is filed for — that `diagnose()` and the gate
+    // agree about a dead discovery glob.
+    if (findings.length === before) {
+      const evidence = zeroSubjectsFinding(rule, name)
+      if (evidence !== undefined) findings.push(evidence)
+    }
   }
   return findings
+}
+
+/**
+ * A rule that examined nothing, when nothing else explained why — plan 0096.
+ *
+ * Returns `undefined` unless the family answers `examinedUnits()` and answered
+ * zero. Two callers, on purpose: the project-unknown branch (a family with no
+ * project still has evidence — `correspondence` and `schemaFromSDL` have no
+ * `ArchProject` at all, and the first attempt gated this on one and gave those
+ * two families no preview whatsoever) and the tail of the normal path.
+ *
+ * NOT called from the project-empty branch. That fault is the instrument, it
+ * already has its own finding, and reporting both would print one fault twice
+ * — and prefigure 0098's precedence backwards, where an empty project outranks
+ * every declaration because a declaration asserts a fact about a loaded corpus.
+ */
+function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFinding | undefined {
+  if (rule.examinedUnits === undefined) return undefined
+  if (rule.examinedUnits() !== 0) return undefined
+  return {
+    kind: 'zero-subjects',
+    rule: name,
+    // ONE cause, because precedence has already removed the others: this fires
+    // only when no dead glob, missing assertion or empty project explained the
+    // emptiness first. So the remedy can name that cause without the hedging
+    // ADR-008 rule 2 forbids — and it must not say "your filters", because the
+    // commonest trigger is a default the author never wrote (`minLines` is 5).
+    advice:
+      'this rule examined 0 subjects, so it can never fail. Its own narrowing removed ' +
+      'everything the project loaded — including any default it applies that you did not ' +
+      'write. Widen it, or declare the empty state with .expectEmpty() if that is the ' +
+      'point. From a later minor this becomes a failing configuration finding.',
+  }
 }
 
 /**
