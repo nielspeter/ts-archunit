@@ -389,8 +389,10 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
       'everything the project loaded — including any default it applies that you did not ' +
       'write. Widen it, or declare the empty state with ' +
       (rule.emptyDeclarationAdvice?.() ?? '.expectEmpty()') +
-      ' if that is the point. A later release makes this state fail at check time; ' +
-      'this surface is how you find it first.',
+      ' if that is the point — but the declaration is not itself checked yet, so it ' +
+      'silences this without proving anything; widening is the fix, declaring is the ' +
+      'exception. A later release makes this state fail at check time; this surface is ' +
+      'how you find it first.',
   }
 }
 

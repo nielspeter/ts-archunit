@@ -9,9 +9,12 @@
  * `getProject()`, so `diagnose()` hit its `if (!target) … continue` and never reached the check.
  * A row that calls the accessor proves the accessor; only a row that calls `diagnose()` proves the
  * feature. Both kinds appear below and they are labelled: the first `describe` is accessor-level and
- * proves the SEAM, the second is `diagnose()`-level and proves the FEATURE. An earlier version of this
- * header claimed every family was reached the second way; it was three of five, which is an affirmative
- * false claim in the documentation of the file written to prevent exactly that.
+ * proves the SEAM, the second is `diagnose()`-level and proves the FEATURE.
+ *
+ * All five families are reached the second way, and that sentence has been wrong twice — first at
+ * three of five, then at four, each time asserted rather than counted, in the documentation of the
+ * file written to prevent exactly that. It is now true, and the way to keep it true is to count the
+ * `kindsOf(...)` call sites in the second `describe` rather than to trust this paragraph.
  *
  * ## What each fixture holds
  *
@@ -167,6 +170,10 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     // Both is — and the base body would report here, telling an author who
     // declared both sides to go and declare them.
     expect(kindsOf(base.expectEmpty('a').expectEmpty('b'))).toEqual([])
+    // And `[].every(...)` is TRUE, so a correspondence with no sides at all would
+    // declare itself empty vacuously — the ∀-over-∅ shape this whole plan is
+    // about, reappearing inside the check that suppresses the plan's own finding.
+    expect(correspondence(loaded).beComplete().declaresEmpty()).toBe(false)
   })
 
   it('resolvers reports through diagnose(), not only through the accessor', () => {
@@ -208,18 +215,19 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
   })
 
   it('does NOT fire beside project-empty — one fault, one finding', () => {
-    const kinds = kindsOf(smells.duplicateBodies(emptyProject), emptyProject)
-    expect(kinds).toContain('project-empty')
-    expect(kinds).not.toContain('zero-subjects')
+    // toEqual, for the same reason as every other positive row here — leaving
+    // two rows on the form this file's own header calls "the cheap green the
+    // plan bans" is the inconsistency that lets a third finding appear unseen.
+    expect(kindsOf(smells.duplicateBodies(emptyProject), emptyProject)).toEqual(['project-empty'])
   })
 
   it('does NOT fire beside a dead glob — the derived symptom yields to the cause', () => {
     // Emitting this first produced ['zero-subjects','dead-glob'] for one typo, with
     // advice that is false on that path, and broke the invariant bug 0040 is filed
     // for: that `diagnose()` and the gate agree about a dead discovery glob.
-    const kinds = kindsOf(smells.duplicateBodies(loaded).inFolder('**/nowhere-at-all/**'), loaded)
-    expect(kinds).toContain('dead-glob')
-    expect(kinds).not.toContain('zero-subjects')
+    expect(
+      kindsOf(smells.duplicateBodies(loaded).inFolder('**/nowhere-at-all/**'), loaded),
+    ).toEqual(['dead-glob'])
   })
 
   it('stays silent when the family examined something', () => {
@@ -253,6 +261,13 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     expect(finding?.advice).toContain('0 subjects')
     expect(finding?.advice).toContain('did not write')
     expect(finding?.advice).not.toContain('glob')
+    // And it says which of the two remedies is the real one. `.expectEmpty()` is
+    // a one-line chain method that makes this finding vanish and — until 0098's
+    // effectiveness half — proves nothing, which is ADR-008 rule 3's corollary:
+    // "a marker an agent can stamp on any file to go green is worse than no
+    // marker". Advice that offers it as a peer of widening invites exactly that.
+    expect(finding?.advice).toContain('not itself checked yet')
+    expect(finding?.advice).toContain('widening is the fix')
   })
 })
 
@@ -369,6 +384,55 @@ describe('classification of the evidence hooks (plan 0096)', () => {
  * this memo, so a stale entry is a stale VERDICT and a stale count that agree
  * with each other. That is the failure mode plan 0096 exists to remove.
  */
+describe('the sharing and the memo are observable, not just intended (plan 0096)', () => {
+  /**
+   * The structural requirement of this plan — ONE `selected()`, called by both
+   * the gate and the evidence — is BEHAVIOURALLY INVISIBLE. Re-deriving the same
+   * set inline inside `detect()` produces identical violations and an identical
+   * count, which is exactly how the first attempt shipped `inconsistentSiblings`
+   * with two derivations of one threshold, and how a reviewer then rewrote its
+   * `selected()` to `sourceFiles.length` with the whole suite green.
+   *
+   * So the guard cannot be behavioural. It is a COUNT: a project that records
+   * how often its file list is asked for. One shared, memoized selection asks
+   * once; un-share `detect()` and it asks twice; delete the memo and it asks
+   * twice. That also makes it the only guard on the plan's stated performance
+   * requirement — `doctor` calls `diagnose()` once per rule file, and without
+   * the memo a rule file with ten smell rules pays the walk twice over.
+   */
+  it('both readers ask the project for its files exactly ONCE', () => {
+    const tsMorphProject = new Project({ useInMemoryFileSystem: true })
+    for (const name of ['a', 'b']) {
+      tsMorphProject.createSourceFile(
+        `/src/${name}.ts`,
+        `export function ${name}() {\n  log.info('x')\n  const q = 1\n  const w = 2\n  return q + w\n}\n`,
+      )
+    }
+    let asked = 0
+    const counting: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsMorphProject,
+      getSourceFiles: () => {
+        asked++
+        return tsMorphProject.getSourceFiles()
+      },
+    }
+    const rule = smells.inconsistentSiblings(counting).forPattern(call('log.info')).minLines(2)
+
+    expect(rule.examinedUnits()).toBe(2)
+    const afterEvidence = asked
+    expect(afterEvidence).toBe(1)
+
+    // The gate now reads the SAME materialized selection. A second ask here
+    // means a second derivation — the defect, not a performance nit.
+    // `violations()` is the public gate path — `collectViolations()` is protected,
+    // and reaching past a visibility boundary to test would guard a seam no
+    // consumer can reach.
+    expect(rule.violations()).toEqual([])
+    expect(asked, 'the gate re-derived what the evidence already computed').toBe(afterEvidence)
+  })
+})
+
 describe('the selection memo yields to resetProjectCache() (plan 0096)', () => {
   const heldProject = (): ArchProject => {
     const tsMorphProject = new Project({ useInMemoryFileSystem: true })

@@ -323,6 +323,42 @@ _fix_ did. Every edit in this round now asserts its own application.
 `declaresEmpty()` and `emptyDeclarationAdvice()`. An ADR is a decision, and 010 is Proposed and awaiting
 joint ratification — so this is recorded for that moment rather than edited in.
 
+### What the testing reviewer's delta added, and the guard that had no shape
+
+Both reviewers reached the same critical independently, from different evidence — which is what rule 5
+asks of two derivations. The testing matrix re-scored the same 34-row enumeration and moved **12 caught
+by nothing to 9** on the fix commit alone; the rows it found still uncovered are now closed:
+
+- **Un-sharing `detect()` again was caught by nothing, and could not be caught behaviourally.** Re-deriving
+  the same set inline produces identical violations and an identical count — which is precisely how the
+  first attempt shipped and how a reviewer then rewrote `selected()` to `sourceFiles.length` with the
+  suite green. The guard is therefore a **count, not a value**: a project that records how often its file
+  list is asked for. One shared memoized selection asks **once**; un-share it and it asks twice; delete
+  the memo and it asks twice. That one row closes the structural requirement AND the plan's performance
+  claim, which until now had no guard at all.
+- **The suppressor was pinned at the base and not at the override.** `every` → `some` (declaring one side
+  of two suppresses) and dropping `_sides.length > 0` (a correspondence with **no sides** declares itself
+  empty, because `[].every(...)` is `true`) both passed. The second is this plan's own subject — ∀ over ∅
+  — reappearing inside the check that suppresses this plan's finding.
+- **The declaration is an unchecked silencer, and the advice offered it as a peer of widening.** Nothing
+  verifies a declaration until 0098's effectiveness half, so `.expectEmpty()` is a one-line chain method
+  that makes the finding vanish and proves nothing — ADR-008 rule 3's corollary about a marker an agent
+  can stamp to go green. The advice now says so, and says which remedy is the real one.
+
+**The sabotage matrix produced a false CAUGHT, and the harness caught it rather than the verdict.** The
+row for the advice text replaced a string with an expression that did not parse, so vitest exited 1 and
+scored CAUGHT — for the TypeScript parser, not for any assertion. Rewritten as a valid edit it scored
+NOT CAUGHT, which was the truth: no test read that sentence. **A sabotage that does not compile is not a
+sabotage**, and it fails in the direction that flatters the suite. Final matrix: 12 rows, all caught,
+every patch syntactically valid and asserted to apply.
+
+**Recorded, not guarded** (rule 5's third corollary): un-sharing the two condition-side call sites and
+dropping the `groupByFolder` sort are true equivalences — both sites compute the same value. Removing the
+spread at `detect()`'s `[...this.selected()]` would let `.sort()` reorder the shared memo in place; it is
+unobservable today because no second reader depends on the order, so it carries a comment naming the
+hazard instead of a row that would pass either way. The Outcome above should be read as: the sharing is
+**enforced by the call-count row** for `inconsistentSiblings`, and review-enforced elsewhere.
+
 ### Independence, stated rather than implied
 
 The 0095 matrix is **not** an independent check for this change: it probes `check()`/`warn()` over a
