@@ -80,3 +80,28 @@ as the stale prose in v0.49.1 — text that is true and unreachable.
   [0087](./completed/0087-an-inline-type-import-still-requests-the-module.md) — the three changes preset
   users cannot respond to.
 - `src/presets/layered.ts`, `src/presets/boundaries.ts`, `docs/upgrading.md`.
+
+## Added 2026-08-07 — the declared-empty carrier
+
+[ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) part 3 makes this plan's mechanism binding
+for a second reason: **every preset must expose a declaration carrier that reaches every check it
+constructs.** Under [0098](./0098-the-evidence-seam-and-the-floor.md), a check that examined zero units
+fails unless the author declared empty — and a preset user holds no builder, so without a carrier their
+only reachable remedy is disabling the option, which deletes coverage permanently. That is ADR-008 rule
+1's trained-suppression dynamic, produced by our own gate.
+
+One shared option satisfies it; per-option unions do not generalise (`noInlineLogic` constructs many
+rules from one entry, so a union cannot name which):
+
+```ts
+expectEmpty?: AgentGuardrailsRuleId[] // typed on the preset's own id union, like `overrides`
+```
+
+**An id that binds to no constructed rule is itself a failing configuration finding** — never a warning
+(rule 1: a warning is invisible), through the existing unknown-`overrides`-key path. The silent version
+turns an expiring assertion into nothing and makes 0098's remedy tell the user to add the option they
+already added, misspelled: bug 0017's shape. It also buys rename protection, and makes the coupling
+explicit — **preset rule ids become a declaration interface, so renaming one is a breaking change.**
+
+This does not change 0089's priority or blast radius; it means 0098 depends on this plan, and the option
+should be designed with that consumer in view.
