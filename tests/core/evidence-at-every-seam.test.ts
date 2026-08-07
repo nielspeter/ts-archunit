@@ -31,7 +31,7 @@ import { project, resetProjectCache } from '../../src/core/project.js'
 import type { ArchProject } from '../../src/core/project.js'
 import { diagnose } from '../../src/core/diagnose.js'
 import { smells } from '../../src/smells/index.js'
-import { call } from '../../src/index.js'
+import { call, globAnyOf, stampGlobs } from '../../src/index.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
 import { resolvers, schemaFromSDL } from '../../src/graphql/index.js'
 import * as rootExports from '../../src/index.js'
@@ -219,6 +219,30 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     // two rows on the form this file's own header calls "the cheap green the
     // plan bans" is the inconsistency that lets a third finding appear unseen.
     expect(kindsOf(smells.duplicateBodies(emptyProject), emptyProject)).toEqual(['project-empty'])
+  })
+
+  it('does NOT fire beside project-unknown — the OTHER gate, on the other branch', () => {
+    // The no-project branch has its own copy of the precedence gate, and the
+    // shape it exists to prevent — ['project-unknown', ..., 'zero-subjects'] —
+    // needs a rule that declares globs AND cannot name a project. No builder in
+    // the library is that shape today, so it is hand-built here exactly as
+    // `diagnose.test.ts` hand-builds the `project-unknown` case: the branch is
+    // reachable through the structural interface, so it is guarded through it.
+    // One row had been credited to two call sites, and this is the other half.
+    const opaque = {
+      violations: () => [],
+      globs: () => [
+        stampGlobs(globAnyOf(['**/anywhere/**'], 'file-path'), 'selector', () => 'hand-built'),
+      ],
+      examinedUnits: () => 0,
+    }
+    expect(diagnose([opaque]).map((f) => f.kind)).toEqual(['project-unknown'])
+
+    // And with no globs the same rule DOES reach the evidence check, so the row
+    // above is the gate working rather than the branch being unreachable.
+    expect(diagnose([{ violations: () => [], examinedUnits: () => 0 }]).map((f) => f.kind)).toEqual(
+      ['zero-subjects'],
+    )
   })
 
   it('does NOT fire beside a dead glob — the derived symptom yields to the cause', () => {

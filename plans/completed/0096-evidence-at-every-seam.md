@@ -352,6 +352,13 @@ NOT CAUGHT, which was the truth: no test read that sentence. **A sabotage that d
 sabotage**, and it fails in the direction that flatters the suite. Final matrix: 12 rows, all caught,
 every patch syntactically valid and asserted to apply.
 
+**The no-project gate had been credited a guard it did not have.** The row scoring it exercised the
+`no-condition` path, not the `project-unknown` one — one row credited to two call sites, and split, half
+was unguarded. The shape the gate exists to prevent needs a rule that declares globs AND cannot name a
+project, and **no builder in the library is that shape**; it is hand-built through the structural
+interface, exactly as `diagnose.test.ts` already hand-builds the `project-unknown` case. A branch
+reachable through the interface is guarded through the interface rather than declared unreachable.
+
 **Recorded, not guarded** (rule 5's third corollary): un-sharing the two condition-side call sites and
 dropping the `groupByFolder` sort are true equivalences — both sites compute the same value. Removing the
 spread at `detect()`'s `[...this.selected()]` would let `.sort()` reorder the shared memo in place; it is
