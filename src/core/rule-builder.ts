@@ -33,23 +33,6 @@ import { assertsCardinality } from './cardinality.js'
  * seven builders on the other branch. Plan 0069 needs `globs()` to reach all
  * thirteen, so it goes on the root and the root is now singular.
  */
-/**
- * Declaring both emptiness assertions is a contradiction, and 0069's appendix
- * says it "must fail at build time, not silently pick one".
- *
- * Thrown when the chain is built rather than reported as a finding: this is not
- * a property of the codebase under test, it is a rule that cannot be evaluated,
- * and the author is standing right there.
- *
- * `TypeError`, following `combinators.ts`'s "cannot mix Predicate objects and
- * TypeMatcher functions" — the same class of build-time misuse. A bare `Error`
- * was written first and this project's own `quality/typed-errors` rule rejected
- * it, which is the third time in this plan's implementation that the dogfooding
- * caught the new code.
- */
-const CONTRADICTION =
-  '.expectEmpty() and .expectNonEmpty() on the same rule contradict each other — ' +
-  'a selection cannot be required to be both empty and non-empty. Keep the one you mean.'
 
 export abstract class RuleBuilder<T> extends TerminalBuilder {
   protected _predicates: Predicate<T>[] = []
@@ -61,9 +44,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
   // and a predicate applied after `should()` leaves no other trace.
   protected _reachedShould = false
   protected _misplaced: string[] = []
-  protected _requireNonEmpty = false
   /** `.expectEmpty()` — plan 0074. Asserts the selection is empty, and fails when it is not. */
-  protected _expectEmpty = false
 
   constructor(protected readonly project: ArchProject) {
     super()
@@ -127,56 +108,6 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       return this.addPredicate(custom)
     }
     return this.addCondition(custom)
-  }
-
-  /**
-   * Assert that the predicate chain matches at least one subject. If the
-   * filtered subject set is empty, the rule FAILS with a config-level
-   * meta-finding instead of passing vacuously — the "0 === 0" false-green
-   * ADR-008 forbids. Opt-in: legitimately-empty selections (e.g. "no
-   * repositories yet") stay green without it. Built on the materialized
-   * subject set (plan 0064); the finding bypasses diff/baseline (plan 0067).
-   */
-  expectNonEmpty(): this {
-    if (this._expectEmpty) throw new TypeError(CONTRADICTION)
-    const next = this.copy()
-    next._requireNonEmpty = true
-    return next
-  }
-
-  /**
-   * Assert that this selector matches **nothing**, and fail the day it matches
-   * something.
-   *
-   * Plan 0074 (R3b). Since an empty selection is now a failure by default, a
-   * rule whose selection is legitimately empty needs a way to say so — and
-   * 0069's appendix rejected `.allowEmpty()` for being "one word, silent
-   * forever, typo or not, and nothing revisits it". This is the shape that
-   * survived review, and the difference is that it is an **assertion**:
-   *
-   * ```ts
-   * classes(p).that().haveDecorator('Deprecated')
-   *   .expectEmpty()          // nothing is deprecated yet
-   *   .should().beExported()
-   *
-   * // the day someone deprecates a class:
-   * //   FAIL: .expectEmpty() asserted 0 subjects, found 1
-   * ```
-   *
-   * An agent that reaches for this to silence a real typo gets a different
-   * failure the moment the typo is fixed, and until then the intent is stated
-   * in the rule where a reader sees it — rather than in a baseline, or nowhere.
-   *
-   * Exactly symmetric with {@link expectNonEmpty}, and the two together mean
-   * the empty/non-empty question is always answerable from the rule text.
-   * Declaring both is a contradiction and throws here rather than silently
-   * picking one.
-   */
-  expectEmpty(): this {
-    if (this._requireNonEmpty) throw new TypeError(CONTRADICTION)
-    const next = this.copy()
-    next._expectEmpty = true
-    return next
   }
 
   // --- Terminal methods ---
