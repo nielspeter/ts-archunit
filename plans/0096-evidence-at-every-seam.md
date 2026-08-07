@@ -1,7 +1,7 @@
 # Plan 0096 — evidence at every seam, and the preview that reads it
 
 **Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 1.
-**Depends on:** [0095](./0095-the-vacuity-matrix-and-the-conformance-audit.md) — its truth table names
+**Depends on:** [0095](./completed/0095-the-vacuity-matrix-and-the-conformance-audit.md) — its truth table names
 which families need wiring, and the matrix is what independently checks this plan's work.
 **Priority:** High. It is the diagnostic-first half of the migration
 [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1's corollary requires: the release that

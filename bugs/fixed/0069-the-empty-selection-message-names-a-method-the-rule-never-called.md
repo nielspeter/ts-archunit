@@ -2,7 +2,7 @@
 
 **Reported:** 2026-08-06 · **Fixed:** 2026-08-06 (v0.58.0)
 **Found in:** an unrelated measurement — probing the `within()` vacuity cell for
-[plan 0095](../../plans/0095-the-vacuity-matrix-and-the-conformance-audit.md). The finding fired correctly; its
+[plan 0095](../../plans/completed/0095-the-vacuity-matrix-and-the-conformance-audit.md). The finding fired correctly; its
 first sentence was wrong. Reproduced on the published 0.57.0 dist.
 **Severity:** **Medium.** Published API and every adopter meets it — this is the finding 0.34.0 made the
 default fault, so it is the most-seen configuration finding in the library. It is not High because the

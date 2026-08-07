@@ -46,6 +46,11 @@ pruneDeadProbeRuns()
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
+    // Plan 0095: the vacuity matrix imports from `dist`, and this suite runs BEFORE the build
+    // in both workflows. A matrix row that skipped when `dist/` was absent would be a check
+    // that cannot fail, so it lives behind `npm run test:matrix` and an explicit post-build CI
+    // step — the pattern `scripts/verify-package.mjs` established for the same reason.
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/matrix/**'],
     globals: false,
     // Vitest's default is 5000ms, and this suite loads real ts-morph projects.
     // A case costing 300ms alone costs 3-5s under full parallelism — the repo's

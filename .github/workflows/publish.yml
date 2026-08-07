@@ -43,6 +43,13 @@ jobs:
       # only tests naming the package treated it as a string. Must run AFTER build.
       - run: node scripts/verify-package.mjs
 
+      # Plan 0095: the vacuity matrix — every published check-constructor run over a corpus of
+      # zero subjects, asserting the recorded truth table exactly. Excluded from `npm run test`
+      # because it imports `dist`, and the suite above runs before the build; a row that skipped
+      # when `dist/` was absent would be a check that cannot fail. Must run AFTER build, for the
+      # same reason as verify-package.mjs directly above.
+      - run: npx vitest run --config vitest.matrix.config.ts
+
       # Verify the version in package.json matches the tag
       - name: Verify version matches tag
         run: |
