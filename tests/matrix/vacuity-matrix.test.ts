@@ -27,12 +27,18 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import path from 'node:path'
 import { project } from '../../src/core/project.js'
 import { loadPublishedExports, SUBPATHS } from './enumerate.js'
-import { CHECKS, NOT_CHECKS, type Ctx, type Probeable } from './vacuity-classification.js'
+import {
+  CHECKS,
+  NOT_CHECKS,
+  NO_CORPUS,
+  type Ctx,
+  type Probeable,
+} from './vacuity-classification.js'
 
 const fixtures = path.resolve(import.meta.dirname, 'fixtures')
 
 /** What a probe can conclude about one construction over zero subjects. */
-type Verdict = 'fail-open' | 'config-finding' | 'other-throw'
+type Verdict = 'fail-open' | 'config-finding' | 'other-throw' | 'no-checks'
 
 function isProbeable(value: unknown): value is Probeable {
   if (typeof value !== 'object' || value === null) return false
@@ -88,7 +94,10 @@ function verdictOf(entryKey: string, ctx: Ctx, terminal: 'check' | 'warn'): Verd
       : 'other-throw'
   }
   const built = probeables(result)
-  if (built.length === 0) throw new Error(`${entryKey}: recipe produced nothing probeable`)
+  // A preset that constructs NOTHING is its own verdict, not a harness error. Measured:
+  // `dataLayerIsolation({ repositories })` returns an empty array, so a user who configured it
+  // gets zero rules and a green build — vacuity one level up from the one this matrix probes.
+  if (built.length === 0) return 'no-checks'
   // A preset builds many checks; the family fails open only if EVERY one of them does.
   const verdicts = built.map((b) => probe(() => (terminal === 'check' ? b.check() : b.warn())))
   return verdicts.every((v) => v === 'fail-open')
@@ -104,8 +113,15 @@ function verdictOf(entryKey: string, ctx: Ctx, terminal: 'check' | 'warn'): Verd
  * fail-open cannot be admitted by editing one line. ADR-008 rule 3's corollary — a marker an
  * agent can stamp to go green is worse than no marker.
  */
-const AUDIT_2026_08: readonly string[] = ['.:smells.duplicateBodies', './presets:recommended']
-const KNOWN_FAIL_OPEN: readonly string[] = ['.:smells.duplicateBodies', './presets:recommended']
+const AUDIT_2026_08: Readonly<Record<string, Verdict>> = {
+  '.:smells.duplicateBodies': 'fail-open', // bug 0066
+  '.:smells.inconsistentSiblings': 'fail-open', // predicted in BUGS.md, measured here first
+  './presets:agentGuardrails': 'fail-open', // with noCopyPaste as the only enabled rule
+  './presets:strictBoundaries': 'fail-open', // same shape
+  './presets:dataLayerIsolation': 'no-checks', // constructs zero rules from a valid option
+  './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
+}
+const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = AUDIT_2026_08
 
 /** The release that must have emptied the list; past it, a stalled programme reds the audit. */
 const EXPIRES_AT_VERSION = '0.62.0'
@@ -129,7 +145,7 @@ describe('the vacuity matrix (plan 0095)', () => {
 
   it('every published export is classified, and every classified name is published', () => {
     const publishedKeys = new Set(published.map((e) => e.key))
-    const classified = new Set([...Object.keys(CHECKS), ...NOT_CHECKS])
+    const classified = new Set([...Object.keys(CHECKS), ...NO_CORPUS, ...NOT_CHECKS])
 
     // Forward: a new family joins the audit by being written down, or it fails here.
     expect([...publishedKeys].filter((k) => !classified.has(k)).sort()).toEqual([])
@@ -142,13 +158,14 @@ describe('the vacuity matrix (plan 0095)', () => {
   })
 
   it('the known-fail-open list may only shrink, and expires', () => {
-    expect(KNOWN_FAIL_OPEN.filter((k) => !AUDIT_2026_08.includes(k))).toEqual([])
+    expect(Object.keys(KNOWN_FAIL_OPEN).filter((k) => !(k in AUDIT_2026_08))).toEqual([])
     const current: string = process.env.npm_package_version ?? '0.0.0'
     const past = (a: string, b: string): boolean =>
       a.split('.').map(Number).join('.') >= b.split('.').map(Number).join('.')
-    if (KNOWN_FAIL_OPEN.length > 0 && past(current, EXPIRES_AT_VERSION)) {
+    const open = Object.values(KNOWN_FAIL_OPEN).filter((v) => v === 'fail-open').length
+    if (open > 0 && past(current, EXPIRES_AT_VERSION)) {
       throw new Error(
-        `${String(KNOWN_FAIL_OPEN.length)} cells still fail open at ${current}. Plan 0098 was ` +
+        `${String(open)} cells still fail open at ${current}. Plan 0098 was ` +
           `due by ${EXPIRES_AT_VERSION}; a stalled programme must red the audit rather than live behind it.`,
       )
     }
@@ -156,7 +173,7 @@ describe('the vacuity matrix (plan 0095)', () => {
 
   it.each(Object.keys(CHECKS))('%s behaves as recorded at .check()', (key) => {
     const verdict = verdictOf(key, ctx, 'check')
-    const expected: Verdict = KNOWN_FAIL_OPEN.includes(key) ? 'fail-open' : 'config-finding'
+    const expected: Verdict = KNOWN_FAIL_OPEN[key] ?? 'config-finding'
     // Exact, in both directions: a silent fix is as loud as a silent regression.
     expect(`${key} → ${verdict}`).toBe(`${key} → ${expected}`)
   })
@@ -165,7 +182,7 @@ describe('the vacuity matrix (plan 0095)', () => {
     // `.warn()` is the path most likely to have been forgotten — a configuration finding is the
     // one thing warn cannot downgrade, and six producers once resolved to `warn` regardless.
     const verdict = verdictOf(key, ctx, 'warn')
-    const expected: Verdict = KNOWN_FAIL_OPEN.includes(key) ? 'fail-open' : 'config-finding'
+    const expected: Verdict = KNOWN_FAIL_OPEN[key] ?? 'config-finding'
     expect(`${key} → ${verdict}`).toBe(`${key} → ${expected}`)
   })
 

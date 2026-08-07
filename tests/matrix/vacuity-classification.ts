@@ -24,7 +24,6 @@ import {
   modules,
   slices,
   smells,
-  tsconfig,
   types,
   haveMatchingCounterpart,
 } from '../../src/index.js'
@@ -35,7 +34,7 @@ import {
   recommended,
   strictBoundaries,
 } from '../../src/presets/index.js'
-import { resolvers, schema, schemaFromSDL } from '../../src/graphql/index.js'
+import { resolvers, schema } from '../../src/graphql/index.js'
 import type { ArchProject } from '../../src/core/project.js'
 
 /** What a probe needs from a constructed check. `warn()` returns void; the throw is the observable. */
@@ -97,11 +96,11 @@ export const CHECKS: Record<string, CheckEntry> = {
   },
   '.:calls': {
     unit: 'post-filter subjects handed to the conditions',
-    recipe: (c) => calls(c.project).should().notExist(),
+    recipe: (c) => calls(c.project).should().haveCallbackContaining(call('x')),
   },
   '.:jsxElements': {
     unit: 'post-filter subjects handed to the conditions',
-    recipe: (c) => jsxElements(c.project).should().notExist(),
+    recipe: (c) => jsxElements(c.project).should().haveAttribute('key'),
   },
   '.:slices': {
     unit: 'slices discovered, then their files',
@@ -137,21 +136,12 @@ export const CHECKS: Record<string, CheckEntry> = {
         .should(haveMatchingCounterpart()),
     deviation: 'crossLayer cannot be constructed without layers',
   },
-  '.:tsconfig': {
-    unit: 'no-corpus — the requirements object is the input',
-    recipe: (c) => tsconfig(c.project).requires({ strict: true }),
-  },
 
   // ── graphql ───────────────────────────────────────────────────────────────
   './graphql:schema': {
     unit: 'schema fields entering the chain',
     recipe: (c) => schema(c.emptyDir, '**/*.graphql').that().queries().should().haveFields('id'),
     deviation: 'schema() requires a glob; it has no bare form',
-  },
-  './graphql:schemaFromSDL': {
-    unit: 'no-corpus — the SDL string is the input',
-    recipe: () =>
-      schemaFromSDL('type Query { a: String }').that().queries().should().haveFields('a'),
   },
   './graphql:resolvers': {
     unit: 'collected resolver functions',
@@ -187,6 +177,15 @@ export const CHECKS: Record<string, CheckEntry> = {
  * Runtime enumeration cannot see type-only exports — they are erased. Those are covered by the
  * static/runtime pairing in `tests/docs/deprecated-symbols.test.ts`, not here.
  */
+export const NO_CORPUS: readonly string[] = [
+  // A family whose input IS its argument has no corpus to be empty OF, so the zero-subject
+  // cell does not exist for it — asking the question would measure a satisfied assertion and
+  // report it as vacuity. Classified explicitly rather than omitted, because "we thought about
+  // this one" and "we forgot this one" must not look the same.
+  '.:tsconfig', // the requirements object is the input
+  './graphql:schemaFromSDL', // the SDL string is the input
+]
+
 export const NOT_CHECKS: readonly string[] = [
   './graphql:ResolverRuleBuilder',
   './graphql:SchemaRuleBuilder',
