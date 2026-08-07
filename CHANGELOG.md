@@ -5,6 +5,85 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.58.0] - 2026-08-06
+
+Two messages that named the wrong thing. Both were found by a measurement taken for another purpose,
+and both had a guard beside them that could not see them, because each guard was written for the field
+its own fix had touched.
+
+### Fixed
+
+- **A function metric identifies the function its message names.** The three function metrics built
+  their message from `fn.getName()` and then handed the AST node to `metricViolation` with no name, so
+  the identity re-derived one and `getElementName` resolved an unnamed node up to its nearest **named
+  ancestor** — the enclosing function. Measured: an object-literal function's `lines` finding reported
+  `element=makeAlpha` with identity `…::makeAlpha::lines`, byte-identical to the enclosing function's
+  own. `BaselineEntry.measured` is a per-identity **ceiling**, so ceilings were keyed to a positional
+  slot rather than to a function.
+
+  **The identity is now scope-qualified** (`makeAlpha.errorResponseBuilder`), because the subject's own
+  name is not always unique: `owningBindingName` deliberately refuses to prefix an object literal that
+  is **returned from a factory** or passed as an argument, so two factories each returning `{ build }`
+  both name it `build`. Qualifying only by the own name closed one collision and opened that one —
+  caught in review, and now its own regression row. Display names, messages and `haveNameMatching` are
+  untouched: an identity is an opaque key, not a claim about what a thing is called.
+
+  `element` now carries the qualified name — it is what the terminal prints, what JSON reports, and one
+  of three fields string-form `.excluding()` matches by exact membership, so the disagreement also made
+  an exclusion written against the printed name silently miss.
+
+  **One shape is not covered, and was not covered before either:** an object literal passed as a **call
+  argument** at module level (`register({ handler: … })`) has no enclosing declaration to qualify by, so
+  two of them in one file sharing a key name still share an identity — measured identical in 0.57.0 and
+  0.58.0 alike. Filed as
+  [bug 0070](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0070-an-object-literal-in-a-call-argument-has-no-scope-so-siblings-share-an-identity.md);
+  nothing stable distinguishes them, so it may end as a documented limit with a warning rather than a
+  fix.
+  ([bug 0068](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0068-a-function-metric-identifies-an-object-literal-function-by-its-enclosing-function.md))
+
+  ⚠️ **Regenerate the baseline for `functions()` metric rules.** Identities move for object-literal
+  functions **and for class methods** — `functions()` collects methods by default, so `UserRepo.save`
+  is affected. `classes()` metrics (`maxMethodLines`, `maxParameters`, `maxCyclomaticComplexity` over a
+  class selection) keep byte-identical identities and need no regeneration — but their **`element`
+  changes** from `save` to `UserRepo.save`, which is a `.excluding()` change, not a baseline one. See
+  `docs/upgrading.md` for the preview command that names every moving entry before you upgrade.
+
+- **The empty-selection finding names no method the rule never called.** It opened with _"Selector
+  matched 0 subjects, but `.expectNonEmpty()` requires at least one"_ and closed with _"remove
+  `.expectNonEmpty()`"_ — on rules that never called it, and where removing it is impossible, because
+  0.34.0 made an empty selection the default fault and left the opt-in a no-op. ADR-008 rule 2: a
+  remedy impossible on the path that produced it is worse than none. The `Fix:` line is unchanged; it
+  already carried both reachable remedies. No baseline impact — this finding bypasses filters, so none
+  ever stored it.
+  ([bug 0069](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0069-the-empty-selection-message-names-a-method-the-rule-never-called.md))
+
+### Notes
+
+Both fixes ship with the guard the original fix should have had. Plan 0074 diagnosed bug 0069's exact
+defect, corrected the `suggestion`, and its test asserted that field alone — so the identical sentence
+survived one line above it, in the text the reader meets first. Both fields are now one assertion pair.
+
+**A first attempt at bug 0068's guard shipped vacuous and was caught by review.** It scanned source with
+a regex requiring exactly twelve spaces of indentation; every real call site is at fourteen or sixteen,
+so it inspected **0 of 9** and passed with the whole fix deleted — the shape ADR-008 exists against,
+inside a fix for a bug filed under it. It is now a ts-morph parse that asserts its own population
+(`parsed.length === textual occurrences`) before asserting anything about it, and the three call sites
+that legitimately pass no name are listed by name rather than assumed absent.
+
+The sabotage matrix was rebuilt for the same reason: the first read one verdict per row from the whole
+suite, so another test caught every row and the vacuous census never showed. It now records **which
+tests fail per patch** — ADR-008 rule 6's floor is "prove each detector fires", and that is a per-test
+question. 7 rows, green baseline asserted, every patch asserted to apply non-trivially, verdicts from
+exit codes, the three identical `qualifiedName` edits split into three rows. **Caught by nothing: 0 of
+7**, and the census and the regression row both appear in the caught lists.
+
+Also landed (docs only):
+[ADR-009](https://github.com/nielspeter/ts-archunit/blob/main/adr/009-a-pass-is-constructed-from-evidence.md)
+— a pass is constructed from evidence of examination — with
+[ADR-010](https://github.com/nielspeter/ts-archunit/blob/main/adr/010-the-extension-surface-is-a-contract.md)
+and [plan 0095](https://github.com/nielspeter/ts-archunit/blob/main/plans/0095-a-pass-carries-its-evidence.md).
+Both ADRs are Proposed; no behaviour follows from them yet.
+
 ## [0.57.0] - 2026-08-05
 
 The identity invariant becomes a mechanism. Three filed collisions close together because one

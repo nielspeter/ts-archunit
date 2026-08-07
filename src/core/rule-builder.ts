@@ -531,9 +531,14 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       element: this._metadata?.id ?? description,
       file: '',
       line: 0,
+      // Names no API the rule may not have called (bug 0069). It used to open
+      // "…but .expectNonEmpty() requires at least one" and close "remove
+      // .expectNonEmpty()", on rules that never called it and where removing it
+      // is impossible — the identical defect the comment below records for the
+      // remedy, left in the sentence the reader meets first.
       message:
-        'Selector matched 0 subjects, but .expectNonEmpty() requires at least one — ' +
-        'likely a wrong glob or filter. If an empty match is valid here, remove .expectNonEmpty().',
+        'Selector matched 0 subjects, so this rule can never fail — ' +
+        'likely a wrong glob or filter.',
       because: this._reason,
       // Its own remedy, and only its own. The two actions below are the whole set
       // for this finding, and both are true whichever way the selector is empty.

@@ -1,8 +1,8 @@
 # Bug 0068: a function metric names an object-literal function after its enclosing function
 
-**Reported:** 2026-08-05 · **Fixed:** not yet · **Rewritten:** 2026-08-05, after v0.57.0 closed the half
+**Reported:** 2026-08-05 · **Fixed:** 2026-08-06 (v0.58.0) · **Rewritten:** 2026-08-05, after v0.57.0 closed the half
 this report led with.
-**Found in:** asking whether [0067](./fixed/0067-a-duplicate-pair-identity-collides-on-two-same-named-functions-in-one-file.md)
+**Found in:** asking whether [0067](./0067-a-duplicate-pair-identity-collides-on-two-same-named-functions-in-one-file.md)
 was smells-only. It is not — the same wrong-name mechanism reaches `rules/metrics`.
 **Severity:** **High.** Downgraded to Low after v0.57.0 closed the collision half, then **restored** when
 three reviewers independently measured that it still costs coverage — see "Why Low was wrong" below.
@@ -188,3 +188,140 @@ Derive the census rather than listing the three rules: every `metricViolation` c
 - Whether `element` disagreeing with `message` has consequences beyond identity — `.excluding()` matches
   against `[element, file, message]`, so an exclusion written against the message may not match the element.
   Not tested.
+
+## Fix as shipped
+
+**v0.58.0**, 2026-08-06. Shipped in two attempts; the first was wrong in a way worth recording, because
+it is the same shape as the bug.
+
+### Attempt 1 — passing the own name alone, and why it regressed
+
+The report's Fix section prescribed one line per rule: `qualifiedName: fn.getName()`. That makes the
+identity agree with the message, and it **moved the collision instead of closing it.**
+`owningBindingName` (`arch-function.ts:248`) deliberately declines to prefix an object literal that is
+**returned from a factory** or passed as a call argument — _"inventing one from a distant ancestor would
+be a guess"_ — so two factories each returning `{ build: … }` both name it `build`. Measured:
+
+|                       | before attempt 1     | after attempt 1                  |
+| --------------------- | -------------------- | -------------------------------- |
+| `makeBeta`'s `build`  | `::makeBeta::lines`  | `::build::lines`                 |
+| `makeGamma`'s `build` | `::makeGamma::lines` | `::build::lines` — **identical** |
+
+Distinct before, byte-identical after, falling back to `disambiguateIdentities`' positional `#N` — the
+exact ceiling-rotation mechanism this report's severity rests on, relocated into the resolver-map and
+route-table shapes the release notes advertise as fixed. A reviewer reproduced the harm end-to-end
+through the CLI: a survivor inherited a ceiling of 8 and a 4 → 8 regression was silently accepted.
+
+### Attempt 2 — as shipped
+
+The refusal in `owningBindingName` is right for a **display name**, which is what it governs. An
+**identity is an opaque key**, not a claim about what a thing is called, so scope-qualifying it is not a
+guess. `metricViolation` now builds the identity's name segment from the pair — measured across every
+function shape, because neither name alone is sufficient:
+
+| shape                             | own name                   | scope (`getElementName`)                             | identity segment                    |
+| --------------------------------- | -------------------------- | ---------------------------------------------------- | ----------------------------------- |
+| two factories returning `{build}` | `build`, `build` — collide | `makeBeta`, `makeGamma`                              | `makeBeta.build`, `makeGamma.build` |
+| arrow inside a named function     | `errorResponseBuilder`     | `makeAlpha` — collides with its parent's own finding | `makeAlpha.errorResponseBuilder`    |
+| bound literal `resolvers.top`     | `resolvers.top`            | `ArrowFunction` — a kind, not a scope                | `resolvers.top`                     |
+| top-level `function takesFive`    | `takesFive`                | `takesFive`                                          | `takesFive` — unchanged             |
+
+Display names, messages and `haveNameMatching` are untouched. The three call sites derive the name
+**once** and use it for both the message and the identity — two expressions that agreed in every branch
+but one (`fn.getName() ?? '<anonymous>'` beside a bare `fn.getName()`) would have reproduced this
+report's own defect for an anonymous function, inside its fix.
+
+`element` also carries the qualified name. That was **not** in the report's Fix section and had to be
+added: `qualifiedName` alone corrects the identity and leaves consequence 1 — the terminal and JSON
+field — still naming the enclosing function.
+
+### Correction: the class path WAS touched
+
+This section previously said the class metrics were untouched "because they already passed
+`qualifiedName`". False for `element`. They pass it, so `element: options.qualifiedName ?? base.element`
+changes them too — measured, `save` → `UserRepo.save`, on `maxCyclomaticComplexity`, `maxMethodLines`
+and `maxParameters`. Identity is unchanged there, so no `classes()` baseline moves; `.excluding()` by
+bare member name does. Three documents said otherwise and all three are corrected. Nothing in the suite
+pinned `element` for a class metric — an output change on three published conditions passed 3189 tests
+silently — so `tests/rules/metrics.test.ts` now pins it as a literal.
+
+**The `functions()` path reaches class methods too**, since `collectFunctions` includes them by default,
+so `UserRepo.save` identities move under a `functions()` metric. The release notes originally scoped the
+migration to object-literal functions; corrected.
+
+### Measured, before and after
+
+Fixture `tests/fixtures/metrics/src/nested-object-literal.ts`, built around the traps this report named
+plus the two the review added:
+
+| metric                      | before                                                                  | after                                                                       |
+| --------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| lines, inner arrow          | `element=makeAlpha  id=…::makeAlpha::lines` (identical to its parent's) | `element=errorResponseBuilder  id=…::makeAlpha.errorResponseBuilder::lines` |
+| lines, two factory `build`s | `::makeBeta::lines`, `::makeGamma::lines`                               | `::makeBeta.build::lines`, `::makeGamma.build::lines`                       |
+| parameters, `manyParams`    | `element=makeAlpha`                                                     | `element=manyParams  id=…::makeAlpha.manyParams::parameters`                |
+
+**The `maxFunctionParameters` item from "Not measured" is now measured**, and the report's expectation
+was half right. It produces the wrong name as predicted — but with the original fixture it did **not**
+collide, because a collision needs the enclosing function to breach the _same_ metric and `makeAlpha`
+took no parameters. The fixture now gives `makeAlpha` five, so the parameters row exercises a real
+group. Before that change, reverting the parameters fix left the row **green**.
+
+### Guard
+
+`tests/rules/metric-identity-names-its-own-function.test.ts`, plus the class-metric `element` pin in
+`tests/rules/metrics.test.ts`:
+
+- **Never a count.** `toHaveLength(4)` passes with the bug intact — the bug loses identities, not
+  findings. Even `identities.size === violations.length` was rejected: two counts, and this repo's own
+  cardinality scanner flagged it. The rows assert identity **names** as lists.
+- **An independent derivation**: literal expected element names, written out, compared against what the
+  conditions produce — the one row that notices if the shared `fn.getName()` source is itself wrong.
+- **A regression row** for the two factory `build`s, asserting `['makeBeta.build','makeGamma.build']`
+  rather than "two distinct strings", which a positional `#N` would also satisfy.
+- **Behavioural `.excluding()` rows**, closing the report's third "Not measured" item and testing the
+  release notes' two-directional claim by applying it rather than reading it (ADR-008 rule 2).
+- **A census that asserts its own population first.** The first version scanned with a regex requiring
+  exactly twelve spaces of indentation; every real call site is at fourteen or sixteen, so it inspected
+  **0 of 9** and passed with the entire fix deleted. It is now a ts-morph parse asserting
+  `parsed.length === textual occurrences` before asserting anything about the contents, and the three
+  sites that legitimately pass no name are listed by name — the stated invariant was false too, so a
+  repaired regex would have redded on correct code.
+
+### Sabotage
+
+7 rows, **verdicts recorded per test rather than per row** — the first matrix scored 5/5 caught and was
+blind to the vacuous census, because another test caught every row and one whole-suite exit code cannot
+see which detector fired. Green baseline asserted, every patch asserted to apply non-trivially (two did
+not on the first run and were reported as unmeasured rather than scored), verdicts from exit codes, the
+three identical `qualifiedName` edits split into three rows.
+
+| row                                                  | caught by                                |
+| ---------------------------------------------------- | ---------------------------------------- |
+| complexity site drops the name                       | 3 tests, incl. the census                |
+| lines site drops the name                            | 6 tests                                  |
+| parameters site drops the name                       | 3 tests, incl. the census                |
+| `element` stops using the qualified name             | 6 tests, incl. an `.excluding()` row     |
+| **identity drops the scope prefix (the regression)** | 3 tests, incl. the dedicated factory row |
+| identity uses scope only (pre-0068 behaviour)        | 6 tests                                  |
+
+**Caught by nothing: 0 of 7.**
+
+### Still open
+
+- **Adopter baselines move for `functions()` metrics** — object-literal functions and class methods
+  alike. Same class as 0064/0065; the changelog carries a preview command that names every moving entry
+  before upgrade.
+- **A literal passed as a call argument has no scope to qualify by**, so two in one file sharing a key
+  name still collide. Measured identical on 0.57.0, so this is a pre-existing limit this fix narrows
+  around rather than a regression — filed as
+  [bug 0070](../0070-an-object-literal-in-a-call-argument-has-no-scope-so-siblings-share-an-identity.md)
+  rather than left in a docblock, because a known limit that lives only in a code comment is a
+  hand-maintained claim nobody derives.
+- **Two classes in one file with a same-named method** — this report's second unmeasured item. The
+  scope-qualified identity now separates them under a `functions()` metric (`Repo.save` vs `Other.save`
+  are already distinct own names), but the case was not probed directly.
+- **An anonymous function** still reports `<anonymous>` in the message against a kind-derived identity
+  (`FunctionDeclaration`). The three call sites now derive one name, so message and identity no longer
+  disagree about _which_ function — but the name itself is still not an identity. That is 0067's
+  territory, not this one's.
+- 0067 is **not** closed by this and must not be merged into it.
