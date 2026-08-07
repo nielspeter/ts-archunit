@@ -1,6 +1,10 @@
 # Plan 0096 — evidence at every seam, and the preview that reads it
 
-**Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 1.
+**Status:** Open, **amended 2026-08-07** after a five-persona review of a first attempt (branch
+`feat/0096-evidence-at-every-seam`, one WIP commit, no PR). The amendment is structural, not a fix list:
+the first attempt built evidence as a **second derivation** parallel to the one 0098 will create, and
+that drift is already measurable inside its single commit. Rework against this text, do not patch that
+branch. Filed 2026-08-07, split out of plan 0095's Phase 1.
 **Depends on:** [0095](./completed/0095-the-vacuity-matrix-and-the-conformance-audit.md) — its truth table names
 which families need wiring, and the matrix is what independently checks this plan's work.
 **Priority:** High. It is the diagnostic-first half of the migration
@@ -20,9 +24,32 @@ has to be able to see what the flip will do to them before it happens.
 
 ## The work
 
-**Each family counts its examined units at its own seam**, exposed through a **public** accessor on
-`DiagnosableRule`. Public is forced, not chosen: a protected member cannot satisfy that structural
-interface, which is the recorded reason `assertsSomething()` is public.
+### One selection per family, two readers — the amendment's whole point
+
+**Each family extracts the set its conditions receive into ONE private method, and both
+`collectViolations()` and the evidence accessor call it.** Not "each family counts at its seam", which is
+what the first attempt implemented and what produced the defect:
+
+| family              | first attempt                                           | what `collectViolations()` actually hands its conditions |
+| ------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| graphql `schema`    | post-predicate — correct, with a comment explaining why | post-predicate                                           |
+| graphql `resolvers` | **pre-predicate**                                       | post-predicate                                           |
+
+Two sibling classes, one commit, opposite answers — and the wrong one preserves the fail-open cell this
+programme exists to close. Measured: a resolvers chain whose `.that()` selects nothing reported
+`examined: 14`, handed its conditions **0**, and passed green with `diagnose()` silent. The schema
+builder's own comment states the rule the resolver builder broke: _"counting `getElements()` would report
+a healthy number for a chain whose `.that()` narrowed to nothing, which is the fiction ADR-009 part 1
+forbids."_
+
+Sharing the method is not tidiness. It is the difference between _"the preview derives from the same
+computation the gate will use"_ being true **structurally** and being true **by inspection** — and
+inspection is what just failed. It also decides 0098's cost: with one method per family, 0098 retypes one
+call site each and the accessor becomes a one-liner over the same set or disappears. Without it, 0098
+inherits two derivations of one number that can drift, and the only alternatives there are bad ones.
+
+**The accessor is public** on `DiagnosableRule`. Public is forced, not chosen: a protected member cannot
+satisfy that structural interface, which is the recorded reason `assertsSomething()` is public.
 
 The `RuleBuilder` grammar needs no wiring — measured, not assumed: `filterElements()` returns the one set
 that is both the selection and what conditions receive, and the one builder suspected of narrowing
@@ -38,6 +65,36 @@ examined ≡ selection, and the 0.34.0 guard already **is** ADR-009's floor. Rec
 | graphql schema       | schema fields entering the chain                                 |
 | graphql resolvers    | collected resolver functions                                     |
 | tsconfig             | `no-corpus` — the requirements object is the input, not a corpus |
+
+Two families in that table were measured **unreachable** from `diagnose()` in the first attempt, and the
+plan must decide the fix rather than leave it to implementation. `CorrespondenceBuilder` and
+`SchemaRuleBuilder` both return `undefined` from `getProject()` — correspondence discards its project by
+documented design, `schemaFromSDL` never has one — so `diagnose()` hits its `if (!target) … continue`
+and never reaches the evidence check. `doctor` calls `diagnose(loaded)` with no project, so those users
+get **no preview at all** and then a red build. **Decision: the evidence check must not be gated on
+`target`.** Move it above the project resolution, or resolve evidence independently of it — a family's
+examined count is a fact about the family, not about whether we could name its project.
+
+### Precedence, ruled here rather than discovered in 0098
+
+`zero-subjects` is emitted **last, and only when nothing else already explained the emptiness for that
+rule** — after the glob walk, gated on the rule having produced no other finding. The first attempt
+emitted it first and unconditionally, which measured as `['zero-subjects', 'dead-glob']` for one typo and
+`['no-condition', 'zero-subjects', 'dead-glob']` for a resolvers rule: the derived symptom printed above
+the root cause, with advice (_"its own filters removed everything"_) that is false on both paths.
+
+That also broke a named invariant — `tests/core/a-dead-discovery-glob-fails.test.ts` exists because
+`diagnose()` and the gate disagreeing about a dead discovery glob **is** bug 0040 — and it contradicts
+this plan's own requirement that the preview derive from the computation the gate uses. The gate has an
+explicit precedence at `terminal-builder.ts` (assertion-less → dead selector → dead discovery → collect,
+each _replacing_ what follows); `diagnose()` already mirrors it for `project-empty` via a `continue`, and
+must mirror it here too.
+
+**The advice must be per-cause**, not one string. ADR-009 part 4 already enumerates three causes with
+three remedies and forbids naming one as universal; and the _filters_ cause must name the **actual
+excluder including internal defaults** (`minLines` defaults to 5), because "fix your filters" sends a
+user who wrote none looking for filters that do not exist. Do not pin a single-cause message in a test —
+the first attempt did, which guarded the violation into the suite.
 
 **`zero-subjects` lands in `src/core/diagnose.ts`, not in the doctor wrapper.** Doctor stays a renderer,
 "two hosts, one diagnosis" stays true, and — the reason it matters — a rule file that imports a test
@@ -75,8 +132,51 @@ The five family files above, `src/core/diagnose.ts`, `src/cli/commands/doctor.ts
   `project-empty` on a zero-file project**. Without that negative row, release A double-reports every
   empty project and prefigures 0098's precedence wrongly.
 - **Sabotage**: break one family's evidence computation → diagnose's row moves with it. Same-derivation
-  by design; the matrix from 0095 is the independent check, and that is stated rather than disguised.
-  Verdicts read **per test**, not per row.
+  by design; and note honestly what the 0095 matrix does and does not provide here — it probes
+  `check()`/`warn()` over a zero-file corpus and this plan changes neither, so **for this release the
+  evidence has only same-derivation guards**. Rule 5 permits that where it is stated; the first attempt
+  claimed the matrix as the independent check, which it is not for this change. Verdicts read **per
+  test**, not per row.
+- **Every family reached through `diagnose()`, not through the accessor.** The first attempt asserted
+  `examinedUnits()` directly for correspondence and schema and routed only `duplicateBodies` through
+  `diagnose()` — which is exactly why 8 of 8 passed while the preview was inert for two families. A row
+  that calls the accessor proves the accessor; only a row that calls `diagnose()` proves the feature.
+- **Precedence rows**: a dead glob yields `['dead-glob']` and not `['zero-subjects','dead-glob']`; a
+  condition-less rule yields `['no-condition']` alone. These are the four tests the first attempt broke,
+  and three of them are the invariant, not stale expectations.
+- **A boundary row for `duplicateBodies`**: one body examined. The unit is _"bodies entering pairwise
+  comparison"_, and one body enters no pair — so a floor gating on `> 0` would let a provably
+  unfireable rule through. `inconsistentSiblings` already applies `>= 2` at the folder level; the two
+  smell families must agree, and the plan should say which way.
+- **An error boundary.** `examinedUnits()` now runs user code — a `correspondence` `keyFn`, full AST
+  walks. `diagnose()` has no catch, so the documented `expect(diagnose(rules)).toEqual([])` recipe
+  throws a stack instead of reporting; in `doctor` a throw lands in the load-failure catch and is
+  reported as _"could not be loaded — if this file imports a test runner"_, a false cause. One row per
+  host.
+
+## What 0097 changed for this plan
+
+0097 landed first, deliberately, so this plan's remedy could name an API that exists: `.expectEmpty()` is
+now reachable on every family. Two consequences to build against rather than rediscover:
+
+- **The `filters excluded everything` remedy may now say "declare the empty state"** and mean it. It
+  could not when the first attempt was written, which was an ADR-008 rule 2 violation the reordering
+  exists to prevent.
+- **`correspondence().expectEmpty()` with no argument throws**, and `declaresEmpty()` is `protected` on
+  `TerminalBuilder` with a per-side override on correspondence. Evidence code must not assume the
+  whole-rule flag is reachable on every family.
+
+## Performance, decided rather than discovered
+
+`examinedUnits()` re-runs each family's materialization, and `diagnose()` calls it per rule. Measured on
+this repo (605 files): ~500ms per `duplicateBodies` rule cold, and `doctor` calls `diagnose()` once per
+rule file — a rule file with ten smell rules paid ~2s to compute ten integers. Two requirements:
+
+- **Memoize per builder instance**, so `violations()` after `diagnose()` does not redo the walk. The
+  shared-selection method above is where the memo belongs, which is another reason it is one method.
+- **`duplicateBodies` must not fingerprint to count.** `meetsMinLines` already returns false for a
+  bodyless function, so `fingerprintAll(xs).length === xs.length` always — the fingerprint pass is
+  provably dead work on what becomes the hot path of every consumer's `diagnose()` call.
 
 ## Out of scope
 
