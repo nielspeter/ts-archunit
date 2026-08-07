@@ -10,7 +10,14 @@ import { defineConfig } from 'vitest/config'
  * `afterAll`. A killed run never reaches `afterAll`, and then:
  *
  *  - the leftovers are **gitignored**, so `git status` reads clean;
- *  - `include: ['tests/**\/*.test.ts']` collects them;
+ *  - `exclude: [
+      // Plan 0095: the vacuity matrix imports from `dist`, and the suite runs BEFORE the
+      // build in both workflows. A row that skipped when `dist/` was absent would be a check
+      // that cannot fail, so it lives behind `npm run test:matrix` and an explicit post-build
+      // CI step instead — the pattern `scripts/verify-package.mjs` already established.
+      'tests/matrix/**',
+    ],
+    include: ['tests/**\/*.test.ts']` collects them;
  *  - they are designed to fail.
  *
  * So the next run reds for a reason nothing in the working tree shows. A reviewer
