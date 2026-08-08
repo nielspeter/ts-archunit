@@ -2,6 +2,7 @@ import type { RuleDescription } from '../core/rule-description.js'
 import picomatch from 'picomatch'
 import path from 'node:path'
 import type { SourceFile } from 'ts-morph'
+import { selectionMemo } from '../core/selection-memo.js'
 import { SmellBuilder } from './smell-builder.js'
 import { collectFunctions } from '../models/arch-function.js'
 import { searchFunctionBody } from '../helpers/body-traversal.js'
@@ -14,6 +15,8 @@ const MAJORITY_THRESHOLD = 0.6
 
 /** Test file patterns for ignoreTests(). */
 const TEST_PATTERNS = ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**']
+
+const selectionOf = selectionMemo<[string, SourceFile[]]>()
 
 export class InconsistentSiblingsBuilder extends SmellBuilder {
   private _pattern?: ExpressionMatcher
@@ -47,6 +50,34 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
       if (searchFunctionBody(fn, pattern).found) return true
     }
     return false
+  }
+
+  /**
+   * Sibling files in folders large enough to be compared — plan 0096, and the
+   * ONE method both readers call.
+   *
+   * The `>= 2` threshold lives HERE rather than in `detect()`'s loop, which is
+   * what makes this a shared derivation instead of two that agree by luck.
+   * Filtering before the caller's sort is safe: `groupFilesByFolder()` returns
+   * insertion order and `detect()` sorts by folder name, a total order, so
+   * removing entries cannot reorder the survivors.
+   */
+  private selected(): [string, SourceFile[]][] {
+    return selectionOf(this, () =>
+      [...this.groupFilesByFolder().entries()].filter(([, files]) => files.length >= 2),
+    )
+  }
+
+  /**
+   * Units this detector examined — plan 0096: sibling files in folders large
+   * enough to be compared.
+   *
+   * Counted in units ITERATED, never in pattern matches: a tripwire that
+   * examines every sibling and matches none has non-empty evidence, which is the
+   * 0.34.0 carve-out this must not break.
+   */
+  examinedUnits(): number {
+    return this.selected().reduce((total, [, files]) => total + files.length, 0)
   }
 
   /** Partition files into matching and non-matching based on the pattern. */
@@ -131,11 +162,18 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     const pattern = this._pattern
     if (!pattern) return []
 
-    const filesByFolder = this.groupFilesByFolder()
     const ruleDescription = this.describe()
     const patternDesc = pattern.description
 
-    const folderEntries = [...filesByFolder.entries()]
+    // THE shared selection — plan 0096. This method used to re-group and
+    // re-apply `files.length < 2` inline, which made the evidence a second
+    // derivation of the same threshold: reviewers rewrote `selected()` to
+    // `sourceFiles.length` and the whole suite stayed green. Both readers now
+    // take the comparable folders from one place.
+    // The spread COPIES before the sort below. `selected()` returns the memoized
+    // array itself, and `.sort()` is in-place — sorting it would reorder shared
+    // evidence for every later reader (`element-cache.ts` states this as a rule).
+    const folderEntries = [...this.selected()]
     if (this._groupByFolder) {
       folderEntries.sort((a, b) => a[0].localeCompare(b[0]))
     }
@@ -143,8 +181,6 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     const violations: ArchViolation[] = []
 
     for (const [folder, files] of folderEntries) {
-      if (files.length < 2) continue
-
       const { matching, nonMatching } = this.partitionByPattern(files, pattern)
       const total = matching.length + nonMatching.length
       if (total === 0) continue

@@ -152,6 +152,13 @@ export abstract class TerminalBuilder {
    * finding that tells them to declare what they declared, which is ADR-008
    * rule 2's loop.
    *
+   * PUBLIC, and forced rather than chosen — the same reason `assertsSomething()`
+   * is: `DiagnosableRule` is a structural interface, and a protected member
+   * cannot satisfy it. Plan 0096's preview is the first reader, and a preview
+   * that ignored the declaration would report a finding on a rule the gate will
+   * accept — over-reporting against the very thing it previews, which is the
+   * rule 5 violation inside the migration that plan warns about.
+   *
    * It exists now, ahead of the floor that reads it, for a reason worth stating:
    * a private version of this lived on `CorrespondenceBuilder` and was deleted
    * as dead code, correctly — but the deletion also removed the only expression
@@ -159,8 +166,25 @@ export abstract class TerminalBuilder {
    * rather than as the compile error a narrowed-visibility clash would have
    * produced. Declaring it here makes the coupling loud again.
    */
-  protected declaresEmpty(): boolean {
+  declaresEmpty(): boolean {
     return this._expectEmpty
+  }
+
+  /**
+   * How THIS family spells the declaration, for a remedy that names a real call.
+   *
+   * The sibling of `assertionAdvice()`, and it exists for the same reason: a
+   * remedy is only verified to remediate if following it works, and the generic
+   * `.expectEmpty()` is a `TypeError` on `CorrespondenceBuilder`, which declares
+   * per side. Advice that names the one form the reader cannot call is ADR-008
+   * rule 2's failure with extra confidence.
+   *
+   * Overriding `expectEmpty()` and not this leaves a remedy that throws, so the
+   * classification census in `evidence-at-every-seam.test.ts` requires both
+   * together rather than trusting the next author to remember.
+   */
+  emptyDeclarationAdvice(): string {
+    return '.expectEmpty()'
   }
 
   /**

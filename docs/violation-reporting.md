@@ -110,7 +110,7 @@ The third example is the one worth studying, because it does not look broken. Pr
 
 **There is no opt-out.** Not `.warn()`, not `.asSeverity('warn')`, not `.excluding()`, not baseline, not diff-aware mode. If a rule is a placeholder, delete it or leave it commented out; if it is generated from configuration, skip generating it when there is nothing to assert. A rule that is present and green is a claim that something is checked.
 
-Run [`ts-archunit doctor`](/cli#doctor) to find these across a whole rule set without running the rules.
+Run [`ts-archunit doctor`](/cli#doctor) to find these across a whole rule set without evaluating their conditions.
 
 ### When to Use Which
 

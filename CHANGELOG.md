@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`diagnose()` and `doctor` report `zero-subjects`** — a rule whose project loaded files but whose
+  own narrowing left it **nothing to examine**, so it can never fail. Five families now count the units
+  they examined: both smell detectors, `correspondence`, and both GraphQL builders.
+
+  This is the **preview surface for the same release's gate**. `doctor`, or
+  `expect(diagnose(rules)).toEqual([])` inside your own suite, answers the question _before_ your build
+  does — you can run it on the rules you have and see the list, rather than discovering it from a red
+  CI job. It lands in `diagnose()` rather than only in `doctor` for that reason: `doctor` cannot load a
+  rule file that imports a test runner, which is the primary documented way to write rules.
+
+  It reports **last**, and only when nothing else already explained the emptiness. A dead glob, a
+  missing assertion or an empty project each names its own cause with its own remedy; adding "your
+  narrowing removed everything" beside one of them would print the derived symptom above the root
+  cause. And it never says _"your filters"_ — the commonest trigger is a default you did not write
+  (`duplicateBodies` applies `minLines(5)` unless told otherwise).
+
+  ⚠️ **`DiagnosticFinding['kind']` gains a member**, which is source-breaking for an exhaustive
+  `switch`. The documented contract in `docs/api-reference.md` said four values and listed four; it is
+  now six — `orphan-exclusion` had been missing since 0.43.0 as well.
+
+  ⚠️ **`doctor` exits non-zero on anything it reports**, so a pipeline running it goes red for rules
+  that are green today, while `check()` still passes them. That gap is the point — you can run
+  `diagnose()`/`doctor` on demand and see the list before a later release makes the same state fail.
+
+  The runtime advice deliberately does **not** name the release that flips it. An earlier draft said
+  "in this same release", which was measured false for four of the five families it can print for —
+  a string the library prints cannot assert the contents of a plan that has not started.
+
+  A rule that **declared** the empty state with `.expectEmpty()` is not reported. The preview honours
+  the same declaration the gate does, which is why the grammar shipped alongside it rather than after.
+  The remedy names the form **that family** accepts: `correspondence` declares per side and throws on
+  the zero-arg call, so advice naming `.expectEmpty()` there would be a remedy the reader cannot follow.
+
+  ⚠️ **`TerminalBuilder.declaresEmpty()` is public, and `emptyDeclarationAdvice()` is new** — both on
+  the root that ADR-010 rule 1 names as contract. Free
+  today (neither existed in a released version), listed because that is where the ⚠️ list is read.
+  A family overriding `expectEmpty()` must override both; a classification test enforces it rather
+  than leaving it to the next author, since forgetting either fails silently and in opposite
+  directions — no preview at all, or a preview that tells an author to declare what they declared.
+
+  **`diagnose()` no longer reports "without running any of them".** It does not evaluate conditions,
+  but it does materialize each rule's selection — "this rule examined nothing" is a fact about the
+  selection, and the preview has to read the same computation the floor will. Six documentation sites
+  said otherwise and are corrected. Selections are memoized per builder, so a `diagnose()` followed by
+  a `check()` does the work once.
+
 ### Changed (⚠️ BREAKING — `correspondence().allowEmpty()` is now `.expectEmpty()`)
 
 - **The declared-empty grammar reaches every family.** `.expectEmpty()` and `.expectNonEmpty()` moved

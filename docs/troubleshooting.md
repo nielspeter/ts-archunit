@@ -26,7 +26,7 @@ terminal, severity, exclusion, baseline or diff filter can suppress. If you are 
 this because a rule started failing with "asserts nothing and can never fail", that is
 the release, and the finding names the shape you wrote and what to add.
 
-To find them without running the rules: `npx ts-archunit doctor <your rule files>`, or
+To find them without evaluating their conditions: `npx ts-archunit doctor <your rule files>`, or
 `diagnose(rules)` for rules written inside a test.
 
 **The rule never executes.** If a rule in `arch.rules.ts` seems to do nothing, check that it does **not** end in `.check()` (or `.warn()` / `.severity()`). In a CLI rule file, those terminals execute the rule immediately and return `undefined`, so the CLI silently skips it:
@@ -173,7 +173,7 @@ this release adds nothing for you.
 
 **0.34.0** turned two silent passes into failures. Both mean the rule was never enforcing anything; neither is a new problem in your code.
 
-**"This rule's selector … can never match anything in this project"** — the glob is unsatisfiable: no file or directory in the project can match it, whatever you write in your source. Usually a typo or a stale path. `ts-archunit doctor` reported this before 0.34.0 and still does, without running any rule.
+**"This rule's selector … can never match anything in this project"** — the glob is unsatisfiable: no file or directory in the project can match it, whatever you write in your source. Usually a typo or a stale path. `ts-archunit doctor` reported this before 0.34.0 and still does, without evaluating any condition.
 
 **"Selector matched 0 subjects"** — the glob is fine, but nothing matched _this run_. Either the selection is genuinely empty today, or the predicate chain is narrower than you meant.
 
@@ -234,7 +234,7 @@ That's by design for **severity** warnings. Rules marked `.asSeverity('warn')` (
 A rule that **asserts nothing** is the one thing `warn` cannot cover: through 0.22.0 it
 reported nothing at all, and since 0.23.0 it fails at `error` severity whatever you asked
 for, because a rule that cannot fire has no violations to be advisory about. `doctor` and
-`diagnose()` find them without running the rules (see above).
+`diagnose()` find them without evaluating their conditions (see above).
 
 ## Still stuck?
 

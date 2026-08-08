@@ -10,6 +10,7 @@ import { TerminalBuilder } from '../core/terminal-builder.js'
 import type { ExpressionMatcher } from '../helpers/matchers.js'
 import type { ArchFunction } from '../models/arch-function.js'
 import { collectFunctions } from '../models/arch-function.js'
+import { selectionMemo } from '../core/selection-memo.js'
 import {
   functionContain,
   functionNotContain,
@@ -56,6 +57,8 @@ export function resolveFieldReturning(pattern: RegExp | string): Predicate<ArchF
  *   .check()
  * ```
  */
+const selectionOf = selectionMemo<ArchFunction>()
+
 export class ResolverRuleBuilder extends TerminalBuilder {
   private _predicates: Predicate<ArchFunction>[] = []
   private _conditions: Condition<ArchFunction>[] = []
@@ -215,12 +218,34 @@ export class ResolverRuleBuilder extends TerminalBuilder {
     }
   }
 
-  protected collectViolations(): ArchViolation[] {
-    const allElements = this.getElements()
-
-    const filtered = allElements.filter((element) =>
-      this._predicates.every((predicate) => predicate.test(element)),
+  /**
+   * The set the conditions receive — plan 0096, and the ONE method both readers
+   * call.
+   *
+   * The first attempt at 0096 let `collectViolations()` and the evidence
+   * accessor derive this separately, and they disagreed inside one commit: this
+   * builder counted PRE-predicate while its sibling `SchemaRuleBuilder` counted
+   * post. Measured, a chain whose `.that()` selected nothing reported 14 units
+   * examined, handed its conditions 0, and passed green with `diagnose()`
+   * silent — the fail-open cell ADR-009 exists to close, inside the wave that
+   * closes it. Sharing the method is what makes "the preview derives from the
+   * same computation the gate uses" structural rather than a claim.
+   */
+  private selected(): ArchFunction[] {
+    return selectionOf(this, () =>
+      this.getElements().filter((element) =>
+        this._predicates.every((predicate) => predicate.test(element)),
+      ),
     )
+  }
+
+  /** Units this rule examined — plan 0096. The selection, not what precedes it. */
+  examinedUnits(): number {
+    return this.selected().length
+  }
+
+  protected collectViolations(): ArchViolation[] {
+    const filtered = this.selected()
 
     if (filtered.length === 0) {
       return []

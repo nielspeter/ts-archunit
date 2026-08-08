@@ -1,5 +1,6 @@
 import type { RuleDescription } from '../core/rule-description.js'
 import { Node } from 'ts-morph'
+import { selectionMemo } from '../core/selection-memo.js'
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import { getElementName, getElementFile, getElementLine } from '../core/violation.js'
@@ -100,6 +101,8 @@ function keyedFromKeys(keys: KeysSource): Map<string, unknown[]> {
  *   .rule({ id: 'auth/route-matrix', suggestion: 'Add the route to ROUTE_PERMISSIONS.' })
  *   .check()
  */
+const sidesOf = selectionMemo<Map<string, unknown[]>>()
+
 export class CorrespondenceBuilder extends TerminalBuilder {
   private _sides: Side[] = []
   private _checkComplete = false
@@ -218,6 +221,39 @@ export class CorrespondenceBuilder extends TerminalBuilder {
   }
 
   /**
+   * Both sides, materialized once — plan 0096, and the ONE method both readers
+   * call.
+   *
+   * Correspondence has no corpus of its own: its sides ARE its input, so the
+   * examined unit is their keys and the "selection" is the materialization
+   * itself. Sharing it matters more here than anywhere else, because
+   * `Side.materialize` is a bare closure over a user-supplied `keyFn` and a full
+   * rule selection — so a second derivation would re-run arbitrary user code,
+   * and `diagnose()` calling the accessor before `check()` would pay for the
+   * whole thing twice.
+   */
+  private materializedSides(a: Side, b: Side): [Map<string, unknown[]>, Map<string, unknown[]>] {
+    // `!` rather than a `?? new Map()` fallback: the compute always returns two
+    // entries, so the fallback could never fire — and a branch that cannot fire
+    // is the shape this whole programme is about, even when it is only types.
+    const pair = sidesOf(this, () => [a.materialize(), b.materialize()])
+    return [pair[0]!, pair[1]!]
+  }
+
+  /**
+   * Units this rule examined — plan 0096: the keys of both sides, summed.
+   *
+   * Zero means the comparison had nothing to compare, which for this family is
+   * two empty sides. One empty side is already its own finding and is not this
+   * question.
+   */
+  examinedUnits(): number {
+    if (this._sides.length < 2) return 0
+    const [a, b] = this.materializedSides(this._sides[0]!, this._sides[1]!)
+    return a.size + b.size
+  }
+
+  /**
    * Declared when EVERY side is — plan 0097.
    *
    * The base implementation reads the whole-rule flag, which this class refuses
@@ -228,14 +264,19 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * previous private version was dead code and was removed. This one is for
    * the root, which asks the question about the rule rather than about a side.
    *
-   * **Unobservable until 0098, and recorded as such rather than guarded.** No
-   * shipped code reads `declaresEmpty()` yet, so reverting this override to the
-   * base body changes no output and no test fails — measured. ADR-008's
-   * split-row corollary says to record an equivalence rather than invent a guard
-   * for it; the row that makes it observable is in 0098's inventory, where the
-   * floor that calls it lands.
+   * **This was recorded as unobservable-until-0098, and that equivalence EXPIRED**
+   * the moment plan 0096 made `diagnose()` its first reader. Reverting this
+   * override to the base body — which for this class can never be true, since the
+   * zero-arg `expectEmpty()` throws — makes a rule whose every side is declared
+   * report `zero-subjects` again, telling the author to declare what they
+   * declared. A recorded equivalence is a claim with a lifetime, and this one's
+   * ended one commit after it was written; it is guarded now.
    */
-  protected override declaresEmpty(): boolean {
+  override emptyDeclarationAdvice(): string {
+    return '.expectEmpty(sideName) for each side'
+  }
+
+  override declaresEmpty(): boolean {
     return this._sides.length > 0 && this._sides.every((s) => this._expectEmptySides.has(s.name))
   }
 
@@ -343,8 +384,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
       return unbound.map((name) => this.unboundSideViolation(name, meta, [sideA.name, sideB.name]))
     }
 
-    const aKeyed = sideA.materialize()
-    const bKeyed = sideB.materialize()
+    const [aKeyed, bKeyed] = this.materializedSides(sideA, sideB)
 
     const result = setCorrespondence(aKeyed.keys(), bKeyed.keys())
 

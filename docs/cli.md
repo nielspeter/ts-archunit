@@ -115,7 +115,7 @@ Outputs a structured description of every rule — id, description, because, sug
 ts-archunit doctor arch.rules.ts
 ```
 
-Reports which rules **cannot enforce anything**, without running them: a glob that can never match, a rule that selects elements but asserts nothing about them, a rule whose project cannot be identified, and a project that loaded no source files at all.
+Reports which rules **cannot enforce anything**, without evaluating their conditions: a glob that can never match, a rule that selects elements but asserts nothing about them, a rule whose project cannot be identified, a project that loaded no source files at all, and a rule whose own narrowing left it **zero subjects to examine**. It does materialize each rule's selection — that last check is a fact about the selection, not about the rule text — so it is fast but no longer free.
 
 That last one is the commonest surprise in a monorepo. A **solution-style** `tsconfig.json` — `"files": []` plus `"references"` — loads nothing itself, so every glob in every rule is dead and none of them is the reason. `doctor` says so once and names the config, rather than blaming each glob in turn:
 
@@ -145,7 +145,23 @@ demo/no-condition
   nothing and can never fail. Add a condition after .should() — or, if this rule is
   generated from configuration, skip generating it when there is nothing to assert;
   if it comes from a preset (ruleId "preset/..."), report it to the preset's author
+
+demo/duplicates
+  zero-subjects: this rule examined 0 subjects, so it can never fail. Its own
+  narrowing removed everything the project loaded — including any default it
+  applies that you did not write. Widen it, or declare the empty state with
+  .expectEmpty() if that is the point — but the declaration is not itself checked
+  yet, so it silences this without proving anything; widening is the fix,
+  declaring is the exception. A later release makes this state fail at check
+  time; this surface is how you find it first
 ```
+
+`zero-subjects` reports **last**, and only when nothing else already explained the emptiness —
+a dead glob, a missing assertion or an empty project each names its own cause with its own
+remedy, so reporting this beside one of them would print the derived symptom above the root
+cause. Note what it does **not** say: "your filters". The commonest trigger is a default you
+never wrote — `duplicateBodies` applies `minLines(5)` unless you say otherwise — and telling a
+reader to fix filters they did not write sends them looking for code that is not there.
 
 It reports **identities, never totals** — which rule file, which rule, and for a dead glob the glob and its position. (Before 0.24.0 this promised a position for every finding, which only a dead glob has: a rule that asserts nothing has no glob and no position, and its only identity was a prose sentence you had to grep for.) It **exits non-zero when it reports anything**, because an agent reads `exit 0` as "nothing to do".
 
