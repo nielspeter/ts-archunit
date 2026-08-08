@@ -142,6 +142,62 @@ const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = {
 /** The release that must have emptied the list; past it, a stalled programme reds the audit. */
 const EXPIRES_AT_VERSION = '0.62.0'
 
+/**
+ * Numeric, component-wise version compare — module scope so the gate and its
+ * CONTROL call the SAME function.
+ *
+ * They did not: each declared its own copy with the same body, so reverting the
+ * gate to the lexicographic form left the control passing. ADR-008 rule 5's
+ * question answered "pass", in the file whose purpose is finding checks that
+ * cannot fail, in the commit repairing that file's expiry gate — the same shape
+ * fixed one level up (counting only `'fail-open'`) and reintroduced one down.
+ *
+ * The bug it exists against: the original re-joined to a STRING after
+ * `map(Number)`, so `past('0.100.0', '0.62.0')` was false.
+ */
+/**
+ * The whole expiry verdict, as ONE function — returns the failure message or
+ * `undefined`.
+ *
+ * The gate and its CONTROL must drive the SAME code. They did not: each held its
+ * own copy of the comparison, so reverting the gate left the control passing.
+ * Measured across all three repairs this file made — the numeric compare, the
+ * vacuity predicate, and the version source — each reverted GREEN. ADR-008 rule
+ * 5 answered "pass" three times, in the file whose subject is checks that cannot
+ * fail.
+ *
+ * Taking `version` and `list` as arguments is what makes it drivable: the control
+ * can ask for a verdict at 0.100.0, or over a synthetic list, without waiting for
+ * a release.
+ */
+export function expiryFailure(
+  version: string,
+  list: Readonly<Record<string, Verdict>>,
+): string | undefined {
+  // Everything still VACUOUS, not only `'fail-open'`. Plan 0099 converts all four
+  // `'fail-open'` cells, so a gate counting only those reaches zero and can never
+  // fire again at any version. `'other-throw'` is excluded because it fails
+  // CLOSED — `./graphql:schema` refuses an empty corpus, which is the wanted
+  // behaviour, not a debt.
+  const vacuous = Object.values(list).filter((v) => v === 'fail-open' || v === 'no-checks').length
+  if (vacuous === 0 || !past(version, EXPIRES_AT_VERSION)) return undefined
+  return (
+    `${String(vacuous)} cells are still vacuous at ${version}. Plan 0100 was ` +
+    `due by ${EXPIRES_AT_VERSION}; a stalled programme must red the audit rather than live behind it.`
+  )
+}
+
+function past(a: string, b: string): boolean {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0
+    const y = pb[i] ?? 0
+    if (x !== y) return x > y
+  }
+  return true
+}
+
 describe('the vacuity matrix (plan 0095)', () => {
   let published: Awaited<ReturnType<typeof loadPublishedExports>>
   let ctx: Ctx
@@ -175,71 +231,47 @@ describe('the vacuity matrix (plan 0095)', () => {
 
   it('the known-fail-open list may only shrink, and expires', () => {
     expect(Object.keys(KNOWN_FAIL_OPEN).filter((k) => !(k in AUDIT_2026_08))).toEqual([])
-
-    // The version, read from disk. `process.env.npm_package_version ?? '0.0.0'`
-    // failed open twice over: the fallback is never past any deadline, and
-    // `npm_package_*` is only set when npm runs the script — CI invokes
-    // `npx vitest` directly, so the deadline was already dead in the only place
-    // it runs. `enumerate.ts` reads `package.json` the same way.
-    const current: string = readPackageVersion()
-    expect(current).toMatch(/^\d+\.\d+\.\d+/)
-
-    // Numeric, component-wise. The old form re-joined to a STRING after
-    // `map(Number)`, so the comparison was lexicographic: measured,
-    // `past('0.100.0', '0.62.0')` was **false**. At this repo's cadence (0.22 to
-    // 0.58 across this programme) 0.100.0 is reachable, and the failure mode is a
-    // deadline that quietly stops existing.
-    const past = (a: string, b: string): boolean => {
-      const pa = a.split('.').map(Number)
-      const pb = b.split('.').map(Number)
-      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const x = pa[i] ?? 0
-        const y = pb[i] ?? 0
-        if (x !== y) return x > y
-      }
-      return true
-    }
-
-    // Counts every cell that is still VACUOUS, not only `'fail-open'`.
-    //
-    // Plan 0099 converts all four `'fail-open'` cells, so a gate counting only
-    // those would reach zero and could never fire again at any version — a check
-    // that cannot fail, inside the file whose purpose is finding checks that
-    // cannot fail. `'no-checks'` is the one entry that remains genuinely vacuous,
-    // so it is what the deadline is now about.
-    const vacuous = Object.values(KNOWN_FAIL_OPEN).filter(
-      (v) => v === 'fail-open' || v === 'no-checks',
-    ).length
-    if (vacuous > 0 && past(current, EXPIRES_AT_VERSION)) {
-      throw new Error(
-        `${String(vacuous)} cells are still vacuous at ${current}. Plan 0100 was ` +
-          `due by ${EXPIRES_AT_VERSION}; a stalled programme must red the audit rather than live behind it.`,
-      )
-    }
+    const failure = expiryFailure(readPackageVersion(), KNOWN_FAIL_OPEN)
+    if (failure !== undefined) throw new Error(failure)
   })
 
-  it('CONTROL: the expiry gate can still fire, and its comparison is numeric', () => {
-    // Without this the gate above is unfalsifiable — which is exactly the defect
-    // it exists to prevent, and exactly what counting only `'fail-open'` would
-    // have made it after this plan.
-    const past = (a: string, b: string): boolean => {
-      const pa = a.split('.').map(Number)
-      const pb = b.split('.').map(Number)
-      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const x = pa[i] ?? 0
-        const y = pb[i] ?? 0
-        if (x !== y) return x > y
-      }
-      return true
+  it('CONTROL: each of the three repairs is falsifiable through the gate itself', () => {
+    // Drives `expiryFailure`, not a copy of it. Each row below kills exactly one
+    // revert; measured before this, all three reverted GREEN.
+
+    // 1. The numeric compare. Lexicographically '0.100.0' < '0.62.0', so the old
+    //    form returned undefined here and the deadline quietly stopped existing.
+    expect(expiryFailure('0.100.0', KNOWN_FAIL_OPEN)).toBeDefined()
+    expect(expiryFailure('0.61.9', KNOWN_FAIL_OPEN)).toBeUndefined()
+
+    // 2. The vacuity predicate. A list whose only debt is 'no-checks' must still
+    //    expire — counting 'fail-open' alone made the gate unreachable the moment
+    //    this plan converted those four cells.
+    expect(expiryFailure('0.100.0', { x: 'no-checks' })).toBeDefined()
+    // ...and 'other-throw' is not debt: it fails closed.
+    expect(expiryFailure('0.100.0', { x: 'other-throw' })).toBeUndefined()
+
+    // 3. The version source. `process.env.npm_package_version ?? '0.0.0'` failed
+    //    open twice: the fallback is past no deadline, and the variable is unset
+    //    whenever vitest is invoked directly — which is how CI runs this file.
+    //    `toMatch(/^\d+\.\d+\.\d+/)` passed on '0.0.0', so it rejected nothing.
+    //
+    //    Asserted by REMOVING the variable rather than by observing it absent:
+    //    `npm run test:matrix` sets it, `npx vitest` (which is how CI invokes
+    //    this file) does not, so an assertion about the ambient environment would
+    //    pass or fail depending on who ran it. With it unset, the old
+    //    env-reading implementation returns the '0.0.0' fallback and this fails.
+    const saved = process.env.npm_package_version
+    delete process.env.npm_package_version
+    try {
+      expect(readPackageVersion()).not.toBe('0.0.0')
+      expect(readPackageVersion()).toMatch(/^\d+\.\d+\.\d+/)
+    } finally {
+      if (saved !== undefined) process.env.npm_package_version = saved
     }
-    // The measured lexicographic bug: '0.100.0' IS past '0.62.0'.
-    expect(past('0.100.0', '0.62.0')).toBe(true)
-    expect(past('0.62.0', '0.62.0')).toBe(true)
-    expect(past('0.61.9', '0.62.0')).toBe(false)
+
     // And there is still something for the deadline to be about.
-    expect(
-      Object.values(KNOWN_FAIL_OPEN).filter((v) => v === 'fail-open' || v === 'no-checks').length,
-    ).toBeGreaterThan(0)
+    expect(Object.keys(KNOWN_FAIL_OPEN).length).toBeGreaterThan(0)
   })
 
   it.each(Object.keys(CHECKS))('%s behaves as recorded at .check()', (key) => {
