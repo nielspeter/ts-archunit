@@ -23,6 +23,8 @@ import { functions } from '../../src/builders/function-rule-builder.js'
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { functionNoEval } from '../../src/rules/security.js'
 import { smells } from '../../src/smells/index.js'
+import { agentGuardrails } from '../../src/presets/agent-guardrails.js'
+import { dataLayerIsolation } from '../../src/presets/data-layer.js'
 import { schemaFromSDL } from '../../src/graphql/index.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { diagnose } from '../../src/core/diagnose.js'
@@ -520,5 +522,57 @@ describe('advice is attached only to the finding it can settle', () => {
     const p = inMemory({ '/src/a.ts': 'export const a = 1\n' })
     const v = smells.duplicateBodies(p).minLines(500).violations()[0]
     expect(v?.message ?? '').toContain('declare that instead')
+  })
+})
+
+describe('the guards that landed on one carrier', () => {
+  // Both rows below exist because a fix landed everywhere and its guard landed on
+  // one of the carriers — the second-order pattern the architect measured twice.
+
+  it('EVERY preset carrier states the reachable spelling, not just recommended', () => {
+    // Measured: reverting the stamp in `collectRule` — the carrier for
+    // strictBoundaries, layeredArchitecture and dataLayerIsolation, the three
+    // whose rules are folder-glob-scoped and so likeliest to examine zero — left
+    // 3315 tests green. Same for agent-guardrails. Only `recommended` was
+    // guarded, and it is the one preset that does NOT use the shared carrier.
+    //
+    // Reverting sends those users to `.expectEmpty()`, a call a preset user holds
+    // no builder to make: bug 0089's exact shape, on an unsuppressable failure.
+    const p = inMemory({ '/src/types-only.ts': 'export type A = { n: number }\n' })
+
+    // collectRule carrier — a LIVE glob with zero subjects. A dead glob gets the
+    // discovery diagnosis instead, which never reaches the floor.
+    const data = dataLayerIsolation(p, {
+      repositories: '**/types-only.ts',
+      baseClass: 'BaseRepository',
+    })
+      .flatMap((r) => r.violations())
+      .filter((v) => v.bypassFilters === true)
+    expect(data.length).toBeGreaterThan(0)
+    expect(data.map((v) => v.message ?? '').join('\n')).toContain("in this preset's options")
+
+    // agent-guardrails' own push helper
+    const agent = agentGuardrails(p, { src: '**/types-only.ts', noEmptyBodies: true })
+      .flatMap((r) => r.violations())
+      .filter((v) => v.bypassFilters === true)
+    expect(agent.length).toBeGreaterThan(0)
+    expect(agent.map((v) => v.message ?? '').join('\n')).toContain("in this preset's options")
+  })
+
+  it('the smell hint does not claim a cause on a corpus that never had bodies', () => {
+    // The row above this one routes through `functions()`, where narrowingHint()
+    // returns undefined — so it guarded the BASE fallback, not the family that
+    // produces the hint. Break the smell hint completely and it still passed.
+    //
+    // Types-only corpus with the DEFAULT threshold: zero function bodies existed,
+    // so minLines removed nothing.
+    const p = inMemory({ '/src/types-only.ts': 'export type A = { n: number }\n' })
+    const v = smells.duplicateBodies(p).violations()[0]
+    expect(v?.message ?? '').toContain('examined 0 function bodies')
+    expect(v?.message ?? '').toContain('minLines(5)')
+    // Stated as fact, never as the cause.
+    expect(v?.message ?? '').not.toContain('narrowing removed them')
+    // ...and it still discloses that the threshold is not the author's.
+    expect(v?.message ?? '').toContain('did not write')
   })
 })

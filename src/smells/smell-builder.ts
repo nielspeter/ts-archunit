@@ -49,10 +49,20 @@ export abstract class SmellBuilder extends TerminalBuilder {
     // which is false on the path that produced it: an agent goes hunting for
     // where 5 comes from and never touches the 500 that is the actual fault.
     // ADR-008 rule 2, on an unsuppressable hard failure.
+    // States the filters as FACT, and does not claim they caused the emptiness.
+    //
+    // "Its own narrowing removed them" asserts removal. Measured on a types-only
+    // corpus with the default threshold: there were zero function bodies, so
+    // `minLines` removed nothing — the sentence named a false cause and pointed at
+    // a knob that `agentGuardrails` and `strictBoundaries` expose no setter for,
+    // on an unsuppressable hard failure. `narrowingHint()`'s own docstring
+    // promises the caller "names the possibility rather than asserting a cause it
+    // cannot verify"; this is the family honouring that rather than the base
+    // softening it afterwards.
     const wroteItThemselves = this._minLines !== DEFAULT_MIN_LINES
     return wroteItThemselves
-      ? `Its own narrowing removed them: ${applied.join(', ')}.`
-      : `Its own narrowing removed them: ${applied.join(', ')}` +
+      ? `Its narrowing was: ${applied.join(', ')}.`
+      : `Its narrowing was: ${applied.join(', ')}` +
           ` — minLines defaults to ${String(DEFAULT_MIN_LINES)}, a default you did not write.`
   }
 
