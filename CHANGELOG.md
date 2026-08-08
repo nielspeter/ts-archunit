@@ -218,7 +218,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and never revisited. Fix the rule, declare the empty state, or pin.
 
   **Which rules flip.** Seven families had no zero-unit gate and now have one: both smell detectors,
-  `correspondence`, `crossLayer`, slices, both GraphQL builders and `tsconfig`. `crossLayer` is the one
+  `correspondence`, `crossLayer`, both GraphQL builders and `tsconfig`. `crossLayer` is the one
   most likely to surprise — **both layers resolve files, zero pairs form, the rule looks healthy** — and
   pairs are what that family examines. The `RuleBuilder` entry points — `classes()`, `functions()`, `modules()`,
   `types()`, `calls()` and `jsxElements()` — are **not** part of this: their empty-selection gate has
