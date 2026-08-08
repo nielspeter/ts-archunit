@@ -1,0 +1,88 @@
+/**
+ * The gate that refuses a patch release carrying feature-level change.
+ *
+ * Found in review of plan 0089. The constraint "the next release is 0.59.0, not a
+ * patch" lived only as a prose blockquote in `CHANGELOG.md` — no test, no script,
+ * no workflow step read it. `publish.yml` verified the tag matched `package.json`
+ * and that a changelog section existed; **both pass for `v0.58.1`**. And the
+ * release-notes extractor would then have lifted that very blockquote into the
+ * GitHub release body, printed after `npm publish`, which is immutable.
+ *
+ * ADR-008 rule 6 puts a gate on an irreversible effect in the "guard the guard"
+ * row, so the gate is a script rather than an inline `run:` block, and these rows
+ * exercise it directly. Asked rule 5's question — what would this do if the guard
+ * were completely broken? — a `run:` block could only have been read, not run.
+ */
+import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+
+const SCRIPT = path.resolve(
+  import.meta.dirname,
+  '../../.github/scripts/assert-version-bump-is-safe.sh',
+)
+const dir = mkdtempSync(path.join(tmpdir(), 'bump-guard-'))
+
+const notes = (body: string, name: string): string => {
+  const file = path.join(dir, name)
+  writeFileSync(file, body)
+  return file
+}
+
+/** Returns the exit code, never throwing, so a row can assert a refusal. */
+function run(version: string, latest: string, notesFile: string): { code: number; err: string } {
+  try {
+    execFileSync(SCRIPT, [version, latest, notesFile], { encoding: 'utf8', stdio: 'pipe' })
+    return { code: 0, err: '' }
+  } catch (e: unknown) {
+    const status = typeof e === 'object' && e !== null && 'status' in e ? e.status : 1
+    const stderr = typeof e === 'object' && e !== null && 'stderr' in e ? String(e.stderr) : ''
+    return { code: typeof status === 'number' ? status : 1, err: stderr }
+  }
+}
+
+const ADDED = notes('### Added\n- a new preset option\n', 'added.md')
+const FIXED = notes('### Fixed\n- a bug\n', 'fixed.md')
+const CHANGED = notes('### Changed\n- a default\n', 'changed.md')
+
+describe('the version-bump guard', () => {
+  it('REFUSES the exact release this branch must not ship: 0.58.1 carrying Added', () => {
+    const { code, err } = run('0.58.1', '0.58.0', ADDED)
+    expect(code).toBe(1)
+    expect(err).toContain('resolves inside 0.58.x')
+    // The remedy names the version to use, because the reader is often an agent.
+    expect(err).toContain('0.59.0 or later')
+  })
+
+  it('refuses a patch carrying Changed', () => {
+    expect(run('0.58.1', '0.58.0', CHANGED).code).toBe(1)
+  })
+
+  it('ALLOWS the minor — this is what 0.59.0 must do', () => {
+    expect(run('0.59.0', '0.58.0', ADDED).code).toBe(0)
+  })
+
+  it('allows a genuine patch: Fixed only', () => {
+    // Without this row the guard could be `exit 1` and every other row would pass.
+    expect(run('0.58.1', '0.58.0', FIXED).code).toBe(0)
+  })
+
+  it('allows a major', () => {
+    expect(run('1.0.0', '0.58.0', ADDED).code).toBe(0)
+  })
+
+  it('FAILS CLOSED when the published baseline is unknown', () => {
+    // `npm view` returning empty (network, auth, unpublished) must not read as
+    // "probably fine" — npm publish is immutable.
+    const { code, err } = run('0.58.1', '', ADDED)
+    expect(code).toBe(1)
+    expect(err).toContain('fails closed')
+  })
+
+  it('FAILS CLOSED when the release-notes file is missing', () => {
+    const { code } = run('0.58.1', '0.58.0', path.join(dir, 'absent.md'))
+    expect(code).toBe(1)
+  })
+})
