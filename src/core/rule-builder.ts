@@ -8,7 +8,6 @@ import type { DeclaredGlob, GlobNode } from './glob-site.js'
 import { countDeclaredGlobs, stampGlobs } from './glob-site.js'
 import { TerminalBuilder } from './terminal-builder.js'
 import { assertsCardinality } from './cardinality.js'
-import { UNSUPPRESSABLE } from './unsuppressable.js'
 
 /**
  * Abstract base class for the predicate/condition rule builders.
@@ -450,105 +449,31 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * `.expectNonEmpty()`. A typed literal (no `createViolation` — there is no
    * Node), ADR-005-clean, flagged `bypassFilters` so diff/baseline keep it.
    */
-  /**
-   * `.expectEmpty()` was declared and the selection is not empty.
-   *
-   * The assertion half of the escape hatch — what stops it being
-   * `.allowEmpty()`. Reports the count, because here the number IS the finding:
-   * the author asserted zero and the answer is not zero.
-   */
-  private unexpectedlyNonEmptyViolation(found: number): ArchViolation {
-    const description = this.buildRuleDescription() || 'selector'
-    const declaration = this.emptyDeclarationAdvice()
-    const message = `${declaration} asserted this selector matches nothing, and it matched ${String(found)}.`
-    // A DISTINCT remedy, not the message repeated. `format.ts` drops the `Fix:`
-    // line when `suggestion === message`, so this finding shipped with no remedy
-    // at all — and both actions its message offered ("drop .expectEmpty()",
-    // "the selector is broader than you meant") are impossible for a preset user,
-    // whose config says `expectEmpty: [id]` and who cannot reach the selector.
-    const suggestion =
-      `Remove ${declaration} and let the rule enforce itself — the thing you were waiting for ` +
-      `has appeared, and the rule now has something to check. If instead the selection is wider ` +
-      `than you meant, narrow it and keep the declaration. ` +
-      // NOT "reported below this finding". Ordering holds on a plain local
-      // `check`, but the claim is false under `--changed` and baseline (which keep
-      // `bypassFilters` findings and drop the violations), under `--format github`
-      // (run-level annotation vs inline PR annotations — different parts of the
-      // UI), and under `.warn()` (advisories to stderr BEFORE the throw). A
-      // spatial claim inside a `Fix:` line is one an agent acts on, so it states
-      // the relationship instead, which is true everywhere.
-      `The rule's own violations are reported as separate findings under the same rule id. ` +
-      UNSUPPRESSABLE
-    return {
-      rule: description,
-      ruleId: this._metadata?.id,
-      // `description`, NOT the rule id, and the distinction is load-bearing.
-      // `dedupeConfigFindings` keys on `(file, ruleId ?? rule, element)`; with
-      // `file: ''` and the id in both remaining slots, every instance of a
-      // fanned-out preset id collapses to one and picks up `affectedNote`'s
-      // "this one option generated N rules that cannot enforce anything".
-      //
-      // That note is true for `emptySelectionViolation`, where the N rules really
-      // are inert. Here it is false, and false because of the fix in this same
-      // commit: a rule whose declaration expired enforces fine, and its violations
-      // are printed directly underneath. Measured — 4 findings became 3, the
-      // survivor claiming two rules could not enforce while both their `lodash`
-      // and `knex` violations sat below it. An agent reads that and hunts a broken
-      // glob that does not exist (bug 0021's shape).
-      //
-      // The description differs per instance, so it keeps them distinct. Nothing
-      // is lost: the rich formatter never renders `element` for a locationless
-      // finding, JSON carries `ruleId` separately, and the id is in the message.
-      element: description,
-      file: '',
-      line: 0,
-      message,
-      suggestion,
-      bypassFilters: true,
-    }
-  }
 
   private emptySelectionViolation(): ArchViolation {
     const description = this.buildRuleDescription() || 'selector'
+    // The TEXT comes from the shared producer; the ATTRIBUTION stays here.
+    //
+    // Plan 0099 keeps this family's block because it is the better-attributed
+    // implementation — it can name the chain and carries the author's `because`.
+    // What it must not keep is its own wording: two texts for one state is the
+    // plan-0070 drift shape, and this one carried the three defects 0098's
+    // user-perspective review found ("can never fail" overstates for a folder
+    // empty in a young repo; it hedged about defaults it could have printed; and
+    // it ranked declaring below widening for the greenfield adopters who cannot
+    // widen because the code does not exist yet).
+    //
+    // `element` keeps the rule id: unlike the expiry finding, N rules that cannot
+    // enforce ARE one edit, so `dedupeConfigFindings` collapsing them is correct.
+    const shared = this.zeroSubjectsViolation(this.project)
     return {
+      ...shared,
       rule: description,
-      ruleId: this._metadata?.id,
       element: this._metadata?.id ?? description,
-      file: '',
-      line: 0,
-      // Names no API the rule may not have called (bug 0069). It used to open
-      // "…but .expectNonEmpty() requires at least one" and close "remove
-      // .expectNonEmpty()", on rules that never called it and where removing it
-      // is impossible — the identical defect the comment below records for the
-      // remedy, left in the sentence the reader meets first.
-      message:
-        'Selector matched 0 subjects, so this rule can never fail — ' +
-        'likely a wrong glob or filter.',
+      // The author's rationale, which the shared producer has no access to. Not
+      // their `suggestion`/`docs` (bug 0021): this finding says the selector
+      // matched nothing, and the author's remedy is for a violation of the rule.
       because: this._reason,
-      // Its own remedy, and only its own. The two actions below are the whole set
-      // for this finding, and both are true whichever way the selector is empty.
-      // The remedy changed with plan 0074. It used to say "drop
-      // .expectNonEmpty() if matching nothing is valid here", which stopped
-      // being true the moment empty became the default fault — dropping the
-      // opt-in now changes nothing, so an agent following it fails, and then
-      // improvises. ADR-008 rule 2: a remedy that is impossible on the path
-      // that produced it is worse than none.
-      // `emptyDeclarationAdvice()` rather than a literal `.expectEmpty()`: the
-      // family-specific spelling already existed for exactly this reason and this
-      // producer was not asking for it, so a preset user — who holds no builder —
-      // was sent to a call they cannot make, and a `CorrespondenceBuilder` reader
-      // to one that throws.
-      suggestion:
-        'Widen the selector until it matches at least one subject, or declare ' +
-        `${this.emptyDeclarationAdvice()} if matching nothing is the point — that asserts it, and ` +
-        'fails the day something does match.',
-      // No `suggestion`/`docs` from `this._metadata` (bug 0021). This finding says
-      // the selector matched nothing; the author's remedy is for a violation of the
-      // rule, and inheriting it prints an unrelated `Fix:`. The guard in
-      // `execute-rule.ts` cannot help here — this producer was copying the fields
-      // itself, which is why the two shipped config-finding producers disagreed
-      // about policy and the misleading one won.
-      bypassFilters: true,
     }
   }
 
@@ -579,23 +504,16 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       return [this.emptySelectionViolation()]
     }
 
-    // `.expectEmpty()` asserted nothing would match, and something did. This is
-    // the property that makes it an assertion rather than `.allowEmpty()`.
+    // NO expiry branch here. Plan 0099 moved it to the root
+    // (`TerminalBuilder.collectWithAssertionGuard`), because this family's copy
+    // and the root's would both fire and double-report one fault.
     //
-    // It reports and KEEPS GOING. Returning here discarded every real violation
-    // the rule would have found — measured on plan 0089's preset carrier, where
-    // one preset rule id constructs N rules (`restricted-packages` per package,
-    // `no-cross-boundary` per boundary): declaring the id applies the assertion
-    // to all N, and one non-empty instance replaced a genuine
-    // `imports "lodash" which matches forbidden [lodash]` with a config error.
-    // The architecture violation vanished from a run the user had made stricter.
-    //
-    // Failing on a false declaration is right; losing the finding underneath it
-    // is not. The rule already fails either way, so reporting both can only add
-    // information — and the one the reader must act on is the violation.
-    const unexpectedlyNonEmpty = this._expectEmpty
-      ? [this.unexpectedlyNonEmptyViolation(filtered.length)]
-      : []
+    // The property it enforced is unchanged and is now enforced for EVERY family
+    // rather than this one: a false declaration fails, and — the part plan 0089's
+    // review measured — it does not swallow the violations underneath it. The
+    // root appends them, so a fanned-out preset id whose one non-empty instance
+    // used to replace a genuine `imports "lodash" which matches forbidden` with a
+    // config error now reports both.
 
     // Step 4: Build context for conditions
     const context = this.buildConditionContext()
@@ -606,10 +524,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       violations.push(...condition.evaluate(filtered, context))
     }
 
-    // The false declaration first: it says the configuration is wrong, which the
-    // reader needs before any finding produced under it — the ordering bug 0038
-    // settled for unknown override keys, and the same argument applies here.
-    return [...unexpectedlyNonEmpty, ...violations]
+    return violations
   }
 
   /**

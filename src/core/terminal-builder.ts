@@ -366,10 +366,54 @@ export abstract class TerminalBuilder {
       const dead = this.deadSelectorFindings()
       if (dead.selector.length > 0) return dead.selector
       if (dead.discovery.length > 0 && !this.ownsDiscoveryDiagnosis()) return dead.discovery
-      // Plan 0098 is the SEAM only: the evidence is now produced and discarded
-      // here. Plan 0099 is where this stops being a discard and becomes a floor.
-      // Deliberately behaviour-neutral — see this file's `CollectResult`.
-      return this.collectViolations().violations
+      // Plan 0099: the floor. 0098 produced this evidence and discarded it here;
+      // this is where discarding stops.
+      const { violations, examined } = this.collectViolations()
+
+      // A family that produced ANY finding passes through untouched. The floor
+      // fires only where a family produced *nothing* from *nothing* — bug 0066's
+      // shape. Each family's own empty-selection block stays as the
+      // better-attributed implementation; this is a floor beneath them, not a
+      // replacement for them.
+      if (violations.length === 0 && examined === 0) {
+        // The instrument outranks the selection. A declaration asserts a fact
+        // about a LOADED corpus; over zero loaded files it asserts nothing, and
+        // the expiry that justifies `.expectEmpty()` can never engage — so on a
+        // solution-style tsconfig a one-line declaration would restore bug 0066's
+        // 401-findings-reported-clean permanently, through the sanctioned door.
+        // This supersedes the precedence bug 0066's root-cause note endorsed:
+        // that ordering is right at SELECTION level and wrong at INSTRUMENT level.
+        //
+        // `getProject()` may be undefined and that is honest, not a gap:
+        // `correspondence` discards its project by documented design, and an
+        // ADR-010 dialect over a non-TypeScript element type has none. The
+        // instrument check is skipped; the zero-subjects floor below still holds.
+        const project = this.getProject()
+        if (project !== undefined && loadedNothing(project)) {
+          return [this.emptyProjectViolation(project)]
+        }
+        // `.notExist()` and friends examine zero BECAUSE that is what they
+        // assert. Exempt since 0.34.0, and `diagnose()` exempts it too — the two
+        // must agree or `doctor` and `check` disagree about a working rule.
+        if (this.assertsCardinality()) return violations
+        // The author said empty is the point. `declaresEmpty()` — not
+        // `_expectEmpty` — because `CorrespondenceBuilder` declares per side and
+        // overrides this; asking a fully-declared correspondence to declare would
+        // be ADR-008 rule 2's loop, and the base implementation cannot express it.
+        if (!this.declaresEmpty()) return [this.zeroSubjectsViolation(project)]
+      }
+
+      // The expiry half, and it is the ROOT's alone — `rule-builder.ts` used to
+      // carry its own, so keeping both double-reported one fault.
+      //
+      // `_expectEmpty`, NOT `declaresEmpty()`: `.notExist()` over a non-empty
+      // selection is the condition doing its job, never an expired declaration,
+      // and on `CorrespondenceBuilder` `declaresEmpty()` is an all-sides
+      // conjunction whose per-side expiry that class reports itself.
+      if (examined > 0 && this._expectEmpty) {
+        return [this.expiredDeclarationViolation(examined), ...violations]
+      }
+      return violations
     }
 
     const described = this.describeRule()
@@ -761,6 +805,111 @@ export abstract class TerminalBuilder {
       message: advice,
       // Its own remedy, never the author's (bug 0021).
       suggestion: advice,
+      bypassFilters: true,
+    }
+  }
+
+  /**
+   * A rule that ran, examined **zero units**, and nothing else explained why —
+   * plan 0099's floor.
+   *
+   * Precedence has already removed the other causes by the time this is reached:
+   * no dead selector glob, no missing assertion, no empty project, no cardinality
+   * assertion, no declaration. So the remedy names ONE cause without the hedging
+   * ADR-008 rule 2 forbids.
+   *
+   * Three defects in 0098's preview wording are fixed here, from its
+   * user-perspective review:
+   *
+   * - **It hedged where we hold the fact.** "including any default it applies
+   *   that you did not write" was printed as a hypothetical while the rule knew
+   *   the answer. We materialized the selection, so we know the project loaded N
+   *   files and the selection produced 0 — print the numbers.
+   * - **"can never fail" overstated.** For a `crossLayer` rule whose pairs do not
+   *   exist yet, or a folder empty in a young repository, the rule is correct and
+   *   matches nothing *today*. "never" made a true statement false.
+   * - **The ranking was wrong for the people most likely to adopt early.** It
+   *   called widening the fix and declaring "the exception… proves nothing". For
+   *   a team whose second layer is not built yet, widening is *impossible* — the
+   *   code does not exist — so the only available action was the one the message
+   *   disparaged. Both are now offered as peers, and the declaration is described
+   *   by what it does: it expires.
+   */
+  protected zeroSubjectsViolation(project: ArchProject | undefined): ArchViolation {
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    // The numbers, not the possibility. `loaded` is omitted rather than guessed
+    // when the family has no project — the honest gap `getProject()` documents.
+    const loaded = project === undefined ? undefined : project.getSourceFiles().length
+    const counted =
+      loaded === undefined
+        ? 'This rule examined 0 subjects'
+        : `The project loaded ${String(loaded)} file${loaded === 1 ? '' : 's'}, and this rule examined 0 of them`
+    const advice =
+      `${counted}, so it enforces nothing as written today. ` +
+      `Either widen it until it matches something, or declare the empty state with ` +
+      `${this.emptyDeclarationAdvice()} — a declaration is an assertion, not a silencer: ` +
+      `it fails the day something does match. ` +
+      UNSUPPRESSABLE
+    return {
+      rule: name,
+      ruleId: described.id,
+      element: name,
+      file: '',
+      line: 0,
+      message: advice,
+      // Its own remedy, never the author's (bug 0021).
+      suggestion: advice,
+      bypassFilters: true,
+    }
+  }
+
+  /**
+   * A declaration that has expired — plan 0099.
+   *
+   * The property that makes `.expectEmpty()` an assertion rather than
+   * `allowEmpty()`'s permission, which had no failing state and so stayed green
+   * forever. Here the number IS the finding: the author asserted zero and the
+   * answer is not zero.
+   *
+   * The remedy is DISTINCT from the message, because `format.ts` drops the `Fix:`
+   * line when the two are equal — a defect this producer's rule-builder ancestor
+   * shipped with, found in review of plan 0089.
+   */
+  protected expiredDeclarationViolation(examined: number): ArchViolation {
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    const declaration = this.emptyDeclarationAdvice()
+    const message = `${declaration} asserted this rule examines nothing, and it examined ${String(examined)}.`
+    const suggestion =
+      `Remove ${declaration} and let the rule enforce itself — the thing you were waiting for has ` +
+      `appeared, and the rule now has something to check. If instead the selection is wider than you ` +
+      `meant, narrow it and keep the declaration. ` +
+      `The rule's own violations are reported as separate findings under the same rule id. ` +
+      UNSUPPRESSABLE
+    return {
+      rule: name,
+      ruleId: described.id,
+      // The DESCRIPTION, not the id — and this is the one place in this file
+      // where that differs on purpose.
+      //
+      // `dedupeConfigFindings` keys on `(file, ruleId ?? rule, element)`. With
+      // `file: ''` and the id in both remaining slots, every instance of a
+      // fanned-out preset id collapses to one and picks up `affectedNote`'s
+      // "this one option generated N rules that cannot enforce anything".
+      //
+      // For `zeroSubjectsViolation` that collapse is CORRECT: those N rules
+      // genuinely cannot enforce, and they are one edit. Here it is false — a
+      // rule whose declaration expired enforces fine, and its violations are
+      // reported alongside. Measured in review of plan 0089: 4 findings became 3,
+      // the survivor claiming two rules could not enforce while both their real
+      // violations sat below it. `RuleBuilder.describeRule()` returns the chain
+      // description, which differs per instance and keeps them distinct.
+      element: described.rule || name,
+      file: '',
+      line: 0,
+      message,
+      suggestion,
       bypassFilters: true,
     }
   }
