@@ -244,6 +244,19 @@ export class PairFinalBuilder extends TerminalBuilder {
    * Pairs this rule examined — plan 0098. `condition.evaluate` receives exactly
    * this array, so the count cannot drift from what was checked.
    */
+
+  /**
+   * This family counts layer pairs — the pairs of layers it compares.
+   *
+   * Plan 0099: `CollectResult.examined` is unit-typed per family (ADR-009 part
+   * 1), and the zero-examined message prints the noun. Inheriting the base
+   * `'subjects'` is a category error in a sentence whose whole job is naming what
+   * was and was not looked at.
+   */
+  protected override examinedUnitNoun(): string {
+    return 'layer pairs'
+  }
+
   examinedUnits(): number {
     return this.pairs.length
   }

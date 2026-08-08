@@ -417,14 +417,19 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
     // cannot drift. The fallback is for a foreign dialect that predates the seam;
     // it deliberately no longer promises "a later release makes this fail" — that
     // release is this one.
+    // NO fallback literal. It was a six-line copy of the producer's sentence —
+    // dead for every real builder (every `TerminalBuilder` has the method), never
+    // referenced by a test, and already diverging: no unit noun, no file count,
+    // no narrowing hint. The seam exists because "two texts for one state is the
+    // plan-0070 drift shape"; a fallback is that second text, one level down, in
+    // the commit that added the seam.
+    //
+    // A duck-typed `DiagnosableRule` that cannot answer simply has no advice to
+    // report, which is honest — better than core inventing a sentence for a
+    // family whose units and remedies it does not know.
     advice:
       rule.zeroSubjectsAdvice?.() ??
-      'this rule examined 0 subjects, so it enforces nothing as written today. Its own ' +
-        'narrowing removed everything the project loaded — including any default it applies ' +
-        'that you did not write. Either close the gap — widen the selector, or add the code ' +
-        'it is waiting for — or declare the empty state with ' +
-        (rule.emptyDeclarationAdvice?.() ?? '.expectEmpty()') +
-        ' — a declaration is an assertion, not a silencer: it fails the day something does match.',
+      'this rule examined 0 units, so it enforces nothing as written today.',
   }
 }
 

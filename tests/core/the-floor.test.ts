@@ -424,3 +424,71 @@ describe('distinct rules stay distinct through dedupe', () => {
     expect(collapsed[0]?.rule).toContain('duplicate')
   })
 })
+
+describe('the message names the right unit, in the right number', () => {
+  // `CollectResult.examined` is unit-typed per family (ADR-009 part 1). A message
+  // that prints one family's noun for another is a category error in the sentence
+  // whose whole job is naming what was and was not looked at — and the seam
+  // existed with only ONE family implementing it, so graphql, cross-layer and
+  // correspondence all printed "subjects".
+  it('each family names its own unit', () => {
+    const p = inMemory({ '/src/a.ts': 'export const a = 1\n' })
+    const smell = smells.duplicateBodies(p).minLines(500).violations()[0]
+    expect(smell?.message).toContain('0 function bodies')
+
+    const gql = schemaFromSDL('type Query { a: String }')
+      .that()
+      .typesNamed(/^ZZZ$/)
+      .should()
+      .haveFields()
+      .violations()[0]
+    expect(gql?.message).toContain('0 schema types')
+    // The bug this replaces: every family inherited the base noun.
+    expect(gql?.message).not.toContain('0 subjects')
+  })
+
+  it('singular when there is one of it — the likeliest expiry case', () => {
+    // A declaration expires the day the FIRST thing appears, so "examined 1
+    // subjects" is the sentence a reader is likeliest to meet.
+    const p = inMemory({ '/src/a.ts': 'export function f() { eval("1") }\n' })
+    const v = functions(p)
+      .that()
+      .resideInFile('**/src/**')
+      .should()
+      .satisfy(functionNoEval())
+      .rule({ id: 'x/no-eval', because: 'b', suggestion: 's' })
+      .expectEmpty()
+      .violations()
+      .find((x) => x.bypassFilters === true)
+    expect(v?.message).toContain('examined 1 subject.')
+    expect(v?.message).not.toContain('1 subjects')
+  })
+
+  it('does not ASSERT that narrowing removed something it cannot verify', () => {
+    // `narrowingHint()` promises the caller "names the possibility rather than
+    // asserting a cause it cannot verify". On a corpus that never contained a
+    // unit of this family's kind, nothing was removed.
+    const p = inMemory({ '/src/types-only.ts': 'export type A = { n: number }\n' })
+    const v = functions(p)
+      .that()
+      .resideInFile('**/types-only.ts')
+      .should()
+      .satisfy(functionNoEval())
+      .rule({ id: 'x/no-eval', because: 'b', suggestion: 's' })
+      .violations()[0]
+    expect(v?.message).toContain('may have removed')
+    expect(v?.message).not.toContain('narrowing removed them —')
+  })
+
+  it('diagnose() carries no second copy of the advice', () => {
+    // The seam exists because two texts for one state is the plan-0070 drift
+    // shape. A fallback literal is that second text, one level down — it was
+    // already diverging (no unit noun, no file count, no narrowing hint).
+    const p = inMemory({ '/src/a.ts': 'export const a = 1\n' })
+    const rule = smells.duplicateBodies(p).minLines(500).rule({ id: 'x/d', because: 'b' })
+    const preview = diagnose([rule]).find((f) => f.kind === 'zero-subjects')
+    const gate = configFindings(rule.violations())[0]
+    expect(preview?.advice).toBeDefined()
+    expect(gate?.message).toContain(preview?.advice ?? '__absent__')
+  })
+})

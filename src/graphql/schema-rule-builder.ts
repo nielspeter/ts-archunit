@@ -206,6 +206,19 @@ export class SchemaRuleBuilder extends TerminalBuilder {
   }
 
   /** Units this rule examined — plan 0096. */
+
+  /**
+   * This family counts schema types — the SDL types it selected.
+   *
+   * Plan 0099: `CollectResult.examined` is unit-typed per family (ADR-009 part
+   * 1), and the zero-examined message prints the noun. Inheriting the base
+   * `'subjects'` is a category error in a sentence whose whole job is naming what
+   * was and was not looked at.
+   */
+  protected override examinedUnitNoun(): string {
+    return 'schema types'
+  }
+
   examinedUnits(): number {
     return this.selected().length
   }

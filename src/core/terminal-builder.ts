@@ -78,6 +78,19 @@ export interface CollectResult {
   examined: number
 }
 
+/**
+ * The unit noun, singular when there is one of it — plan 0099.
+ *
+ * `n === 1` is the MOST likely expiry case: a declaration expires the day the
+ * first thing appears, so "it examined 1 subjects" is the sentence a reader is
+ * likeliest to meet. The zero-subjects sentence one method away already
+ * pluralises its file count correctly.
+ */
+function singularise(noun: string, n: number): string {
+  if (n !== 1) return noun
+  return noun.endsWith('ies') ? `${noun.slice(0, -3)}y` : noun.replace(/s$/, '')
+}
+
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
@@ -897,10 +910,15 @@ export abstract class TerminalBuilder {
     // preview said "including any default it applies that you did not write",
     // this plan called that hedging, and the replacement printed numbers that
     // disclose no cause — net information loss on the commonest real case.
+    // "removed them" asserts there was something to remove. On a corpus that
+    // never contained a single unit of this family's kind, nothing was removed
+    // and the true cause is upstream — `narrowingHint()`'s own docstring promises
+    // the caller "names the possibility rather than asserting a cause it cannot
+    // verify", and asserting removal breaks that promise.
     const hint = this.narrowingHint()
     const cause =
       hint === undefined
-        ? ' Its own narrowing removed them — including any default it applies that you did not write.'
+        ? ' Its own narrowing may have removed them — including any default it applies that you did not write.'
         : ` ${hint}`
     return (
       `${counted}, so it enforces nothing as written today.${cause} ` +
@@ -956,7 +974,7 @@ export abstract class TerminalBuilder {
     const described = this.describeRule()
     const name = described.id || described.rule || this.constructor.name
     const declaration = this.emptyDeclarationAdvice()
-    const message = `${declaration} asserted this rule examines nothing, and it examined ${String(examined)} ${this.examinedUnitNoun()}.`
+    const message = `${declaration} asserted this rule examines nothing, and it examined ${String(examined)} ${singularise(this.examinedUnitNoun(), examined)}.`
     const suggestion =
       `Remove ${declaration} and let the rule enforce itself — the thing you were waiting for has ` +
       `appeared, and the rule now has something to check. If instead the selection is wider than you ` +
