@@ -60,6 +60,24 @@ const CONTRADICTION =
   '.expectEmpty() and .expectNonEmpty() on the same rule contradict each other — ' +
   'a selection cannot be required to be both empty and non-empty. Keep the one you mean.'
 
+/**
+ * What a family returns from `collectViolations()` — plan 0098.
+ *
+ * Part of the extension surface [ADR-010](../../adr/010-the-extension-surface-is-a-contract.md)
+ * rule 1 names as contract, so changing this shape is a breaking change.
+ */
+export interface CollectResult {
+  /** The violations the family found. Unchanged in meaning from the array this replaced. */
+  violations: ArchViolation[]
+  /**
+   * Units this family's own semantics examined — subjects, bodies, pairs, keys,
+   * declared requirements. **Never a file count**: counting one layer too high
+   * reads healthy on exactly the input this evidence exists to catch, which is a
+   * rule whose own narrowing removed everything the project loaded.
+   */
+  examined: number
+}
+
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
@@ -335,7 +353,10 @@ export abstract class TerminalBuilder {
       const dead = this.deadSelectorFindings()
       if (dead.selector.length > 0) return dead.selector
       if (dead.discovery.length > 0 && !this.ownsDiscoveryDiagnosis()) return dead.discovery
-      return this.collectViolations()
+      // Plan 0098 is the SEAM only: the evidence is now produced and discarded
+      // here. Plan 0099 is where this stops being a discard and becomes a floor.
+      // Deliberately behaviour-neutral — see this file's `CollectResult`.
+      return this.collectViolations().violations
     }
 
     const described = this.describeRule()
@@ -567,8 +588,23 @@ export abstract class TerminalBuilder {
    * member breaks external subclasses. `RuleBuilder` overrides it by reading
    * its own conditions; the builders that take their condition as a
    * constructor argument have no cardinality condition to declare.
+   *
+   * **PUBLIC since plan 0098**, for the same structural reason as
+   * `assertsSomething()` and `declaresEmpty()`: `diagnose()` reads it through a
+   * structural interface and a protected member cannot satisfy one. It became a
+   * reader the moment the rule-builder family started reporting evidence —
+   * `.should().notExist()` examines zero subjects *because that is what it
+   * asserts*, and previewing it as a fault tells the author their working rule
+   * is broken. Caught by this repo's own 53-rule suite, on the one rule in it
+   * that ends in `.notExist()`.
+   *
+   * Deliberately NOT folded into `declaresEmpty()`, though both suppress the
+   * same finding. They are different facts and plan 0099 needs them apart: its
+   * expiry branch reads the declaration flag alone, because `.notExist()` over a
+   * selection that has grown is the condition doing its job, never a declaration
+   * that has expired.
    */
-  protected assertsCardinality(): boolean {
+  assertsCardinality(): boolean {
     return false
   }
 
@@ -825,8 +861,49 @@ export abstract class TerminalBuilder {
   }
 
   /**
-   * Subclasses implement this to collect and evaluate violations.
+   * Subclasses implement this to collect and evaluate violations, **and to say
+   * how many units they examined while doing it** — plan 0098.
+   *
    * Called lazily during `.check()` / `.warn()`.
+   *
+   * ## Why the return type carries the evidence
+   *
+   * Plan 0096 gave five families an `examinedUnits()` accessor and `diagnose()`
+   * reads it — but it is **optional**, and four waves of vacuity guards have each
+   * closed their own enumeration only for the next family to land outside it
+   * ([ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md)'s Context
+   * table). A guard is something you can forget to add. A required return type is
+   * not: a new family cannot compile without stating its number.
+   *
+   * Nothing acts on `examined` in this release — plan 0099 adds the floor that
+   * fails a rule which produced nothing from nothing. This plan ships the seam
+   * alone so that the break to
+   * [ADR-010](../../adr/010-the-extension-surface-is-a-contract.md)'s contract
+   * lands in a commit whose only job is the break.
+   *
+   * ## What the compiler cannot force, and what does
+   *
+   * The type forces the field to **exist**; it cannot force it to mean anything,
+   * and every implementer could satisfy it with `examined: 0`. That is a real
+   * hole and it is half-closed:
+   *
+   * - **The numbers are guarded.** Every family exposes `examinedUnits()` and
+   *   `tests/core/evidence-at-every-seam.test.ts` requires each to show its count
+   *   **responding to input** — zero on a narrowed selection, non-zero on a wide
+   *   one, over a corpus that loaded files either way. A constant fails one half
+   *   of that pair whichever constant it is; measured, six sabotage rows caught.
+   * - **The WIRING is not, and cannot be, in this release.** `examined` is
+   *   produced here and discarded by the one consumer, so nothing observes it:
+   *   rewriting any family's `collectViolations()` to `examined: 0` while leaving
+   *   `examinedUnits()` correct leaves the entire suite green — measured, for the
+   *   smell family and for `RuleBuilder`. An ADR-008 rule 5 equivalence, recorded
+   *   rather than guarded by an instrument invented for it.
+   *
+   * **That equivalence expires in plan 0099**, which reads `examined` at the
+   * floor. The commit that gives a claim its first reader is the commit that must
+   * retire it — this repo has already had one recorded equivalence outlive its
+   * truth by exactly one commit (`CorrespondenceBuilder.declaresEmpty`), and a
+   * sabotage row for the wiring belongs in 0099's matrix on day one.
    */
-  protected abstract collectViolations(): ArchViolation[]
+  protected abstract collectViolations(): CollectResult
 }

@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Every rule family now reports what it examined** — plan 0098. `collectViolations()` returns
+  `{ violations, examined }` instead of `ArchViolation[]`, so a family cannot compile without stating how
+  many units it looked at. Plan 0096 gave five families an **optional** accessor; four waves of vacuity
+  guards have each closed their own enumeration only for the next family to land outside it, and an
+  optional hook is one you can forget. A required return type is not.
+
+  ⚠️ **Breaking for external dialects.** `collectViolations()` is the one abstract member that ADR-010 rule 1 names, so a subclass must return the
+  new shape. The compile error names the member — migration is `return { violations: <what you returned
+before>, examined: <your own unit> }`. Pick the unit at **your own seam**: the set your conditions
+  receive, never a file count, because counting one layer too high reads healthy on exactly the input this
+  exists to catch.
+
+  ⚠️ **`assertsCardinality()` is public**, joining `assertsSomething()`, `declaresEmpty()` and
+  `emptyDeclarationAdvice()` on the contract root, for the same structural reason: `diagnose()` reads it
+  through a structural interface and a protected member cannot satisfy one.
+
+  **`diagnose()` and `doctor` now preview four more families** — the rule builders, slices, `crossLayer`
+  and `tsconfig` — because they answer the same accessor the preview already read. Two consequences worth
+  stating: a rule ending in `.notExist()` is **not** reported (zero subjects is what it asserts, and the
+  gate has exempted it since 0.34.0 — the preview now agrees); and a `crossLayer` rule whose mapping never
+  matches **is** reported, because pairs are what that family examines and layers selecting files says
+  nothing about whether any pair was formed.
+
+  `check()` behaviour is unchanged. Plan 0099 is the release that makes an examined count of zero fail.
+
+### Added
+
 - **`diagnose()` and `doctor` report `zero-subjects`** — a rule whose project loaded files but whose
   own narrowing left it **nothing to examine**, so it can never fail. Five families now count the units
   they examined: both smell detectors, `correspondence`, and both GraphQL builders.
@@ -113,7 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   presets** when a smell rule is the only one enabled. A fifth, `dataLayerIsolation`, constructs zero
   rules from a valid option. Full table in
   [bug 0066](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0066-a-smell-detector-over-zero-files-passes.md);
-  the fixes are [plan 0098](https://github.com/nielspeter/ts-archunit/blob/main/plans/0098-the-evidence-seam-and-the-floor.md).
+  the fixes are [plan 0098](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0098-the-evidence-seam-and-the-floor.md).
 
   Runs post-build in CI and publish, and via `npm run test:matrix`. It imports `dist` on purpose — the
   shipped artifact is what adopters run — which is why it is excluded from `npm run test`, where the

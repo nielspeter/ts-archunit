@@ -1,4 +1,5 @@
 import type { RuleDescription } from '../core/rule-description.js'
+import type { CollectResult } from '../core/terminal-builder.js'
 import type { ArchProject } from '../core/project.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
@@ -317,7 +318,20 @@ export class SliceRuleBuilder extends TerminalBuilder {
     return true
   }
 
-  protected collectViolations(): ArchViolation[] {
+  /**
+   * Slices holding at least one file — plan 0098.
+   *
+   * Counting `_slices.length` would count the SHAPE of the discovery rather than
+   * what was examined: `assignedFrom()` returns one slice per key whether or not
+   * anything matched, so the empty case is "every slice has no files", never "no
+   * slices" (arch-014 I1) — which is the same condition this family already
+   * fails closed on.
+   */
+  examinedUnits(): number {
+    return this._slices.filter((slice) => slice.files.length > 0).length
+  }
+
+  protected collectViolations(): CollectResult {
     // Discovery non-vacuity (ADR-008 / plan 0067): a slice selection that
     // resolved to no slices — or slices that matched no files — discovered
     // nothing, so it enforces nothing. Fail with a config-level meta-finding
@@ -325,7 +339,11 @@ export class SliceRuleBuilder extends TerminalBuilder {
     // returns one slice per key regardless of matches, so the empty case is
     // "every slice has no files", not "no slices" (arch-014 I1).
     if (this._slices.length === 0 || this._slices.every((slice) => slice.files.length === 0)) {
-      return [this.emptyDiscoveryViolation()]
+      // Plan 0098: this family ALREADY fails closed here, and has since 0067 —
+      // a config-level meta-finding, not a vacuous pass. The floor 0099 adds is a
+      // generalisation of this branch, not an invention. `examined` is 0 on the
+      // same condition that produces the finding.
+      return { violations: [this.emptyDiscoveryViolation()], examined: 0 }
     }
 
     // Every slice condition is a statement about relationships BETWEEN slices, so a
@@ -357,8 +375,11 @@ export class SliceRuleBuilder extends TerminalBuilder {
     for (const condition of this._conditions) {
       violations.push(...condition.evaluate(this._slices, context))
     }
-
-    return violations
+    // Slices holding at least one file. Counting `_slices.length` would count the
+    // shape of the discovery rather than what was examined: `assignedFrom()`
+    // returns one slice per key whether or not anything matched, so the empty
+    // case is "every slice has no files", never "no slices" (arch-014 I1).
+    return { violations, examined: this.examinedUnits() }
   }
 
   private buildRuleDescription(): string {

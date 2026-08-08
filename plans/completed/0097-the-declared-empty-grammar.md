@@ -2,7 +2,7 @@
 
 **Status:** **DONE 2026-08-07.** Filed 2026-08-07, split out of plan 0095's Phase 2c/2f.
 **Depends on:** nothing in code — it is additive and can land any time. It **must precede**
-[0098](../0098-the-evidence-seam-and-the-floor.md), whose floor reads the mint this plan lifts.
+[0098](./0098-the-evidence-seam-and-the-floor.md), whose floor reads the mint this plan lifts.
 **Executes** [ADR-010](../../adr/010-the-extension-surface-is-a-contract.md) rule 3(a), accepted there from
 the consumer's side. One mechanism, two documents served — which is why it is its own plan rather than a
 line inside another.
@@ -73,7 +73,7 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 
 - `.expectEmpty()` **reachable** on `SmellBuilder` — bug 0066's unmeasured item, answered: it was
   unreachable, and now is not. The **effectiveness** half moved to
-  [0098](../0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor that reads the flag
+  [0098](./0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor that reads the flag
   lands; claiming it here would be a row nothing can satisfy in this plan's scope.
 - the contradiction guard with `.expectNonEmpty()` still throws after the hoist.
 - `expectEmpty(side?)` rows: some-sides-declared → still reds; **all-sides-declared → passes**;
@@ -86,7 +86,7 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 ## Out of scope
 
 The floor that consumes these declarations, and the precedence ruling that an empty **project** outranks
-them — [0098](../0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
+them — [0098](./0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
 [0089](../0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
 mechanism and is the right home for it.
 

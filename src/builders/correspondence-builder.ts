@@ -1,4 +1,5 @@
 import type { RuleDescription } from '../core/rule-description.js'
+import type { CollectResult } from '../core/terminal-builder.js'
 import { Node } from 'ts-morph'
 import { selectionMemo } from '../core/selection-memo.js'
 import type { ArchProject } from '../core/project.js'
@@ -329,7 +330,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     }
   }
 
-  protected collectViolations(): ArchViolation[] {
+  protected collectViolations(): CollectResult {
     // Unreachable through `.check()` / `.warn()` / `.violations()` as of the
     // bug-0025 fix: `assertsSomething()` above is false for wrong arity, so the
     // gate reports it as a configuration finding before this method is called.
@@ -381,7 +382,14 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     const declaredNames = new Set([...this._expectEmptySides, ...this._distinctKeys])
     const unbound = [...declaredNames].filter((n) => !this._sides.some((side) => side.name === n))
     if (unbound.length > 0) {
-      return unbound.map((name) => this.unboundSideViolation(name, meta, [sideA.name, sideB.name]))
+      // A configuration fault: the sides were never materialized, so nothing was
+      // examined. Plan 0098 — 0 here is the honest number, not a placeholder.
+      return {
+        violations: unbound.map((name) =>
+          this.unboundSideViolation(name, meta, [sideA.name, sideB.name]),
+        ),
+        examined: 0,
+      }
     }
 
     const [aKeyed, bKeyed] = this.materializedSides(sideA, sideB)
@@ -413,7 +421,8 @@ export class CorrespondenceBuilder extends TerminalBuilder {
         emptyFindings.push(this.unexpectedlyNonEmptyViolation(side.name, meta))
       }
     }
-    if (emptyFindings.length > 0) return emptyFindings
+    if (emptyFindings.length > 0)
+      return { violations: emptyFindings, examined: this.examinedUnits() }
 
     const violations: ArchViolation[] = []
 
@@ -467,7 +476,7 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     // objects), so a "both sides literal" heuristic would false-positive, and a
     // console.warn is invisible to the agent consumer (ADR-008). Left to review.
 
-    return violations
+    return { violations, examined: this.examinedUnits() }
   }
 
   private keyViolations(

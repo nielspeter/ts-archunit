@@ -1,8 +1,8 @@
 # Plan 0099 — the floor no family can be born below
 
-**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./0098-the-evidence-seam-and-the-floor.md)
+**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./completed/0098-the-evidence-seam-and-the-floor.md)
 when that plan's own amendment measured it as two plans wearing one number.
-**Depends on:** [0098](./0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
+**Depends on:** [0098](./completed/0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
 which does not exist until the seam lands), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor
 reads the mint it lifts), [0089](./0089-presets-forward-their-options.md) — and the reason is
 sharper than "a preset user cannot write `.expectEmpty()`". They **can** reach a remedy today:

@@ -198,5 +198,5 @@ covered by the fix. Filed as its own row in the matrix rather than folded in her
 deviation recorded that its bare construction reds on the assertion gate before the vacuity cell is
 reachable, so the probe carries `.forPattern(…)`.
 
-The fix for all of it is [plan 0098](../plans/0098-the-evidence-seam-and-the-floor.md), which empties
+The fix for all of it is [plan 0098](../plans/completed/0098-the-evidence-seam-and-the-floor.md), which empties
 the matrix's `KNOWN_FAIL_OPEN` in the same commit that retypes the seam.

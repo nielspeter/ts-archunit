@@ -1,4 +1,5 @@
 import type { RuleDescription } from '../core/rule-description.js'
+import type { CollectResult } from '../core/terminal-builder.js'
 import { isRecord } from '../core/type-guards.js'
 import { ScriptTarget, ModuleKind, ModuleResolutionKind } from 'ts-morph'
 import type { CompilerOptions } from 'ts-morph'
@@ -59,7 +60,19 @@ export class TsconfigBuilder extends TerminalBuilder {
     }
   }
 
-  protected collectViolations(): ArchViolation[] {
+  /**
+   * Requirements this rule declared — plan 0098.
+   *
+   * This family examines a CONFIG, not a corpus, so its unit is not a subject
+   * count. Zero means `.require({})`: a tsconfig rule that asserts nothing,
+   * which is this family's shape of the vacuity every other family expresses as
+   * an empty selection.
+   */
+  examinedUnits(): number {
+    return Object.keys(this._requirements).length
+  }
+
+  protected collectViolations(): CollectResult {
     const opts = this.getOptions()
     const file = this.project.tsConfigPath
     const violations: ArchViolation[] = []
@@ -82,7 +95,12 @@ export class TsconfigBuilder extends TerminalBuilder {
       })
     }
 
-    return violations
+    // Plan 0098. This family examines a CONFIG, not a corpus, so its unit is the
+    // requirements the author declared — the loop above is over exactly these.
+    // Zero means `.require({})`: a tsconfig rule that asserts nothing, which is
+    // this family's shape of the vacuity every other family expresses as an
+    // empty selection.
+    return { violations, examined: this.examinedUnits() }
   }
 
   /**

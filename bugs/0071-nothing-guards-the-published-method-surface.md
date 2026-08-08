@@ -5,7 +5,7 @@
 which removed the public method `CorrespondenceBuilder.allowEmpty()`. A reviewer asked what would have
 caught that if the repo's own tests had not happened to call it, and measured the answer.
 **Severity:** **Medium as a defect, and the reason it is filed is what it means for
-[plan 0098](../plans/0098-the-evidence-seam-and-the-floor.md).** Nothing is broken today. But 0098 leans
+[plan 0098](../plans/completed/0098-the-evidence-seam-and-the-floor.md).** Nothing is broken today. But 0098 leans
 on the vacuity matrix as its independent behavioural derivation, and the matrix cannot see the surface
 0098 changes. A guard's blind spot should be a known number before the plan that depends on it ships,
 not a discovery during.

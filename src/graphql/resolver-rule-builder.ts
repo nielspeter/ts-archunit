@@ -1,4 +1,5 @@
 import type { RuleDescription } from '../core/rule-description.js'
+import type { CollectResult } from '../core/terminal-builder.js'
 import type { SourceFile } from 'ts-morph'
 import type { ArchViolation } from '../core/violation.js'
 import type { Condition, ConditionContext } from '../core/condition.js'
@@ -244,11 +245,13 @@ export class ResolverRuleBuilder extends TerminalBuilder {
     return this.selected().length
   }
 
-  protected collectViolations(): ArchViolation[] {
+  protected collectViolations(): CollectResult {
     const filtered = this.selected()
 
     if (filtered.length === 0) {
-      return []
+      // Plan 0098: the early exit IS the zero-evidence case, stated rather than
+      // implied by an empty violation list.
+      return { violations: [], examined: 0 }
     }
 
     const context: ConditionContext = {
@@ -263,7 +266,7 @@ export class ResolverRuleBuilder extends TerminalBuilder {
     for (const condition of this._conditions) {
       violations.push(...condition.evaluate(filtered, context))
     }
-    return violations
+    return { violations, examined: filtered.length }
   }
 
   private getElements(): ArchFunction[] {

@@ -75,6 +75,14 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * `TerminalBuilder.emptyDeclarationAdvice()`.
    */
   emptyDeclarationAdvice?: () => string
+
+  /**
+   * Whether a condition on this rule declares emptiness as its PASSING state —
+   * `.notExist()` and friends. Zero examined is the assertion succeeding, so the
+   * evidence check must not report it. See `TerminalBuilder.assertsCardinality()`
+   * for why this is separate from `declaresEmpty()`.
+   */
+  assertsCardinality?: () => boolean
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -376,6 +384,11 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
   // would over-report against 0098's floor, which honours the same mint. That
   // the mint exists at all is why 0097 shipped first; this is its first reader.
   if (rule.declaresEmpty?.() === true) return undefined
+  // `.notExist()` examines zero BECAUSE that is what it asserts — the gate has
+  // exempted this since 0.34.0 and the preview must agree, or `doctor` reports a
+  // working rule as broken. Plan 0098: the rule-builder family is the first to
+  // report evidence, so this is the first release in which the two could differ.
+  if (rule.assertsCardinality?.() === true) return undefined
   return {
     kind: 'zero-subjects',
     rule: name,
