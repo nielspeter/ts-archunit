@@ -1,25 +1,42 @@
 /**
- * Families we ship but never ran on ourselves.
+ * Families we ship but had never run on ourselves.
  *
- * `arch-rules.test.ts` applies four of the eighteen checkable surfaces the
+ * `arch-rules.test.ts` applied four of the eighteen checkable surfaces the
  * vacuity matrix enumerates — `classes`, `functions`, `modules`, `slices`.
- * The other fourteen are shipped, documented, and never pointed at this repo.
- * That includes every family plan 0099's floor newly gated: a release whose
- * subject is "a check that examined nothing is a lie" went out with its own
- * detectors unexercised on its own corpus.
+ * The other fourteen were shipped, documented, and never pointed at this repo,
+ * including every family plan 0099's floor newly gated: a release whose subject
+ * is "a check that examined nothing is a lie" went out with its own detectors
+ * unexercised on its own corpus. With this file the count is **14 of 18**.
  *
- * This file closes the gap for the families that have a real corpus here.
- * Deliberately excluded, with reasons, so "we thought about this" and "we
- * forgot this" do not look the same:
+ * The four still uncovered are excluded for a reason, so that "we thought about
+ * this" and "we forgot this" do not look the same — and because a rule pointed
+ * at a corpus this repo does not have is precisely the vacuous pass 0099 now
+ * fails:
  *
  *  - `jsxElements` — no JSX in `src/`; the only .tsx is a fixture with its own
  *    tsconfig (see the root tsconfig's `exclude`).
  *  - `graphql:schema` / `graphql:resolvers` — no schema and no resolvers here.
  *  - `presets:dataLayerIsolation` — no data layer.
  *
- * Every rule below is asserted to examine a non-zero number of units. Without
- * that, a rule that silently stopped matching would still be counted as
- * coverage — ADR-009's whole subject, and the reason this file exists.
+ * ## What each rule asserts, and why it is not one thing
+ *
+ * The rule families assert `examinedUnits() > 0` before their condition:
+ * without it, a selector that silently stopped matching still counts as
+ * coverage, which is ADR-009's whole subject.
+ *
+ * The preset rows do NOT, and cannot — a preset returns an array of rules, so
+ * there is no single examined count to assert. They assert instead that the
+ * array is non-empty and carries no CONFIGURATION finding (the `bypassFilters`
+ * class: a rule that enforces nothing). That is the preset-level spelling of
+ * the same question.
+ *
+ * And `examinedUnits() > 0` is necessary but **not sufficient**, which this
+ * file learned the hard way — see the `inconsistentSiblings` row, where a rule
+ * examined all 11 files in a folder and was still structurally incapable of
+ * producing a finding. The question ADR-008 rule 5 actually asks is what the
+ * rule would do if the thing it guards were broken, and the only answer that
+ * counts is a measured one. Each rule here has been sabotaged and observed to
+ * fail; three of them first fired on real defects in their own construction.
  */
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
@@ -38,10 +55,15 @@ import {
   ArchRuleError,
 } from '../../src/index.js'
 import type { ArchViolation } from '../../src/index.js'
-import { recommended } from '../../src/presets/recommended.js'
-import { agentGuardrails } from '../../src/presets/agent-guardrails.js'
-import { strictBoundaries } from '../../src/presets/boundaries.js'
-import { layeredArchitecture } from '../../src/presets/layered.js'
+// Through the `./presets` barrel, not the individual modules: that subpath is
+// what the exports map publishes and what an adopter imports, so a preset
+// dropped from the barrel breaks this file rather than passing unnoticed.
+import {
+  recommended,
+  agentGuardrails,
+  strictBoundaries,
+  layeredArchitecture,
+} from '../../src/presets/index.js'
 
 const p = project('tsconfig.json')
 const root = path.resolve(import.meta.dirname, '../..')
@@ -165,7 +187,7 @@ describe('crossLayer: the family most likely to look healthy while empty', () =>
     // leave a rule that examines nothing.
     // `.js` as well as `.ts`: import specifiers are ESM-resolved
     // (`../../src/builders/slice-rule-builder.js`, ADR-004), so a stem that
-    // only strips `.ts` leaves `-builder.js` and matches no builder — all 10
+    // only strips `.ts` leaves `-builder.js` and matches no builder — all 11
     // pairs then read as "does not import its builder". Measured, not assumed.
     const stem = (f: string): string =>
       path
