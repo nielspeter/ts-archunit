@@ -14,9 +14,12 @@ import { isProjectRelative } from '../core/project-relative.js'
  * different chain grammar (no .that()/.should()) and execution model
  * (pairwise comparison rather than individual element evaluation).
  */
+/** The `minLines` threshold applied when the author sets none. */
+const DEFAULT_MIN_LINES = 5
+
 export abstract class SmellBuilder extends TerminalBuilder {
   protected _folders: string[] = []
-  protected _minLines = 5
+  protected _minLines: number = DEFAULT_MIN_LINES
   protected _ignoreTests = false
   protected _ignorePaths: string[] = []
   protected _groupByFolder = false
@@ -40,10 +43,17 @@ export abstract class SmellBuilder extends TerminalBuilder {
     if (this._folders.length > 0) applied.push(`inFolder(${this._folders.join(', ')})`)
     if (this._ignorePaths.length > 0) applied.push(`ignorePaths(${this._ignorePaths.join(', ')})`)
     if (this._ignoreTests) applied.push('ignoreTests()')
-    return (
-      `Its own narrowing removed them: ${applied.join(', ')}` +
-      ` — minLines defaults to 5, a default you did not write.`
-    )
+    // The "you did not write it" clause is TRUE only while the value is still the
+    // default. Rendered with an author-written `.minLines(500)` it said
+    // "minLines(500) — minLines defaults to 5, a default you did not write",
+    // which is false on the path that produced it: an agent goes hunting for
+    // where 5 comes from and never touches the 500 that is the actual fault.
+    // ADR-008 rule 2, on an unsuppressable hard failure.
+    const wroteItThemselves = this._minLines !== DEFAULT_MIN_LINES
+    return wroteItThemselves
+      ? `Its own narrowing removed them: ${applied.join(', ')}.`
+      : `Its own narrowing removed them: ${applied.join(', ')}` +
+          ` — minLines defaults to ${String(DEFAULT_MIN_LINES)}, a default you did not write.`
   }
 
   constructor(protected readonly project: ArchProject) {

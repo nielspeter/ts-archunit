@@ -111,6 +111,13 @@ export function dedupeConfigFindings(violations: readonly ArchViolation[]): Arch
 function keyFor(violation: ArchViolation): string | undefined {
   if (violation.bypassFilters !== true) return undefined
   const identity = violation.ruleId ?? violation.rule
-  if (identity === '' || violation.element === '') return undefined
+  // `'unnamed'` is `TerminalBuilder.describeRule()`'s SENTINEL, not an identity.
+  // A family that never overrides it gives every one of its rules the same key,
+  // so distinct rules merged and the survivor claimed they were "one edit" —
+  // measured on three different `duplicateBodies` detectors in plan 0099. A
+  // missing key must mean "keep it", never "merge everything that lacks one",
+  // which is the rule the empty-string guard beside this already follows.
+  if (identity === '' || identity === 'unnamed') return undefined
+  if (violation.element === '' || violation.element === 'unnamed') return undefined
   return `${violation.file} ${identity} ${violation.element}`
 }

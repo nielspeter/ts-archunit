@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import picomatch from 'picomatch'
 import path from 'node:path'
 import { selectionMemo } from '../core/selection-memo.js'
@@ -33,6 +34,26 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     const next = this.copy()
     next._minSimilarity = threshold
     return next
+  }
+
+  /**
+   * Named by id or by what the detector checks — the inherited version returns
+   * the sentinel `'unnamed'`, and `inconsistent-siblings.ts` already carries this
+   * override for that reason.
+   *
+   * It became load-bearing in plan 0099: the floor makes an over-filtered
+   * detector FAIL, and `dedupeConfigFindings` keys on `(file, ruleId ?? rule,
+   * element)`. With `file: ''` and `'unnamed'` in both other slots, three
+   * genuinely different detectors — different similarity, different
+   * `ignorePaths` — collapsed into one finding claiming they were "one option"
+   * and "one edit". Two were silently discarded and the survivor said
+   * `Rule: unnamed`.
+   */
+  override describeRule(): RuleDescription {
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? this.describe(),
+    }
   }
 
   protected detect(): ArchViolation[] {

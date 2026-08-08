@@ -26,6 +26,7 @@ import { smells } from '../../src/smells/index.js'
 import { schemaFromSDL } from '../../src/graphql/index.js'
 import { ArchRuleError } from '../../src/core/errors.js'
 import { diagnose } from '../../src/core/diagnose.js'
+import { dedupeConfigFindings } from '../../src/core/dedupe-config-findings.js'
 
 function inMemory(files: Record<string, string>): ArchProject {
   const tsm = new Project({ useInMemoryFileSystem: true })
@@ -370,5 +371,56 @@ describe('diagnose() and check() agree — the row that keeps the preview honest
       .rule({ id: 'x/no-eval', because: 'b', suggestion: 's' })
     expect(diagnose([rule]).map((f) => f.kind)).not.toContain('zero-subjects')
     expect(configFindings(rule.violations())).toEqual([])
+  })
+})
+
+describe('distinct rules stay distinct through dedupe', () => {
+  // Plan 0099 made an over-filtered detector FAIL, and `dedupeConfigFindings`
+  // keys on `(file, ruleId ?? rule, element)`. A family that never overrides
+  // `describeRule()` returns the SENTINEL `'unnamed'`, so with `file: ''` three
+  // genuinely different detectors produced one identical key.
+  //
+  // Measured before the fix: three `duplicateBodies` builders with different
+  // similarity and filters collapsed to ONE finding reading `Rule: unnamed` and
+  // claiming "this one option generated 3 rules ... they are one edit". Two were
+  // silently discarded, and both clauses were false — the user wrote no option,
+  // and three rules are three edits. `dedupe-config-findings.ts` says exactly
+  // that: "two findings, because they are two edits".
+  const dupFixture = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
+
+  it('three different smell detectors are three findings, not one', () => {
+    const p = project(path.join(dupFixture, 'tsconfig.json'))
+    const raw = [
+      ...smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.9).violations(),
+      ...smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.7).violations(),
+      ...smells.duplicateBodies(p).minLines(500).ignoreTests().violations(),
+    ]
+    expect(raw).toHaveLength(3)
+    // Identity, not a count: three findings that all read the same thing would
+    // satisfy a length of 3 while still telling the reader nothing.
+    const names = dedupeConfigFindings(raw).map((v) => v.rule)
+    expect(new Set(names).size).toBe(3)
+    expect(names.join('\n')).toContain('0.9')
+    expect(names.join('\n')).toContain('0.7')
+  })
+
+  it('and none of them is named by the sentinel', () => {
+    // `Rule: unnamed` gives the reader nothing to open. The identity half of the
+    // fix — the dedupe guard alone would keep three findings that all read
+    // "unnamed".
+    const p = project(path.join(dupFixture, 'tsconfig.json'))
+    const vs = smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.9).violations()
+    expect(vs[0]?.rule).not.toBe('unnamed')
+    expect(vs[0]?.rule ?? '').toContain('duplicate')
+  })
+
+  it('CONTROL: genuinely identical findings still collapse', () => {
+    // Without this the fix could be "never dedupe anything", which would undo
+    // what the dedupe exists for.
+    const p = project(path.join(dupFixture, 'tsconfig.json'))
+    const one = () => smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.9).violations()
+    const collapsed = dedupeConfigFindings([...one(), ...one()])
+    expect(collapsed).toHaveLength(1)
+    expect(collapsed[0]?.rule).toContain('duplicate')
   })
 })

@@ -337,7 +337,16 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
       (f) => f.kind === 'zero-subjects',
     )
     expect(finding?.advice).toContain('0 function bodies')
-    expect(finding?.advice).toContain('did not write')
+    // The narrowing is NAMED with its actual value...
+    expect(finding?.advice).toContain('minLines(9999)')
+    // ...and because the author wrote 9999 themselves, the advice must NOT claim
+    // they did not. Plan 0099 first appended "minLines defaults to 5, a default
+    // you did not write" unconditionally, which rendered as
+    // "minLines(9999) — minLines defaults to 5, a default you did not write":
+    // false on the path that produced it, on an unsuppressable hard failure, and
+    // it sends an agent hunting for where 5 comes from instead of the 9999 that
+    // is the fault.
+    expect(finding?.advice).not.toContain('did not write')
     expect(finding?.advice).not.toContain('glob')
     // The ranking INVERTED in plan 0099, and this row now asserts the inverse
     // rather than being deleted.
@@ -362,6 +371,18 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     expect(finding?.advice).not.toContain('widening is the fix')
     expect(finding?.advice).toContain('widen the selector')
     expect(finding?.advice).toContain('declare the empty state')
+  })
+
+  it('and it DOES name the default when the author left it alone', () => {
+    // The other half of the branch. Without this row the fix above could be
+    // "never mention the default at all", which loses the single most useful
+    // fact for the commonest cause — a threshold the author never set.
+    const [finding] = diagnose(
+      [smells.duplicateBodies(loaded).ignorePaths('**/*.ts')],
+      loaded,
+    ).filter((f) => f.kind === 'zero-subjects')
+    expect(finding?.advice).toContain('minLines(5)')
+    expect(finding?.advice).toContain('did not write')
   })
 })
 
