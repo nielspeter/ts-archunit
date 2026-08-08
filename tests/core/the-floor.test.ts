@@ -25,6 +25,7 @@ import { functionNoEval } from '../../src/rules/security.js'
 import { smells } from '../../src/smells/index.js'
 import { schemaFromSDL } from '../../src/graphql/index.js'
 import { ArchRuleError } from '../../src/core/errors.js'
+import { diagnose } from '../../src/core/diagnose.js'
 
 function inMemory(files: Record<string, string>): ArchProject {
   const tsm = new Project({ useInMemoryFileSystem: true })
@@ -310,5 +311,53 @@ describe('the expiry half is the root’s alone', () => {
   it('the Fix line is distinct from the message, so format.ts does not drop it', () => {
     const v = configFindings(expired())[0]
     expect(v?.suggestion).not.toBe(v?.message)
+  })
+})
+
+describe('diagnose() and check() agree — the row that keeps the preview honest', () => {
+  // 0096 shipped the preview saying "a later release makes this state fail at
+  // check time". This is that release, and `docs/upgrading.md` tells people to
+  // run `doctor` first and fix what it reports. Measured before the seam: the
+  // gate said "a declaration is an assertion, not a silencer" while the preview
+  // still said "the declaration is not itself checked yet ... A later release
+  // makes this state fail" — contradicting advice for one rule, on the surface
+  // the upgrade path walks.
+  const zeroSubjectRule = () =>
+    smells
+      .duplicateBodies(inMemory({ '/src/a.ts': 'export const a = 1\n' }))
+      .minLines(500)
+      .rule({ id: 'x/no-dup', because: 'b', suggestion: 's' })
+
+  it('the preview reports the same input the gate fails on', () => {
+    const findings = diagnose([zeroSubjectRule()])
+    expect(findings.map((f) => f.kind)).toContain('zero-subjects')
+    expect(configFindings(zeroSubjectRule().violations())).toHaveLength(1)
+  })
+
+  it('and it reports the SAME SENTENCE, by construction rather than by luck', () => {
+    const preview = diagnose([zeroSubjectRule()]).find((f) => f.kind === 'zero-subjects')
+    const gate = configFindings(zeroSubjectRule().violations())[0]
+    expect(preview?.advice).toBeDefined()
+    // The gate appends the unsuppressable notice; the advice itself must match.
+    expect(gate?.message).toContain(preview?.advice ?? '__absent__')
+  })
+
+  it('the preview never promises a LATER release does this — this is that release', () => {
+    const preview = diagnose([zeroSubjectRule()]).find((f) => f.kind === 'zero-subjects')
+    expect(preview?.advice ?? '').not.toContain('later release')
+    expect(preview?.advice ?? '').not.toContain('not itself checked yet')
+    expect(preview?.advice ?? '').not.toContain('can never fail')
+  })
+
+  it('CONTROL: a rule that examines something is silent on BOTH surfaces', () => {
+    const p = inMemory({ '/src/a.ts': 'export function f() { eval("1") }\n' })
+    const rule = functions(p)
+      .that()
+      .resideInFile('**/src/**')
+      .should()
+      .satisfy(functionNoEval())
+      .rule({ id: 'x/no-eval', because: 'b', suggestion: 's' })
+    expect(diagnose([rule]).map((f) => f.kind)).not.toContain('zero-subjects')
+    expect(configFindings(rule.violations())).toEqual([])
   })
 })

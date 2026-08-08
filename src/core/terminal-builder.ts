@@ -871,27 +871,18 @@ export abstract class TerminalBuilder {
     return 'subjects'
   }
 
-  protected zeroSubjectsViolation(project: ArchProject | undefined): ArchViolation {
-    // The precedence lives HERE, not only at the call site, because this
-    // producer's docstring declares "no empty project" as a precondition and an
-    // assumed precondition is one a second caller forgets.
-    //
-    // Measured: `rule-builder`'s `emptySelectionViolation` called this directly,
-    // and `deadSelectorFindings` only catches a rule that DECLARES a glob — so
-    // `functions(p).that().haveNameMatching(/x/)` over a zero-file project was
-    // told "The project loaded 0 files … widen it, or declare the empty state".
-    // Both remedies are impossible on that input: nothing widens into a corpus of
-    // zero files, and declaring produces a different failure. The sentence stated
-    // the instrument-level fact and then gave selection-level advice contradicting
-    // it — ADR-008 rule 2, on the one input class this plan's headline ruling is
-    // about. `diagnose()` already got this right and refused to pair them.
-    if (project !== undefined && loadedNothing(project)) {
-      return this.emptyProjectViolation(project)
-    }
-    const described = this.describeRule()
-    const name = described.id || described.rule || this.constructor.name
-    // The numbers, not the possibility. `loaded` is omitted rather than guessed
-    // when the family has no project — the honest gap `getProject()` documents.
+  /**
+   * The advice for a rule that examined zero units — plan 0099.
+   *
+   * PUBLIC and zero-arg, following `assertionAdvice()`'s precedent exactly: it is
+   * read structurally by `diagnose()` so `doctor` and the gate carry the same
+   * string **by construction**. Plan 0070 added that seam after the two were
+   * measured diverging; review measured this pair diverging the same way, with
+   * `diagnose()` still closing "A later release makes this state fail at check
+   * time" in the release that makes it fail.
+   */
+  zeroSubjectsAdvice(): string {
+    const project = this.getProject()
     const loaded = project === undefined ? undefined : project.getSourceFiles().length
     // The project file count is CONTEXT in parentheses, never a denominator: the
     // rule did not examine files, and "0 of 616" reads as a glob problem when the
@@ -911,12 +902,31 @@ export abstract class TerminalBuilder {
       hint === undefined
         ? ' Its own narrowing removed them — including any default it applies that you did not write.'
         : ` ${hint}`
-    const advice =
+    return (
       `${counted}, so it enforces nothing as written today.${cause} ` +
-      `Either close the gap — widen the selector, or add the code it is waiting for — or declare the empty state with ` +
-      `${this.emptyDeclarationAdvice()} — a declaration is an assertion, not a silencer: ` +
-      `it fails the day something does match. ` +
-      UNSUPPRESSABLE
+      `Either close the gap — widen the selector, or add the code it is waiting for — or declare ` +
+      `the empty state with ${this.emptyDeclarationAdvice()} — a declaration is an assertion, not ` +
+      `a silencer: it fails the day something does match.`
+    )
+  }
+
+  protected zeroSubjectsViolation(project: ArchProject | undefined): ArchViolation {
+    // The precedence lives HERE, not only at the call site, because this
+    // producer's docstring declares "no empty project" as a precondition and an
+    // assumed precondition is one a second caller forgets.
+    //
+    // Measured: `rule-builder`'s `emptySelectionViolation` called this directly,
+    // and `deadSelectorFindings` only catches a rule that DECLARES a glob — so
+    // `functions(p).that().haveNameMatching(/x/)` over a zero-file project was
+    // told "widen it, or declare the empty state". Both remedies are impossible
+    // on that input, and the sentence stated the instrument-level fact and then
+    // gave selection-level advice contradicting it.
+    if (project !== undefined && loadedNothing(project)) {
+      return this.emptyProjectViolation(project)
+    }
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    const advice = `${this.zeroSubjectsAdvice()} ${UNSUPPRESSABLE}`
     return {
       rule: name,
       ruleId: described.id,
