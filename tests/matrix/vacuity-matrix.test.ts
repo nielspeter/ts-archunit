@@ -26,7 +26,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import path from 'node:path'
 import { project } from '../../src/core/project.js'
-import { loadPublishedExports, SUBPATHS } from './enumerate.js'
+import { loadPublishedExports, readPackageVersion, SUBPATHS } from './enumerate.js'
 import {
   CHECKS,
   NOT_CHECKS,
@@ -121,7 +121,23 @@ const AUDIT_2026_08: Readonly<Record<string, Verdict>> = {
   './presets:dataLayerIsolation': 'no-checks', // constructs zero rules from a valid option
   './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
 }
-const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = AUDIT_2026_08
+/**
+ * Today's truth, after plan 0099's floor. It may only SHRINK against
+ * `AUDIT_2026_08` above, which is the dated measurement it is bounded by.
+ *
+ * The four `'fail-open'` cells are gone: every one of them now reports a
+ * configuration finding at both `check()` and `.warn()`. That is bug 0066 closed,
+ * measured by an instrument written before the fix and untouched by it.
+ *
+ * It cannot be emptied, and the remaining entry names its own reason rather than
+ * looking stalled: `dataLayerIsolation` constructs **zero rules** from a valid
+ * option set, so no per-rule floor reaches it — a function that returned `[]` has
+ * nothing to stand beneath. That is [plan 0100](../../plans/0100-a-preset-that-constructs-nothing.md).
+ */
+const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = {
+  './presets:dataLayerIsolation': 'no-checks', // 0100 — constructs zero rules; no floor can reach it
+  './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
+}
 
 /** The release that must have emptied the list; past it, a stalled programme reds the audit. */
 const EXPIRES_AT_VERSION = '0.62.0'
@@ -159,16 +175,71 @@ describe('the vacuity matrix (plan 0095)', () => {
 
   it('the known-fail-open list may only shrink, and expires', () => {
     expect(Object.keys(KNOWN_FAIL_OPEN).filter((k) => !(k in AUDIT_2026_08))).toEqual([])
-    const current: string = process.env.npm_package_version ?? '0.0.0'
-    const past = (a: string, b: string): boolean =>
-      a.split('.').map(Number).join('.') >= b.split('.').map(Number).join('.')
-    const open = Object.values(KNOWN_FAIL_OPEN).filter((v) => v === 'fail-open').length
-    if (open > 0 && past(current, EXPIRES_AT_VERSION)) {
+
+    // The version, read from disk. `process.env.npm_package_version ?? '0.0.0'`
+    // failed open twice over: the fallback is never past any deadline, and
+    // `npm_package_*` is only set when npm runs the script — CI invokes
+    // `npx vitest` directly, so the deadline was already dead in the only place
+    // it runs. `enumerate.ts` reads `package.json` the same way.
+    const current: string = readPackageVersion()
+    expect(current).toMatch(/^\d+\.\d+\.\d+/)
+
+    // Numeric, component-wise. The old form re-joined to a STRING after
+    // `map(Number)`, so the comparison was lexicographic: measured,
+    // `past('0.100.0', '0.62.0')` was **false**. At this repo's cadence (0.22 to
+    // 0.58 across this programme) 0.100.0 is reachable, and the failure mode is a
+    // deadline that quietly stops existing.
+    const past = (a: string, b: string): boolean => {
+      const pa = a.split('.').map(Number)
+      const pb = b.split('.').map(Number)
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const x = pa[i] ?? 0
+        const y = pb[i] ?? 0
+        if (x !== y) return x > y
+      }
+      return true
+    }
+
+    // Counts every cell that is still VACUOUS, not only `'fail-open'`.
+    //
+    // Plan 0099 converts all four `'fail-open'` cells, so a gate counting only
+    // those would reach zero and could never fire again at any version — a check
+    // that cannot fail, inside the file whose purpose is finding checks that
+    // cannot fail. `'no-checks'` is the one entry that remains genuinely vacuous,
+    // so it is what the deadline is now about.
+    const vacuous = Object.values(KNOWN_FAIL_OPEN).filter(
+      (v) => v === 'fail-open' || v === 'no-checks',
+    ).length
+    if (vacuous > 0 && past(current, EXPIRES_AT_VERSION)) {
       throw new Error(
-        `${String(open)} cells still fail open at ${current}. Plan 0098 was ` +
+        `${String(vacuous)} cells are still vacuous at ${current}. Plan 0100 was ` +
           `due by ${EXPIRES_AT_VERSION}; a stalled programme must red the audit rather than live behind it.`,
       )
     }
+  })
+
+  it('CONTROL: the expiry gate can still fire, and its comparison is numeric', () => {
+    // Without this the gate above is unfalsifiable — which is exactly the defect
+    // it exists to prevent, and exactly what counting only `'fail-open'` would
+    // have made it after this plan.
+    const past = (a: string, b: string): boolean => {
+      const pa = a.split('.').map(Number)
+      const pb = b.split('.').map(Number)
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const x = pa[i] ?? 0
+        const y = pb[i] ?? 0
+        if (x !== y) return x > y
+      }
+      return true
+    }
+    // The measured lexicographic bug: '0.100.0' IS past '0.62.0'.
+    expect(past('0.100.0', '0.62.0')).toBe(true)
+    expect(past('0.62.0', '0.62.0')).toBe(true)
+    expect(past('0.61.9', '0.62.0')).toBe(false)
+    // And there is still something for the deadline to be about.
+    expect(
+      Object.values(KNOWN_FAIL_OPEN).filter((v) => v === 'fail-open' || v === 'no-checks').length,
+    ).toBeGreaterThan(0)
   })
 
   it.each(Object.keys(CHECKS))('%s behaves as recorded at .check()', (key) => {
