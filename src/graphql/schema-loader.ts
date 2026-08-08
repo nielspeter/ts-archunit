@@ -89,10 +89,27 @@ function requireGraphQL(): GraphQLPackage {
     // ts-archunit-exclude adr005/no-as-cast-module: optional peer dep, no typed path
     cachedGraphQL = esmRequire('graphql') as GraphQLPackage
     return cachedGraphQL
-  } catch {
+  } catch (cause) {
+    // MODULE_NOT_FOUND is the only failure the install instruction answers.
+    // Every other cause — a corrupt install, a version mismatch, a throw from
+    // `graphql`'s own module initialisation — used to be reported as "not
+    // installed", which sends the reader to run an install that cannot help and
+    // discards the one line that would have told them what actually happened.
+    // Found by running `preset/recommended/no-silent-catch` over our own `src/`
+    // for the first time.
+    const missing = cause instanceof Error && 'code' in cause && cause.code === 'MODULE_NOT_FOUND'
+    if (missing) {
+      throw new Error(
+        '[ts-archunit/graphql] The "graphql" package is required but not installed.\n' +
+          'Install it with: npm install graphql',
+        { cause },
+      )
+    }
     throw new Error(
-      '[ts-archunit/graphql] The "graphql" package is required but not installed.\n' +
-        'Install it with: npm install graphql',
+      `[ts-archunit/graphql] The "graphql" package is installed but could not be loaded: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+      { cause },
     )
   }
 }
