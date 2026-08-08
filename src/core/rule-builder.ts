@@ -8,6 +8,7 @@ import type { DeclaredGlob, GlobNode } from './glob-site.js'
 import { countDeclaredGlobs, stampGlobs } from './glob-site.js'
 import { TerminalBuilder } from './terminal-builder.js'
 import { assertsCardinality } from './cardinality.js'
+import { UNSUPPRESSABLE } from './unsuppressable.js'
 
 /**
  * Abstract base class for the predicate/condition rule builders.
@@ -458,17 +459,30 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    */
   private unexpectedlyNonEmptyViolation(found: number): ArchViolation {
     const description = this.buildRuleDescription() || 'selector'
-    const advice =
-      `.expectEmpty() asserted this selector matches nothing, and it matched ${String(found)}. ` +
-      'Either the thing you were waiting for has appeared — in which case drop .expectEmpty() ' +
-      'and let the rule enforce itself — or the selector is broader than you meant.'
+    const declaration = this.emptyDeclarationAdvice()
+    const message = `${declaration} asserted this selector matches nothing, and it matched ${String(found)}.`
+    // A DISTINCT remedy, not the message repeated. `format.ts` drops the `Fix:`
+    // line when `suggestion === message`, so this finding shipped with no remedy
+    // at all — and both actions its message offered ("drop .expectEmpty()",
+    // "the selector is broader than you meant") are impossible for a preset user,
+    // whose config says `expectEmpty: [id]` and who cannot reach the selector.
+    const suggestion =
+      `Remove ${declaration} and let the rule enforce itself — the thing you were waiting for ` +
+      `has appeared, and the rule now has something to check. If instead the selection is wider ` +
+      `than you meant, narrow it and keep the declaration. ` +
+      `Any violations found are reported below this finding. ` +
+      UNSUPPRESSABLE
     return {
       rule: description,
-      element: description,
+      // Carried so the reader can act: the default terminal formatter prints the
+      // chain description, never `ruleId`, and for a preset rule the id IS the
+      // argument they have to type.
+      ruleId: this._metadata?.id,
+      element: this._metadata?.id ?? description,
       file: '',
       line: 0,
-      message: advice,
-      suggestion: advice,
+      message,
+      suggestion,
       bypassFilters: true,
     }
   }
@@ -498,9 +512,14 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       // opt-in now changes nothing, so an agent following it fails, and then
       // improvises. ADR-008 rule 2: a remedy that is impossible on the path
       // that produced it is worse than none.
+      // `emptyDeclarationAdvice()` rather than a literal `.expectEmpty()`: the
+      // family-specific spelling already existed for exactly this reason and this
+      // producer was not asking for it, so a preset user — who holds no builder —
+      // was sent to a call they cannot make, and a `CorrespondenceBuilder` reader
+      // to one that throws.
       suggestion:
         'Widen the selector until it matches at least one subject, or declare ' +
-        '.expectEmpty() if matching nothing is the point — that asserts it, and ' +
+        `${this.emptyDeclarationAdvice()} if matching nothing is the point — that asserts it, and ` +
         'fails the day something does match.',
       // No `suggestion`/`docs` from `this._metadata` (bug 0021). This finding says
       // the selector matched nothing; the author's remedy is for a violation of the
@@ -541,10 +560,21 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
 
     // `.expectEmpty()` asserted nothing would match, and something did. This is
     // the property that makes it an assertion rather than `.allowEmpty()`.
-    if (this._expectEmpty) return [this.unexpectedlyNonEmptyViolation(filtered.length)]
-
-    // `.expectEmpty()` asserted nothing would match, and something did. This is
-    // the property that makes it an assertion rather than `.allowEmpty()`.
+    //
+    // It reports and KEEPS GOING. Returning here discarded every real violation
+    // the rule would have found — measured on plan 0089's preset carrier, where
+    // one preset rule id constructs N rules (`restricted-packages` per package,
+    // `no-cross-boundary` per boundary): declaring the id applies the assertion
+    // to all N, and one non-empty instance replaced a genuine
+    // `imports "lodash" which matches forbidden [lodash]` with a config error.
+    // The architecture violation vanished from a run the user had made stricter.
+    //
+    // Failing on a false declaration is right; losing the finding underneath it
+    // is not. The rule already fails either way, so reporting both can only add
+    // information — and the one the reader must act on is the violation.
+    const unexpectedlyNonEmpty = this._expectEmpty
+      ? [this.unexpectedlyNonEmptyViolation(filtered.length)]
+      : []
 
     // Step 4: Build context for conditions
     const context = this.buildConditionContext()
@@ -555,7 +585,10 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       violations.push(...condition.evaluate(filtered, context))
     }
 
-    return violations
+    // The false declaration first: it says the configuration is wrong, which the
+    // reader needs before any finding produced under it — the ordering bug 0038
+    // settled for unknown override keys, and the same argument applies here.
+    return [...unexpectedlyNonEmpty, ...violations]
   }
 
   /**
