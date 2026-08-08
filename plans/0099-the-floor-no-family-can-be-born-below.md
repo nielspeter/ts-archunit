@@ -243,6 +243,50 @@ Naming the two calls is what turns a qualifier into a disclosure:
 > no rules at all — `agentGuardrails(p, { src })` and `dataLayerIsolation(p, { repositories })` with no
 > flags enabled produce an empty array and nothing to check. Enable at least one flag. Tracked in 0100.
 
+## Added 2026-08-08 — what 0089's review left on this plan's doorstep
+
+Three items from the five-persona review of [0089](./completed/0089-presets-forward-their-options.md).
+The first is a design correction to something 0089 shipped, and it should be settled **here** rather
+than filed as a defect, because it is a decision about where knowledge lives.
+
+**1. The preset-shaped remedy currently branches on a string prefix, in core.** 0089 made
+`TerminalBuilder.emptyDeclarationAdvice()` return `expectEmpty: ['<id>'] in this preset's options` when
+`this._metadata?.id` starts with `preset/`, so a preset user is no longer told to call `.expectEmpty()`,
+which they cannot reach. The outcome is right and this plan depends on it — 0099 line 125 already
+commits to "when the rule id begins `preset/`, the remedy is preset-shaped".
+
+The mechanism is not. **Core cannot verify what that sentence asserts.** It is false for a third-party
+preset built on `RuleBuilder` that never extended `PresetBaseOptions`, false for a hand-written
+`.rule({ id: 'preset/…' })`, and false for a preset that forwards `overrides` but not `expectEmpty`. The
+method exists precisely to stop advice naming a call the reader cannot make — `CorrespondenceBuilder`
+overrides it because the zero-arg form throws there — and deriving it from a **prefix** rather than from
+the family that knows gives that discipline up. It is also an
+[ADR-010](../adr/010-the-extension-surface-is-a-contract.md) rule 1 **semantics** change to a member the
+contract names, shipped under `### Fixed`.
+
+The fix belongs where the knowledge is: `declareEmptyIfListed` in `src/presets/shared.ts` is the single
+site that knows both the id **and** that its caller is a preset accepting `expectEmpty`. Have the preset
+supply the spelling — an optional `RuleMetadata` field, or a protected setter the carrier calls — and
+leave `emptyDeclarationAdvice()` in core returning `.expectEmpty()`. Third-party presets then get it
+right for free by using the same carrier, and core stops guessing. Doing it in this plan keeps the
+ADR-010 note in the release that also carries the floor.
+
+**2. The declaration is inert for the smell family, and `declaresEmpty()` still returns `true`** —
+[bug 0073](../bugs/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md). That matters here more
+than anywhere: this plan's floor reads `declaresEmpty()` to stand down, so today the declaration's only
+working effect on a smell rule is to suppress the floor that has not shipped yet. Either 0073 ships
+first or this plan carries it; what must not happen is the floor arming while one family answers the
+question it asks with a value nothing sets.
+
+**3. Which release makes a declaration expire is currently unstated.** For `preset/recommended/*`,
+`preset/data/*` and the function rules of `agentGuardrails`, a false declaration hard-fails **today**.
+For `preset/layered/no-cycles`, `layer-order`, `preset/boundaries/no-cycles` and
+`preset/agent/no-copy-paste` it asserts nothing until this plan lands. `docs/presets.md` says flatly
+that a declaration "states a fact about today that a later release can hold you to" — true for some ids
+and, right now, false for the one the docs use as their example. This plan is the release that makes the
+sentence true; say so in the docs when it ships, and note the docs site deploys on merge rather than on
+tag, so the claim goes live before the version does.
+
 ## Out of scope
 
 The CLI beyond what the root conversion reaches (0095 measures it; a fix beyond that gets its own number).
