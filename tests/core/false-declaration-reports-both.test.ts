@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import type { ArchProject } from '../../src/core/project.js'
 import { layeredArchitecture } from '../../src/presets/layered.js'
+import { recommended } from '../../src/presets/recommended.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { functionNoEval } from '../../src/rules/security.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
@@ -144,15 +145,22 @@ describe('the remedy names a call the reader can actually make', () => {
     return { message: v?.message ?? '', suggestion: v?.suggestion ?? '' }
   }
 
-  it('a PRESET rule id is told the config spelling, never `.expectEmpty()`', () => {
-    // The whole point: a preset user holds no builder, so `.expectEmpty()` is
-    // unreachable to them — and the default terminal formatter prints the chain
-    // description, never the id, so the argument they need was nowhere on screen.
+  it('a hand-written rule with a preset/ id gets the BUILDER spelling', () => {
+    // This row asserted the opposite, and it was pinning a defect.
+    //
+    // `emptyDeclarationAdvice()` used to branch on `id.startsWith('preset/')`.
+    // A prefix is a naming convention, not a capability: this rule is built by
+    // hand with `functions()`, there is no preset anywhere, and telling its
+    // author to edit "this preset's options" names something that does not
+    // exist. The same was true for a third-party preset that never extended
+    // `PresetBaseOptions`, and for one forwarding `overrides` but not
+    // `expectEmpty`.
+    //
+    // The spelling is now stated by whoever CONSTRUCTS the rule, so core stops
+    // guessing — and this test is the guard for that.
     const { message, suggestion } = declaredNonEmpty('preset/recommended/no-eval')
-    expect(message).toContain("expectEmpty: ['preset/recommended/no-eval']")
-    expect(suggestion).toContain("expectEmpty: ['preset/recommended/no-eval']")
-    expect(message).not.toContain('.expectEmpty()')
-    expect(suggestion).not.toContain('.expectEmpty()')
+    expect(message).toContain('.expectEmpty()')
+    expect(suggestion).not.toContain("in this preset's options")
   })
 
   it('a non-preset rule still gets the builder spelling', () => {
@@ -178,21 +186,16 @@ describe('the remedy names a call the reader can actually make', () => {
     expect(v?.suggestion ?? '').toContain('separate findings under the same rule id')
   })
 
-  it('the EMPTY-selection finding points at the reachable spelling too', () => {
-    // A LIVE glob with a zero selection — the file exists and matches, it just
-    // declares no functions. A dead glob (`**/nowhere/**`) produces the
-    // can-never-match finding instead, which is a different diagnosis with its
-    // own remedy and no declaration to offer.
+  it('a REAL preset rule is told the config spelling — the reachable one', () => {
+    // The other half, and the one that matters: routed through an actual preset,
+    // whose carrier states the spelling because it is the one place that knows
+    // both the id and that its caller accepts `expectEmpty`.
     const p = inMemory({ '/src/types-only.ts': 'export type A = { n: number }\n' })
-    const v = functions(p)
-      .that()
-      .resideInFile('**/types-only.ts')
-      .should()
-      .satisfy(functionNoEval())
-      .rule({ id: 'preset/recommended/no-eval', because: 'b', suggestion: 's' })
-      .violations()
+    const v = recommended(p, { include: '**/types-only.ts' })
+      .flatMap((r) => r.violations())
       .find((x) => x.bypassFilters === true)
-    expect(v?.message ?? '').toContain('matched 0 subjects')
-    expect(v?.suggestion ?? '').toContain("expectEmpty: ['preset/recommended/no-eval']")
+    expect(v?.message ?? '').toContain('examined 0')
+    expect(v?.message ?? '').toContain("expectEmpty: ['preset/recommended/")
+    expect(v?.message ?? '').toContain("in this preset's options")
   })
 })

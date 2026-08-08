@@ -35,6 +35,23 @@ function distTarget(entry: unknown): string | undefined {
   return undefined
 }
 
+/**
+ * This package's version, read from `package.json` on disk — plan 0099.
+ *
+ * The expiry gate used `process.env.npm_package_version ?? '0.0.0'`, which failed
+ * open twice: the fallback is never past any deadline, and `npm_package_*` is
+ * only set when npm runs the script. CI invokes `npx vitest` directly, so the
+ * deadline was dead in the one place it actually runs. This reads the same file
+ * the exports map is read from, by the same route.
+ */
+export function readPackageVersion(): string {
+  const raw: unknown = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
+  if (!isRecord(raw) || typeof raw.version !== 'string') {
+    throw new Error('package.json has no version')
+  }
+  return raw.version
+}
+
 function readExportsMap(): { subpath: string; dist: string }[] {
   const raw: unknown = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   if (!isRecord(raw) || !isRecord(raw.exports)) throw new Error('package.json has no exports map')

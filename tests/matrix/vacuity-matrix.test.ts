@@ -26,7 +26,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import path from 'node:path'
 import { project } from '../../src/core/project.js'
-import { loadPublishedExports, SUBPATHS } from './enumerate.js'
+import { loadPublishedExports, readPackageVersion, SUBPATHS } from './enumerate.js'
 import {
   CHECKS,
   NOT_CHECKS,
@@ -121,10 +121,94 @@ const AUDIT_2026_08: Readonly<Record<string, Verdict>> = {
   './presets:dataLayerIsolation': 'no-checks', // constructs zero rules from a valid option
   './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
 }
-const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = AUDIT_2026_08
+/**
+ * Today's truth, after plan 0099's floor. It may only SHRINK against
+ * `AUDIT_2026_08` above, which is the dated measurement it is bounded by.
+ *
+ * The four `'fail-open'` cells are gone: every one of them now reports a
+ * configuration finding at both `check()` and `.warn()`. That is bug 0066 closed,
+ * measured by an instrument written before the fix and untouched by it.
+ *
+ * It cannot be emptied, and the remaining entry names its own reason rather than
+ * looking stalled: `dataLayerIsolation` constructs **zero rules** from a valid
+ * option set, so no per-rule floor reaches it — a function that returned `[]` has
+ * nothing to stand beneath. That is [plan 0100](../../plans/0100-a-preset-that-constructs-nothing.md).
+ */
+const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = {
+  './presets:dataLayerIsolation': 'no-checks', // 0100 — constructs zero rules; no floor can reach it
+  './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
+}
 
 /** The release that must have emptied the list; past it, a stalled programme reds the audit. */
 const EXPIRES_AT_VERSION = '0.62.0'
+
+/**
+ * Numeric, component-wise version compare — module scope so the gate and its
+ * CONTROL call the SAME function.
+ *
+ * They did not: each declared its own copy with the same body, so reverting the
+ * gate to the lexicographic form left the control passing. ADR-008 rule 5's
+ * question answered "pass", in the file whose purpose is finding checks that
+ * cannot fail, in the commit repairing that file's expiry gate — the same shape
+ * fixed one level up (counting only `'fail-open'`) and reintroduced one down.
+ *
+ * The bug it exists against: the original re-joined to a STRING after
+ * `map(Number)`, so `past('0.100.0', '0.62.0')` was false.
+ */
+/**
+ * The whole expiry verdict, as ONE function — returns the failure message or
+ * `undefined`.
+ *
+ * The gate and its CONTROL must drive the SAME code. They did not: each held its
+ * own copy of the comparison, so reverting the gate left the control passing.
+ * Measured across all three repairs this file made — the numeric compare, the
+ * vacuity predicate, and the version source — each reverted GREEN. ADR-008 rule
+ * 5 answered "pass" three times, in the file whose subject is checks that cannot
+ * fail.
+ *
+ * Taking `version` and `list` as arguments is what makes it drivable: the control
+ * can ask for a verdict at 0.100.0, or over a synthetic list, without waiting for
+ * a release.
+ */
+export function expiryFailure(
+  list: Readonly<Record<string, Verdict>>,
+  // DEFAULTED, so the gate has no version expression to revert. The control
+  // asserted `readPackageVersion()` directly, which proved the function but never
+  // the gate's choice to call it: reverting only the call site to
+  // `process.env.npm_package_version ?? '0.0.0'` left the matrix 43/43 green.
+  // A defaulted parameter removes the seam instead of adding a row to watch it.
+  version: string = readPackageVersion(),
+  // The deadline is injectable for one reason: without it the default `version`
+  // is unfalsifiable. Both the real version (0.58.0) and the broken '0.0.0'
+  // fallback sit BEFORE 0.62.0, so every assertion returns undefined either way —
+  // measured, reverting the default to `process.env.npm_package_version ?? '0.0.0'`
+  // left the matrix 43/43 green. Driving a deadline below the real version is what
+  // separates them.
+  deadline: string = EXPIRES_AT_VERSION,
+): string | undefined {
+  // Everything still VACUOUS, not only `'fail-open'`. Plan 0099 converts all four
+  // `'fail-open'` cells, so a gate counting only those reaches zero and can never
+  // fire again at any version. `'other-throw'` is excluded because it fails
+  // CLOSED — `./graphql:schema` refuses an empty corpus, which is the wanted
+  // behaviour, not a debt.
+  const vacuous = Object.values(list).filter((v) => v === 'fail-open' || v === 'no-checks').length
+  if (vacuous === 0 || !past(version, deadline)) return undefined
+  return (
+    `${String(vacuous)} cells are still vacuous at ${version}. Plan 0100 was ` +
+    `due by ${deadline}; a stalled programme must red the audit rather than live behind it.`
+  )
+}
+
+function past(a: string, b: string): boolean {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0
+    const y = pb[i] ?? 0
+    if (x !== y) return x > y
+  }
+  return true
+}
 
 describe('the vacuity matrix (plan 0095)', () => {
   let published: Awaited<ReturnType<typeof loadPublishedExports>>
@@ -159,16 +243,56 @@ describe('the vacuity matrix (plan 0095)', () => {
 
   it('the known-fail-open list may only shrink, and expires', () => {
     expect(Object.keys(KNOWN_FAIL_OPEN).filter((k) => !(k in AUDIT_2026_08))).toEqual([])
-    const current: string = process.env.npm_package_version ?? '0.0.0'
-    const past = (a: string, b: string): boolean =>
-      a.split('.').map(Number).join('.') >= b.split('.').map(Number).join('.')
-    const open = Object.values(KNOWN_FAIL_OPEN).filter((v) => v === 'fail-open').length
-    if (open > 0 && past(current, EXPIRES_AT_VERSION)) {
-      throw new Error(
-        `${String(open)} cells still fail open at ${current}. Plan 0098 was ` +
-          `due by ${EXPIRES_AT_VERSION}; a stalled programme must red the audit rather than live behind it.`,
-      )
+    const failure = expiryFailure(KNOWN_FAIL_OPEN)
+    if (failure !== undefined) throw new Error(failure)
+  })
+
+  it('CONTROL: each of the three repairs is falsifiable through the gate itself', () => {
+    // Drives `expiryFailure`, not a copy of it. Each row below kills exactly one
+    // revert; measured before this, all three reverted GREEN.
+
+    // 1. The numeric compare. Lexicographically '0.100.0' < '0.62.0', so the old
+    //    form returned undefined here and the deadline quietly stopped existing.
+    expect(expiryFailure(KNOWN_FAIL_OPEN, '0.100.0')).toBeDefined()
+    expect(expiryFailure(KNOWN_FAIL_OPEN, '0.61.9')).toBeUndefined()
+
+    // 2. The vacuity predicate. A list whose only debt is 'no-checks' must still
+    //    expire — counting 'fail-open' alone made the gate unreachable the moment
+    //    this plan converted those four cells.
+    expect(expiryFailure({ x: 'no-checks' }, '0.100.0')).toBeDefined()
+    // ...and 'other-throw' is not debt: it fails closed.
+    expect(expiryFailure({ x: 'other-throw' }, '0.100.0')).toBeUndefined()
+
+    // 3. The version source. `process.env.npm_package_version ?? '0.0.0'` failed
+    //    open twice: the fallback is past no deadline, and the variable is unset
+    //    whenever vitest is invoked directly — which is how CI runs this file.
+    //    `toMatch(/^\d+\.\d+\.\d+/)` passed on '0.0.0', so it rejected nothing.
+    //
+    //    Asserted by REMOVING the variable rather than by observing it absent:
+    //    `npm run test:matrix` sets it, `npx vitest` (which is how CI invokes
+    //    this file) does not, so an assertion about the ambient environment would
+    //    pass or fail depending on who ran it. With it unset, the old
+    //    env-reading implementation returns the '0.0.0' fallback and this fails.
+    const saved = process.env.npm_package_version
+    delete process.env.npm_package_version
+    try {
+      expect(readPackageVersion()).not.toBe('0.0.0')
+      expect(readPackageVersion()).toMatch(/^\d+\.\d+\.\d+/)
+      // The DEFAULT is what the gate uses, so prove it directly: with the env
+      // var gone, a '0.0.0' default would never be past any deadline and the
+      // call below would return undefined.
+      // The DEFAULT version, against a deadline below the real one. With the
+      // env var gone, a '0.0.0' fallback is not past 0.1.0 and this returns
+      // undefined; the real 0.58.0 is, and it returns a message. That is the
+      // assertion that separates the two defaults.
+      expect(expiryFailure({ x: 'no-checks' }, undefined, '0.1.0')).toBeDefined()
+      expect(expiryFailure({ x: 'no-checks' })).toBeUndefined()
+    } finally {
+      if (saved !== undefined) process.env.npm_package_version = saved
     }
+
+    // And there is still something for the deadline to be about.
+    expect(Object.keys(KNOWN_FAIL_OPEN).length).toBeGreaterThan(0)
   })
 
   it.each(Object.keys(CHECKS))('%s behaves as recorded at .check()', (key) => {

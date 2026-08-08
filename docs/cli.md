@@ -36,7 +36,7 @@ It creates:
 | `--force`           | Overwrite existing files. Without it, `init` refuses and lists conflicts.                                     |
 | `--dry-run`         | Print what would be created; write nothing.                                                                   |
 
-`init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do.
+`init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do. **One exception:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob (since 0.34.0) or one that examined **zero units** (since 0.59.0) — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not.
 
 A shape preset scaffolds `arch.rules.ts` with the `recommended` floor **plus** the chosen architecture preset, pre-filled with example folder globs. Pick by your architecture:
 
@@ -147,13 +147,12 @@ demo/no-condition
   if it comes from a preset (ruleId "preset/..."), report it to the preset's author
 
 demo/duplicates
-  zero-subjects: this rule examined 0 subjects, so it can never fail. Its own
-  narrowing removed everything the project loaded — including any default it
-  applies that you did not write. Widen it, or declare the empty state with
-  .expectEmpty() if that is the point — but the declaration is not itself checked
-  yet, so it silences this without proving anything; widening is the fix,
-  declaring is the exception. A later release makes this state fail at check
-  time; this surface is how you find it first
+  zero-subjects: This rule examined 0 function bodies (the project loaded 1 file),
+  so it enforces nothing as written today. Its narrowing was: minLines(5) —
+  minLines defaults to 5, a default you did not write. Either close the gap —
+  widen the selector, or add the code it is waiting for — or declare the empty
+  state with .expectEmpty() — a declaration is an assertion, not a silencer: it
+  fails the day something does match.
 ```
 
 `zero-subjects` reports **last**, and only when nothing else already explained the emptiness —
@@ -255,7 +254,7 @@ export default [...myPreset(p)]
 ```
 
 `check` exits non-zero only when there are **error**-severity violations; warnings
-are reported but never fail the run.
+are reported but never fail the run. **One exception:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob (since 0.34.0) or one that examined **zero units** (since 0.59.0) — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not.
 
 ::: warning Leave rule-file builders un-terminated
 In a rule file, entries in the `export default [...]` array must be **builders**,

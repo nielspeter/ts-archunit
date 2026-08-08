@@ -12,6 +12,7 @@ import {
   overrideFindings,
   validateOverrides,
   declareEmptyIfListed,
+  presetDeclarationSpelling,
   declaredEmptyFindings,
 } from './shared.js'
 
@@ -102,7 +103,10 @@ const RULE_IDS: readonly string[] = SPECS.map((s) => s.meta.id)
  * Returns severity-carrying builders (the returning form), so spread it into a
  * rule file: `export default [...recommended(p)]`. The two `error` rules fail
  * the run; the two `warn` rules (silent-catch, empty-bodies) are reported but
- * never fail — they have known, suppressible false positives.
+ * never fail **when the rule works** — they have known, suppressible false
+ * positives. A configuration finding (a rule that examined zero units, or whose
+ * glob is dead) is `error` regardless of severity and fails the build: `'warn'`
+ * grades violations, not a rule that cannot enforce anything.
  *
  * Overlaps `agentGuardrails` on empty bodies and `eval`. For agent-focused
  * projects prefer `agentGuardrails` alone, or override the duplicated ids to
@@ -128,7 +132,7 @@ export function recommended(p: ArchProject, options: RecommendedOptions = {}): R
           .resideInFile(include)
           .should()
           .satisfy(condition)
-          .rule(meta)
+          .rule({ ...meta, declarationSpelling: presetDeclarationSpelling(meta.id) })
           .asSeverity(sev),
         meta.id,
         options,

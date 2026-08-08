@@ -1,3 +1,4 @@
+import type { RuleDescription } from '../core/rule-description.js'
 import picomatch from 'picomatch'
 import path from 'node:path'
 import { selectionMemo } from '../core/selection-memo.js'
@@ -35,6 +36,26 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     return next
   }
 
+  /**
+   * Named by id or by what the detector checks — the inherited version returns
+   * the sentinel `'unnamed'`, and `inconsistent-siblings.ts` already carries this
+   * override for that reason.
+   *
+   * It became load-bearing in plan 0099: the floor makes an over-filtered
+   * detector FAIL, and `dedupeConfigFindings` keys on `(file, ruleId ?? rule,
+   * element)`. With `file: ''` and `'unnamed'` in both other slots, three
+   * genuinely different detectors — different similarity, different
+   * `ignorePaths` — collapsed into one finding claiming they were "one option"
+   * and "one edit". Two were silently discarded and the survivor said
+   * `Rule: unnamed`.
+   */
+  override describeRule(): RuleDescription {
+    return {
+      ...super.describeRule(),
+      rule: this._metadata?.id ?? this.describe(),
+    }
+  }
+
   protected detect(): ArchViolation[] {
     const functions = this.selected()
     const fingerprinted = this.fingerprintAll(functions)
@@ -44,7 +65,20 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
 
   protected describe(): string {
     const scope = this._folders.length > 0 ? this._folders.join(', ') : 'all files'
-    return `No duplicate function bodies in ${scope} (similarity >= ${String(this._minSimilarity)})`
+    // EVERY narrowing that distinguishes two instances, not just similarity.
+    //
+    // This is the `Rule:` line a reader sees, and since plan 0099 it is also the
+    // dedupe identity for a detector with no `.rule({ id })`. Rendering only
+    // folders and similarity meant three detectors differing in `minLines` shared
+    // one key: measured, 3 findings collapsed to 1 claiming they were "one edit",
+    // and fixing the surviving threshold left the other two dead and green.
+    const filters = [`minLines >= ${String(this._minLines)}`]
+    if (this._ignorePaths.length > 0) filters.push(`ignoring ${this._ignorePaths.join(', ')}`)
+    if (this._ignoreTests) filters.push('ignoring tests')
+    return (
+      `No duplicate function bodies in ${scope} ` +
+      `(similarity >= ${String(this._minSimilarity)}, ${filters.join(', ')})`
+    )
   }
 
   /** Check if a file path passes all glob-based filters. */

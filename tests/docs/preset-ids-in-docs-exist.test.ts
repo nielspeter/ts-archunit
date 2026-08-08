@@ -46,12 +46,23 @@ function idsMentionedIn(file: string, unreleasedOnly = false): Map<string, numbe
   // quote a MISSPELLED id: bug 0038's entry reads "'…/no-silent-cach': 'error'
   // left the rule at warn", which is the whole point of that entry. Correcting it
   // would falsify the record, so the ∀ runs over what is still being written.
-  const start = unreleasedOnly ? all.findIndex((l) => /^## \[Unreleased\]/.test(l)) : 0
+  // Falls back to the NEWEST RELEASED section when `[Unreleased]` is absent.
+  //
+  // Without this the guard went vacuous the moment the release commit renamed the
+  // heading: `start` was -1, `end` became 7, and the window was the CHANGELOG
+  // PREAMBLE — seven lines of boilerplate with zero preset ids in it. Green, and
+  // scanning nothing, for this release and every one after. That is the failure
+  // mode this repo exists to catch, in a guard written to catch it.
+  const start = unreleasedOnly ? all.findIndex((l) => /^## \[(Unreleased|\d)/.test(l)) : 0
   const endOffset = unreleasedOnly
     ? all.slice(start + 1).findIndex((l) => /^## \[/.test(l))
     : all.length
   const end = unreleasedOnly && endOffset >= 0 ? start + 1 + endOffset : all.length
   const lines = all.slice(start < 0 ? 0 : start, end)
+  // The window must contain something. A slice that silently empties is the
+  // ∀-over-∅ pass, and this file's whole subject is guards that cannot fail.
+  if (lines.length === 0)
+    throw new Error(`${file}: scan window is empty — the guard would be vacuous`)
   const found = new Map<string, number>()
   lines.forEach((line, i) => {
     for (const m of line.matchAll(/(preset\/[a-z0-9-]+\/[a-z0-9-]+(?:\/[a-z0-9$<>{}-]+)?)/gi)) {

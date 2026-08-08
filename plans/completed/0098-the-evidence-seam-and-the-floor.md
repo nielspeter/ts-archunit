@@ -2,7 +2,7 @@
 
 **Status:** Open, READY. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
 **Amended 2026-08-08 — narrowed to the seam.** The floor moved to
-[0099](../0099-the-floor-no-family-can-be-born-below.md); the preset gap this amendment measured is
+[0099](./0099-the-floor-no-family-can-be-born-below.md); the preset gap this amendment measured is
 [0100](../0100-a-preset-that-constructs-nothing.md). See **Amendment** below for the measurement that
 forced it. Everything from "Convert at the root" onward now belongs to 0099 and is kept here only as
 the design 0099 inherits.
@@ -10,7 +10,7 @@ the design 0099 inherits.
 seam can require it), [0097](./0097-the-declared-empty-grammar.md) (the floor reads the mint it lifts),
 [0089](./0089-presets-forward-their-options.md) (preset declarations need somewhere to be threaded), and
 **ADR-010 ratified** — Phase 2a retypes its rule 1 contract member.
-**Carries** the fix for [bug 0066](../../bugs/0066-a-smell-detector-over-zero-files-passes.md), deliberately:
+**Carries** the fix for [bug 0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md), deliberately:
 ADR-009 requires the seam change and the smell-family fix to land in **one red event**, so they ship in
 one release even though they are separate PRs.
 **Priority:** High. This is the plan that makes vacuity unrepresentable; the others prepare for it.
@@ -158,7 +158,7 @@ rule 2: the reference implementation changes in the same commit as the contract)
 **Deliberately NOT here**, because this plan changes no behaviour and review caught the earlier list
 claiming them: no `CHANGELOG.md` version heading, no `docs/upgrading.md` / `troubleshooting.md` /
 `api-reference.md` / `smell-detection.md` / `presets.md` / `recipes.md`, and **not** the
-`bugs/0066-*.md` → `bugs/fixed/` move. All belong to [0099](../0099-the-floor-no-family-can-be-born-below.md),
+`bugs/0066-*.md` → `bugs/fixed/` move. All belong to [0099](./0099-the-floor-no-family-can-be-born-below.md),
 which is the commit that makes them true. `docs.yml` deploys on push to `main` rather than on tag, so
 shipping those files here would publish a claim the released artifact does not yet honour.
 
@@ -189,7 +189,7 @@ shipping those files here would publish a claim the released artifact does not y
 ## Release
 
 **This plan ships no release of its own.** It is behaviour-neutral and merges to `main` ahead of
-[0099](../0099-the-floor-no-family-can-be-born-below.md); the tag is cut after 0099, and 0099's Release
+[0099](./0099-the-floor-no-family-can-be-born-below.md); the tag is cut after 0099, and 0099's Release
 section owns the note. The paragraph that stood here predated the split and still said "ships with 0097"
 — which had already merged — while carrying the terminal claim this plan alone does not deliver.
 

@@ -5,8 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.59.0] - 2026-08-08
 
+> **If your CI just went red on this upgrade:** a rule that runs and examines **zero units** now fails
+> `check()` where it passed. Run `ts-archunit doctor` **on 0.59.0** (not on 0.58.x — the diagnosis does
+> not exist there) to list every affected rule at once, then fix or declare each. **There is no flag** —
+> `--baseline`, `--changed`, `.warn()` and `.excluding()` all leave the finding. To buy time, pin to
+> `0.58.x`. Full detail under _a rule that examines zero units now FAILS_ below.
+>
 > **This release is `0.59.0`, not a patch.** It carries breaking changes to the extension surface and
 > makes `doctor` report — and therefore exit non-zero on — cases it previously ignored. Pre-1.0,
 > `^0.58.0` resolves anywhere inside `0.58.x`, so shipping this as `0.58.1` would reach every consumer
@@ -91,19 +97,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   matches **is** reported, because pairs are what that family examines and layers selecting files says
   nothing about whether any pair was formed.
 
-  ⚠️ **This can turn a green CI step red.** `doctor` exits non-zero on anything it reports, so
-  previewing four more families means rules you have had for a year can now fail that step — while
-  `check()` still passes them. Your enforcement gates are unaffected; there is deliberately no
+  ⚠️ **This turns a green CI step red, and in this release `check()` goes red with it.** `doctor`
+  exits non-zero on anything it reports, so previewing four more families means rules you have had for a
+  year now fail that step — and the floor below means `check()` fails on the same input. There is
+  deliberately no
   per-finding suppression, and `baseline` will refuse these. If you cannot work through the list now,
-  drop the `doctor` step or pin to `0.58.x`.
+  pin to `0.58.x` while you work through the list. Dropping the `doctor` step is no longer an escape: `check()` fails on the same input.
 
-  `check()` behaviour is unchanged in this release. **The next minor makes an examined count of zero fail
-  at `check()` time** (plan 0099) — so treat what `doctor` reports now as the list that goes red then.
+  **`check()` behaviour changes in this release too** — the floor below makes an examined count of zero
+  fail at `check()` time, so what `doctor` reports here is the same list `check()` reports.
 
 - **`diagnose()` and `doctor` report `zero-subjects`** — a rule whose project loaded files but whose
   own narrowing left it **nothing to examine**, so it can never fail. This landed first for five
   families — both smell detectors, `correspondence`, and both GraphQL builders — and the entry above
-  adds the remaining four, so **all nine report it in this release**. The two entries are one shipped
+  adds the remaining three, so **all eight report it in this release**. The two entries are one shipped
   behaviour described in the order it was built.
 
   This is the **preview surface for the same release's gate**. `doctor`, or
@@ -123,15 +130,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   now six — `orphan-exclusion` had been missing since 0.43.0 as well.
 
   ⚠️ **`doctor` exits non-zero on anything it reports**, so a pipeline running it goes red for rules
-  that are green today, while `check()` still passes them.
+  that are green today — and in this release `check()` fails on the same input.
 
-  **If this reddens a pipeline you cannot fix today:** `check()` is unaffected, so your enforcement gates
-  still run — drop the `doctor` step or pin to `0.58.x` while you work through the list. There is
+  **If this reddens a pipeline you cannot fix today:** your enforcement gates fail on the same input, so
+  pin to `0.58.x` while you work through the list; dropping the `doctor` step no longer helps, because `check()` fails on the same input. There is
   deliberately **no per-finding suppression**, and `ts-archunit baseline` will refuse these: a rule that
   enforces nothing is the one thing this tool will not let you accept quietly. That is a considered
   position rather than an oversight, and it is stated here so you meet it in the changelog instead of in a
-  non-zero exit from `baseline`. That gap is the point — you can run
-  `diagnose()`/`doctor` on demand and see the list before a later release makes the same state fail.
+  non-zero exit from `baseline`. Run `diagnose()`/`doctor` on 0.59.0 to see the whole
+  list at once, rather than meeting it one rule at a time through `check()`.
 
   The runtime advice deliberately does **not** name the release that flips it. An earlier draft said
   "in this same release", which was measured false for four of the five families it can print for —
@@ -195,6 +202,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   _nothing_, "correct the id" was simply false: the id is usually right and the cause is upstream, so
   that branch now names the discovery glob and the `off` overrides instead.
 
+### Changed (⚠️ BREAKING — a rule that examines zero units now FAILS)
+
+- **The floor: a check that cannot fail is no longer counted as coverage** — plan 0099.
+
+  **If your CI just went red, start here.** A rule that ran and examined **zero units** now fails at
+  `check()` instead of passing. Run `ts-archunit doctor` on **0.59.0** to list every affected rule at
+  once, then fix or declare each. To buy time, pin to `0.58.x` — there is no flag, and the reasons are
+  below.
+
+  **There is no flag.** `--baseline`, `--changed`, `.warn()`, `.asSeverity('warn')`, `.excluding()`, an
+  inline `// ts-archunit-exclude` comment and `overrides: { id: 'warn' }` all leave the finding in place.
+  `--changed` in particular keeps it unconditionally, so `check --changed` as a PR gate goes red on a PR
+  touching no source at all. `overrides: { id: 'off' }` does remove it, by deleting the rule — permanent,
+  and never revisited. Fix the rule, declare the empty state, or pin.
+
+  **Which rules flip.** Seven families had no zero-unit gate and now have one: both smell detectors,
+  `correspondence`, `crossLayer`, both GraphQL builders and `tsconfig`. `crossLayer` is the one
+  most likely to surprise — **both layers resolve files, zero pairs form, the rule looks healthy** — and
+  pairs are what that family examines. The `RuleBuilder` entry points — `classes()`, `functions()`, `modules()`,
+  `types()`, `calls()` and `jsxElements()` — are **not** part of this: their empty-selection gate has
+  failed since 0.34.0.
+
+  **Through a preset, you are affected only if you opted in.** The two preset rules that flip are
+  `preset/agent/no-copy-paste` and `preset/boundaries/no-duplicate-bodies`, both behind `noCopyPaste:
+true` and neither on by default. The larger affected population is direct `smells.duplicateBodies(p)` /
+  `smells.inconsistentSiblings(p)` callers, who need no opt-in.
+
+  **The remedy is per cause, and the finding names which one.** An empty project points at the tsconfig
+  holding your sources and never offers a declaration. A dead glob asks you to fix the glob. A rule whose
+  own narrowing left nothing names the narrowing — including a default you did not write, which is the
+  commonest case:
+
+  ```
+  agentGuardrails(p, { src: '**/lib/**', noCopyPaste: true })   // glob is correct, points at real code
+
+  This rule examined 0 function bodies (the project loaded 1 file), so it enforces nothing as written
+  today. Its narrowing was: minLines(5) — minLines defaults to 5, a default you did not write. Either
+  close the gap — widen the selector, or add the code it is waiting for — or declare the empty state
+  with expectEmpty: ['preset/agent/no-copy-paste'] in this preset's options — a declaration is an
+  assertion, not a silencer: it fails the day something does match.
+  ```
+
+  **Declaring is a peer of widening, not a lesser option.** For a layer that is not built yet, widening
+  is impossible; the declaration states a fact about today and **fails the day it stops being true**.
+  Preset users get the reachable spelling — `expectEmpty: ['<rule id>']` — because they hold no builder.
+
+  **`'warn'` never covered this.** A configuration finding is `error` regardless of severity. That was
+  already true for dead globs since 0.34.0 and the docs said otherwise in six places; those are corrected
+  here rather than newly broken.
+
+  ⚠️ **Extension surface** — ADR-010 rule 1.
+  `collectViolations()` returns `CollectResult`, and `examined` is now **behaviour-defining**: a dialect
+  satisfying the type with a constant `0` was previously unobserved and now hard-fails every rule it
+  runs. It must be a real count from the same materialization the family evaluates. `zeroSubjectsAdvice()`,
+  `narrowingHint()` and `examinedUnitNoun()` join the contract; a dialect that leaves the last alone
+  prints "subjects" for units that are not subjects.
+
+  Closes bug 0066, which measured **401 findings reported as clean** across two apps.
+
 ### Changed (⚠️ BREAKING — `correspondence().allowEmpty()` is now `.expectEmpty()`)
 
 - **The declared-empty grammar reaches every family.** `.expectEmpty()` and `.expectNonEmpty()` moved
@@ -240,19 +306,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   change is otherwise written against, and leaving it would have been the replacement inheriting the
   half of the defect nobody looked at.
 
-### Added
-
 - **The vacuity matrix** (`tests/matrix/`) — every published check-constructor run over a corpus of
   **zero subjects**, asserting the recorded truth table exactly, so a silent regression and a silent
   fix are equally loud. Enumerated from the `package.json` **exports map**: the one list a published
   entry point cannot avoid joining. No shipped behaviour changes; this measures.
 
   It is the ADR-008 conformance audit, and the first time this surface has been measured whole rather
-  than a family at a time. **Ten cells are guarded; `graphql:schema` fails closed by its own loader;
-  four fail open** — `smells.duplicateBodies`, `smells.inconsistentSiblings`, and **both shipped
-  presets** when a smell rule is the only one enabled. A fifth, `dataLayerIsolation`, constructs zero
-  rules from a valid option. Full table in
-  [bug 0066](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0066-a-smell-detector-over-zero-files-passes.md);
+  than a family at a time. **The audit found four cells failing open** — `smells.duplicateBodies`,
+  `smells.inconsistentSiblings`, and **both shipped presets** when a smell rule is the only one enabled —
+  **and the floor in this same release closed all four.** They now report a configuration finding at both
+  `check()` and `.warn()`, measured by this instrument rather than asserted. The known-fail-open list is
+  down to two: `graphql:schema`, which fails **closed** by its own loader, and `dataLayerIsolation`, which
+  constructs zero rules from a valid option so no per-rule floor can reach it (plan 0100). Full table in
+  [bug 0066](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md);
   the fixes are [plan 0098](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0098-the-evidence-seam-and-the-floor.md).
 
   Runs post-build in CI and publish, and via `npm run test:matrix`. It imports `dist` on purpose — the

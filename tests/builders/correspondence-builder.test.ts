@@ -292,6 +292,37 @@ describe('correspondence()', () => {
           .check()
       }).not.toThrow()
     })
+
+    it('every side declared and NON-empty: per-side expiry only, never a whole-rule one', () => {
+      // Plan 0099's floor puts the expiry at the ROOT, and it reads
+      // `_expectEmpty` rather than `declaresEmpty()`. Six lines of comment defend
+      // that choice and NOTHING falsified it: swapping the two branches produced
+      // 0 failures across 3305 tests, measured by two reviewers independently.
+      //
+      // The difference is reachable here. `CorrespondenceBuilder.declaresEmpty()`
+      // is an all-sides conjunction and this class reports its own per-side
+      // expiry, so reading it at the root would emit a THIRD, whole-rule finding
+      // on top of the two per-side ones — the double-report the root's sole
+      // ownership exists to prevent. Worse, that finding's own text would be
+      // self-contradicting: `emptyDeclarationAdvice()` here returns
+      // `.expectEmpty(sideName) for each side`, so it would say
+      // "`.expectEmpty(sideName) for each side` asserted this RULE examines
+      // nothing" — a claim this class refuses to make by design.
+      const vs = correspondence(stubProject)
+        .side('services', services(), byNameKey)
+        .side('registry', ['UserService', 'OrderService'])
+        .expectEmpty('services')
+        .expectEmpty('registry')
+        .beComplete()
+        .violations()
+      const config = vs.filter((v) => v.bypassFilters === true)
+      // Per side, by identity — a count alone would accept the whole-rule finding
+      // in place of one of them.
+      expect(config.map((v) => v.element).sort()).toEqual(['registry', 'services'])
+      expect(config.every((v) => !v.message.includes('asserted this rule examines nothing'))).toBe(
+        true,
+      )
+    })
   })
 
   describe('.distinctKeysOn() — over-normalization guard', () => {

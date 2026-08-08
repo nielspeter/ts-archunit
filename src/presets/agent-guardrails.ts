@@ -13,6 +13,7 @@ import {
   overrideFindings,
   validateOverrides,
   declareEmptyIfListed,
+  presetDeclarationSpelling,
   declaredEmptyFindings,
 } from './shared.js'
 import type { RuleSeverity } from './shared.js'
@@ -89,7 +90,15 @@ export function agentGuardrails(
     // shared path would cover the families someone remembered.
     if (sev !== 'off') {
       constructed.push(meta.id)
-      builders.push(declareEmptyIfListed(builder.rule(meta).asSeverity(sev), meta.id, options))
+      builders.push(
+        declareEmptyIfListed(
+          builder
+            .rule({ ...meta, declarationSpelling: presetDeclarationSpelling(meta.id) })
+            .asSeverity(sev),
+          meta.id,
+          options,
+        ),
+      )
     }
   }
 

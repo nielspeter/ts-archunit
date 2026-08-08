@@ -1,12 +1,12 @@
 # Bug 0066: a smell detector over zero source files passes, unless the rule happens to declare a glob
 
-**Reported:** 2026-08-05 · **Fixed:** not yet
+**Reported:** 2026-08-05 · **Fixed:** v0.59.0
 **Found in:** an evaluation of `smells.duplicateBodies()` against an external corpus (cmless `main` @
 `1481446`, 2,371 TS/TSX files). Not found by reading the code — found because two of the corpus's apps
 reported clean and should not have.
 **Severity:** **High.** Blast radius is published API: both `agentGuardrails({ noCopyPaste: true })` and
 `strictBoundaries({ noCopyPaste: true })` construct the detector in exactly the configuration that fails
-open. Top row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6.
+open. Top row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6.
 
 ## What happens
 
@@ -125,7 +125,7 @@ So the full path for a bare detector is: `globs()` → `[]` → line 511 returns
 evaluated → no configuration finding → `.check()` passes.
 
 **This is bug 0048's fix inheriting its host's precondition.** The comment at `:513-527` credits
-[0048](./fixed/0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md), which fixed the
+[0048](./0048-the-dead-glob-gate-blames-the-glob-when-the-project-is-empty.md), which fixed the
 _attribution_ — the gate used to blame a correct glob for an empty project and print "Correct the glob, or
 remove the rule". That fix was right, and it was placed where the wrong blame was being assigned: inside the
 glob gate. The fault it diagnoses, however, is **not a glob fault**, so siting it there silently scoped it
@@ -198,5 +198,29 @@ covered by the fix. Filed as its own row in the matrix rather than folded in her
 deviation recorded that its bare construction reds on the assertion gate before the vacuity cell is
 reachable, so the probe carries `.forPattern(…)`.
 
-The fix for all of it is [plan 0098](../plans/completed/0098-the-evidence-seam-and-the-floor.md), which empties
+The fix for all of it is [plan 0098](../../plans/completed/0098-the-evidence-seam-and-the-floor.md), which empties
 the matrix's `KNOWN_FAIL_OPEN` in the same commit that retypes the seam.
+
+## Fix as shipped
+
+**v0.59.0**, 2026-08-08, by [plan 0099](../../plans/completed/0099-the-floor-no-family-can-be-born-below.md).
+
+Not a per-family guard — the fifth wave of those is what ADR-009's Context table is about. The floor
+lives at the **root**, in `TerminalBuilder.collectWithAssertionGuard()`: a family that produced no
+violations from zero examined units gets a configuration finding, whichever family it is. The smell
+detectors needed no smell-specific line.
+
+**Measured by the instrument written before the fix.** `tests/matrix/vacuity-matrix.test.ts` derives its
+population from `package.json`'s exports map rather than from this code, and all four `'fail-open'` cells
+— `smells.duplicateBodies`, `smells.inconsistentSiblings`, `agentGuardrails`, `strictBoundaries` — now
+report `config-finding` at **both** `check()` and `.warn()`. `KNOWN_FAIL_OPEN` shrank from six entries to
+two, and the one that remains is `dataLayerIsolation: 'no-checks'`, which constructs zero rules from a
+valid option set so no per-rule floor can reach it — plan 0100.
+
+**The remedy names the cause.** The commonest trigger here was never a filter the author wrote: it is
+`minLines`, which defaults to 5. The finding names it, and says so only when the value IS still the
+default.
+
+Sabotage: removing the floor's decision reds 4 rows; dropping the empty-project precedence reds 2;
+inverting it so a declaration outranks an empty project reds 1. Each patch asserted to apply and to
+compile.

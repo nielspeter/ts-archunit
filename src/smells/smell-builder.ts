@@ -14,12 +14,57 @@ import { isProjectRelative } from '../core/project-relative.js'
  * different chain grammar (no .that()/.should()) and execution model
  * (pairwise comparison rather than individual element evaluation).
  */
+/** The `minLines` threshold applied when the author sets none. */
+const DEFAULT_MIN_LINES = 5
+
 export abstract class SmellBuilder extends TerminalBuilder {
   protected _folders: string[] = []
-  protected _minLines = 5
+  protected _minLines: number = DEFAULT_MIN_LINES
   protected _ignoreTests = false
   protected _ignorePaths: string[] = []
   protected _groupByFolder = false
+
+  /**
+   * This family's own narrowing, named — plan 0099 / ADR-009 part 4.
+   *
+   * `_minLines` defaults to 5 and neither `agentGuardrails` nor `strictBoundaries`
+   * exposes a knob for it, so a user whose bodies are all shorter is told their
+   * rule enforces nothing by a filter they never wrote and cannot reach. Naming it
+   * is the difference between an actionable finding and one that sends an agent
+   * hunting for filters that do not exist.
+   */
+  /** This family counts function bodies, not subjects — plan 0099. */
+  protected override examinedUnitNoun(): string {
+    return 'function bodies'
+  }
+
+  protected override narrowingHint(): string | undefined {
+    const applied = [`minLines(${String(this._minLines)})`]
+    if (this._folders.length > 0) applied.push(`inFolder(${this._folders.join(', ')})`)
+    if (this._ignorePaths.length > 0) applied.push(`ignorePaths(${this._ignorePaths.join(', ')})`)
+    if (this._ignoreTests) applied.push('ignoreTests()')
+    // The "you did not write it" clause is TRUE only while the value is still the
+    // default. Rendered with an author-written `.minLines(500)` it said
+    // "minLines(500) — minLines defaults to 5, a default you did not write",
+    // which is false on the path that produced it: an agent goes hunting for
+    // where 5 comes from and never touches the 500 that is the actual fault.
+    // ADR-008 rule 2, on an unsuppressable hard failure.
+    // States the filters as FACT, and does not claim they caused the emptiness.
+    //
+    // "Its own narrowing removed them" asserts removal. Measured on a types-only
+    // corpus with the default threshold: there were zero function bodies, so
+    // `minLines` removed nothing — the sentence named a false cause and pointed at
+    // a knob that `agentGuardrails` and `strictBoundaries` expose no setter for,
+    // on an unsuppressable hard failure. `narrowingHint()`'s own docstring
+    // promises the caller "names the possibility rather than asserting a cause it
+    // cannot verify"; this is the family honouring that rather than the base
+    // softening it afterwards.
+    const wroteItThemselves = this._minLines !== DEFAULT_MIN_LINES
+    return wroteItThemselves
+      ? `Its narrowing was: ${applied.join(', ')}.`
+      : `Its narrowing was: ${applied.join(', ')}` +
+          ` — minLines defaults to ${String(DEFAULT_MIN_LINES)}, a default you did not write.`
+  }
 
   constructor(protected readonly project: ArchProject) {
     super()

@@ -1,22 +1,22 @@
 # Plan 0099 — the floor no family can be born below
 
-**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./completed/0098-the-evidence-seam-and-the-floor.md)
+**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./0098-the-evidence-seam-and-the-floor.md)
 when that plan's own amendment measured it as two plans wearing one number.
-**Depends on:** [0098](./completed/0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
-which does not exist until the seam lands), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor
-reads the mint it lifts), [0089](./completed/0089-presets-forward-their-options.md) — and the reason is
+**Depends on:** [0098](./0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
+which does not exist until the seam lands), [0097](./0097-the-declared-empty-grammar.md) (the floor
+reads the mint it lifts), [0089](./0089-presets-forward-their-options.md) — and the reason is
 sharper than "a preset user cannot write `.expectEmpty()`". They **can** reach a remedy today:
 `overrides: { '<id>': 'off' }`, documented. It is the **wrong** remedy — permanent, non-expiring, the
 `allowEmpty` shape ADR-009 rejects and 0097 spent a release converting away from. Shipping the floor
 without the carrier trains every preset user to write the permanent silencer, which is worse than
 today's vacuous pass because it looks intentional and nothing ever revisits it: ADR-008 rule 1's
 trained-suppression dynamic, manufactured by our own gate.
-**Carries** the fix for [bug 0066](../bugs/0066-a-smell-detector-over-zero-files-passes.md), deliberately:
+**Carries** the fix for [bug 0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md), deliberately:
 ADR-009 requires the seam change and the smell-family fix in **one red event**, so 0098 and this ship in one
 release even though they are separate PRs.
 **Priority:** High. This is the plan that makes vacuity unrepresentable; 0095–0098 prepare for it.
 **Effort:** Medium.
-**Blast radius:** **Published API — top row** of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6.
+**Blast radius:** **Published API — top row** of [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6.
 Every entry point flips from pass to fail on one input class. Guard the guard: adversarial review of the
 floor, sabotage per branch, and the 0095 matrix as the independent behavioural check — which for this plan
 it genuinely is, because the matrix probes `check()` over a zero-file corpus and that is exactly what
@@ -27,7 +27,7 @@ changes.
 After 0098 every family **reports** what it examined, and after 0096 `diagnose()` **previews** the ones that
 examined nothing. Neither fails. A rule whose glob matched nothing, whose filters excluded everything, or
 whose corpus never loaded still returns green from `check()`, and the suite counts it as coverage — the
-statement ADR-008 opens with, and the reason [bug 0066](../bugs/0066-a-smell-detector-over-zero-files-passes.md)
+statement ADR-008 opens with, and the reason [bug 0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md)
 reported 401 findings as clean.
 
 The components to fix it all exist. What does not exist is the thing that makes them **unavoidable**: a
@@ -88,7 +88,26 @@ Four rulings that are not obvious from the code and must not be re-derived by wh
   findings **bypass baselines**. Name the concrete remedy (`include:`) in the changelog and fix that
   paragraph's scope.
 
-**Lead the changelog with the pre-upgrade preview, the way 0.34.0 did.** `docs/upgrading.md`'s 0.34.0
+**CORRECTED 2026-08-08 — the 0.34.0 precedent does not transfer, and this instruction was wrong.**
+Measured: `git grep -l "zero-subjects" v0.58.0 -- src/` returns **nothing**; the kind exists only at
+HEAD. `DiagnosticFinding['kind']` at 0.58.0 is `dead-glob | project-unknown | project-empty |
+no-condition | orphan-exclusion | unanchored`. Plan 0096 sits in `completed/` but its changelog entry is
+in `[Unreleased]` — **the preview and the gate ship in the same release**.
+
+0.34.0 worked because its preview shipped a release _earlier_, which is what let it say "run `doctor` on
+0.33.x first". That sentence cannot be written here, and writing it invites a reader to run `doctor` on
+0.58.x, see nothing, and conclude they are unaffected — on the very class this release is built around
+(a live glob whose narrowing empties). `docs/upgrading.md`'s recipe step "Steps 1–3 happen on your
+**current** version" is wrong for this row for the same reason, and it is in the same atomically-coupled
+commit.
+
+The honest instruction, which is still good: **install 0.59.0, then run `doctor` (or
+`expect(diagnose(rules)).toEqual([])`) before letting CI run `check`.** `doctor` and `check` are separate
+commands and both read `zeroSubjectsAdvice()` structurally, so the preview is complete _within_ 0.59.0.
+
+The paragraph below is kept for the reasoning it records, and superseded by the two above.
+
+**~~Lead the changelog with the pre-upgrade preview, the way 0.34.0 did.~~** `docs/upgrading.md`'s 0.34.0
 entry — the closest precedent for this exact break — opens with _"Run `ts-archunit doctor` on 0.33.x
 first, and fix what it reports before you upgrade."_ 0096 shipped precisely that preview. The inventory
 row "`diagnose()` and `check()` agree" is what makes the preview **complete** rather than hopeful, so
@@ -112,10 +131,13 @@ the remedy text, so they are fixed here rather than in the seam PR:
   people most likely to adopt an architecture tool early, and they meet this on day one. Either soften
   the ranking for the relational families, or accept that `.expectEmpty()` is the ordinary answer for a
   not-yet-populated layer and stop calling it an exception.
-- **One paragraph per finding does not scale.** ~70 words repeated across a dozen findings is a wall.
-  Split it: a short per-finding form carrying the facts, and the shared explanation printed **once** at
-  the end of the run. The per-family spelling from `emptyDeclarationAdvice()` still substitutes into the
-  per-finding form.
+- **One paragraph per finding does not scale** — ~70 words repeated across a dozen findings is a wall.
+  **Split out to [0101](../0101-the-shared-explanation-is-printed-once.md)**, because it is the one defect
+  of the four that is not text inside a producer: it needs a run-level channel that **does not exist**
+  (measured — no renderer emits a footer today) threaded through four renderers that disagree about
+  advice already. Keeping it here made this plan two plans wearing one number, which is exactly how 0098
+  was split out of it. 0099 ships the long form; 0101 splits it. The ordering is deliberate — 0101 cannot
+  be designed against a message that has not settled, and the first three defects settle it here.
 
 **Per-cause remedies** (ADR-009 part 4). Three causes, three remedies, and rule 2 forbids naming one as
 universal: empty project → point at the tsconfig holding the sources, and **never** offer `.expectEmpty()`;
@@ -159,7 +181,7 @@ that touches it:
 `inconsistentSiblings`, `agentGuardrails`, `strictBoundaries` all become `config-finding`. It cannot be
 emptied: `dataLayerIsolation` constructs zero rules and no per-rule floor reaches it — and 0100's
 measurement found `agentGuardrails` silent at its minimal call too, which the matrix's own recipe hid
-([0100](./0100-a-preset-that-constructs-nothing.md)). The matrix's `EXPIRES_AT_VERSION` stays, and the
+([0100](../0100-a-preset-that-constructs-nothing.md)). The matrix's `EXPIRES_AT_VERSION` stays, and the
 remaining entry carries a `// 0100` citation so the list names its own reason rather than looking stalled.
 
 **Measure this repo's own 53-rule dogfood suite BEFORE the flip.** `tests/archunit/arch-rules.test.ts`
@@ -245,7 +267,7 @@ Naming the two calls is what turns a qualifier into a disclosure:
 
 ## Added 2026-08-08 — what 0089's review left on this plan's doorstep
 
-Three items from the five-persona review of [0089](./completed/0089-presets-forward-their-options.md).
+Three items from the five-persona review of [0089](./0089-presets-forward-their-options.md).
 The first is a design correction to something 0089 shipped, and it should be settled **here** rather
 than filed as a defect, because it is a decision about where knowledge lives.
 
@@ -261,7 +283,7 @@ preset built on `RuleBuilder` that never extended `PresetBaseOptions`, false for
 method exists precisely to stop advice naming a call the reader cannot make — `CorrespondenceBuilder`
 overrides it because the zero-arg form throws there — and deriving it from a **prefix** rather than from
 the family that knows gives that discipline up. It is also an
-[ADR-010](../adr/010-the-extension-surface-is-a-contract.md) rule 1 **semantics** change to a member the
+[ADR-010](../../adr/010-the-extension-surface-is-a-contract.md) rule 1 **semantics** change to a member the
 contract names, shipped under `### Fixed`.
 
 The fix belongs where the knowledge is: `declareEmptyIfListed` in `src/presets/shared.ts` is the single
@@ -272,7 +294,7 @@ right for free by using the same carrier, and core stops guessing. Doing it in t
 ADR-010 note in the release that also carries the floor.
 
 **2. The declaration is inert for the smell family, and `declaresEmpty()` still returns `true`** —
-[bug 0073](../bugs/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md). That matters here more
+[bug 0073](../../bugs/fixed/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md). That matters here more
 than anywhere: this plan's floor reads `declaresEmpty()` to stand down, so today the declaration's only
 working effect on a smell rule is to suppress the floor that has not shipped yet. Either 0073 ships
 first or this plan carries it; what must not happen is the floor arming while one family answers the
@@ -291,4 +313,20 @@ tag, so the claim goes live before the version does.
 
 The CLI beyond what the root conversion reaches (0095 measures it; a fix beyond that gets its own number).
 Bug 0056's fail-open half. `defineCondition` internal vacuity. ADR-010's contract fixture. The preset seam —
-[0100](./0100-a-preset-that-constructs-nothing.md).
+[0100](../0100-a-preset-that-constructs-nothing.md). Splitting the message into a per-finding form and a
+run-level explanation — [0101](../0101-the-shared-explanation-is-printed-once.md).
+
+## Scope, measured 2026-08-08 — why this is one PR
+
+The plan's own unknown was its own CI: _"after this plan such a rule reds our own CI in the same PR as the
+flip"_, with the blast radius recorded as unknown until measured. **Measured: 37 rules built, all 37 carry
+`examinedUnits()` after 0098, and exactly one examines zero** — `api/no-single-glob-predicates`, the rule
+0098's amendment already named. So the dogfood cost is one rule, not a list of unknown length.
+
+With that resolved and 0101 split out, everything remaining is the floor and the things this plan's own
+text forces into the **same commit** as the floor: the matrix expiry-gate repair and the `KNOWN_FAIL_OPEN`
+shrink (the floor breaks that gate otherwise), bug 0066's fix (ADR-009's one red event), and the remedy
+text the floor prints. Two later additions belong for the same reason — the floor **reads**
+`declaresEmpty()`, which the smell family answers `true` with nothing setting it
+([bug 0073](../../bugs/fixed/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md)), and the floor **prints**
+the preset-shaped remedy whose mechanism is the design correction above.

@@ -263,7 +263,15 @@ layeredArchitecture(p, {
 })
 ```
 
-Three severity levels: `'error'` (fails the run), `'warn'` (reported but never fails — surfaces in terminal / JSON / GitHub output and is baseline-filterable), `'off'` (skipped entirely). Unrecognized override keys emit a warning — catches typos.
+Three severity levels: `'error'` (fails the run), `'warn'` (reported but never fails **a rule that works** — surfaces in terminal / JSON / GitHub output and is baseline-filterable), `'off'` (skipped entirely). Unrecognized override keys emit a warning — catches typos.
+
+**`'warn'` does not cover a rule that cannot enforce anything.** A configuration finding — a dead glob,
+a missing assertion, or (since 0.59.0) a rule that examined **zero units** — is reported at `error`
+regardless of the severity you set, and `overrides: { id: 'warn' }` cannot downgrade it. The distinction
+is deliberate: `'warn'` grades how strictly you want violations of a working rule treated, and a rule
+that enforces nothing has no violations to grade. Four shipped preset rules default to `'warn'` and are
+affected — `preset/agent/no-copy-paste`, `preset/boundaries/no-duplicate-bodies`,
+`preset/recommended/no-silent-catch` and `preset/recommended/no-empty-bodies`.
 
 **Before reaching for `'off'`, read the next section.** If the rule is red because it has nothing to
 check — not because you disagree with it — `expectEmpty` says that and expires when it stops being true.

@@ -248,6 +248,19 @@ export class CorrespondenceBuilder extends TerminalBuilder {
    * two empty sides. One empty side is already its own finding and is not this
    * question.
    */
+
+  /**
+   * This family counts keys — the keys of both sides, summed.
+   *
+   * Plan 0099: `CollectResult.examined` is unit-typed per family (ADR-009 part
+   * 1), and the zero-examined message prints the noun. Inheriting the base
+   * `'subjects'` is a category error in a sentence whose whole job is naming what
+   * was and was not looked at.
+   */
+  protected override examinedUnitNoun(): string {
+    return 'keys'
+  }
+
   examinedUnits(): number {
     if (this._sides.length < 2) return 0
     const [a, b] = this.materializedSides(this._sides[0]!, this._sides[1]!)

@@ -6,7 +6,7 @@ the fail-closed floor cannot reach this.
 **Depends on:** nothing structurally, but **coupled to 0099's release**: if this lands first, 0099's
 claim drops its qualifier; if after, the changelog ships a named exception. Best decided alongside
 [0089](./completed/0089-presets-forward-their-options.md), which already threads preset options.
-**Priority:** Medium as a defect, **High as a claim**: [0099](./0099-the-floor-no-family-can-be-born-below.md)'s
+**Priority:** Medium as a defect, **High as a claim**: [0099](./completed/0099-the-floor-no-family-can-be-born-below.md)'s
 release note says vacuity is unrepresentable, and this is the exception that has to be named in it. An
 unqualified claim gets falsified by the first person who hits this, and burns the trust the whole programme
 is spending.
@@ -156,4 +156,4 @@ Not settled, and the options are not equivalent:
 
 ## Out of scope
 
-Everything the per-rule floor already covers ([0099](./0099-the-floor-no-family-can-be-born-below.md)).
+Everything the per-rule floor already covers ([0099](./completed/0099-the-floor-no-family-can-be-born-below.md)).

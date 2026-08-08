@@ -34,13 +34,38 @@ describe('SmellBuilder.ignoreTests()', () => {
 describe('SmellBuilder.ignorePaths()', () => {
   it('ignorePaths excludes matching files from duplicateBodies', () => {
     const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
-    // Ignoring all .ts files should result in no functions to compare
+    // Ignore a SUBSET, not `**/*.ts`. Plan 0099 makes an emptied corpus fail, so
+    // the old shape (`ignorePaths('**/*.ts')` then `.not.toThrow()`) would now
+    // pass whether `ignorePaths` works or is a no-op — the floor fires either
+    // way. Ignoring one file of the duplicate pair is what still proves the
+    // filter does something: the duplicate disappears while subjects remain.
+    const withoutFilter = smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8)
+    expect(withoutFilter.violations().length).toBeGreaterThan(0)
+
+    const builder = smells
+      .duplicateBodies(p)
+      .minLines(3)
+      .withMinSimilarity(0.8)
+      .ignorePaths('**/file-b.ts')
+    // The duplicate is gone...
+    expect(builder.violations().filter((v) => v.bypassFilters !== true)).toEqual([])
+    // ...and the rule still examined something, so this is the filter working
+    // rather than the corpus being emptied.
+    expect(builder.examinedUnits()).toBeGreaterThan(0)
+    expect(builder.violations().filter((v) => v.bypassFilters === true)).toEqual([])
+  })
+
+  it('ignorePaths that empties the corpus FAILS — plan 0099', () => {
+    // The old shape, kept as its own row so the behaviour is stated rather than
+    // lost. This is bug 0066: a filter that removes everything used to pass.
+    const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
     const builder = smells
       .duplicateBodies(p)
       .minLines(3)
       .withMinSimilarity(0.8)
       .ignorePaths('**/*.ts')
-    expect(() => builder.check()).not.toThrow()
+    expect(() => builder.check()).toThrow(ArchRuleError)
+    expect(builder.violations()[0]?.message).toContain('examined 0 function bodies')
   })
 
   it('ignorePaths excludes matching files from inconsistentSiblings', () => {
@@ -49,9 +74,12 @@ describe('SmellBuilder.ignorePaths()', () => {
       .inconsistentSiblings(p)
       .forPattern(call('this.extractCount'))
       .minLines(2)
-      .ignorePaths('**/*.ts')
-    // With all files ignored, no violations possible
-    expect(() => builder.check()).not.toThrow()
+      .ignorePaths('**/legacy-repo.ts')
+    // A SUBSET again: the inconsistent sibling is the ignored file, so the
+    // finding disappears while the other repositories are still examined.
+    expect(builder.violations().filter((v) => v.bypassFilters !== true)).toEqual([])
+    expect(builder.examinedUnits()).toBeGreaterThan(0)
+    expect(builder.violations().filter((v) => v.bypassFilters === true)).toEqual([])
   })
 
   it('ignorePaths can be called multiple times', () => {
@@ -137,11 +165,25 @@ describe('SmellBuilder.warn() output formats', () => {
     expect(warnSpy).toHaveBeenCalled()
   })
 
-  it('warn does nothing when no violations', () => {
+  it('warn does nothing when there is genuinely nothing to report', () => {
+    // The corpus here used to be `minLines(1000)` — which is not CLEAN, it is
+    // VACUOUS, and plan 0099 makes that fail. Flipping this row to expect a throw
+    // would have deleted the only assertion that `.warn()` is ever silent, so the
+    // silence property keeps its row and gets a genuinely clean corpus:
+    // similarity 1.0 finds no exact duplicates while still examining bodies.
     const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
+    const builder = smells.duplicateBodies(p).minLines(3).withMinSimilarity(1.0)
+    expect(builder.examinedUnits()).toBeGreaterThan(0)
     const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    smells.duplicateBodies(p).minLines(1000).withMinSimilarity(0.5).warn()
+    builder.warn()
     expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('warn on a VACUOUS corpus is loud — it is not a clean run', () => {
+    const p = project(path.join(dupFixturesDir, 'tsconfig.json'))
+    expect(() => smells.duplicateBodies(p).minLines(1000).withMinSimilarity(0.5).warn()).toThrow(
+      ArchRuleError,
+    )
   })
 })
 

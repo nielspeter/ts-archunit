@@ -105,14 +105,20 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     verified:
       'behavioural: exclusion-comments-reach-every-condition.test.ts — adding a reason clears it and keeps the exemption',
   },
-  'src/core/rule-builder.ts::unexpectedlyNonEmptyViolation': {
-    remedy: 'own',
-    verified:
-      'behavioural: false-declaration-reports-both.test.ts — the remedy names the reachable spelling, the Fix is distinct from the message, and the rule violations it used to discard are reported alongside it',
-  },
   'src/core/rule-builder.ts::emptySelectionViolation': {
     remedy: 'own',
-    verified: 'behavioural: assertion-gate.test.ts — widening the selector clears it',
+    verified:
+      'behavioural: dead-selector-fails.test.ts and the-floor.test.ts — it delegates its text to zeroSubjectsViolation (one text for one state) while keeping its own attribution, and the shared remedy is proven to remediate there',
+  },
+  'src/core/terminal-builder.ts::zeroSubjectsViolation': {
+    remedy: 'own',
+    verified:
+      'behavioural: the-floor.test.ts — a rule examining zero units fails through violations(), check() and warn(); the empty-project branch never offers a declaration, and a rule that produced a finding passes through untouched',
+  },
+  'src/core/terminal-builder.ts::expiredDeclarationViolation': {
+    remedy: 'own',
+    verified:
+      'behavioural: the-floor.test.ts — removing the declaration clears it (the stated remedy applied), exactly one finding rather than one per implementation, and the Fix is distinct from the message so format.ts does not drop it',
   },
   'src/core/terminal-builder.ts::collectWithAssertionGuard': {
     remedy: 'own',

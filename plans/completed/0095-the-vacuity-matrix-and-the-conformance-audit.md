@@ -76,7 +76,7 @@ type Entry =
 
 ## Deliverable
 
-The completed truth table, appended to [bug 0066](../../bugs/0066-a-smell-detector-over-zero-files-passes.md)
+The completed truth table, appended to [bug 0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md)
 and to this plan, and **linked from the changelog** — it is the falsifiable backing for the claim the
 later plans will make. `KNOWN_FAIL_OPEN` records what it finds, bounded by a dated `AUDIT_2026_08`
 constant it may only shrink from, and expires (the matrix reds if the list is non-empty once the package
@@ -113,7 +113,7 @@ back fail-open is recorded, not repaired — including bug 0066's, whose fix bel
 Built and measured 2026-08-07. `tests/matrix/` — enumeration from the exports map, a classification
 of all 328 published bindings, twenty probed constructors, three controls — plus post-build steps in
 `ci.yml` and `publish.yml`, and `npm run test:matrix`. The full table is appended to
-[bug 0066](../../bugs/0066-a-smell-detector-over-zero-files-passes.md).
+[bug 0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md).
 
 **ADR-009's premise holds.** Four families fail open — `smells.duplicateBodies`,
 `smells.inconsistentSiblings`, and both shipped presets when a smell rule is the only one enabled.

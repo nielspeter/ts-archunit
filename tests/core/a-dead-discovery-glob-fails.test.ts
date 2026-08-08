@@ -105,12 +105,25 @@ describe('a dead discovery glob fails at every entry point (plan 0080)', () => {
     expect(config[0]?.message).toContain('discovery glob')
   })
 
-  it('graphql CONTROL: a live glob is silent', () => {
+  it('graphql CONTROL: a live glob is not reported as a DEAD one', () => {
+    // This control exists so that "always report" cannot pass the row above it,
+    // and plan 0099 nearly destroyed it: the fixture has no resolvers, so the
+    // floor now reports a zero-subjects finding and a naive rewrite to
+    // `toHaveLength(1)` would make the dead-glob row and this row produce the
+    // same count — the control stops discriminating at exactly the moment it is
+    // needed.
+    //
+    // So it discriminates by CAUSE instead of by count: whatever is reported here
+    // must not be the discovery diagnosis, because the glob is live.
     const found = resolvers(dupProject(), '**/duplicate-bodies/**')
       .should()
       .notContain(call(/^eval$/))
       .violations()
-    expect(found.filter((v) => v.bypassFilters === true)).toEqual([])
+    const config = found.filter((v) => v.bypassFilters === true)
+    for (const v of config) {
+      expect(v.message).not.toContain('discovery glob')
+      expect(v.message).not.toContain('can never match')
+    }
   })
 
   it('a dead FINAL layer is reported, by all three conditions alike', () => {

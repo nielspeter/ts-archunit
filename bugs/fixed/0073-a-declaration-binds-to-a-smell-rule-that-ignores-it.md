@@ -1,11 +1,11 @@
 # Bug 0073: a declared-empty carrier binds to a smell rule that ignores it, so the declaration is certified and asserts nothing
 
-**Reported:** 2026-08-08 · **Fixed:** not yet
-**Found in:** the five-persona review of [plan 0089](../plans/completed/0089-presets-forward-their-options.md)
+**Reported:** 2026-08-08 · **Fixed:** v0.59.0
+**Found in:** the five-persona review of [plan 0089](../../plans/completed/0089-presets-forward-their-options.md)
 (architect, round 2), with the documentation face of it reported independently by the customer persona.
 **Severity:** **High** — by blast radius rather than by frequency, per this repo's convention. Nothing
 regresses today: 0089 is additive and no floor reads the declaration yet. It is High because
-[plan 0099](../plans/0099-the-floor-no-family-can-be-born-below.md) arms the thing that reads it, and
+[plan 0099](../../plans/completed/0099-the-floor-no-family-can-be-born-below.md) arms the thing that reads it, and
 reads it via `declaresEmpty()` — which this family answers `true` with nothing setting it. A user who
 follows `docs/presets.md`'s worked example today therefore buys **permanent silence** on that family the
 day the floor lands, which is the outcome the whole carrier exists to prevent.
@@ -13,7 +13,7 @@ day the floor lands, which is the outcome the whole carrier exists to prevent.
 ## What happens
 
 `SmellBuilder.collectViolations()` never reads `_expectEmpty`. `.expectEmpty()` was hoisted to
-`TerminalBuilder` by [plan 0097](../plans/completed/0097-the-declared-empty-grammar.md), so every family
+`TerminalBuilder` by [plan 0097](../../plans/completed/0097-the-declared-empty-grammar.md), so every family
 **has** the method; the smell family does not **act** on it.
 
 Measured on this repo's own `tests/fixtures/smells/duplicate-bodies` fixture, which contains a real
@@ -47,7 +47,7 @@ a fact that expires.
 **0089 made the bad remedy followable.** Before it, the advice said `.expectEmpty()` — a call a preset
 user cannot make, so nobody acted on it. Now it names the exact array to paste, for a family where
 pasting it does nothing. That is a remedy verified to _read_ well and not to _remediate_, which is
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 2's failure with extra confidence.
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 2's failure with extra confidence.
 
 **The docs teach it.** `docs/presets.md`'s worked `expectEmpty` example is
 `expectEmpty: ['preset/agent/no-copy-paste']`, three lines under a new guarantee that reads _"A false
@@ -60,7 +60,7 @@ The same question applies to every family that inherits `expectEmpty()` from `Te
 acting on it. The rule builders and `correspondence` act on it (`correspondence` per side). The smell
 family does not. **The others have not been measured** — that enumeration is part of the fix, not an
 assumption, and it is exactly the "covers the families someone remembered" shape
-[ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) exists to name.
+[ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) exists to name.
 
 ## Two candidate fixes
 
@@ -77,3 +77,21 @@ belongs with the family that has it, per `assertsSomething()`'s precedent.
 
 Whichever ships, the guard is the one this bug was measured with: a **false** declaration over a corpus
 with a known duplicate must produce a finding, and the row must assert by id rather than by count.
+
+## Fix as shipped
+
+**v0.59.0**, 2026-08-08, by [plan 0099](../../plans/completed/0099-the-floor-no-family-can-be-born-below.md)
+— **as a by-product, with no smell-specific line**, which is the part worth recording.
+
+Moving the expiry to the root (`TerminalBuilder.collectWithAssertionGuard()`) gave every family the
+behaviour this bug says the smell family lacked: a false declaration over a non-empty corpus now
+produces an expiry finding, and the rule's real violations are reported alongside it rather than
+swallowed. Measured: `smells.duplicateBodies(p).rule({ id }).expectEmpty()` over a two-body corpus yields
+the expiry finding **and** the duplicate.
+
+That is the argument for a floor rather than a fifth wave of per-family guards, made by the bug that was
+filed against one family: the fix reached it without naming it.
+
+The related scope defect stays open — `agentGuardrails`' copy-paste rule ignores `src`
+([bug 0075](../0075-agentguardrails-copy-paste-rule-ignores-src.md)), so a declaration on that id
+measures files the author scoped out.

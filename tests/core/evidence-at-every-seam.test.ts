@@ -336,16 +336,53 @@ describe('the preview reports it, with the gate’s precedence (plan 0096)', () 
     const [finding] = diagnose([smells.duplicateBodies(loaded).minLines(9999)], loaded).filter(
       (f) => f.kind === 'zero-subjects',
     )
-    expect(finding?.advice).toContain('0 subjects')
-    expect(finding?.advice).toContain('did not write')
+    expect(finding?.advice).toContain('0 function bodies')
+    // The narrowing is NAMED with its actual value...
+    expect(finding?.advice).toContain('minLines(9999)')
+    // ...and because the author wrote 9999 themselves, the advice must NOT claim
+    // they did not. Plan 0099 first appended "minLines defaults to 5, a default
+    // you did not write" unconditionally, which rendered as
+    // "minLines(9999) — minLines defaults to 5, a default you did not write":
+    // false on the path that produced it, on an unsuppressable hard failure, and
+    // it sends an agent hunting for where 5 comes from instead of the 9999 that
+    // is the fault.
+    expect(finding?.advice).not.toContain('did not write')
     expect(finding?.advice).not.toContain('glob')
-    // And it says which of the two remedies is the real one. `.expectEmpty()` is
-    // a one-line chain method that makes this finding vanish and — until 0098's
-    // effectiveness half — proves nothing, which is ADR-008 rule 3's corollary:
-    // "a marker an agent can stamp on any file to go green is worse than no
-    // marker". Advice that offers it as a peer of widening invites exactly that.
-    expect(finding?.advice).toContain('not itself checked yet')
-    expect(finding?.advice).toContain('widening is the fix')
+    // The ranking INVERTED in plan 0099, and this row now asserts the inverse
+    // rather than being deleted.
+    //
+    // 0096 ranked declaring below widening because `.expectEmpty()` was "a marker
+    // an agent can stamp to go green" — it made the finding vanish and proved
+    // nothing. This comment named the condition for that changing: "until 0098's
+    // effectiveness half". 0099 is that half — a false declaration now fails, so
+    // the declaration is an assertion and the two are genuine peers.
+    //
+    // The old ranking is also unavailable to the reader it was aimed at: for a
+    // greenfield adopter whose second layer does not exist yet, widening is
+    // impossible, so "widening is the fix" was advice they could not take.
+    expect(finding?.advice).not.toContain('not itself checked yet')
+    expect(finding?.advice).not.toContain('proving anything')
+    // ADR-008 rule 3's corollary still holds, and this is what now enforces it:
+    // the declaration is described by what it DOES, so it cannot read as a mute
+    // button. `the-floor.test.ts` proves the behaviour behind this sentence.
+    expect(finding?.advice).toContain('not a silencer')
+    // Both remedies offered as peers. "widening is the fix" was the 0096 ranking
+    // and it is gone with the policy it expressed.
+    expect(finding?.advice).not.toContain('widening is the fix')
+    expect(finding?.advice).toContain('widen the selector')
+    expect(finding?.advice).toContain('declare the empty state')
+  })
+
+  it('and it DOES name the default when the author left it alone', () => {
+    // The other half of the branch. Without this row the fix above could be
+    // "never mention the default at all", which loses the single most useful
+    // fact for the commonest cause — a threshold the author never set.
+    const [finding] = diagnose(
+      [smells.duplicateBodies(loaded).ignorePaths('**/*.ts')],
+      loaded,
+    ).filter((f) => f.kind === 'zero-subjects')
+    expect(finding?.advice).toContain('minLines(5)')
+    expect(finding?.advice).toContain('did not write')
   })
 })
 

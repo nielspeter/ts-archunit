@@ -70,6 +70,22 @@ export interface DiagnosableRule extends RuleBuilderLike {
   declaresEmpty?: () => boolean
 
   /**
+   * This rule's own zero-subjects advice — plan 0099.
+   *
+   * When present, reported VERBATIM, exactly as `assertionAdvice()` is and for
+   * the identical reason plan 0070 recorded: the doctor and the finding the gate
+   * raises must carry the same string **by construction**, because two texts for
+   * one state is a trust problem for an agent diffing them.
+   *
+   * Measured before this seam existed: `check()` said "a declaration is an
+   * assertion, not a silencer" while `doctor` still said "the declaration is not
+   * itself checked yet ... A later release makes this state fail at check time" —
+   * in the release that makes it fail, on the surface `docs/upgrading.md` tells
+   * people to run first.
+   */
+  zeroSubjectsAdvice?: () => string
+
+  /**
    * How this family spells the declaration. Absent means the generic
    * `.expectEmpty()`, which is a `TypeError` on `correspondence` — see
    * `TerminalBuilder.emptyDeclarationAdvice()`.
@@ -397,15 +413,23 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
     // emptiness first. So the remedy can name that cause without the hedging
     // ADR-008 rule 2 forbids — and it must not say "your filters", because the
     // commonest trigger is a default the author never wrote (`minLines` is 5).
+    // VERBATIM from the rule when it can speak, so this preview and the gate
+    // cannot drift. The fallback is for a foreign dialect that predates the seam;
+    // it deliberately no longer promises "a later release makes this fail" — that
+    // release is this one.
+    // NO fallback literal. It was a six-line copy of the producer's sentence —
+    // dead for every real builder (every `TerminalBuilder` has the method), never
+    // referenced by a test, and already diverging: no unit noun, no file count,
+    // no narrowing hint. The seam exists because "two texts for one state is the
+    // plan-0070 drift shape"; a fallback is that second text, one level down, in
+    // the commit that added the seam.
+    //
+    // A duck-typed `DiagnosableRule` that cannot answer simply has no advice to
+    // report, which is honest — better than core inventing a sentence for a
+    // family whose units and remedies it does not know.
     advice:
-      'this rule examined 0 subjects, so it can never fail. Its own narrowing removed ' +
-      'everything the project loaded — including any default it applies that you did not ' +
-      'write. Widen it, or declare the empty state with ' +
-      (rule.emptyDeclarationAdvice?.() ?? '.expectEmpty()') +
-      ' if that is the point — but the declaration is not itself checked yet, so it ' +
-      'silences this without proving anything; widening is the fix, declaring is the ' +
-      'exception. A later release makes this state fail at check time; this surface is ' +
-      'how you find it first.',
+      rule.zeroSubjectsAdvice?.() ??
+      'this rule examined 0 units, so it enforces nothing as written today.',
   }
 }
 
