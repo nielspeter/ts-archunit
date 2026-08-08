@@ -17,7 +17,7 @@ import type { SilentExclusion } from './silent-exclusion.js'
 import { isSilent } from './silent-exclusion.js'
 import { executeCheck, executeWarn, applyFilters } from './execute-rule.js'
 import { shallowClone } from './shallow-clone.js'
-import { UNSUPPRESSABLE } from './unsuppressable.js'
+import { DECLARE_INSTEAD, UNSUPPRESSABLE } from './unsuppressable.js'
 
 /**
  * The single root of every rule builder.
@@ -938,7 +938,7 @@ export abstract class TerminalBuilder {
     }
     const described = this.describeRule()
     const name = described.id || described.rule || this.constructor.name
-    const advice = `${this.zeroSubjectsAdvice()} ${UNSUPPRESSABLE}`
+    const advice = `${this.zeroSubjectsAdvice()} ${UNSUPPRESSABLE} ${DECLARE_INSTEAD}`
     return {
       rule: name,
       ruleId: described.id,

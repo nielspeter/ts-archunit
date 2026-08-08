@@ -45,8 +45,28 @@ export const UNSUPPRESSABLE =
   // by our own gate. It is NOT added to `UNSUPPRESSABLE_MECHANISMS`, because that
   // list is the set the parity guard proves DO refuse — and this one does not.
   "A preset's overrides: { id: 'off' } does remove it, by deleting the rule " +
-  'entirely — that is not a suppression, it is a permanent decision that never ' +
-  'expires. If the rule genuinely has nothing to check, declare that instead.'
+  'entirely — that is not a suppression, it is a permanent decision that never expires.'
+
+/**
+ * The declaration half, appended ONLY by the zero-examined producer.
+ *
+ * It used to live in {@link UNSUPPRESSABLE}, which every configuration finding
+ * carries — so it was stapled to findings a declaration cannot settle. Measured:
+ * on the assertion-gate finding ("this detector has no pattern") and on a dead
+ * selector glob, adding `.expectEmpty()` changes nothing, because both are
+ * decided before any declaration is consulted. The reader declares, re-runs, and
+ * gets the identical failure with the identical advice — ADR-008 rule 2's loop,
+ * introduced by the sentence written to close one.
+ *
+ * On the dead-glob kind it was worse than a no-op: there `overrides: { id: 'off' }`
+ * IS the working exit and declaring is not, so the message steered the reader off
+ * the only door that opens.
+ *
+ * Zero-examined is the one kind a declaration actually settles.
+ */
+export const DECLARE_INSTEAD =
+  'If the rule genuinely has nothing to check, declare that instead — a declaration ' +
+  'is an assertion that expires, where deleting the rule is not.'
 
 /** The mechanism names the sentence claims to refuse, for the parity guard. */
 export const UNSUPPRESSABLE_MECHANISMS = [

@@ -29,7 +29,11 @@ import { describe, expect, it } from 'vitest'
 import { applyFilters } from '../../src/core/execute-rule.js'
 import { severityFor } from '../../src/core/violation.js'
 import { DiffFilter } from '../../src/helpers/diff-aware.js'
-import { UNSUPPRESSABLE, UNSUPPRESSABLE_MECHANISMS } from '../../src/core/unsuppressable.js'
+import {
+  DECLARE_INSTEAD,
+  UNSUPPRESSABLE,
+  UNSUPPRESSABLE_MECHANISMS,
+} from '../../src/core/unsuppressable.js'
 import { Baseline } from '../../src/helpers/baseline.js'
 import type { ArchViolation } from '../../src/core/violation.js'
 
@@ -119,6 +123,19 @@ describe('the unsuppressability sentence is true and complete', () => {
     expect(UNSUPPRESSABLE).toContain('never')
     // And it stays OUT of the refuses-list, because it does not refuse.
     expect(UNSUPPRESSABLE_MECHANISMS.some((m) => m.includes('overrides'))).toBe(false)
+  })
+
+  it('the declaration advice is NOT carried by every finding', () => {
+    // It lived in UNSUPPRESSABLE, which every configuration finding carries — so
+    // it was stapled to findings a declaration cannot settle. Measured: on the
+    // assertion-gate finding and on a dead selector glob, adding .expectEmpty()
+    // changes nothing, because both are decided before any declaration is
+    // consulted. The reader declares, re-runs, gets the identical failure with
+    // the identical advice — ADR-008 rule 2's loop, introduced by the sentence
+    // written to close one. On the dead-glob kind it is worse than a no-op:
+    // there overrides:'off' IS the working exit and declaring is not.
+    expect(UNSUPPRESSABLE).not.toContain('declare that instead')
+    expect(DECLARE_INSTEAD).toContain('declare that instead')
   })
 
   it('VACUITY: the probe set is non-empty and the sentence is not', () => {

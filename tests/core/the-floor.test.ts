@@ -391,17 +391,23 @@ describe('distinct rules stay distinct through dedupe', () => {
   it('three different smell detectors are three findings, not one', () => {
     const p = project(path.join(dupFixture, 'tsconfig.json'))
     const raw = [
-      ...smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.9).violations(),
-      ...smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.7).violations(),
-      ...smells.duplicateBodies(p).minLines(500).ignoreTests().violations(),
+      // Differ by the fields `describe()` did NOT render. The first version of
+      // this row differed by `withMinSimilarity`, which was the one field it did
+      // — so the guard fired against the sentinel and could not fire against the
+      // class the sentinel was an instance of. Rule 5 answered from memory rather
+      // than from the diff.
+      ...smells.duplicateBodies(p).minLines(500).violations(),
+      ...smells.duplicateBodies(p).minLines(400).violations(),
+      ...smells.duplicateBodies(p).minLines(300).ignoreTests().violations(),
     ]
     expect(raw).toHaveLength(3)
     // Identity, not a count: three findings that all read the same thing would
     // satisfy a length of 3 while still telling the reader nothing.
     const names = dedupeConfigFindings(raw).map((v) => v.rule)
     expect(new Set(names).size).toBe(3)
-    expect(names.join('\n')).toContain('0.9')
-    expect(names.join('\n')).toContain('0.7')
+    expect(names.join('\n')).toContain('minLines >= 500')
+    expect(names.join('\n')).toContain('minLines >= 400')
+    expect(names.join('\n')).toContain('ignoring tests')
   })
 
   it('and none of them is named by the sentinel', () => {
@@ -418,7 +424,7 @@ describe('distinct rules stay distinct through dedupe', () => {
     // Without this the fix could be "never dedupe anything", which would undo
     // what the dedupe exists for.
     const p = project(path.join(dupFixture, 'tsconfig.json'))
-    const one = () => smells.duplicateBodies(p).minLines(500).withMinSimilarity(0.9).violations()
+    const one = () => smells.duplicateBodies(p).minLines(500).violations()
     const collapsed = dedupeConfigFindings([...one(), ...one()])
     expect(collapsed).toHaveLength(1)
     expect(collapsed[0]?.rule).toContain('duplicate')
@@ -490,5 +496,29 @@ describe('the message names the right unit, in the right number', () => {
     const gate = configFindings(rule.violations())[0]
     expect(preview?.advice).toBeDefined()
     expect(gate?.message).toContain(preview?.advice ?? '__absent__')
+  })
+})
+
+describe('advice is attached only to the finding it can settle', () => {
+  it('a dead glob is NOT told to declare — there, off is the working exit', () => {
+    // Measured before the fix: `.expectEmpty()` on a dead-glob rule changed
+    // nothing, and the message still said "declare that instead" — steering the
+    // reader off the only door that opens.
+    const p = inMemory({ '/src/a.ts': 'export const a = 1\n' })
+    const v = classes(p)
+      .that()
+      .resideInFile('**/nowhere-at-all/**')
+      .should()
+      .beExported()
+      .rule({ id: 'x/dead', because: 'b', suggestion: 's' })
+      .violations()[0]
+    expect(v?.message ?? '').toContain('can never match')
+    expect(v?.message ?? '').not.toContain('declare that instead')
+  })
+
+  it('a zero-examined rule IS — it is the one kind a declaration settles', () => {
+    const p = inMemory({ '/src/a.ts': 'export const a = 1\n' })
+    const v = smells.duplicateBodies(p).minLines(500).violations()[0]
+    expect(v?.message ?? '').toContain('declare that instead')
   })
 })
