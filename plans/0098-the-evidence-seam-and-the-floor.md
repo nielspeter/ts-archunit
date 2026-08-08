@@ -1,6 +1,11 @@
-# Plan 0098 — the evidence seam, and the floor no family can be born below
+# Plan 0098 — the evidence seam every family is born with
 
-**Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
+**Status:** Open, READY. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
+**Amended 2026-08-08 — narrowed to the seam.** The floor moved to
+[0099](./0099-the-floor-no-family-can-be-born-below.md); the preset gap this amendment measured is
+[0100](./0100-a-preset-that-constructs-nothing.md). See **Amendment** below for the measurement that
+forced it. Everything from "Convert at the root" onward now belongs to 0099 and is kept here only as
+the design 0099 inherits.
 **Depends on:** [0096](./completed/0096-evidence-at-every-seam.md) (families must produce the evidence before the
 seam can require it), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor reads the mint it lifts),
 [0089](./0089-presets-forward-their-options.md) (preset declarations need somewhere to be threaded), and
@@ -13,6 +18,40 @@ one release even though they are separate PRs.
 **Blast radius:** **Published API — top row** of [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 rule 6. Every entry point, plus an extension-contract break. Guard the guard: adversarial review of the
 seam, sabotage per detector, and the 0095 matrix as the independent behavioural check.
+
+## Amendment — two things measured on 2026-08-08, before any code
+
+**1. This cannot be one PR, and the house rule is that a plan completes in the one it was built in.**
+The retype has one consumer (`terminal-builder.ts:338`) and **eight producers** — a good shape. But
+only three of the eight can answer today (`correspondence`, both graphql builders). The other five
+need their examined unit **designed, not threaded**: what is the examined unit of a `tsconfig` check,
+of a `crossLayer` rule, of the whole `RuleBuilder<T>` family? And `SmellBuilder` — the class that
+actually implements the seam — cannot see its own detectors' `examinedUnits()`, because that hook was
+added to the detector subclasses and `collectViolations()` delegates through `detect()`. Five
+definitions plus a floor plus ten documentation files is two plans wearing one number.
+
+**2. The floor cannot empty `KNOWN_FAIL_OPEN`, and this plan claimed it would.** Measured against the
+matrix's own recipes on its own empty fixture:
+
+| entry                         | rules constructed | a per-rule floor reaches it |
+| ----------------------------- | ----------------- | --------------------------- |
+| `smells.duplicateBodies`      | 1                 | yes                         |
+| `smells.inconsistentSiblings` | 1                 | yes                         |
+| `presets:agentGuardrails`     | 1                 | yes                         |
+| `presets:strictBoundaries`    | 2                 | yes                         |
+| `presets:dataLayerIsolation`  | **0**             | **no — nothing to floor**   |
+| `graphql:schema`              | —                 | already fails CLOSED        |
+
+**Two** of the five published presets construct zero rules at their minimal type-correct call
+(`agentGuardrails({ src })` and `dataLayerIsolation({ repositories })`) — the matrix caught one of them
+only because that recipe happened to pass fewer options. A preset that constructs zero rules has no
+`collectViolations()` to floor, so
+the invariant this programme is built on stops one level short of it: ∀ over ∅ at the **preset** seam
+rather than the rule seam. That is ADR-009's own Context table repeating — four waves each closed
+their enumeration and the next family was outside it — and this plan's enumeration was "families
+implementing the seam". A preset is not one. Filed as [0100](./0100-a-preset-that-constructs-nothing.md)
+rather than absorbed, because the mechanism is different: nothing about `CollectResult` reaches a
+function that returned `[]`.
 
 ## Problem
 
@@ -82,16 +121,46 @@ implementation and `docs/graphql.md` (ADR-010 rule 2). The break gets a **progra
 non-zero exit is the assertion** against an old-signature subclass — the external dialect's upgrade
 experience, simulated. ADR-010's own fixture and eess's bump gate remain the real thing.
 
+## The examined unit, settled per producer
+
+Review asked whether this plan is READY or PROPOSED — whether the five producers that cannot answer
+today need their unit **designed** or merely **threaded**. Measured by reading each `collectViolations()`.
+**All five are mechanical; none needs a decision, so READY stands.** Recorded here so an implementer
+reads the answer instead of re-deriving it, which is the only thing the label is worth:
+
+| producer            | examined unit                            | why that is the family's own seam                                            |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `RuleBuilder<T>`    | filtered subjects                        | `evaluate()` already narrows to exactly the set the conditions receive       |
+| `SliceRuleBuilder`  | slices holding at least one file         | its own empty-discovery rule is already "every slice has no files"           |
+| `CrossLayerBuilder` | `pairs.length`                           | `condition.evaluate(this.pairs, ctx)` — the pairs ARE the examined set       |
+| `TsconfigBuilder`   | `Object.keys(this._requirements).length` | it iterates declared requirements; zero means `{}`, a rule asserting nothing |
+| `SmellBuilder`      | delegated to the detector                | one abstract declaration; both detectors already implement the hook          |
+
+Two findings that make this **smaller** than the amendment estimated:
+
+- **`SliceRuleBuilder` already fails closed.** `collectViolations()` returns `emptyDiscoveryViolation()`
+  — a config-level meta-finding that bypasses baseline — when no slice holds a file. It is not a gap to
+  fill but a **working precedent for 0099's floor**, shipped and proven, and it is why slices never
+  appear in `KNOWN_FAIL_OPEN`. 0099 should be written as generalising this, not as inventing it.
+- **`SmellBuilder` is one declaration, not a redesign.** It delegates straight to `detect()`, and both
+  detectors already implement `examinedUnits()` from 0096. The amendment's "cannot see its own detectors'
+  hook" is real but costs a single abstract member on the base class.
+
 ## Files changed
 
-`src/core/terminal-builder.ts`, `src/core/rule-builder.ts`, `src/smells/smell-builder.ts`, both smell
-detectors, `src/builders/correspondence-builder.ts`, both graphql builders, `src/core/execute-rule.ts`,
-`tests/matrix/*`, `tests/core/every-config-finding-is-classified.test.ts` (three new producers join the
-census with `behavioural:` citations), `CHANGELOG.md`, `docs/upgrading.md`, `docs/troubleshooting.md`
-(its "every rule passes, and doctor says 0 files" premise becomes false), `docs/api-reference.md` (the
-external-subclass "exempt by default" story inverts), `docs/smell-detection.md`, `docs/presets.md`,
-`docs/graphql.md`, `docs/recipes.md` (a shared rule file across N packages where some are legitimately
-tiny), `bugs/0066-*.md` → `bugs/fixed/`; this plan moves to `plans/completed/`.
+**Source and tests only.** `src/core/terminal-builder.ts` (the seam and its one consumer),
+`src/core/rule-builder.ts`, `src/builders/slice-rule-builder.ts`, `src/builders/cross-layer-builder.ts`,
+`src/builders/correspondence-builder.ts`, `src/tsconfig/tsconfig-builder.ts`, `src/smells/smell-builder.ts`,
+both graphql builders, `tests/core/evidence-at-every-seam.test.ts` (the classification census gains the
+three producers 0096 could not reach), `docs/graphql.md` + `src/graphql/schema-rule-builder.ts` (ADR-010
+rule 2: the reference implementation changes in the same commit as the contract).
+
+**Deliberately NOT here**, because this plan changes no behaviour and review caught the earlier list
+claiming them: no `CHANGELOG.md` version heading, no `docs/upgrading.md` / `troubleshooting.md` /
+`api-reference.md` / `smell-detection.md` / `presets.md` / `recipes.md`, and **not** the
+`bugs/0066-*.md` → `bugs/fixed/` move. All belong to [0099](./0099-the-floor-no-family-can-be-born-below.md),
+which is the commit that makes them true. `docs.yml` deploys on push to `main` rather than on tag, so
+shipping those files here would publish a claim the released artifact does not yet honour.
 
 ## Test inventory
 
@@ -119,12 +188,16 @@ tiny), `bugs/0066-*.md` → `bugs/fixed/`; this plan moves to `plans/completed/`
 
 ## Release
 
-Ships with 0097 (and 0089's threading) as **one red event**, with a self-contained changelog — dependabot
-users jump straight over the preview release — carrying the full per-cause remedy table inline, every
-break enumerated including the `.warn()` and precedence flips, and the terminal claim **scoped
-falsifiably**: _zero examined units can no longer produce a pass, for any published check entry point,
-enforced by `tests/matrix/`_ — with ADR-009's three named residues still review-enforced. A broad "vacuous
-greens are over" gets falsified by the first residue bug and burns the trust it was spending.
+**This plan ships no release of its own.** It is behaviour-neutral and merges to `main` ahead of
+[0099](./0099-the-floor-no-family-can-be-born-below.md); the tag is cut after 0099, and 0099's Release
+section owns the note. The paragraph that stood here predated the split and still said "ships with 0097"
+— which had already merged — while carrying the terminal claim this plan alone does not deliver.
+
+**Do not tag between this merge and 0099's.** The intermediate commit retypes `collectViolations()`,
+which ADR-010 rule 1 names as contract, so a release cut from it ships a foreign-dialect compile break
+with **zero** behaviour change. Nothing in CI prevents that: `publish.yml` is tag-triggered, the matrix
+still records its pre-floor verdicts, and the expiry gate is silent below `0.62.0` — every check would
+pass an intermediate tag. The constraint is social, so it is written down in both plans.
 
 ## Out of scope
 
