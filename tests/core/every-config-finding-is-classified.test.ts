@@ -136,6 +136,13 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     remedy: 'own',
     verified: 'behavioural: baseline.test.ts — a matching baseline produces none',
   },
+  'src/presets/shared.ts::declaredEmptyFindings': {
+    remedy: 'own',
+    verified:
+      'behavioural: recommended.test.ts — a declaration naming an off (unconstructed) rule reports, ' +
+      'and the carrier itself is proven by declaring a live-glob-zero-subject rule and watching the ' +
+      'finding clear, with a one-of-four row so "reached every rule" cannot pass as "silenced everything"',
+  },
   'src/presets/shared.ts::overrideFindings': {
     remedy: 'own',
     verified:

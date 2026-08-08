@@ -1,0 +1,136 @@
+/**
+ * Presets forward `importOptions` to every condition that takes one — plan 0089.
+ *
+ * ## Why the option exists, and why it is ONE bag
+ *
+ * The conditions disagree by default, deliberately. `beFreeOfCycles` ignores
+ * type-only imports because it asks whether the module is *evaluated*, and an
+ * erased import cannot contribute to an initialization cycle. `respectLayerOrder`
+ * and `notDependOn` count them because they ask whether the code is *coupled*,
+ * and a shared type is coupling.
+ *
+ * Holding a builder that distinction is visible and you choose per condition.
+ * Through a preset it is invisible — and plan 0089 was filed because a preset
+ * user could not align the two even when their project wanted them aligned. So
+ * the bag means one thing: this project's answer to "is a type-only edge a
+ * dependency?", applied everywhere. Splitting it into two fields would preserve
+ * the disagreement and leave the filed problem unsolved.
+ *
+ * ## What these rows must prove
+ *
+ * The plan is explicit, and names the mistake it is guarding against: prove the
+ * option **where it changes the answer**, because "a row asserting the same
+ * result either way proves nothing — that mistake was made and caught in plan
+ * 0085". Every row below therefore asserts a DIFFERENT outcome per value.
+ */
+import { describe, it, expect } from 'vitest'
+import { Project } from 'ts-morph'
+import path from 'node:path'
+import type { ArchProject } from '../../src/core/project.js'
+import { layeredArchitecture } from '../../src/presets/layered.js'
+import { strictBoundaries } from '../../src/presets/boundaries.js'
+
+const typeEdgeDir = path.resolve(import.meta.dirname, '../fixtures/presets/layered-type-edge')
+const typeEdgeTsconfig = path.join(typeEdgeDir, 'tsconfig.json')
+
+/** Services (inner) imports a TYPE from routes (outer) — an erased outward edge. */
+function typeEdgeProject(): ArchProject {
+  const tsm = new Project({ tsConfigFilePath: typeEdgeTsconfig })
+  return {
+    tsConfigPath: typeEdgeTsconfig,
+    _project: tsm,
+    getSourceFiles: () => tsm.getSourceFiles(),
+  }
+}
+
+/** Two slices whose only mutual edges are the spellings passed in. */
+function twoSlices(aImportsB: string, bImportsA: string): ArchProject {
+  const tsm = new Project({ useInMemoryFileSystem: true })
+  tsm.createSourceFile(
+    '/src/a/index.ts',
+    `${aImportsB}\nexport type Alpha = { n: number }\nexport const alpha = 1\n`,
+  )
+  tsm.createSourceFile(
+    '/src/b/index.ts',
+    `${bImportsA}\nexport type Beta = { n: number }\nexport const beta = 1\n`,
+  )
+  return {
+    tsConfigPath: '/tsconfig.json',
+    _project: tsm,
+    getSourceFiles: () => tsm.getSourceFiles(),
+  }
+}
+
+const ruleIds = (rules: { violations: () => { ruleId?: string; bypassFilters?: boolean }[] }[]) =>
+  rules
+    .flatMap((r) => r.violations())
+    .filter((v) => v.bypassFilters !== true)
+    .map((v) => v.ruleId)
+
+describe('importOptions reaches the layer conditions (plan 0089)', () => {
+  const layers = { routes: '**/routes/**', services: '**/services/**' }
+
+  it('flips whether a type-only outward edge is a layer violation', () => {
+    const p = typeEdgeProject()
+    // Default: layering counts the erased edge, because coupling is the question.
+    expect(ruleIds(layeredArchitecture(p, { layers }))).toContain('preset/layered/layer-order')
+    // The option reaches the condition and changes the answer.
+    expect(
+      ruleIds(layeredArchitecture(p, { layers, importOptions: { ignoreTypeImports: true } })),
+    ).not.toContain('preset/layered/layer-order')
+  })
+
+  it('an explicit false is today’s behaviour — the additive claim, asserted', () => {
+    const p = typeEdgeProject()
+    expect(
+      ruleIds(layeredArchitecture(p, { layers, importOptions: { ignoreTypeImports: false } })),
+    ).toContain('preset/layered/layer-order')
+  })
+
+  it('CONTROL: the fixture’s only cross-layer edge really is type-only', () => {
+    // If a value import appeared in this fixture, the row above would pass for
+    // the wrong reason — the violation would survive `ignoreTypeImports: true`
+    // and the option would look broken rather than the fixture wrong.
+    const p = typeEdgeProject()
+    const text = p
+      .getSourceFiles()
+      .map((f) => f.getFullText())
+      .join('\n')
+    expect(text).toContain('import type { HandlerContext }')
+    expect(text).not.toMatch(/^import \{/m)
+  })
+})
+
+describe('importOptions reaches beFreeOfCycles (plan 0089)', () => {
+  const TYPE_ONLY_CYCLE = {
+    a: "import type { Beta } from '../b/index.js'",
+    b: "import type { Alpha } from '../a/index.js'",
+  }
+
+  it('flips whether a type-only cycle is reported, through strictBoundaries', () => {
+    const p = twoSlices(TYPE_ONLY_CYCLE.a, TYPE_ONLY_CYCLE.b)
+    const opts = { folders: '**/src/*' }
+    // Default: the cycle rule ignores erased edges, so a type-only cycle is not
+    // a cycle — nothing to report.
+    expect(ruleIds(strictBoundaries(p, opts))).not.toContain('preset/boundaries/no-cycles')
+    // Asking for type edges to count makes it one. This is the direction that
+    // STRENGTHENS, and it is the half a preset user could not reach before.
+    expect(
+      ruleIds(strictBoundaries(p, { ...opts, importOptions: { ignoreTypeImports: false } })),
+    ).toContain('preset/boundaries/no-cycles')
+  })
+
+  it('CONTROL: the same two slices in a VALUE cycle report either way', () => {
+    // Proves the row above turns on the erasure rather than on the cycle
+    // detection being off in this fixture.
+    const p = twoSlices(
+      "import { beta } from '../b/index.js'\nvoid beta",
+      "import { alpha } from '../a/index.js'\nvoid alpha",
+    )
+    const opts = { folders: '**/src/*' }
+    expect(ruleIds(strictBoundaries(p, opts))).toContain('preset/boundaries/no-cycles')
+    expect(
+      ruleIds(strictBoundaries(p, { ...opts, importOptions: { ignoreTypeImports: true } })),
+    ).toContain('preset/boundaries/no-cycles')
+  })
+})

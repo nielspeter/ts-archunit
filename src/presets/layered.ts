@@ -1,4 +1,5 @@
 import type { SourceFile } from 'ts-morph'
+import type { ImportOptions } from '../core/import-options.js'
 import type { ArchProject } from '../core/project.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { not } from '../core/combinators.js'
@@ -6,7 +7,12 @@ import { resideInFolder as resideInFolderPredicate } from '../predicates/identit
 import { slices } from '../builders/slice-rule-builder.js'
 import { modules } from '../builders/module-rule-builder.js'
 import type { PresetBaseOptions } from './shared.js'
-import { collectRule, overrideFindings, validateOverrides } from './shared.js'
+import {
+  collectRule,
+  overrideFindings,
+  validateOverrides,
+  declaredEmptyFindings,
+} from './shared.js'
 
 /** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
 export type LayeredArchitectureRuleId = (typeof RULE_IDS)[number]
@@ -22,6 +28,26 @@ export interface LayeredArchitectureOptions extends PresetBaseOptions<LayeredArc
   typeImportsAllowed?: string[]
   /** Package restriction: glob → list of npm package name patterns. Only those layers may import those packages. */
   restrictedPackages?: Record<string, string[]>
+  /**
+   * This project's answer to "is a type-only edge a dependency?", applied to
+   * **every** rule this preset constructs — plan 0089.
+   *
+   * The conditions disagree by default, deliberately: `beFreeOfCycles` ignores
+   * type-only imports because it asks whether the module is *evaluated*, and an
+   * erased import cannot contribute to an initialization cycle; the layer and
+   * boundary conditions count them because they ask whether the code is
+   * *coupled*. Holding a builder, that distinction is visible and you choose per
+   * condition. Through a preset it is invisible, and this option exists because
+   * a preset user could not align them even when their project wanted them
+   * aligned.
+   *
+   * So passing it moves exactly one side, and which side depends on the value:
+   * `{ ignoreTypeImports: true }` stops the layer rules counting type coupling
+   * (the cycle rule already ignored it); `{ ignoreTypeImports: false }` makes
+   * the cycle rule count type edges (the layer rules already did). `docs/presets.md`
+   * carries that table.
+   */
+  importOptions?: ImportOptions
 }
 
 const RULE_IDS = [
@@ -39,7 +65,8 @@ function applyTypeImportRules(
   p: ArchProject,
   typeImportsAllowed: string[],
   layerGlobs: string[],
-  overrides: LayeredArchitectureOptions['overrides'],
+  config: LayeredArchitectureOptions,
+  constructed: string[],
 ): RuleBuilderLike[] {
   const builders: RuleBuilderLike[] = []
   for (const layerGlob of typeImportsAllowed) {
@@ -61,7 +88,8 @@ function applyTypeImportRules(
             imperative: 'Use `import type` for cross-layer imports from this layer',
           },
           'warn',
-          overrides,
+          config,
+          constructed,
         ),
       )
     }
@@ -75,7 +103,8 @@ function applyTypeImportRules(
 function applyRestrictedPackages(
   p: ArchProject,
   restrictedPackages: Record<string, string[]>,
-  overrides: LayeredArchitectureOptions['overrides'],
+  config: LayeredArchitectureOptions,
+  constructed: string[],
 ): RuleBuilderLike[] {
   // Invert: for each package, find which layers are allowed
   const packageToAllowed = new Map<string, string[]>()
@@ -115,7 +144,8 @@ function applyRestrictedPackages(
           imperative: 'Do NOT import a restricted package in this layer',
         },
         'error',
-        overrides,
+        config,
+        constructed,
       ),
     )
   }
@@ -130,9 +160,10 @@ export function layeredArchitecture(
   p: ArchProject,
   options: LayeredArchitectureOptions,
 ): RuleBuilderLike[] {
-  const overrides = options.overrides
-  validateOverrides(overrides, [...RULE_IDS])
-  const overrideProblems = overrideFindings(overrides, RULE_IDS)
+  const config = options
+  const constructed: string[] = []
+  validateOverrides(config.overrides, [...RULE_IDS])
+  const overrideProblems = overrideFindings(config.overrides, RULE_IDS)
 
   const layerNames = Object.keys(options.layers)
   const layerGlobs = Object.values(options.layers)
@@ -150,7 +181,7 @@ export function layeredArchitecture(
       slices(p)
         .assignedFrom(layerDef)
         .should()
-        .respectLayerOrder(...layerNames),
+        .respectLayerOrder(layerNames, options.importOptions ?? {}),
       {
         id: 'preset/layered/layer-order',
         because:
@@ -160,14 +191,15 @@ export function layeredArchitecture(
         imperative: 'Do NOT import outwards across layers — depend inwards only',
       },
       'error',
-      overrides,
+      config,
+      constructed,
     ),
   )
 
   // --- No cycles ---
   builders.push(
     ...collectRule(
-      slices(p).assignedFrom(layerDef).should().beFreeOfCycles(),
+      slices(p).assignedFrom(layerDef).should().beFreeOfCycles(options.importOptions),
       {
         id: 'preset/layered/no-cycles',
         because:
@@ -177,7 +209,8 @@ export function layeredArchitecture(
         imperative: 'Do NOT create an import cycle between layers',
       },
       'error',
-      overrides,
+      config,
+      constructed,
     ),
   )
 
@@ -204,7 +237,8 @@ export function layeredArchitecture(
             imperative: 'Do NOT add dependencies to the innermost layer',
           },
           'error',
-          overrides,
+          config,
+          constructed,
         ),
       )
     }
@@ -212,15 +246,23 @@ export function layeredArchitecture(
 
   // --- Type imports only for specified layers ---
   if (options.typeImportsAllowed && options.typeImportsAllowed.length > 0) {
-    builders.push(...applyTypeImportRules(p, options.typeImportsAllowed, layerGlobs, overrides))
+    builders.push(
+      ...applyTypeImportRules(p, options.typeImportsAllowed, layerGlobs, config, constructed),
+    )
   }
 
   // --- Restricted packages ---
   if (options.restrictedPackages) {
-    builders.push(...applyRestrictedPackages(p, options.restrictedPackages, overrides))
+    builders.push(...applyRestrictedPackages(p, options.restrictedPackages, config, constructed))
   }
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  return [...overrideProblems, ...builders]
+  // Constructed, not merely known: a rule whose option was never enabled, or that
+  // was overridden `off`, is not built — so a declaration naming it is dead.
+  return [
+    ...overrideProblems,
+    ...declaredEmptyFindings(config.expectEmpty, constructed),
+    ...builders,
+  ]
 }

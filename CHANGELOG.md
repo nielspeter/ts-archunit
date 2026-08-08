@@ -14,6 +14,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Presets accept `expectEmpty` and `importOptions`** — plan 0089, additive.
+
+  `expectEmpty: RuleId[]` declares that a rule of the preset has nothing to check, typed on that
+  preset's own id union so a rename is a compile error rather than a silent no-op. It exists because a
+  preset user holds no builder: once a later release fails a check that examined nothing, their only
+  other remedy is `overrides: { id: 'off' }`, which is **permanent, never expires, and deletes the rule
+  rather than declaring a fact about it**. Two guardrails ship with it — an id naming no constructed
+  rule is an unsuppressable finding (including one you also set to `'off'`, since `off` means it was
+  never built), and a **dead glob remains undeclarable**, because a selector that can never match is a
+  mistake rather than a state.
+
+  `importOptions: ImportOptions` on `layeredArchitecture` and `strictBoundaries` forwards to every
+  condition that takes one. Those conditions disagree by default on purpose — `beFreeOfCycles()` ignores
+  type-only imports because it asks whether a module is _evaluated_; the layer and isolation rules count
+  them because they ask whether code is _coupled_. That distinction is visible when you hold a builder
+  and invisible through a preset, so the bag means one thing: **this project's answer to "is a type-only
+  edge a dependency?", applied everywhere.** It moves exactly one side, and which side depends on the
+  value — `docs/presets.md` carries the table.
+
+  Nothing changes if you pass neither.
+
+  **Upgrade rows now name the presets containing an affected condition.** `docs/upgrading.md` scoped its
+  rows by API names a preset user never types — "Only if you use `slices()` rules" reads as "not me" to
+  someone who calls `layeredArchitecture()`, and is wrong. Eight rows corrected, and a test derives the
+  condition-to-preset map from `src/presets/` so the prose is checked against the code rather than
+  against a copy of it.
+
 - **Every rule family now reports what it examined** — plan 0098. `collectViolations()` returns
   `{ violations, examined }` instead of `ArchViolation[]`, so a family cannot compile without stating how
   many units it looked at. Plan 0096 gave five families an **optional** accessor; four waves of vacuity

@@ -4,7 +4,13 @@ import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import { classes } from '../builders/class-rule-builder.js'
 import { newExpr } from '../helpers/matchers.js'
 import type { PresetBaseOptions } from './shared.js'
-import { atPath, collectRule, overrideFindings, validateOverrides } from './shared.js'
+import {
+  atPath,
+  collectRule,
+  overrideFindings,
+  validateOverrides,
+  declaredEmptyFindings,
+} from './shared.js'
 
 /** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
 export type DataLayerIsolationRuleId = (typeof RULE_IDS)[number]
@@ -31,9 +37,10 @@ export function dataLayerIsolation(
   p: ArchProject,
   options: DataLayerIsolationOptions,
 ): RuleBuilderLike[] {
-  const overrides = options.overrides
-  validateOverrides(overrides, [...RULE_IDS])
-  const overrideProblems = overrideFindings(overrides, RULE_IDS)
+  const config = options
+  const constructed: string[] = []
+  validateOverrides(config.overrides, [...RULE_IDS])
+  const overrideProblems = overrideFindings(config.overrides, RULE_IDS)
 
   const builders: RuleBuilderLike[] = []
 
@@ -55,7 +62,8 @@ export function dataLayerIsolation(
           imperative: 'Do NOT define a repository that does not extend the base repository',
         },
         'error',
-        overrides,
+        config,
+        constructed,
       ),
     )
   }
@@ -78,12 +86,19 @@ export function dataLayerIsolation(
           imperative: 'Do NOT throw new Error() in a repository — throw a domain error type',
         },
         'error',
-        overrides,
+        config,
+        constructed,
       ),
     )
   }
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  return [...overrideProblems, ...builders]
+  // Constructed, not merely known: a rule whose option was never enabled, or that
+  // was overridden `off`, is not built — so a declaration naming it is dead.
+  return [
+    ...overrideProblems,
+    ...declaredEmptyFindings(config.expectEmpty, constructed),
+    ...builders,
+  ]
 }

@@ -9,7 +9,12 @@ import { smells } from '../smells/index.js'
 import type { DuplicateBodiesBuilder } from '../smells/duplicate-bodies.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import type { PresetBaseOptions } from './shared.js'
-import { overrideFindings, validateOverrides } from './shared.js'
+import {
+  overrideFindings,
+  validateOverrides,
+  declareEmptyIfListed,
+  declaredEmptyFindings,
+} from './shared.js'
 import type { RuleSeverity } from './shared.js'
 
 /**
@@ -72,7 +77,12 @@ export function agentGuardrails(
     def: 'error' | 'warn',
   ): void => {
     const sev = lookup(options.overrides, meta.id) ?? def
-    if (sev !== 'off') builders.push(builder.rule(meta).asSeverity(sev))
+    // Plan 0089's carrier, applied here as well as in `collectRule` — this
+    // preset builds through its own helper, and a carrier that reached only the
+    // shared path would cover the families someone remembered.
+    if (sev !== 'off') {
+      builders.push(declareEmptyIfListed(builder.rule(meta).asSeverity(sev), meta.id, options))
+    }
   }
 
   for (const api of options.noInlineLogic ?? []) {
@@ -146,7 +156,16 @@ export function agentGuardrails(
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  return [...overrideProblems, ...builders]
+  // Constructed, not merely known: a rule whose option was never enabled, or
+  // that was overridden `off`, is not built — so a declaration naming it is dead.
+  const constructed = collectRuleIds(options).filter(
+    (id) => lookup(options.overrides, id) !== 'off',
+  )
+  return [
+    ...overrideProblems,
+    ...declaredEmptyFindings(options.expectEmpty, constructed),
+    ...builders,
+  ]
 }
 
 /** All rule ids the given options would generate (for override validation). */

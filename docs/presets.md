@@ -87,6 +87,59 @@ layeredArchitecture(p, {
 
 This generates: "all modules NOT in `src/repositories/**` must not import `knex` or `prisma`". If multiple layers list the same package, the union of those layers may import it.
 
+### `importOptions` — aligning the type-import question
+
+`layeredArchitecture` and `strictBoundaries` construct conditions that **disagree by default, on
+purpose**:
+
+- `beFreeOfCycles()` **ignores** type-only imports. It asks whether the module is _evaluated_, and an
+  `import type` is erased at compile time, so it cannot contribute to an initialization cycle.
+- `respectLayerOrder()` and the isolation conditions **count** them. They ask whether the code is
+  _coupled_, and a shared type is coupling.
+
+Holding a builder you choose per condition, where the distinction is visible. Through a preset it is
+invisible — so `importOptions` is one bag meaning **this project's answer to "is a type-only edge a
+dependency?"**, applied to every rule the preset constructs.
+
+Passing it moves exactly one side, and which side depends on the value:
+
+| you pass                       | the cycle rule                 | the layer / isolation rules      |
+| ------------------------------ | ------------------------------ | -------------------------------- |
+| _(nothing)_                    | ignores type-only edges        | counts them                      |
+| `{ ignoreTypeImports: true }`  | unchanged                      | **stops counting type coupling** |
+| `{ ignoreTypeImports: false }` | **starts counting type edges** | unchanged                        |
+
+```ts
+layeredArchitecture(project, {
+  layers: { routes: '**/routes/**', services: '**/services/**' },
+  // Our team treats a shared type as a real dependency everywhere.
+  importOptions: { ignoreTypeImports: false },
+})
+```
+
+### `expectEmpty` — declaring that a rule has nothing to check
+
+A rule that examines nothing passes without checking anything. When you hold a builder you say so with
+`.expectEmpty()`; a preset user holds none, so presets accept the same declaration by rule id:
+
+```ts
+agentGuardrails(project, {
+  src: '**/src/**',
+  noCopyPaste: true,
+  // This package has no duplicate-body surface yet — say so, rather than
+  // disabling the rule and forgetting.
+  expectEmpty: ['preset/agent/no-copy-paste'],
+})
+```
+
+Prefer it to `overrides: { id: 'off' }`. `off` **deletes** the rule permanently; `expectEmpty` states a
+fact about today that a later release can hold you to. Two guardrails come with it:
+
+- **An id that names no constructed rule fails**, unsuppressably — including a rule you also set to
+  `'off'`, since `off` means it was never built and the declaration applies to nothing.
+- **A dead glob is not declarable.** A selector that can never match is a mistake, not a state, and no
+  declaration hides it.
+
 ## `dataLayerIsolation`
 
 Companion to `layeredArchitecture`. Enforces repository pattern conventions that layer ordering alone cannot catch: base class extension and typed error throwing.

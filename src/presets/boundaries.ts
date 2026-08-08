@@ -1,4 +1,5 @@
 import type { SourceFile } from 'ts-morph'
+import type { ImportOptions } from '../core/import-options.js'
 import picomatch from 'picomatch'
 import type { ArchProject } from '../core/project.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
@@ -12,6 +13,7 @@ import {
   overrideFindings,
   validateOverrides,
   assertDiscovered,
+  declaredEmptyFindings,
 } from './shared.js'
 
 /** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
@@ -26,6 +28,26 @@ export interface StrictBoundariesOptions extends PresetBaseOptions<StrictBoundar
   isolateTests?: boolean
   /** If true, warn on copy-pasted function bodies across boundaries */
   noCopyPaste?: boolean
+  /**
+   * This project's answer to "is a type-only edge a dependency?", applied to
+   * **every** rule this preset constructs — plan 0089.
+   *
+   * The conditions disagree by default, deliberately: `beFreeOfCycles` ignores
+   * type-only imports because it asks whether the module is *evaluated*, and an
+   * erased import cannot contribute to an initialization cycle; the layer and
+   * boundary conditions count them because they ask whether the code is
+   * *coupled*. Holding a builder, that distinction is visible and you choose per
+   * condition. Through a preset it is invisible, and this option exists because
+   * a preset user could not align them even when their project wanted them
+   * aligned.
+   *
+   * So passing it moves exactly one side, and which side depends on the value:
+   * `{ ignoreTypeImports: true }` stops the layer rules counting type coupling
+   * (the cycle rule already ignored it); `{ ignoreTypeImports: false }` makes
+   * the cycle rule count type edges (the layer rules already did). `docs/presets.md`
+   * carries that table.
+   */
+  importOptions?: ImportOptions
 }
 
 const RULE_IDS = [
@@ -44,7 +66,8 @@ function applySharedIsolation(
   p: ArchProject,
   sharedGlobs: string[],
   boundaryFolders: string[],
-  overrides: StrictBoundariesOptions['overrides'],
+  config: StrictBoundariesOptions,
+  constructed: string[],
 ): RuleBuilderLike[] {
   const builders: RuleBuilderLike[] = []
   for (const sharedGlob of sharedGlobs) {
@@ -65,7 +88,8 @@ function applySharedIsolation(
             imperative: 'Do NOT import a boundary from shared code — invert the dependency',
           },
           'error',
-          overrides,
+          config,
+          constructed,
         ),
       )
     }
@@ -79,7 +103,8 @@ function applySharedIsolation(
 function applyTestIsolation(
   p: ArchProject,
   boundaryFolders: string[],
-  overrides: StrictBoundariesOptions['overrides'],
+  config: StrictBoundariesOptions,
+  constructed: string[],
 ): RuleBuilderLike[] {
   const builders: RuleBuilderLike[] = []
   for (const dir of boundaryFolders) {
@@ -102,7 +127,8 @@ function applyTestIsolation(
               "Do NOT import another boundary's tests — duplicate the fixture or share it explicitly",
           },
           'error',
-          overrides,
+          config,
+          constructed,
         ),
       )
     }
@@ -118,9 +144,10 @@ export function strictBoundaries(
   p: ArchProject,
   options: StrictBoundariesOptions,
 ): RuleBuilderLike[] {
-  const overrides = options.overrides
-  validateOverrides(overrides, [...RULE_IDS])
-  const overrideProblems = overrideFindings(overrides, RULE_IDS)
+  const config = options
+  const constructed: string[] = []
+  validateOverrides(config.overrides, [...RULE_IDS])
+  const overrideProblems = overrideFindings(config.overrides, RULE_IDS)
 
   const sharedGlobs = options.shared ?? []
   const builders: RuleBuilderLike[] = []
@@ -207,7 +234,7 @@ export function strictBoundaries(
   if (Object.keys(sliceDef).length > 0) {
     builders.push(
       ...collectRule(
-        slices(p).assignedFrom(sliceDef).should().beFreeOfCycles(),
+        slices(p).assignedFrom(sliceDef).should().beFreeOfCycles(options.importOptions),
         {
           id: 'preset/boundaries/no-cycles',
           because:
@@ -217,7 +244,8 @@ export function strictBoundaries(
           imperative: 'Do NOT create an import cycle between boundaries',
         },
         'error',
-        overrides,
+        config,
+        constructed,
       ),
     )
   }
@@ -261,17 +289,18 @@ export function strictBoundaries(
           imperative: 'Do NOT import a file outside this boundary or its shared modules',
         },
         'error',
-        overrides,
+        config,
+        constructed,
       ),
     )
   }
 
   // --- Shared isolation: shared folders don't import from boundaries ---
-  builders.push(...applySharedIsolation(p, sharedGlobs, boundaryFolders, overrides))
+  builders.push(...applySharedIsolation(p, sharedGlobs, boundaryFolders, config, constructed))
 
   // --- Test isolation ---
   if (options.isolateTests) {
-    builders.push(...applyTestIsolation(p, boundaryFolders, overrides))
+    builders.push(...applyTestIsolation(p, boundaryFolders, config, constructed))
   }
 
   // --- No copy-paste across boundaries ---
@@ -288,12 +317,19 @@ export function strictBoundaries(
           imperative: 'Do NOT copy a function body across boundaries — extract it into shared',
         },
         'warn',
-        overrides,
+        config,
+        constructed,
       ),
     )
   }
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  return [...overrideProblems, ...builders]
+  // Constructed, not merely known: a rule whose option was never enabled, or that
+  // was overridden `off`, is not built — so a declaration naming it is dead.
+  return [
+    ...overrideProblems,
+    ...declaredEmptyFindings(config.expectEmpty, constructed),
+    ...builders,
+  ]
 }

@@ -18,6 +18,8 @@ export type RuleSeverity = 'error' | 'warn' | 'off'
 interface PresetRule {
   rule(m: RuleMetadata): this
   asSeverity(level: 'error' | 'warn'): this
+  /** Plan 0089's carrier — hoisted to `TerminalBuilder` by plan 0097, so every preset rule has it. */
+  expectEmpty(): this
   violations(): ArchViolation[]
 }
 
@@ -39,11 +41,33 @@ export function collectRule(
   builder: PresetRule,
   meta: RuleMetadata & { id: string },
   defaultSeverity: RuleSeverity,
-  overrides: Partial<Record<string, RuleSeverity>> | undefined,
+  config: PresetBaseOptions | undefined,
+  constructed?: string[],
 ): RuleBuilderLike[] {
-  const effective = overrides?.[meta.id] ?? defaultSeverity
+  const effective = config?.overrides?.[meta.id] ?? defaultSeverity
   if (effective === 'off') return []
-  return [builder.rule(meta).asSeverity(effective)]
+  // Record what was actually BUILT. `RuleBuilderLike` exposes no metadata, and
+  // the known-id list cannot answer this: these presets construct rules
+  // conditionally, so "known" and "constructed" differ by exactly the ids a
+  // declaration must not silently bind to.
+  constructed?.push(meta.id)
+  return [declareEmptyIfListed(builder.rule(meta).asSeverity(effective), meta.id, config)]
+}
+
+/**
+ * Apply plan 0089's declaration carrier to one constructed rule.
+ *
+ * Exported because the presets build rules three different ways — through
+ * `collectRule`, through a local `push` helper, and through an inline loop — and
+ * a carrier that reached only one of them would be the shape ADR-009's Context
+ * table is about: a mechanism that covers the families someone remembered.
+ */
+export function declareEmptyIfListed<T extends PresetRule>(
+  builder: T,
+  id: string,
+  config: PresetBaseOptions | undefined,
+): T {
+  return config?.expectEmpty?.includes(id) === true ? builder.expectEmpty() : builder
 }
 
 /**
@@ -146,8 +170,71 @@ export function overrideFindings(
   return [{ violations: () => violations }]
 }
 
+/**
+ * Findings for `expectEmpty` ids that bind to no constructed rule — plan 0089.
+ *
+ * The sibling of {@link overrideFindings}, and it fails for a sharper reason.
+ * An unknown override key leaves a rule at its default: an escalation that did
+ * not happen. An unknown `expectEmpty` id turns an **expiring assertion into
+ * nothing** — the author declared a state, the declaration bound to no rule, and
+ * once plan 0099's floor lands they are told to declare what they already
+ * declared, misspelled. That is bug 0017's shape, and ADR-008 rule 1 forbids
+ * answering it with a warning nobody reads.
+ *
+ * The unbound id is reported against the **constructed** set, not the declared
+ * one, so a rule switched `'off'` and still named here reports too — which is
+ * correct: `'off'` deleted the rule, so the declaration about it is dead.
+ */
+export function declaredEmptyFindings(
+  expectEmpty: readonly string[] | undefined,
+  constructedIds: readonly string[],
+): RuleBuilderLike[] {
+  if (!expectEmpty || expectEmpty.length === 0) return []
+  const built = new Set(constructedIds)
+  const unbound = [...new Set(expectEmpty)].filter((id) => !built.has(id))
+  if (unbound.length === 0) return []
+
+  const violations: ArchViolation[] = unbound.map((id) => ({
+    rule: `preset expectEmpty '${id}'`,
+    ruleId: `preset/expect-empty/${id}`,
+    element: id,
+    file: '',
+    line: 0,
+    message:
+      `expectEmpty names '${id}', which this preset did not construct, so the ` +
+      `declaration applies to nothing.`,
+    because:
+      'a declaration that binds to no rule is not a weaker assertion, it is no assertion — ' +
+      'and it reads in the config as though the empty state has been accounted for',
+    suggestion:
+      `Correct the id, or remove it. This preset constructed: ${constructedIds.join(', ') || '(no rules)'}. ` +
+      `Note that a rule set to 'off' is not constructed, so a declaration naming it is dead. ` +
+      UNSUPPRESSABLE,
+    bypassFilters: true,
+  }))
+  return [{ violations: () => violations }]
+}
+
 export interface PresetBaseOptions<TRuleId extends string = string> {
   overrides?: Partial<Record<TRuleId, RuleSeverity>>
+
+  /**
+   * Rules of this preset whose empty state is **declared** — plan 0089.
+   *
+   * A preset user holds no builder, so they cannot reach `.expectEmpty()`. Once
+   * plan 0099's floor fails a check that examined nothing, their only other
+   * remedy is `overrides: { id: 'off' }` — which is permanent, never expires,
+   * and deletes the rule rather than declaring a fact about it. That is
+   * [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 1's
+   * trained-suppression dynamic, produced by our own gate; ADR-009 part 3 makes
+   * a carrier binding for exactly this reason.
+   *
+   * Typed on the preset's own id union, like `overrides`, so a rename is a
+   * compile error rather than a silent no-op. **An id here that binds to no
+   * constructed rule is a failing configuration finding**, never a warning — see
+   * {@link declaredEmptyFindings}.
+   */
+  expectEmpty?: TRuleId[]
 }
 
 /**

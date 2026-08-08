@@ -87,7 +87,7 @@ shipped), `CHANGELOG.md`, `plans/ROADMAP.md`; this plan moves to `plans/complete
 
 The floor that consumes these declarations, and the precedence ruling that an empty **project** outranks
 them — [0098](./0098-the-evidence-seam-and-the-floor.md). Preset-level declaration threading —
-[0089](../0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
+[0089](./0089-presets-forward-their-options.md), which exists to give presets an options-forwarding
 mechanism and is the right home for it.
 
 ---
@@ -140,5 +140,5 @@ walking JSDoc/brace boundaries instead of slicing on marker strings. For structu
 walk the syntax; do not cut on text landmarks.
 
 **Not in scope and not done:** preset-level declaration threading, which belongs to
-[0089](../0089-presets-forward-their-options.md) because that plan exists to give presets an
+[0089](./0089-presets-forward-their-options.md) because that plan exists to give presets an
 options-forwarding mechanism.

@@ -4,7 +4,7 @@
 when that plan's own amendment measured it as two plans wearing one number.
 **Depends on:** [0098](./completed/0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
 which does not exist until the seam lands), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor
-reads the mint it lifts), [0089](./0089-presets-forward-their-options.md) — and the reason is
+reads the mint it lifts), [0089](./completed/0089-presets-forward-their-options.md) — and the reason is
 sharper than "a preset user cannot write `.expectEmpty()`". They **can** reach a remedy today:
 `overrides: { '<id>': 'off' }`, documented. It is the **wrong** remedy — permanent, non-expiring, the
 `allowEmpty` shape ADR-009 rejects and 0097 spent a release converting away from. Shipping the floor
