@@ -89,14 +89,18 @@ describe('SchemaRuleBuilder — predicates', () => {
     }).toThrow(ArchRuleError)
   })
 
-  it('typesNamed() with regex that matches nothing produces no violations', () => {
-    expect(() => {
-      schemaFromSDL(fullSDL)
-        .typesNamed(/Nonexistent$/)
-        .should()
-        .haveFields('whatever')
-        .check()
-    }).not.toThrow()
+  it('typesNamed() matching nothing now FAILS at the floor — plan 0099', () => {
+    // Behaviour flip, same shape as the resolver row: the throw alone would also
+    // pass if `haveFields` began emitting over an empty set, so assert identity.
+    const rule = schemaFromSDL(fullSDL)
+      .typesNamed(/Nonexistent$/)
+      .should()
+      .haveFields('whatever')
+    expect(() => rule.check()).toThrow()
+    const vs = rule.violations()
+    expect(vs.filter((v) => v.bypassFilters === true)).toHaveLength(1)
+    expect(vs[0]?.message).toContain('examined 0')
+    expect(vs.filter((v) => v.bypassFilters !== true)).toEqual([])
   })
 
   it('returnListOf() filters to fields returning lists', () => {

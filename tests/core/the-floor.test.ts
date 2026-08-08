@@ -158,7 +158,10 @@ describe('what the floor does NOT fire on', () => {
       .rule({ id: 'x/no-eval', because: 'b', suggestion: 's' })
       .violations()
     expect(configFindings(vs)).toEqual([])
+    // Identity: the surviving finding is the rule's OWN violation, not a config
+    // finding that happened to count to one.
     expect(vs).toHaveLength(1)
+    expect(vs[0]?.message).toContain('eval')
   })
 
   it('a cardinality assertion — .notExist() examines zero BECAUSE that is the assertion', () => {
@@ -286,7 +289,15 @@ describe('the expiry half is the root’s alone', () => {
 
   it('exactly ONE expiry finding — not one per implementation', () => {
     // `rule-builder` carried its own copy; keeping both double-reported one fault.
-    expect(configFindings(expired())).toHaveLength(1)
+    //
+    // Identity as well as count: this repo's own cardinality ratchet flagged the
+    // count-only form here, and it is right to — `toHaveLength(1)` accepts any
+    // single configuration finding, including the zero-subjects one this rule
+    // must NOT produce.
+    const config = configFindings(expired())
+    expect(config).toHaveLength(1)
+    expect(config[0]?.message).toContain('asserted this rule examines nothing')
+    expect(config[0]?.message).not.toContain('enforces nothing as written today')
   })
 
   it('and the rule’s own violations are still reported under it', () => {

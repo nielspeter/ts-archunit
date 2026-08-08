@@ -51,10 +51,28 @@ describe('smells.duplicateBodies()', () => {
     expect(() => builder.check()).not.toThrow()
   })
 
-  it('respects minLines filter', () => {
-    // With a very high minLines, no functions qualify
+  it('respects minLines filter — and a filter that empties the corpus now FAILS', () => {
+    // Behaviour flip, plan 0099. This asserted `.not.toThrow()`: a `minLines` so
+    // high that no function qualifies used to pass silently, which is bug 0066 in
+    // one line — the detector reported nothing and the suite counted it as
+    // coverage.
     const builder = smells.duplicateBodies(p).minLines(1000).withMinSimilarity(0.5)
-    expect(() => builder.check()).not.toThrow()
+    expect(() => builder.check()).toThrow(ArchRuleError)
+    // By identity, not by the throw alone: assert it is the FLOOR's finding and
+    // names the filter that did it, rather than any error at all.
+    const config = builder.violations().filter((v) => v.bypassFilters === true)
+    expect(config).toHaveLength(1)
+    expect(config[0]?.message).toContain('examined 0 function bodies')
+    expect(config[0]?.message).toContain('minLines(1000)')
+  })
+
+  it('CONTROL: a filter that leaves subjects behind still enforces normally', () => {
+    // Without this the row above passes if `minLines` were ignored entirely and
+    // every corpus reported the floor finding.
+    const builder = smells.duplicateBodies(p).minLines(3).withMinSimilarity(0.8)
+    const config = builder.violations().filter((v) => v.bypassFilters === true)
+    expect(config).toEqual([])
+    expect(builder.violations().length).toBeGreaterThan(0)
   })
 
   it('.warn() logs but does not throw', () => {

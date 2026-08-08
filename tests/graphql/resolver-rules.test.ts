@@ -55,15 +55,23 @@ describe('ResolverRuleBuilder — predicates', () => {
     }).toThrow(ArchRuleError)
   })
 
-  it('resolveFieldReturning() with no match produces no violations', () => {
-    expect(() => {
-      resolvers(p, 'src/**/*.resolver.ts')
-        .that()
-        .resolveFieldReturning(/ZZZNonExistentType/)
-        .should()
-        .contain(call('loader.load'))
-        .check()
-    }).not.toThrow()
+  it('resolveFieldReturning() with no match now FAILS at the floor — plan 0099', () => {
+    // Behaviour flip. This asserted `.not.toThrow()`: a predicate matching nothing
+    // passed vacuously. The throw ALONE would not be enough — it would also pass
+    // if `contain()` started producing a bogus violation over an empty set, which
+    // is what this row was originally about — so assert it is the configuration
+    // finding and names the fault.
+    const rule = resolvers(p, 'src/**/*.resolver.ts')
+      .that()
+      .resolveFieldReturning(/ZZZNonExistentType/)
+      .should()
+      .contain(call('loader.load'))
+    expect(() => rule.check()).toThrow()
+    const vs = rule.violations()
+    expect(vs.filter((v) => v.bypassFilters === true)).toHaveLength(1)
+    expect(vs[0]?.message).toContain('examined 0')
+    // Not an ordinary violation dressed up as one.
+    expect(vs.filter((v) => v.bypassFilters !== true)).toEqual([])
   })
 
   it('resolveFieldReturning() only filters; unmatched functions are excluded', () => {

@@ -182,10 +182,19 @@ describe('a held builder is immutable — behavioural', () => {
     const all = held.violations()
     expect(all.length).toBeGreaterThan(0)
 
-    // Ignore everything: no findings. This is the rule whose state must not
-    // survive — an inherited ignore is invisible and turns the next rule green.
-    expect(held.ignorePaths('**/*').violations()).toHaveLength(0)
-    expect(held.violations()).toHaveLength(all.length)
+    // Ignoring everything now yields a CONFIGURATION finding rather than an empty
+    // result (plan 0099's floor — an emptied corpus is bug 0066, not a pass), so
+    // this asserts the finding's kind exactly as the `inFolder` leak test below
+    // already does for plan 0080. The property under test is unchanged: the leak
+    // would land on `held` and be visible on the line after.
+    const ignoredAll = held.ignorePaths('**/*').violations()
+    expect(ignoredAll.length).toBeGreaterThan(0)
+    expect(ignoredAll.every((v) => v.bypassFilters === true)).toBe(true)
+    // `held` is untouched: still the ordinary duplicate findings, none of them
+    // configuration findings.
+    const after = held.violations()
+    expect(after).toHaveLength(all.length)
+    expect(after.every((v) => v.bypassFilters !== true)).toBe(true)
   })
 
   it('SmellBuilder: inFolder() and minLines() do not accumulate on the held builder', () => {
@@ -216,8 +225,13 @@ describe('a held builder is immutable — behavioural', () => {
     expect(after.every((v) => v.bypassFilters !== true)).toBe(true)
 
     // A threshold nothing can meet, likewise on `held`, with no re-set after.
-    expect(held.minLines(1000).violations()).toHaveLength(0)
-    expect(held.violations()).toHaveLength(baseline)
+    // Same plan-0099 treatment as the `inFolder` case directly above.
+    const tooHigh = held.minLines(1000).violations()
+    expect(tooHigh.length).toBeGreaterThan(0)
+    expect(tooHigh.every((v) => v.bypassFilters === true)).toBe(true)
+    const stillBaseline = held.violations()
+    expect(stillBaseline).toHaveLength(baseline)
+    expect(stillBaseline.every((v) => v.bypassFilters !== true)).toBe(true)
 
     // And the flag setters, whose leaks change what a LATER detector sees.
     // `ignoreTests` and `groupByFolder` are the false-green direction: an
