@@ -470,15 +470,36 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
       `Remove ${declaration} and let the rule enforce itself — the thing you were waiting for ` +
       `has appeared, and the rule now has something to check. If instead the selection is wider ` +
       `than you meant, narrow it and keep the declaration. ` +
-      `Any violations found are reported below this finding. ` +
+      // NOT "reported below this finding". Ordering holds on a plain local
+      // `check`, but the claim is false under `--changed` and baseline (which keep
+      // `bypassFilters` findings and drop the violations), under `--format github`
+      // (run-level annotation vs inline PR annotations — different parts of the
+      // UI), and under `.warn()` (advisories to stderr BEFORE the throw). A
+      // spatial claim inside a `Fix:` line is one an agent acts on, so it states
+      // the relationship instead, which is true everywhere.
+      `The rule's own violations are reported as separate findings under the same rule id. ` +
       UNSUPPRESSABLE
     return {
       rule: description,
-      // Carried so the reader can act: the default terminal formatter prints the
-      // chain description, never `ruleId`, and for a preset rule the id IS the
-      // argument they have to type.
       ruleId: this._metadata?.id,
-      element: this._metadata?.id ?? description,
+      // `description`, NOT the rule id, and the distinction is load-bearing.
+      // `dedupeConfigFindings` keys on `(file, ruleId ?? rule, element)`; with
+      // `file: ''` and the id in both remaining slots, every instance of a
+      // fanned-out preset id collapses to one and picks up `affectedNote`'s
+      // "this one option generated N rules that cannot enforce anything".
+      //
+      // That note is true for `emptySelectionViolation`, where the N rules really
+      // are inert. Here it is false, and false because of the fix in this same
+      // commit: a rule whose declaration expired enforces fine, and its violations
+      // are printed directly underneath. Measured — 4 findings became 3, the
+      // survivor claiming two rules could not enforce while both their `lodash`
+      // and `knex` violations sat below it. An agent reads that and hunts a broken
+      // glob that does not exist (bug 0021's shape).
+      //
+      // The description differs per instance, so it keeps them distinct. Nothing
+      // is lost: the rich formatter never renders `element` for a locationless
+      // finding, JSON carries `ruleId` separately, and the id is in the message.
+      element: description,
       file: '',
       line: 0,
       message,

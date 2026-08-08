@@ -23,6 +23,7 @@ import { layeredArchitecture } from '../../src/presets/layered.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { functionNoEval } from '../../src/rules/security.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
+import { dedupeConfigFindings } from '../../src/core/dedupe-config-findings.js'
 
 function inMemory(files: Record<string, string>): ArchProject {
   const tsm = new Project({ useInMemoryFileSystem: true })
@@ -83,6 +84,33 @@ describe('a false declaration does not swallow the findings under it', () => {
       .map((v) => v.message)
     expect(messages[0]).toContain('was declared empty')
     expect(messages.join('\n')).toContain('has no matching registry')
+  })
+
+  it('survives dedupeConfigFindings — the pipeline a user actually runs', () => {
+    // Every other row here asserts at `.violations()`, which is the one path that
+    // SKIPS dedupe. Both real consumers dedupe (`check-all.ts`, `cli/check.ts`),
+    // and a one-word change to `element` routed this finding into the collapse:
+    // with `file: ''` and the rule id in both remaining key slots, N fanned-out
+    // instances became one — and the survivor picked up `affectedNote`'s "this one
+    // option generated N rules that cannot enforce anything", which is FALSE here
+    // and false precisely because of the no-swallow fix: those rules enforce, and
+    // their violations print underneath. Measured 4 → 3 before the fix.
+    const p = inMemory({
+      '/src/routes/d.ts': "import { x } from 'lodash'\nvoid x\n",
+      '/src/routes/e.ts': "import { y } from 'knex'\nvoid y\n",
+      '/src/domain/f.ts': 'export const f = 1\n',
+    })
+    const raw = layeredArchitecture(p, {
+      layers: { routes: '**/routes/**', domain: '**/domain/**' },
+      // Two packages → two rules under one id, BOTH genuinely violated.
+      restrictedPackages: { '**/domain/**': ['lodash'], '**/nowhere/**': ['knex'] },
+      expectEmpty: ['preset/layered/restricted-packages'],
+    }).flatMap((r) => r.violations())
+    const deduped = dedupeConfigFindings(raw)
+
+    expect(deduped).toHaveLength(raw.length)
+    // And the false note never appears on a declaration finding.
+    expect(deduped.map((v) => v.message ?? '').join('\n')).not.toContain('cannot enforce anything')
   })
 
   it('the declaration is reported FIRST — configuration before findings produced under it', () => {
@@ -147,7 +175,7 @@ describe('the remedy names a call the reader can actually make', () => {
     // `format.ts` drops the `Fix:` line when suggestion === message, so this
     // finding shipped with no remedy at all.
     expect(v?.suggestion).not.toBe(v?.message)
-    expect(v?.suggestion ?? '').toContain('reported below this finding')
+    expect(v?.suggestion ?? '').toContain('separate findings under the same rule id')
   })
 
   it('the EMPTY-selection finding points at the reachable spelling too', () => {

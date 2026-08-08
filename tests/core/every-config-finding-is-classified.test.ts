@@ -108,7 +108,7 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
   'src/core/rule-builder.ts::unexpectedlyNonEmptyViolation': {
     remedy: 'own',
     verified:
-      'stated-only: the remedy is to drop .expectEmpty(), which changes what the rule asserts rather than fixing a fault',
+      'behavioural: false-declaration-reports-both.test.ts — the remedy names the reachable spelling, the Fix is distinct from the message, and the rule violations it used to discard are reported alongside it',
   },
   'src/core/rule-builder.ts::emptySelectionViolation': {
     remedy: 'own',

@@ -85,4 +85,21 @@ describe('the version-bump guard', () => {
     const { code } = run('0.58.1', '0.58.0', path.join(dir, 'absent.md'))
     expect(code).toBe(1)
   })
+
+  it('REFUSES a downgrade — it moves the latest dist-tag backwards', () => {
+    // The first cut tested `${VERSION%.*} != ${LATEST%.*}`, which is inequality
+    // and not order: measured, 0.57.0 over a published 0.58.0 printed "is a minor
+    // or major bump" and exited 0.
+    for (const older of ['0.57.0', '0.57.5', '0.58.0']) {
+      const { code, err } = run(older, '0.58.0', ADDED)
+      expect({ older, code }).toEqual({ older, code: 1 })
+      expect(err).toContain('not greater than the published')
+    }
+  })
+
+  it('CONTROL: 0.58.1 is still recognised as greater, so the patch rule can be reached', () => {
+    // Without this the ordering check could reject everything and the Fixed-only
+    // row above would be the only thing keeping it honest.
+    expect(run('0.58.1', '0.58.0', FIXED).code).toBe(0)
+  })
 })

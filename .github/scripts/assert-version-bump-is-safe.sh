@@ -42,6 +42,20 @@ if [ -z "${LATEST//[[:space:]]/}" ]; then
   exit 1
 fi
 
+# Ordering first. `${VERSION%.*} != ${LATEST%.*}` tests INEQUALITY, never order,
+# so it waved through a downgrade: measured, `0.57.0` over a published `0.58.0`
+# printed "is a minor or major bump" and exited 0. On a gate over an irreversible
+# effect that must be a comparison, not an assumption — republishing a lower
+# version moves the `latest` dist-tag backwards for every consumer.
+version_gt() { # $1 > $2 ?
+  [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ]
+}
+if ! version_gt "$VERSION" "$LATEST"; then
+  echo "Error: $VERSION is not greater than the published $LATEST." >&2
+  echo "Publishing it would move the 'latest' dist-tag backwards. Bump past $LATEST." >&2
+  exit 1
+fi
+
 # Same major.minor => this is a patch bump over what is already published.
 if [ "${VERSION%.*}" != "${LATEST%.*}" ]; then
   echo "OK: $VERSION is a minor or major bump over $LATEST."
