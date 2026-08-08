@@ -102,10 +102,26 @@ describe('the carrier reaches every construction path (plan 0089)', () => {
   })
 
   it('PATH 3 — the shared collectRule: dataLayerIsolation', () => {
-    const opts = { repositories: EMPTY, baseClass: 'BaseRepository' }
-    expect(configFindings(dataLayerIsolation(p, opts))).toHaveLength(1)
+    // `requireTypedErrors` is on so this path constructs TWO rules. With one, the
+    // one-at-a-time row below collapses into the all-declared row, and a
+    // `collectRule` that ignored the id list and declared everything it built
+    // passed the whole suite — measured, 3254/3254 green.
+    const opts = { repositories: EMPTY, baseClass: 'BaseRepository', requireTypedErrors: true }
+    expect(configFindings(dataLayerIsolation(p, opts))).toHaveLength(2)
+    // One at a time, so "reached every rule" cannot pass as "silenced everything".
+    const one = configFindings(
+      dataLayerIsolation(p, { ...opts, expectEmpty: ['preset/data/extend-base'] }),
+    )
+    expect(one).toHaveLength(1)
+    // Named, not just counted: the survivor must be the rule NOT declared.
+    expect(one[0]?.ruleId).toContain('preset/data/typed-errors')
     expect(
-      configFindings(dataLayerIsolation(p, { ...opts, expectEmpty: ['preset/data/extend-base'] })),
+      configFindings(
+        dataLayerIsolation(p, {
+          ...opts,
+          expectEmpty: ['preset/data/extend-base', 'preset/data/typed-errors'],
+        }),
+      ),
     ).toEqual([])
   })
 
