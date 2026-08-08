@@ -166,6 +166,26 @@ describe('precedence: an empty project outranks every declaration', () => {
     expect(messageOf(vs)).toContain('loaded 0 source files')
   })
 
+  it('holds for a rule with NO glob — the path that bypassed the precedence', () => {
+    // Review measured this: `deadSelectorFindings()` only catches a rule that
+    // DECLARES a glob, and `rule-builder` called the shared producer directly, so
+    // a glob-less rule over a zero-file project was told to "widen it, or declare
+    // the empty state" — both impossible on that input.
+    //
+    // The row above passes through `resideInFile()`, so it never exercised this
+    // path. Asked ADR-008 rule 5's question, it would pass with the instrument
+    // precedence removed from the root entirely.
+    const vs = functions(emptyProject())
+      .that()
+      .haveNameMatching(/^nothing$/)
+      .should()
+      .satisfy(functionNoEval())
+      .rule({ id: 'x/no-eval', because: 'b', suggestion: 's' })
+      .violations()
+    expect(messageOf(vs)).toContain('loaded 0 source files')
+    expect(messageOf(vs)).not.toContain('widen it')
+  })
+
   it('the empty-project remedy NEVER offers a declaration', () => {
     // ADR-008 rule 2 / ADR-009 part 4: three causes, three remedies, and naming
     // the declaration here would be a remedy that cannot remediate.

@@ -21,6 +21,26 @@ export abstract class SmellBuilder extends TerminalBuilder {
   protected _ignorePaths: string[] = []
   protected _groupByFolder = false
 
+  /**
+   * This family's own narrowing, named — plan 0099 / ADR-009 part 4.
+   *
+   * `_minLines` defaults to 5 and neither `agentGuardrails` nor `strictBoundaries`
+   * exposes a knob for it, so a user whose bodies are all shorter is told their
+   * rule enforces nothing by a filter they never wrote and cannot reach. Naming it
+   * is the difference between an actionable finding and one that sends an agent
+   * hunting for filters that do not exist.
+   */
+  protected override narrowingHint(): string | undefined {
+    const applied = [`minLines(${String(this._minLines)})`]
+    if (this._folders.length > 0) applied.push(`inFolder(${this._folders.join(', ')})`)
+    if (this._ignorePaths.length > 0) applied.push(`ignorePaths(${this._ignorePaths.join(', ')})`)
+    if (this._ignoreTests) applied.push('ignoreTests()')
+    return (
+      `Its own narrowing removed them: ${applied.join(', ')}` +
+      ` — minLines defaults to 5 even if you did not set it.`
+    )
+  }
+
   constructor(protected readonly project: ArchProject) {
     super()
   }

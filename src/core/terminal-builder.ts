@@ -835,7 +835,45 @@ export abstract class TerminalBuilder {
    *   disparaged. Both are now offered as peers, and the declaration is described
    *   by what it does: it expires.
    */
+  /**
+   * The narrowing THIS family applied, when it can name it — plan 0099.
+   *
+   * ADR-009 part 4 wants the zero-examined remedy to name the **actual excluder,
+   * including internal defaults**, because "fix your filters" to a user who wrote
+   * none sends an agent looking for filters that do not exist.
+   *
+   * The root cannot know this: only the family holds its own thresholds. Review
+   * measured the cost of leaving it out — `agentGuardrails({ src: '**\/lib/**',
+   * noCopyPaste: true })` over two one-line functions, a **correctly configured**
+   * rule pointing at real code, hard-failed with "widen it until it matches
+   * something" while the true cause was `minLines(5)`, a default the author never
+   * wrote and which that preset exposes no knob for.
+   *
+   * Returns `undefined` when a family has nothing specific to say, and the caller
+   * falls back to naming the possibility rather than asserting a cause it cannot
+   * verify.
+   */
+  protected narrowingHint(): string | undefined {
+    return undefined
+  }
+
   protected zeroSubjectsViolation(project: ArchProject | undefined): ArchViolation {
+    // The precedence lives HERE, not only at the call site, because this
+    // producer's docstring declares "no empty project" as a precondition and an
+    // assumed precondition is one a second caller forgets.
+    //
+    // Measured: `rule-builder`'s `emptySelectionViolation` called this directly,
+    // and `deadSelectorFindings` only catches a rule that DECLARES a glob — so
+    // `functions(p).that().haveNameMatching(/x/)` over a zero-file project was
+    // told "The project loaded 0 files … widen it, or declare the empty state".
+    // Both remedies are impossible on that input: nothing widens into a corpus of
+    // zero files, and declaring produces a different failure. The sentence stated
+    // the instrument-level fact and then gave selection-level advice contradicting
+    // it — ADR-008 rule 2, on the one input class this plan's headline ruling is
+    // about. `diagnose()` already got this right and refused to pair them.
+    if (project !== undefined && loadedNothing(project)) {
+      return this.emptyProjectViolation(project)
+    }
     const described = this.describeRule()
     const name = described.id || described.rule || this.constructor.name
     // The numbers, not the possibility. `loaded` is omitted rather than guessed
@@ -845,8 +883,18 @@ export abstract class TerminalBuilder {
       loaded === undefined
         ? 'This rule examined 0 subjects'
         : `The project loaded ${String(loaded)} file${loaded === 1 ? '' : 's'}, and this rule examined 0 of them`
+    // Name the excluder when the family knows it; name the POSSIBILITY when it
+    // does not. Deleting the possibility was a measured regression: 0.58's
+    // preview said "including any default it applies that you did not write",
+    // this plan called that hedging, and the replacement printed numbers that
+    // disclose no cause — net information loss on the commonest real case.
+    const hint = this.narrowingHint()
+    const cause =
+      hint === undefined
+        ? ' Its own narrowing removed them — including any default it applies that you did not write.'
+        : ` ${hint}`
     const advice =
-      `${counted}, so it enforces nothing as written today. ` +
+      `${counted}, so it enforces nothing as written today.${cause} ` +
       `Either widen it until it matches something, or declare the empty state with ` +
       `${this.emptyDeclarationAdvice()} — a declaration is an assertion, not a silencer: ` +
       `it fails the day something does match. ` +
