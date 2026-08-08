@@ -1,4 +1,5 @@
 import type { ArchProject } from '../core/project.js'
+import type { CollectResult } from '../core/terminal-builder.js'
 import type { ArchViolation } from '../core/violation.js'
 import type { GlobNode } from '../core/glob-site.js'
 import { globAnyOf, stampGlobs } from '../core/glob-site.js'
@@ -120,12 +121,23 @@ export abstract class SmellBuilder extends TerminalBuilder {
   }
 
   /** Delegate to detect() for the terminal builder pipeline. */
-  protected collectViolations(): ArchViolation[] {
-    return this.detect()
+  protected collectViolations(): CollectResult {
+    return { violations: this.detect(), examined: this.examinedUnits() }
   }
 
   /** Subclasses implement: run detection, return violations. */
   protected abstract detect(): ArchViolation[]
+
+  /**
+   * Subclasses implement: units this detector examined — plan 0098.
+   *
+   * Declared here rather than left to the subclasses because
+   * `collectViolations()` is the seam and it cannot see a hook the subclass
+   * merely happens to have. Plan 0096 added `examinedUnits()` to both detectors
+   * and this class could not reach either; a new detector would have compiled
+   * with no evidence at all.
+   */
+  abstract examinedUnits(): number
 
   /** Subclasses implement: human-readable rule description. */
   protected abstract describe(): string

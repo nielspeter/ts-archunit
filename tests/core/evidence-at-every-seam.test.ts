@@ -33,6 +33,8 @@ import { diagnose } from '../../src/core/diagnose.js'
 import { smells } from '../../src/smells/index.js'
 import { call, globAnyOf, stampGlobs } from '../../src/index.js'
 import { correspondence } from '../../src/builders/correspondence-builder.js'
+import { modules, slices, crossLayer, haveMatchingCounterpart } from '../../src/index.js'
+import { tsconfig } from '../../src/tsconfig/index.js'
 import { resolvers, schemaFromSDL } from '../../src/graphql/index.js'
 import * as rootExports from '../../src/index.js'
 import * as graphqlExports from '../../src/graphql/index.js'
@@ -43,6 +45,8 @@ const fixture = (name: string): string =>
 /** A project that loaded files — every row needs upstream healthy. */
 const loaded = project(fixture('smells/duplicate-bodies'))
 const emptyProject = project(fixture('does-not-load'))
+/** This repo itself — crossLayer needs two layers that really select files. */
+const loadedSelf = project(path.resolve(import.meta.dirname, '../../tsconfig.json'))
 
 const kindsOf = (rule: Parameters<typeof diagnose>[0][number], p?: typeof loaded): string[] =>
   diagnose([rule], p).map((f) => f.kind)
@@ -90,6 +94,56 @@ describe('a family counts what it examined (plan 0096)', () => {
         .resolveFieldReturning(/ZZZ_NOTHING_MATCHES/)
         .examinedUnits(),
     ).toBe(0)
+  })
+
+  it('the four families plan 0098 forced answer with a NUMBER, not a constant', () => {
+    // The hole the type cannot close. `collectViolations()` returning
+    // `{ violations, examined }` forces every family to produce the field; it
+    // cannot force the field to mean anything, and all eight could satisfy the
+    // compiler with `examined: 0`. So each family shows its count RESPONDING to
+    // input — zero on a narrowed selection, non-zero on a wide one, over a
+    // project that loaded files either way. A constant fails one half of every
+    // pair below, whichever constant it is.
+    const mods = project(fixture('modules'))
+
+    // RuleBuilder<T> — post-predicate subjects.
+    expect(modules(mods).that().resideInFolder('**/nowhere-at-all/**').examinedUnits()).toBe(0)
+    expect(modules(mods).examinedUnits()).toBeGreaterThan(0)
+
+    // SliceRuleBuilder — slices holding at least one FILE, not slices DECLARED.
+    // `assignedFrom()` is the discriminating shape and `matching()` is not:
+    // matching a dead glob yields no slices at all, so both definitions answer 0
+    // and the row would pass either way. assignedFrom returns one slice per key
+    // whether or not anything matched, so here `_slices.length` is 2 while the
+    // honest count is 0 — measured, and the reason this row uses this API.
+    const declaredButEmpty = slices(mods).assignedFrom({
+      alpha: '**/nowhere-at-all/**',
+      beta: '**/also-nowhere/**',
+    })
+    expect(declaredButEmpty.examinedUnits()).toBe(0)
+    expect(slices(mods).matching('**/src/*').examinedUnits()).toBeGreaterThan(0)
+
+    // TsconfigBuilder — declared requirements. Its unit is not a subject count
+    // at all: this family examines a config, and `.requires({})` is its vacuity.
+    expect(tsconfig(mods).requires({}).examinedUnits()).toBe(0)
+    expect(tsconfig(mods).requires({ strict: true }).examinedUnits()).toBe(1)
+  })
+
+  it('crossLayer counts PAIRS — layers that select files can still examine nothing', () => {
+    // The unit that is least obvious, and the one a reviewer flagged as possibly
+    // ambiguous. Pairs, not layers and not the files behind them: a mapping that
+    // never matches forms no pairs, so the condition receives an empty array and
+    // the rule cannot fail — while both layer globs select real files. Counting
+    // layers (2) or files (many) would report this rule healthy.
+    const both = (map: () => boolean) =>
+      crossLayer(loadedSelf)
+        .layer('core', '**/src/core/*.ts')
+        .layer('builders', '**/src/builders/*.ts')
+        .mapping(map)
+        .forEachPair()
+        .should(haveMatchingCounterpart([]))
+    expect(both(() => false).examinedUnits()).toBe(0)
+    expect(both(() => true).examinedUnits()).toBeGreaterThan(0)
   })
 
   it('the memo does not survive a narrowing — a clone is a different key', () => {
@@ -322,6 +376,16 @@ describe('classification of the evidence hooks (plan 0096)', () => {
     'CorrespondenceBuilder', // materialized sides, and it has no project
     'SchemaRuleBuilder', // post-predicate fields; no project either
     'ResolverRuleBuilder', // post-predicate resolvers
+    // Plan 0098 — the seam's return type forced these. `RuleBuilder` is the
+    // abstract root, so its subclasses correctly INHERIT a real implementation
+    // and the walk finds 'RuleBuilder' rather than a missing hook.
+    'RuleBuilder', // post-predicate subjects
+    'SliceRuleBuilder', // slices holding at least one file
+    'TsconfigBuilder', // declared requirements — a config, not a corpus
+    // NOT listed, and stated rather than left as a gap: `crossLayer`'s seam lives
+    // on `PairFinalBuilder`, which no entry point exports, so a name census
+    // cannot reach it (the same caveat `assertion-gate.test.ts` records). Its
+    // unit is guarded behaviourally by the PAIRS row above instead.
   ]
 
   /**

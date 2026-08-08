@@ -1,4 +1,5 @@
 import picomatch from 'picomatch'
+import type { CollectResult } from '../core/terminal-builder.js'
 import type { SourceFile } from 'ts-morph'
 import type { ArchProject } from '../core/project.js'
 import { ownsEmptyDiscovery } from '../core/owns-empty-discovery.js'
@@ -239,7 +240,15 @@ export class PairFinalBuilder extends TerminalBuilder {
     return ownsEmptyDiscovery(this.condition)
   }
 
-  protected collectViolations() {
+  /**
+   * Pairs this rule examined — plan 0098. `condition.evaluate` receives exactly
+   * this array, so the count cannot drift from what was checked.
+   */
+  examinedUnits(): number {
+    return this.pairs.length
+  }
+
+  protected collectViolations(): CollectResult {
     const layerNames = this.layers.map((l) => l.name)
     const context: PairConditionContext = {
       rule: `cross-layer [${layerNames.join(', ')}] should ${this.condition.description}`,
@@ -254,7 +263,12 @@ export class PairFinalBuilder extends TerminalBuilder {
       layers: this.layers,
     }
 
-    return this.condition.evaluate(this.pairs, context)
+    // Plan 0098: the pairs ARE the examined set — `evaluate` receives exactly
+    // this array, so the count cannot drift from what was checked.
+    return {
+      violations: this.condition.evaluate(this.pairs, context),
+      examined: this.examinedUnits(),
+    }
   }
 }
 

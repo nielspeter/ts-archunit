@@ -1,4 +1,5 @@
 import type { ArchProject } from './project.js'
+import type { CollectResult } from './terminal-builder.js'
 import type { Predicate } from './predicate.js'
 import type { Condition, ConditionContext } from './condition.js'
 import type { ArchViolation } from './violation.js'
@@ -208,7 +209,7 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * An empty condition list is NOT exempt: `[].every()` is `true`, and a rule
    * with no conditions is the assertion-less case that its own gate reports.
    */
-  protected override assertsCardinality(): boolean {
+  override assertsCardinality(): boolean {
     if (this._conditions.length === 0) return false
     return this._conditions.every((condition) => assertsCardinality(condition))
   }
@@ -294,8 +295,26 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
    * filter by predicates, run conditions, add the empty-selector finding —
    * and the root's terminal methods do the rest.
    */
-  protected collectViolations(): ArchViolation[] {
-    return this.evaluate()
+  protected collectViolations(): CollectResult {
+    // Plan 0098. The unit is the POST-predicate set — what the conditions
+    // actually receive — not `getElements()`. `filterElements()` is memoized per
+    // builder (`element-cache.ts`), so asking here and again inside `evaluate()`
+    // walks once.
+    return { violations: this.evaluate(), examined: this.examinedUnits() }
+  }
+
+  /**
+   * Units this rule examined — plan 0098: the POST-predicate subjects, which is
+   * exactly what `subjects()` returns and what the conditions receive.
+   *
+   * Public for the same structural reason as `assertsSomething()`: `diagnose()`
+   * reads it through a structural interface and a protected member cannot
+   * satisfy one. One definition, two readers — `collectViolations()` above and
+   * the preview — so the number the gate carries and the number the preview
+   * reports cannot drift apart.
+   */
+  examinedUnits(): number {
+    return this.filterElements().length
   }
 
   // --- Protected: for subclasses ---

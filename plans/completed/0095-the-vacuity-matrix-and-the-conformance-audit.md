@@ -3,7 +3,7 @@
 **Status:** **DONE 2026-08-07.** Filed 2026-08-06, re-cut 2026-08-07: the original spanned two releases
 and three phases, which is not a plan under this repo's rule that a plan is completed — and moved to
 `completed/` — in the PR that does its work. Split into 0095 (this), [0096](./0096-evidence-at-every-seam.md),
-[0097](./0097-the-declared-empty-grammar.md) and [0098](../0098-the-evidence-seam-and-the-floor.md).
+[0097](./0097-the-declared-empty-grammar.md) and [0098](./0098-the-evidence-seam-and-the-floor.md).
 **Priority:** High, and **first** — it is the only piece with no dependencies, and its deliverable is the
 evidence [ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) is ratified on.
 **Effort:** Medium. The classification is dozens of reviewed entries across twelve subpaths; the test is
@@ -104,7 +104,7 @@ data); `vitest.config.ts`; `package.json`; `.github/workflows/ci.yml`; `.github/
 
 Fixing anything the matrix finds. This plan **measures**; 0096–0098 change behaviour. A cell that comes
 back fail-open is recorded, not repaired — including bug 0066's, whose fix belongs to
-[0098](../0098-the-evidence-seam-and-the-floor.md) so the seam and the smell family land as one red event.
+[0098](./0098-the-evidence-seam-and-the-floor.md) so the seam and the smell family land as one red event.
 
 ---
 

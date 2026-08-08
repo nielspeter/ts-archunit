@@ -1,8 +1,8 @@
 # Plan 0099 — the floor no family can be born below
 
-**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./0098-the-evidence-seam-and-the-floor.md)
+**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./completed/0098-the-evidence-seam-and-the-floor.md)
 when that plan's own amendment measured it as two plans wearing one number.
-**Depends on:** [0098](./0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
+**Depends on:** [0098](./completed/0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
 which does not exist until the seam lands), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor
 reads the mint it lifts), [0089](./0089-presets-forward-their-options.md) — and the reason is
 sharper than "a preset user cannot write `.expectEmpty()`". They **can** reach a remedy today:
@@ -93,6 +93,29 @@ entry — the closest precedent for this exact break — opens with _"Run `ts-ar
 first, and fix what it reports before you upgrade."_ 0096 shipped precisely that preview. The inventory
 row "`diagnose()` and `check()` agree" is what makes the preview **complete** rather than hopeful, so
 say that out loud rather than leaving the reader to trust it.
+
+**Four defects in the current advice string, from a user-perspective review of 0098** — this plan owns
+the remedy text, so they are fixed here rather than in the seam PR:
+
+- **It hedges where the tool holds the fact.** "including any default it applies that you did not write"
+  is printed as a hypothetical when the rule is known: it can say whether `minLines(5)` is in play, and
+  it materialized the selection, so it knows the project loaded N files and the selection produced 0.
+  Print the numbers, not the possibility. This is the largest available improvement and it needs no new
+  machinery.
+- **"can never fail" overstates.** For a `crossLayer` rule whose pairs do not exist yet, or a folder
+  empty in a young repository, the rule is correct and simply matches nothing **today**. Telling that
+  reader their rule is broken is false, and "never" is the word doing it.
+- **The ranking is wrong for greenfield adopters, and 0098 widened exactly their case.** The advice says
+  widening is the fix and declaring is the exception. For a team whose second layer is not built yet,
+  widening is _impossible_ — the code does not exist — so the only available action is the branch the
+  message calls an exception and says "proves nothing", and `doctor` exits 1 either way. These are the
+  people most likely to adopt an architecture tool early, and they meet this on day one. Either soften
+  the ranking for the relational families, or accept that `.expectEmpty()` is the ordinary answer for a
+  not-yet-populated layer and stop calling it an exception.
+- **One paragraph per finding does not scale.** ~70 words repeated across a dozen findings is a wall.
+  Split it: a short per-finding form carrying the facts, and the shared explanation printed **once** at
+  the end of the run. The per-family spelling from `emptyDeclarationAdvice()` still substitutes into the
+  per-finding form.
 
 **Per-cause remedies** (ADR-009 part 4). Three causes, three remedies, and rule 2 forbids naming one as
 universal: empty project → point at the tsconfig holding the sources, and **never** offer `.expectEmpty()`;

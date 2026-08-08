@@ -85,7 +85,7 @@ as the stale prose in v0.49.1 — text that is true and unreachable.
 
 [ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) part 3 makes this plan's mechanism binding
 for a second reason: **every preset must expose a declaration carrier that reaches every check it
-constructs.** Under [0098](./0098-the-evidence-seam-and-the-floor.md), a check that examined zero units
+constructs.** Under [0098](./completed/0098-the-evidence-seam-and-the-floor.md), a check that examined zero units
 fails unless the author declared empty — and a preset user holds no builder, so without a carrier their
 only reachable remedy is disabling the option, which deletes coverage permanently. That is ADR-008 rule
 1's trained-suppression dynamic, produced by our own gate.

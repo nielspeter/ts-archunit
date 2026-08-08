@@ -1,7 +1,7 @@
 # Plan 0100 — a preset that constructs nothing
 
 **Status:** Open, PROPOSED — the design is not settled; see **What this has to decide**.
-Filed 2026-08-08 from [0098](./0098-the-evidence-seam-and-the-floor.md)'s amendment, which measured that
+Filed 2026-08-08 from [0098](./completed/0098-the-evidence-seam-and-the-floor.md)'s amendment, which measured that
 the fail-closed floor cannot reach this.
 **Depends on:** nothing structurally, but **coupled to 0099's release**: if this lands first, 0099's
 claim drops its qualifier; if after, the changelog ships a named exception. Best decided alongside

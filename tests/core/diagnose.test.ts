@@ -140,11 +140,17 @@ describe('diagnose', () => {
     // Checking import-target against a path universe would fail every correct
     // dependency rule in existence. The exemption lives in `viewsFor`, and
     // removing it left the whole suite green.
+    // `.expectEmpty()` because the fixture has no module importing fastify, so
+    // this rule genuinely examines nothing — plan 0098 gave the rule-builder
+    // family evidence and the preview now says so. Declaring it keeps the
+    // assertion at `toEqual([])` (this file bans the weaker form) and keeps the
+    // row about the ONE thing it tests: an import glob is never reported.
     const rule = modules(p)
       .that()
       .importFrom('fastify', '**/node_modules/typescript/**')
       .should()
       .notHaveDefaultExport()
+      .expectEmpty()
     expect(diagnose([rule])).toEqual([])
   })
 
@@ -180,7 +186,13 @@ describe('diagnose', () => {
     // narrower than the `'**/src/domain/**'` the old advice prescribed, and
     // exactly what the author meant. The sibling test below established this
     // for `slices().matching()`; the path predicates now behave the same way.
-    const rule = classes(p).that().resideInFolder('src/domain/**').should().beExported()
+    // `modules`, not `classes`: the non-vacuity control below has always checked
+    // `modules(p)`, while the rule under test used `classes(p)` — and the fixture
+    // has modules in that folder but no classes. So the control was proving a
+    // different builder than the row diagnosed, and the row passed only because
+    // nothing yet reported the rule-builder family's evidence. Plan 0098 made
+    // that visible; the two now agree.
+    const rule = modules(p).that().resideInFolder('src/domain/**').should().notHaveDefaultExport()
     expect(diagnose([rule])).toEqual([])
 
     // And it is not merely undiagnosed — it selects real subjects.
@@ -318,7 +330,11 @@ describe('kind, derived behaviourally rather than restated', () => {
     const rule = crossLayer(self)
       .layer('core', glob)
       .layer('builders', '**/src/builders/*.ts')
-      .mapping(() => false)
+      // A mapping that never matches forms NO PAIRS, and pairs are what this
+      // family examines — so `() => false` made the rule vacuous in a second way,
+      // which plan 0098 now reports. The row is about the layer glob, so the
+      // mapping just has to produce pairs.
+      .mapping(() => true)
       .forEachPair()
       .should(haveMatchingCounterpart([]))
     expect(diagnose([rule])).toEqual([])

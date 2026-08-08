@@ -19,7 +19,7 @@ rule 6, with one top-row edge: `DiagnosticFinding['kind']` is a documented JSON 
 
 [ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md) requires a passing verdict to be constructed
 from evidence of examination. Nothing computes that evidence today. Before the seam can require it
-([0098](../0098-the-evidence-seam-and-the-floor.md)), every family has to produce it — and the consumer
+([0098](./0098-the-evidence-seam-and-the-floor.md)), every family has to produce it — and the consumer
 has to be able to see what the flip will do to them before it happens.
 
 ## The work
@@ -180,7 +180,7 @@ rule file — a rule file with ten smell rules paid ~2s to compute ten integers.
 
 ## Out of scope
 
-The seam retype and anything that changes `check()` — [0098](../0098-the-evidence-seam-and-the-floor.md).
+The seam retype and anything that changes `check()` — [0098](./0098-the-evidence-seam-and-the-floor.md).
 The declared-empty grammar — [0097](./0097-the-declared-empty-grammar.md). Evidence inside a
 user-written `defineCondition` body: ADR-009's named residue, invisible to a seam that counts what was
 handed to it.
@@ -266,7 +266,7 @@ were invisible in the verdicts and obvious in the assertions.
 ### Deferred, and named
 
 - **The effectiveness half of `.expectEmpty()` on `SmellBuilder`** stays in
-  [0098](../0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor makes it possible. This
+  [0098](./0098-the-evidence-seam-and-the-floor.md)'s inventory, where the floor makes it possible. This
   plan makes it _reachable_; nothing reads the flag yet outside the rule builders and `correspondence`.
 - **A boundary row for `duplicateBodies` at exactly one examined body.** The unit is "bodies entering
   pairwise comparison" and one body enters no pair, so a floor gating on `> 0` would let a provably

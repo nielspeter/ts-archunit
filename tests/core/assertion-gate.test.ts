@@ -26,6 +26,7 @@ import { Project } from 'ts-morph'
 import * as rootExports from '../../src/index.js'
 import * as graphqlExports from '../../src/graphql/index.js'
 import { TerminalBuilder, ASSERTION_DOCS } from '../../src/core/terminal-builder.js'
+import type { CollectResult } from '../../src/core/terminal-builder.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { slices } from '../../src/builders/slice-rule-builder.js'
 import { modules } from '../../src/builders/module-rule-builder.js'
@@ -442,8 +443,11 @@ class AdviceLessBuilder extends TerminalBuilder {
     return false
   }
 
-  protected collectViolations(): ArchViolation[] {
-    return []
+  protected collectViolations(): CollectResult {
+    // Plan 0098 retyped this seam. This fixture is the closest thing in-repo to
+    // an ADR-010 foreign dialect, and updating it here IS the upgrade an external
+    // dialect performs — a compile error naming the member, not a silent drift.
+    return { violations: [], examined: 0 }
   }
 }
 
