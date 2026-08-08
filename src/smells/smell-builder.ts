@@ -30,6 +30,11 @@ export abstract class SmellBuilder extends TerminalBuilder {
    * is the difference between an actionable finding and one that sends an agent
    * hunting for filters that do not exist.
    */
+  /** This family counts function bodies, not subjects — plan 0099. */
+  protected override examinedUnitNoun(): string {
+    return 'function bodies'
+  }
+
   protected override narrowingHint(): string | undefined {
     const applied = [`minLines(${String(this._minLines)})`]
     if (this._folders.length > 0) applied.push(`inFolder(${this._folders.join(', ')})`)

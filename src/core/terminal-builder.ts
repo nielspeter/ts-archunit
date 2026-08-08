@@ -857,6 +857,20 @@ export abstract class TerminalBuilder {
     return undefined
   }
 
+  /**
+   * What this family counts in `examined` — plan 0099.
+   *
+   * `CollectResult.examined` is unit-typed per family (subjects, bodies, pairs,
+   * keys), so a message that prints a FILE count and then says the rule examined
+   * "0 of them" commits a category error. Measured on this repo: a rule whose
+   * glob matched essentially all 616 files and whose NAME predicate matched none
+   * printed "loaded 616 files, and this rule examined 0 of them" — sending the
+   * reader to widen a glob that was already maximal.
+   */
+  protected examinedUnitNoun(): string {
+    return 'subjects'
+  }
+
   protected zeroSubjectsViolation(project: ArchProject | undefined): ArchViolation {
     // The precedence lives HERE, not only at the call site, because this
     // producer's docstring declares "no empty project" as a precondition and an
@@ -879,10 +893,14 @@ export abstract class TerminalBuilder {
     // The numbers, not the possibility. `loaded` is omitted rather than guessed
     // when the family has no project — the honest gap `getProject()` documents.
     const loaded = project === undefined ? undefined : project.getSourceFiles().length
-    const counted =
+    // The project file count is CONTEXT in parentheses, never a denominator: the
+    // rule did not examine files, and "0 of 616" reads as a glob problem when the
+    // glob may already match everything.
+    const context =
       loaded === undefined
-        ? 'This rule examined 0 subjects'
-        : `The project loaded ${String(loaded)} file${loaded === 1 ? '' : 's'}, and this rule examined 0 of them`
+        ? ''
+        : ` (the project loaded ${String(loaded)} file${loaded === 1 ? '' : 's'})`
+    const counted = `This rule examined 0 ${this.examinedUnitNoun()}${context}`
     // Name the excluder when the family knows it; name the POSSIBILITY when it
     // does not. Deleting the possibility was a measured regression: 0.58's
     // preview said "including any default it applies that you did not write",
@@ -895,7 +913,7 @@ export abstract class TerminalBuilder {
         : ` ${hint}`
     const advice =
       `${counted}, so it enforces nothing as written today.${cause} ` +
-      `Either widen it until it matches something, or declare the empty state with ` +
+      `Either close the gap — widen the selector, or add the code it is waiting for — or declare the empty state with ` +
       `${this.emptyDeclarationAdvice()} — a declaration is an assertion, not a silencer: ` +
       `it fails the day something does match. ` +
       UNSUPPRESSABLE
@@ -928,7 +946,7 @@ export abstract class TerminalBuilder {
     const described = this.describeRule()
     const name = described.id || described.rule || this.constructor.name
     const declaration = this.emptyDeclarationAdvice()
-    const message = `${declaration} asserted this rule examines nothing, and it examined ${String(examined)}.`
+    const message = `${declaration} asserted this rule examines nothing, and it examined ${String(examined)} ${this.examinedUnitNoun()}.`
     const suggestion =
       `Remove ${declaration} and let the rule enforce itself — the thing you were waiting for has ` +
       `appeared, and the rule now has something to check. If instead the selection is wider than you ` +
