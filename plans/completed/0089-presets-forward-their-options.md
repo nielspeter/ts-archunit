@@ -174,3 +174,39 @@ checked against known rather than constructed ids; agent-guardrails losing the c
 The second row is the one worth keeping: applying the declaration to **every** rule regardless of the
 list makes every "declared clears it" assertion pass. Only the one-of-four rows distinguish "the carrier
 reached every rule" from "the carrier silenced everything".
+
+## Added 2026-08-08 — two defects review measured, and the shape they share
+
+Both survived the 7/7 sabotage above, and both for the same reason: **the revert list was derived from
+what the branch implemented, not from the diff of what the plan promised.** ADR-008 rule 5 says to
+enumerate it from the diff precisely because a list built from the implementation cannot name a site the
+implementation never touched — it answers "pass" honestly and tells you nothing.
+
+**1. The one-of-four row was missing on the path that carries the most rules.** The sabotage row
+"carrier applied to every rule, ignoring the list" was caught by PATH 1 and PATH 2, which have
+one-at-a-time assertions. PATH 3 — the shared `collectRule`, which serves `layered`, `boundaries` and
+`data-layer`, 37 rules in `strictBoundaries` alone — was asserted through a `dataLayerIsolation` call
+constructing a **single** rule, so its one-at-a-time row and its all-declared row were the same row.
+Measured: sabotaging `collectRule` alone to declare every rule it built, ignoring the id list, compiled
+clean and passed **3250/3250**. The fix turns `requireTypedErrors` on so the path constructs two rules,
+then declares one and asserts the survivor **by id** — re-measured, that sabotage now fails.
+
+**2. `importOptions` reached two conditions and was documented as reaching all of them.** Both option
+docstrings said "applied to **every** rule this preset constructs", `docs/presets.md` named "the layer /
+**isolation** rules" in its table, and the forwarding test's own header claimed "every condition that
+takes one". It reached `respectLayerOrder` and `beFreeOfCycles`. Not forwarded, though all four take an
+`ImportOptions`: `innermost-isolation`, `restricted-packages`, `no-cross-boundary`, `shared-isolation`,
+`test-isolation`.
+
+The sharpest measurement is `innermost-isolation`, because it shows the plan's own Problem statement
+still unsolved after the plan: with `{ ignoreTypeImports: true }`, one `layeredArchitecture` call
+answered the project's one question **both ways about the same erased edge** — `layer-order` cleared it,
+`innermost-isolation` still failed it. Before this plan the split was 2-way (cycles vs. everything else);
+the first cut made it 3-way. "Alignment is the feature" was the argument for one bag, and the bag did not
+align.
+
+Fixed by forwarding at all five sites, with five rows added that each assert a **different outcome per
+value**. Reverting the forwarding compiles and fails exactly those five, leaving the original five
+passing. Two rules stay excluded and are now named in the docs rather than silently absent:
+`type-imports-only`, whose condition asks about type imports as its subject, and `no-copy-paste`, which
+compares bodies rather than imports.
