@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Presets accept `expectEmpty` and `importOptions`** — plan 0089, additive.
+
+  `expectEmpty: RuleId[]` declares that a rule of the preset has nothing to check, typed on that
+  preset's own id union so a rename is a compile error rather than a silent no-op. It exists because a
+  preset user holds no builder: once a later release fails a check that examined nothing, their only
+  other remedy is `overrides: { id: 'off' }`, which is **permanent, never expires, and deletes the rule
+  rather than declaring a fact about it**. Two guardrails ship with it — an id naming no constructed
+  rule is an unsuppressable finding (including one you also set to `'off'`, since `off` means it was
+  never built), and a **dead glob remains undeclarable**, because a selector that can never match is a
+  mistake rather than a state.
+
+  `importOptions: ImportOptions` on `layeredArchitecture` and `strictBoundaries` forwards to every
+  condition that takes one. Those conditions disagree by default on purpose — `beFreeOfCycles()` ignores
+  type-only imports because it asks whether a module is _evaluated_; the layer and isolation rules count
+  them because they ask whether code is _coupled_. That distinction is visible when you hold a builder
+  and invisible through a preset, so the bag means one thing: **this project's answer to "is a type-only
+  edge a dependency?", applied everywhere.** It moves exactly one side, and which side depends on the
+  value — `docs/presets.md` carries the table. Two rules are excluded because the bag has no answer to
+  give them: `preset/layered/type-imports-only`, whose condition asks about type imports as its subject,
+  and `preset/boundaries/no-duplicate-bodies`, which compares function bodies rather than imports. Every other
+  rule in both presets is covered, isolation rules included — reviewed against a measurement, because the
+  first cut reached `respectLayerOrder` and `beFreeOfCycles` only, and `{ ignoreTypeImports: true }` then
+  cleared `layer-order` while the same erased edge still failed `innermost-isolation`.
+
+  Nothing changes if you pass neither.
+
+  **Upgrade rows now name the presets containing an affected condition.** `docs/upgrading.md` scoped its
+  rows by API names a preset user never types — "Only if you use `slices()` rules" reads as "not me" to
+  someone who calls `layeredArchitecture()`, and is wrong. Eight rows corrected, and a test derives the
+  condition-to-preset map from `src/presets/` so the prose is checked against the code rather than
+  against a copy of it.
+
 - **Every rule family now reports what it examined** — plan 0098. `collectViolations()` returns
   `{ violations, examined }` instead of `ArchViolation[]`, so a family cannot compile without stating how
   many units it looked at. Plan 0096 gave five families an **optional** accessor; four waves of vacuity
@@ -122,6 +154,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   selection, and the preview has to read the same computation the floor will. Six documentation sites
   said otherwise and are corrected. Selections are memoized per builder, so a `diagnose()` followed by
   a `check()` does the work once.
+
+### Fixed
+
+- **A false `.expectEmpty()` no longer swallows the violations underneath it.** `RuleBuilder.evaluate`
+  returned as soon as it saw a declared-empty selection that turned out non-empty, so the rule's
+  conditions were never evaluated. Harmless while a declaration names one rule; not harmless with plan
+  0089's preset carrier, where one id can construct many rules. Measured on a two-package
+  `restrictedPackages` config where one selection was empty and one was not: a genuine
+  `imports "lodash" which matches forbidden [lodash]` **disappeared**, replaced by a config error. The
+  user had made the run stricter and lost a finding. Both are now reported, configuration first.
+
+  **`correspondence()` had the identical early return, and it is fixed in the same release.** A side
+  declared empty that turned out full short-circuited the whole comparison: measured, two genuine
+  `services "OrderService" has no matching registry` findings became zero. Fixing only the rule builders
+  would have been the "covers the families someone remembered" shape ADR-009 exists to name. The
+  asymmetry that remains is deliberate — a side that is _genuinely_ empty still stops the comparison,
+  because an empty side makes it vacuous; only a **false declaration** now keeps going, since there both
+  sides have content and the correspondence is computable.
+
+- **Every remedy that offers a declaration now names one the reader can actually make.** A preset user
+  holds no builder, so `.expectEmpty()` is a call they cannot reach — yet it was the only spelling the
+  empty-selection and false-declaration findings ever printed, and neither carried the rule id (the
+  terminal formatter prints the chain description, never `ruleId`). When the id begins `preset/`, both
+  now say `expectEmpty: ['<id>']` — which is also exactly the argument to type — and the
+  false-declaration finding carries its `ruleId` and a `Fix:` distinct from its message, where it
+  previously had no `Fix:` line at all because the two strings were identical. ADR-008 rule 2: a remedy
+  impossible on the path that produced it is worse than none.
+
+- **`publish.yml` refuses a patch release carrying feature-level change.** The "next release is a minor"
+  constraint existed only as prose in this file; the workflow checked the tag against `package.json` and
+  that a changelog section existed, **both of which pass for `v0.58.1`** — and the release-notes
+  extractor would then have printed this file's own "not a patch" note into the release body, after the
+  immutable publish. Now a script gate, failing closed including on an unknown baseline, with its own
+  tests.
+
+- **The unbound-`expectEmpty` remedy stops de-duplicating by hand what it never de-duplicated.** The
+  "this preset constructed:" list repeated an id once per boundary/layer/pair — measured at 31 entries
+  naming 4 unique ids, `test-isolation` twenty times consecutively. And when the preset constructed
+  _nothing_, "correct the id" was simply false: the id is usually right and the cause is upstream, so
+  that branch now names the discovery glob and the `off` overrides instead.
 
 ### Changed (⚠️ BREAKING — `correspondence().allowEmpty()` is now `.expectEmpty()`)
 

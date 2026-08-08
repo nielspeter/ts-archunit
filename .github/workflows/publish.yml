@@ -85,6 +85,19 @@ jobs:
             exit 1
           fi
 
+      # Pre-1.0, `^0.58.0` resolves anywhere inside `0.58.x`, so a patch carrying
+      # feature-level change reaches every consumer with an unchanged lockfile.
+      # The two checks above both pass for `v0.58.1` — and the extractor directly
+      # above would have printed the CHANGELOG's own "this release is 0.59.0, not
+      # a patch" blockquote into the release body, AFTER the immutable publish.
+      # Fails closed, including on an unknown baseline. Guarded by
+      # tests/release/version-bump-guard.test.ts.
+      - name: Refuse a patch bump that carries feature-level change
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          LATEST=$(npm view @nielspeter/ts-archunit version 2>/dev/null || echo "")
+          .github/scripts/assert-version-bump-is-safe.sh "$VERSION" "$LATEST" /tmp/release-notes.txt
+
       - name: Publish to npm (Trusted Publishing via OIDC)
         run: npm publish --provenance --access public
 

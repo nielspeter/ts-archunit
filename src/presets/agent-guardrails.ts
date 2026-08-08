@@ -9,7 +9,12 @@ import { smells } from '../smells/index.js'
 import type { DuplicateBodiesBuilder } from '../smells/duplicate-bodies.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import type { PresetBaseOptions } from './shared.js'
-import { overrideFindings, validateOverrides } from './shared.js'
+import {
+  overrideFindings,
+  validateOverrides,
+  declareEmptyIfListed,
+  declaredEmptyFindings,
+} from './shared.js'
 import type { RuleSeverity } from './shared.js'
 
 /**
@@ -66,13 +71,26 @@ export function agentGuardrails(
   const overrideProblems = overrideFindings(options.overrides, collectRuleIds(options))
 
   const builders: RuleBuilderLike[] = []
+  // Recorded HERE, at the one place a rule is actually built — the same argument
+  // `collectRule` makes for its `constructed` parameter ("the known-id list
+  // cannot answer this"). Deriving it instead from `collectRuleIds()` filtered by
+  // severity restates the construction conditionals a second time; the two agree
+  // today only because they are kept in step by hand, and the first rule added to
+  // one and not the other makes a declaration bind to a rule that was never built.
+  const constructed: string[] = []
   const push = (
     builder: FunctionRuleBuilder | DuplicateBodiesBuilder,
     meta: RuleMetadata & { id: string },
     def: 'error' | 'warn',
   ): void => {
     const sev = lookup(options.overrides, meta.id) ?? def
-    if (sev !== 'off') builders.push(builder.rule(meta).asSeverity(sev))
+    // Plan 0089's carrier, applied here as well as in `collectRule` — this
+    // preset builds through its own helper, and a carrier that reached only the
+    // shared path would cover the families someone remembered.
+    if (sev !== 'off') {
+      constructed.push(meta.id)
+      builders.push(declareEmptyIfListed(builder.rule(meta).asSeverity(sev), meta.id, options))
+    }
   }
 
   for (const api of options.noInlineLogic ?? []) {
@@ -146,7 +164,12 @@ export function agentGuardrails(
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  return [...overrideProblems, ...builders]
+  // `constructed` is recorded at the `push` site above, not re-derived here.
+  return [
+    ...overrideProblems,
+    ...declaredEmptyFindings(options.expectEmpty, constructed),
+    ...builders,
+  ]
 }
 
 /** All rule ids the given options would generate (for override validation). */

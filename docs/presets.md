@@ -87,6 +87,41 @@ layeredArchitecture(p, {
 
 This generates: "all modules NOT in `src/repositories/**` must not import `knex` or `prisma`". If multiple layers list the same package, the union of those layers may import it.
 
+### `importOptions` — aligning the type-import question
+
+**Since 0.59.0.** Applies to `layeredArchitecture` and `strictBoundaries`.
+
+These two presets construct conditions that **disagree by default, on purpose**:
+
+- `beFreeOfCycles()` **ignores** type-only imports. It asks whether the module is _evaluated_, and an
+  `import type` is erased at compile time, so it cannot contribute to an initialization cycle.
+- `respectLayerOrder()` and the isolation conditions **count** them. They ask whether the code is
+  _coupled_, and a shared type is coupling.
+
+Holding a builder you choose per condition, where the distinction is visible. Through a preset it is
+invisible — so `importOptions` is one bag meaning **this project's answer to "is a type-only edge a
+dependency?"**, applied to every rule the preset constructs whose condition takes one.
+
+Two rules are excluded, because the bag has no answer to give them: `preset/layered/type-imports-only`
+(`onlyHaveTypeImportsFrom` asks about type imports _as its subject_) and `preset/boundaries/no-duplicate-bodies`
+(it compares function bodies, not imports). Every other rule in both presets is covered.
+
+Passing it moves exactly one side, and which side depends on the value:
+
+| you pass                       | the cycle rule                 | the layer / isolation rules      |
+| ------------------------------ | ------------------------------ | -------------------------------- |
+| _(nothing)_                    | ignores type-only edges        | counts them                      |
+| `{ ignoreTypeImports: true }`  | unchanged                      | **stops counting type coupling** |
+| `{ ignoreTypeImports: false }` | **starts counting type edges** | unchanged                        |
+
+```ts
+layeredArchitecture(project, {
+  layers: { routes: '**/routes/**', services: '**/services/**' },
+  // Our team treats a shared type as a real dependency everywhere.
+  importOptions: { ignoreTypeImports: false },
+})
+```
+
 ## `dataLayerIsolation`
 
 Companion to `layeredArchitecture`. Enforces repository pattern conventions that layer ordering alone cannot catch: base class extension and typed error throwing.
@@ -229,6 +264,56 @@ layeredArchitecture(p, {
 ```
 
 Three severity levels: `'error'` (fails the run), `'warn'` (reported but never fails — surfaces in terminal / JSON / GitHub output and is baseline-filterable), `'off'` (skipped entirely). Unrecognized override keys emit a warning — catches typos.
+
+**Before reaching for `'off'`, read the next section.** If the rule is red because it has nothing to
+check — not because you disagree with it — `expectEmpty` says that and expires when it stops being true.
+`'off'` deletes the rule and never expires.
+
+## `expectEmpty` — declaring that a rule has nothing to check
+
+**Since 0.59.0.** Applies to every preset.
+
+A rule that examines nothing passes without checking anything. When you hold a builder you say so with
+`.expectEmpty()`; a preset user holds none, so presets accept the same declaration by rule id:
+
+```ts
+agentGuardrails(project, {
+  src: '**/src/**',
+  noCopyPaste: true,
+  // This package has no duplicate-body surface yet — say so, rather than
+  // disabling the rule and forgetting.
+  expectEmpty: ['preset/agent/no-copy-paste'],
+})
+```
+
+Prefer it to `overrides: { id: 'off' }`. `off` **deletes** the rule permanently; `expectEmpty` states a
+fact about today that a later release can hold you to. Three guardrails come with it:
+
+- **An id that names no constructed rule fails**, unsuppressably — including a rule you also set to
+  `'off'`, since `off` means it was never built and the declaration applies to nothing.
+- **A dead glob is not declarable.** A selector that can never match is a mistake, not a state, and no
+  declaration hides it.
+- **A false declaration fails, and does not hide what it was covering.** The day the selection fills you
+  get an unsuppressable finding naming the id — and the rule's real violations are reported underneath
+  it, not swallowed by it.
+
+### One id can name several rules
+
+`strictBoundaries` and `layeredArchitecture` construct some ids many times — `no-cross-boundary` once per
+boundary, `restricted-packages` once per package, `test-isolation` once per boundary pair. A declaration
+applies to **every** instance, so it holds only while all of them examine nothing:
+
+```ts
+strictBoundaries(project, {
+  folders: '**/src/features/*',
+  // True only while NO boundary imports across. The day one does, this fails
+  // for that boundary — and that boundary's violations are reported too.
+  expectEmpty: ['preset/boundaries/no-cross-boundary'],
+})
+```
+
+If some instances are empty and others are not, the declaration is the wrong tool: narrow the option
+that generates them instead.
 
 ## Aggregated errors
 

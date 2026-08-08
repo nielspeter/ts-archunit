@@ -108,7 +108,7 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
   'src/core/rule-builder.ts::unexpectedlyNonEmptyViolation': {
     remedy: 'own',
     verified:
-      'stated-only: the remedy is to drop .expectEmpty(), which changes what the rule asserts rather than fixing a fault',
+      'behavioural: false-declaration-reports-both.test.ts — the remedy names the reachable spelling, the Fix is distinct from the message, and the rule violations it used to discard are reported alongside it',
   },
   'src/core/rule-builder.ts::emptySelectionViolation': {
     remedy: 'own',
@@ -135,6 +135,13 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
   'src/helpers/baseline.ts::unmatchedBaselineFinding': {
     remedy: 'own',
     verified: 'behavioural: baseline.test.ts — a matching baseline produces none',
+  },
+  'src/presets/shared.ts::declaredEmptyFindings': {
+    remedy: 'own',
+    verified:
+      'behavioural: recommended.test.ts — a declaration naming an off (unconstructed) rule reports, ' +
+      'and the carrier itself is proven by declaring a live-glob-zero-subject rule and watching the ' +
+      'finding clear, with a one-of-four row so "reached every rule" cannot pass as "silenced everything"',
   },
   'src/presets/shared.ts::overrideFindings': {
     remedy: 'own',

@@ -57,7 +57,7 @@ describe('collectRule', () => {
 
   it('returns an empty array when severity is off', () => {
     const result = collectRule(violatingBuilder(), { id: 'test/rule' }, 'error', {
-      'test/rule': 'off',
+      overrides: { 'test/rule': 'off' },
     })
     expect(result).toEqual([])
   })
@@ -95,7 +95,7 @@ describe('collectRule', () => {
   it('uses the override severity instead of the default', () => {
     // Default error, overridden to warn → violations carry severity:warn.
     const result = collectRule(violatingBuilder(), { id: 'test/rule' }, 'error', {
-      'test/rule': 'warn',
+      overrides: { 'test/rule': 'warn' },
     })
     const violations = result[0]!.violations()
     expect(violations.length).toBeGreaterThan(0)

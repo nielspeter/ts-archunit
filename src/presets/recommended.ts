@@ -8,7 +8,12 @@ import { functionNoSilentCatch } from '../rules/errors.js'
 import { noEmptyBodies } from '../rules/hygiene.js'
 import type { RuleBuilderLike } from '../core/rule-builder-like.js'
 import type { PresetBaseOptions } from './shared.js'
-import { overrideFindings, validateOverrides } from './shared.js'
+import {
+  overrideFindings,
+  validateOverrides,
+  declareEmptyIfListed,
+  declaredEmptyFindings,
+} from './shared.js'
 
 export interface RecommendedOptions extends PresetBaseOptions<RecommendedRuleId> {
   /**
@@ -109,21 +114,36 @@ export function recommended(p: ArchProject, options: RecommendedOptions = {}): R
   const overrideProblems = overrideFindings(options.overrides, RULE_IDS)
 
   const builders: RuleBuilderLike[] = []
+  const constructed: string[] = []
   for (const { condition, meta, default: def } of SPECS) {
     const sev = options.overrides?.[meta.id] ?? def
     if (sev === 'off') continue
+    constructed.push(meta.id)
     builders.push(
-      functions(p, { includeObjectLiteralFunctions: true })
-        .that()
-        .resideInFile(include)
-        .should()
-        .satisfy(condition)
-        .rule(meta)
-        .asSeverity(sev),
+      // Plan 0089's carrier. Applied at construction so it reaches every rule
+      // this preset builds, not only the ones routed through `collectRule`.
+      declareEmptyIfListed(
+        functions(p, { includeObjectLiteralFunctions: true })
+          .that()
+          .resideInFile(include)
+          .should()
+          .satisfy(condition)
+          .rule(meta)
+          .asSeverity(sev),
+        meta.id,
+        options,
+      ),
     )
   }
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  return [...overrideProblems, ...builders]
+  // Unbound declarations sit with the unknown-override findings: both say the
+  // configuration is wrong, which the reader needs before any finding produced
+  // under it (bug 0038).
+  return [
+    ...overrideProblems,
+    ...declaredEmptyFindings(options.expectEmpty, constructed),
+    ...builders,
+  ]
 }

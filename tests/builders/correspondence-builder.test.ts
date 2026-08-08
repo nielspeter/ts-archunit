@@ -187,8 +187,14 @@ describe('correspondence()', () => {
         .expectEmpty('services')
         .beComplete()
         .violations()
-      expect(fixed).toHaveLength(1)
+      // The declaration finding FIRST, and the rule's real finding still under
+      // it. This row asserted `toHaveLength(1)`, which encoded a defect rather
+      // than a decision: a false declaration used to short-circuit the whole
+      // comparison, so `services "OrderService" has no matching registry` — a
+      // genuine finding, on a run the user had made stricter — was discarded.
+      // Both are reported now, configuration first.
       expect(fixed[0]!.message).toContain('was declared empty')
+      expect(fixed.map((x) => x.message).join('\n')).toContain('has no matching registry')
 
       // The remedy's OTHER branch — remove the declaration — is the one an
       // agent takes, and it clears everything.
@@ -248,9 +254,12 @@ describe('correspondence()', () => {
         .expectEmpty('services')
         .beComplete()
         .violations()
-      expect(v).toHaveLength(1)
+      // Identity, not count: the declaration finding is first and unsuppressable,
+      // and the comparison it was hiding still runs. `toHaveLength(1)` here was
+      // pinning the swallowing described above.
       expect(v[0]!.message).toContain('was declared empty')
       expect(v[0]!.bypassFilters).toBe(true)
+      expect(v.map((x) => x.message).join('\n')).toContain('has no matching registry')
     })
 
     it('the expiry remedy remediates: removing the declaration clears it', () => {

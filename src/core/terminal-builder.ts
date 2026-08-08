@@ -202,7 +202,20 @@ export abstract class TerminalBuilder {
    * together rather than trusting the next author to remember.
    */
   emptyDeclarationAdvice(): string {
-    return '.expectEmpty()'
+    // A preset user holds no builder, so `.expectEmpty()` is a call they cannot
+    // make — the same "impossible on the path that produced it" fault this method
+    // exists to fix for `CorrespondenceBuilder`, in the population that meets it
+    // most. Plan 0089 shipped the reachable spelling; without this, every message
+    // that would send them to it still named the unreachable one, and none of them
+    // printed the id they would have to type (the default formatter prints the
+    // chain description, never `ruleId`).
+    //
+    // The id is the discriminator because it is also the argument: a preset rule
+    // id is exactly what goes in the array.
+    const id = this._metadata?.id
+    return id !== undefined && id.startsWith('preset/')
+      ? `expectEmpty: ['${id}'] in this preset's options`
+      : '.expectEmpty()'
   }
 
   /**

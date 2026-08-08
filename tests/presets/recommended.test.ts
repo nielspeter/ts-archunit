@@ -3,6 +3,7 @@ import { Project } from 'ts-morph'
 import path from 'node:path'
 import type { ArchProject } from '../../src/core/project.js'
 import { recommended } from '../../src/presets/recommended.js'
+import type { ArchViolation } from '../../src/core/violation.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/presets/recommended')
 const tsconfigPath = path.join(fixturesDir, 'tsconfig.json')
@@ -147,5 +148,110 @@ describe('recommended preset', () => {
     expect(findings.filter((v) => v.bypassFilters === true)).toEqual([])
     // …and the override did what it said: the rule is gone, not merely unreported.
     expect(findings.filter((v) => v.ruleId === 'preset/recommended/no-silent-catch')).toEqual([])
+  })
+})
+
+/**
+ * The declared-empty carrier — plan 0089.
+ *
+ * A preset user holds no builder, so `.expectEmpty()` is unreachable to them.
+ * Once plan 0099's floor fails a check that examined nothing, their only other
+ * remedy is `overrides: { id: 'off' }` — permanent, non-expiring, and it deletes
+ * the rule rather than declaring a fact about it. ADR-009 part 3 makes the
+ * carrier binding for that reason.
+ */
+describe('expectEmpty reaches the rules a preset constructs (plan 0089)', () => {
+  const p = loadTestProject()
+  /** Matches a real file that declares no functions — live glob, zero subjects. */
+  const EMPTY = '**/types-only.ts'
+  /** Matches nothing at all — a config error, not a declarable state (plan 0074). */
+  const DEAD = '**/nowhere-at-all/**'
+  const ALL_IDS = [
+    'preset/recommended/no-eval',
+    'preset/recommended/no-function-constructor',
+    'preset/recommended/no-silent-catch',
+    'preset/recommended/no-empty-bodies',
+  ] as const
+  const configFindings = (rules: ReturnType<typeof recommended>): ArchViolation[] =>
+    rules.flatMap((r) => r.violations()).filter((v) => v.bypassFilters === true)
+
+  it('the carrier reaches EVERY rule the preset constructs', () => {
+    // The reason this plan blocks 0099. A preset user holds no builder, so
+    // `.expectEmpty()` is unreachable to them; without a carrier their only
+    // remedy is `overrides: 'off'`, which is permanent and deletes the rule
+    // rather than declaring a fact about it.
+    expect(configFindings(recommended(p, { include: EMPTY }))).toHaveLength(ALL_IDS.length)
+
+    // All four clear — so the carrier reached all four, not just the first.
+    expect(configFindings(recommended(p, { include: EMPTY, expectEmpty: [...ALL_IDS] }))).toEqual(
+      [],
+    )
+  })
+
+  it('declaring one rule clears ONLY that rule — by NAME, not by count', () => {
+    // A blanket silencer would clear all four here. Non-vacuity for the row
+    // above, which cannot tell "reached every rule" from "silenced everything".
+    //
+    // Asserted as a SET of surviving ids, because the count alone cannot tell
+    // "reached the right rule" from "reached *a* rule". Measured: rotating the
+    // carrier's key by one — declaring `no-eval` declares the next rule instead —
+    // preserves every count in this file and passed 871/871. ADR-008 rule 5:
+    // compare identities, not integers. Once 0099's floor lands, a mis-bound
+    // carrier leaves the declared rule failing while a DIFFERENT rule is silently
+    // declared empty and stays so — the mute button the carrier must never be.
+    const one = recommended(p, {
+      include: EMPTY,
+      expectEmpty: ['preset/recommended/no-eval'],
+    })
+    expect(
+      configFindings(one)
+        .map((v) => v.ruleId)
+        .sort(),
+    ).toEqual(ALL_IDS.filter((id) => id !== 'preset/recommended/no-eval').sort())
+  })
+
+  it('a DEAD glob is not declarable — the carrier does not silence a config error', () => {
+    // The distinction that makes the carrier safe. Plan 0074: an empty selection
+    // is a state you may declare; a selector that can never match is a mistake,
+    // and no declaration should hide it. Measured: still reported when declared.
+    const dead = recommended(p, { include: DEAD, expectEmpty: [...ALL_IDS] })
+    expect(configFindings(dead)).toHaveLength(ALL_IDS.length)
+    expect(configFindings(dead)[0]?.message).toContain('can never match')
+  })
+
+  it('declaring is not a mute button — a declaration that is FALSE fails', () => {
+    // Over the real corpus these rules DO select subjects, so declaring them
+    // empty is a false statement. This is the half 0099's expiry branch reads.
+    //
+    // The SET, not a count: `toBeGreaterThan(0)` passed when one rule of four
+    // expired, so three carriers could quietly do nothing and the row still read
+    // green. All four are false over this corpus, so all four must say so.
+    expect(
+      configFindings(recommended(p, { expectEmpty: [...ALL_IDS] }))
+        .map((v) => v.ruleId)
+        .sort(),
+    ).toEqual([...ALL_IDS].sort())
+  })
+
+  it('a rule switched off is NOT constructed, so declaring it is dead', () => {
+    // `off` deleted the rule, so a declaration naming it applies to nothing.
+    // Saying so is what stops "declare it" and "disable it" cancelling out.
+    const both = recommended(p, {
+      include: EMPTY,
+      overrides: { 'preset/recommended/no-silent-catch': 'off' },
+      expectEmpty: ['preset/recommended/no-silent-catch'],
+    })
+    const unbound = configFindings(both).filter((v) =>
+      String(v.ruleId ?? '').startsWith('preset/expect-empty/'),
+    )
+    expect(unbound).toHaveLength(1)
+    expect(unbound[0]?.suggestion).toContain("'off' is not constructed")
+  })
+
+  it('CONTROL: no declaration, real corpus — no configuration findings at all', () => {
+    // Without this every row above holds if the producer fired always, or never.
+    const plain = recommended(p)
+    expect(plain).toHaveLength(ALL_IDS.length)
+    expect(configFindings(plain)).toEqual([])
   })
 })

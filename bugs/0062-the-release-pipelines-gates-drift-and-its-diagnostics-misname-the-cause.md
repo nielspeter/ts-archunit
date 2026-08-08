@@ -69,9 +69,48 @@ on publish success.
   derives `SRC_PREFIX` to avoid. No fixture collides today, but `arch/no-cycles` is now `.check()` and the
   new `verbatim-module-syntax` fixtures are deliberately cyclic.
 
+## Added 2026-08-08 — residue after the version-bump gate shipped
+
+The devops persona reviewed the new `assert-version-bump-is-safe.sh` gate (added on the
+[plan 0089](../plans/completed/0089-presets-forward-their-options.md) branch, which closed this bug's
+biggest hole: nothing enforced that a feature-carrying release is a minor). Four ways the gate itself
+failed open were fixed on that branch. **These five did not make that cut and belong here**, because
+they are the same subject as this bug — gates that drift, and diagnostics that misname the cause.
+
+1. **`npm view … 2>/dev/null` discards the only evidence of _why_ the baseline is unknown.**
+   `publish.yml`. Failing closed on an empty `LATEST` is right and is implemented correctly (empty and
+   whitespace-only both exit 1). But `setup-node` writes an `_authToken` line and this job sets no
+   `NODE_AUTH_TOKEN` (it uses OIDC), so `ENEEDAUTH` is a plausible failure — and the operator sees only
+   _"could not determine the currently published version"_. That is this bug's title verbatim: the
+   diagnostic misnames the cause. Redirect to a file and `cat` it on failure.
+2. **No retry on the registry read.** A blip reds a release run that would have succeeded.
+3. **The package name is hardcoded** in the `npm view` call, while the sibling step directly above reads
+   it from `package.json`. A rename degrades safely (404 → empty → fail closed) but silently.
+4. **No shape validation on `VERSION`** — `0.58` over `0.58.0` exits 0. Unreachable today because the
+   tag-vs-`package.json` step runs first, so it is only a hazard if that step is ever reordered.
+5. **The gate runs after ~5 expensive minutes.** The trio _verify version / extract changelog / bump
+   guard_ needs only `checkout`, and sits after `npm ci`, typecheck, lint, format, shellcheck, the full
+   suite, build, verify-package and the matrix. Moving it above `npm ci` fails in ~20s instead. Related:
+   the same script could run in `ci.yml` on PRs, fed from `package.json` and the top `## [x]` section,
+   so the answer arrives while the version is still editable rather than after a tag exists.
+
+Item 5 matters more than it looks: replaying the gate's heading test over this repo's history,
+**8 of 26 real patch releases would have been refused**, so hitting it is the common path, not the rare
+one — and every one of those costs a full pipeline before the verdict.
+
+Also unrecorded elsewhere: **`npm run build` never cleans `dist/`.** Measured, a working checkout held
+632 files against 624 from a fresh worktree of the same commit — 8 orphans whose sources no longer exist
+under `src/`, and `verify-package.mjs` counted them into the tarball without raising anything. CI is
+safe because `dist/` is gitignored and `npm ci` starts empty; the exposure is a manual local publish,
+which `prepublishOnly` would not catch either. `rm -rf dist &&` in the build script closes it.
+
+And **`npm run docs:build` is not a PR gate** — it runs only in `docs.yml`, after merge — so a VitePress
+break surfaces as a red deploy on `main` rather than on the PR that caused it.
+
 ## Related
 
-- `.github/workflows/{ci,publish,docs}.yml`, `.github/scripts/refresh-context7.sh`.
+- `.github/workflows/{ci,publish,docs}.yml`, `.github/scripts/refresh-context7.sh`,
+  `.github/scripts/assert-version-bump-is-safe.sh`.
 - [Bug 0051](./fixed/0051-the-jsx-entry-point-has-never-run-against-a-file-on-disk.md) — where the
   last `format:check` gap was fixed. Note it was fixed **inline, without its own bug report**: an
   untracked file made `validate` pass locally and the v0.46.1 publish fail, and the pathspec was changed

@@ -398,7 +398,22 @@ export class CorrespondenceBuilder extends TerminalBuilder {
 
     // Non-vacuity (ADR-008 / proposal 014): an empty side certifies nothing, so
     // it is the root cause — report it and skip the derived coverage flood.
+    // TWO lists, because only one of them makes the comparison meaningless.
+    //
+    // An empty side genuinely certifies nothing, so it is the root cause and the
+    // derived coverage flood is noise — that short-circuit stays.
+    //
+    // A side DECLARED empty that turned out full is the opposite: both sides have
+    // content, so the correspondence is perfectly computable and its findings are
+    // the ones the reader must act on. Returning here discarded them. Measured on
+    // a two-key side A against a one-key side B: 2 real
+    // `has no matching b` violations became 0 the moment side B was declared
+    // empty, leaving only the config finding. Same defect as
+    // `RuleBuilder.evaluate` (fixed alongside this) — and fixing that family
+    // alone would have been the "covers the families someone remembered" shape
+    // ADR-009 exists to name.
     const emptyFindings: ArchViolation[] = []
+    const falseDeclarations: ArchViolation[] = []
     for (const [side, isEmpty] of [
       [sideA, result.aEmpty],
       [sideB, result.bEmpty],
@@ -418,11 +433,15 @@ export class CorrespondenceBuilder extends TerminalBuilder {
       // permission: a declared-empty side that filled up is the intent
       // reporting itself, where `allowEmpty()` stayed silent forever.
       if (!isEmpty && this._expectEmptySides.has(side.name)) {
-        emptyFindings.push(this.unexpectedlyNonEmptyViolation(side.name, meta))
+        falseDeclarations.push(this.unexpectedlyNonEmptyViolation(side.name, meta))
       }
     }
+    // Only a genuinely empty side stops the comparison.
     if (emptyFindings.length > 0)
-      return { violations: emptyFindings, examined: this.examinedUnits() }
+      return {
+        violations: [...emptyFindings, ...falseDeclarations],
+        examined: this.examinedUnits(),
+      }
 
     const violations: ArchViolation[] = []
 
@@ -476,7 +495,10 @@ export class CorrespondenceBuilder extends TerminalBuilder {
     // objects), so a "both sides literal" heuristic would false-positive, and a
     // console.warn is invisible to the agent consumer (ADR-008). Left to review.
 
-    return { violations, examined: this.examinedUnits() }
+    // The false declaration FIRST — it says the configuration is wrong, which the
+    // reader needs before the findings produced under it, matching the ordering
+    // `RuleBuilder.evaluate` and the preset config findings already use.
+    return { violations: [...falseDeclarations, ...violations], examined: this.examinedUnits() }
   }
 
   private keyViolations(
