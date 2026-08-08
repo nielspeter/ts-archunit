@@ -24,7 +24,24 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { project, types, calls, smells, tsconfig, correspondence } from '../../src/index.js'
+import {
+  project,
+  types,
+  calls,
+  call,
+  smells,
+  tsconfig,
+  correspondence,
+  crossLayer,
+  satisfyPairCondition,
+  checkAll,
+  ArchRuleError,
+} from '../../src/index.js'
+import type { ArchViolation } from '../../src/index.js'
+import { recommended } from '../../src/presets/recommended.js'
+import { agentGuardrails } from '../../src/presets/agent-guardrails.js'
+import { strictBoundaries } from '../../src/presets/boundaries.js'
+import { layeredArchitecture } from '../../src/presets/layered.js'
 
 const p = project('tsconfig.json')
 const root = path.resolve(import.meta.dirname, '../..')
@@ -137,5 +154,147 @@ describe('the rule-builder grammar we never turned on ourselves', () => {
     // at all, with a corpus, so a regression in call collection is visible.
     const rule = calls(p)
     expect(rule.examinedUnits()).toBeGreaterThan(0)
+  })
+})
+
+describe('crossLayer: the family most likely to look healthy while empty', () => {
+  it('every builder is paired with the test file that imports it', () => {
+    // The failure mode 0099's notes single out: both layers resolve files, zero
+    // pairs form, and the rule reads as green. So the pair count is asserted
+    // before the condition — a mapping that stopped matching would otherwise
+    // leave a rule that examines nothing.
+    // `.js` as well as `.ts`: import specifiers are ESM-resolved
+    // (`../../src/builders/slice-rule-builder.js`, ADR-004), so a stem that
+    // only strips `.ts` leaves `-builder.js` and matches no builder — all 10
+    // pairs then read as "does not import its builder". Measured, not assumed.
+    const stem = (f: string): string =>
+      path
+        .basename(f)
+        .replace(/\.test\.(ts|js)$/, '')
+        .replace(/\.(ts|js)$/, '')
+        .replace(/-(rule-)?builder$/, '')
+
+    const rule = crossLayer(p)
+      .layer('builder', '**/src/builders/**')
+      .layer('test', '**/tests/builders/**')
+      .mapping((a, b) => stem(a.getFilePath()) === stem(b.getFilePath()))
+      .forEachPair()
+      .should(
+        satisfyPairCondition(
+          'the test file imports the builder it covers',
+          (pair): ArchViolation | null => {
+            const imports = pair.right
+              .getImportDeclarations()
+              .map((d) => d.getModuleSpecifierValue())
+            const target = stem(pair.left.getFilePath())
+            return imports.some((s) => stem(s) === target)
+              ? null
+              : {
+                  rule: 'builder test imports its builder',
+                  element: path.basename(pair.right.getFilePath()),
+                  file: pair.right.getFilePath(),
+                  line: 1,
+                  message: `${path.basename(pair.right.getFilePath())} is paired with ${path.basename(pair.left.getFilePath())} but does not import it`,
+                }
+          },
+        ),
+      )
+      .because('a test file that does not import its builder is covering something else')
+
+    expect(rule.examinedUnits()).toBeGreaterThan(0)
+    rule.check()
+  })
+})
+
+describe('inconsistentSiblings: the second detector the floor gates', () => {
+  it('every preset validates its overrides', () => {
+    // The detector reports a MINORITY that diverges from its siblings ("5 of 7
+    // files … use call to X"), so the pattern has to be one the majority
+    // already follows or the rule can examine a full folder and still be
+    // incapable of failing. The first draft used `call('copy')` over
+    // `src/builders`: 11 files examined, 4 with the pattern, therefore no
+    // majority and no possible finding — green, and worth nothing.
+    //
+    // `validateOverrides` over `src/presets` is the real invariant: every
+    // preset must reject an override naming a rule it does not construct, or
+    // a typo'd rule id silently does nothing.
+    const rule = smells
+      .inconsistentSiblings(p)
+      .inFolder('**/src/presets/**')
+      // `index.ts` is a barrel and `shared.ts` DEFINES the helper; neither is a
+      // preset, so neither should call it.
+      .ignorePaths('**/src/presets/index.ts', '**/src/presets/shared.ts')
+      .forPattern(call('validateOverrides'))
+    expect(rule.examinedUnits()).toBeGreaterThan(0)
+    expect(rule.violations()).toEqual([])
+  })
+})
+
+/**
+ * The presets, run on ourselves.
+ *
+ * We ship five and ran none of them here. What is asserted is **no
+ * configuration finding** — the `bypassFilters` class, which means a rule
+ * enforces nothing: a dead glob, an assertion-free rule, or (since 0.59.0) one
+ * that examined zero units. Those are not opinions about our code, they are the
+ * preset failing to be a check at all, and they are exactly what `collectRule`'s
+ * declared-empty carrier exists to describe.
+ *
+ * Style violations are deliberately NOT asserted to be zero. These presets are
+ * opinionated and this repo did not adopt them; pretending otherwise would mean
+ * tuning options until the code agreed, which is the move this file already
+ * refused once.
+ */
+const configFindings = (vs: readonly ArchViolation[]): readonly ArchViolation[] =>
+  vs.filter((v) => v.bypassFilters === true)
+
+describe('presets: the surface an adopter actually installs', () => {
+  it('recommended constructs rules that all enforce something', () => {
+    const rules = recommended(p, { include: '**/src/**' })
+    expect(rules.length).toBeGreaterThan(0)
+    expect(configFindings(rules.flatMap((r) => r.violations()))).toEqual([])
+  })
+
+  it('agentGuardrails constructs rules that all enforce something', () => {
+    const rules = agentGuardrails(p, {
+      src: '**/src/**',
+      noGenericErrors: true,
+      noStubs: true,
+      noEmptyBodies: true,
+      noCopyPaste: true,
+    })
+    expect(rules.length).toBeGreaterThan(0)
+    expect(configFindings(rules.flatMap((r) => r.violations()))).toEqual([])
+  })
+
+  it('strictBoundaries constructs rules that all enforce something', () => {
+    // `'**/src/*'`, not `'src/*'`: boundary discovery matches ABSOLUTE paths, so
+    // the unprefixed form discovers nothing. The preset said so itself, in the
+    // finding this assertion now guards against.
+    const rules = strictBoundaries(p, { folders: '**/src/*', shared: ['**/src/core/**'] })
+    expect(rules.length).toBeGreaterThan(0)
+    expect(configFindings(rules.flatMap((r) => r.violations()))).toEqual([])
+  })
+
+  it('layeredArchitecture constructs rules that all enforce something', () => {
+    const rules = layeredArchitecture(p, {
+      layers: { builders: '**/src/builders/**', core: '**/src/core/**' },
+    })
+    expect(rules.length).toBeGreaterThan(0)
+    expect(configFindings(rules.flatMap((r) => r.violations()))).toEqual([])
+  })
+
+  it('checkAll is the aggregation path a preset user runs', () => {
+    // `checkAll` dedupes config findings across the whole array — a seam the
+    // per-rule terminals cannot reach, and the one a preset user actually runs.
+    //
+    // This asserts that it DOES throw, because today our source does not
+    // satisfy `recommended` (7 style findings, none of them configuration —
+    // the rule above proves that half). Pinning today's truth in the direction
+    // it actually points follows `tests/matrix/`: a silent regression and a
+    // silent fix must be equally loud. Clean those 7 up and this row goes red,
+    // which is the notification, not a nuisance — flip it to `.not.toThrow()`.
+    const rules = recommended(p, { include: '**/src/**' })
+    expect(() => checkAll(rules)).toThrow(ArchRuleError)
   })
 })
