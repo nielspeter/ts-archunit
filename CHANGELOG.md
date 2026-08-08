@@ -59,20 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   matches **is** reported, because pairs are what that family examines and layers selecting files says
   nothing about whether any pair was formed.
 
-  ⚠️ **This can turn a green CI step red on a patch upgrade.** `doctor` exits non-zero on anything it
-  reports, so previewing four more families means rules you have had for a year can now fail that step —
-  while `check()` still passes them. What to do about it is under the `doctor` bullet below; the short
-  version is that your enforcement gates are unaffected, and there is no per-finding suppression by
-  design.
+  ⚠️ **This can turn a green CI step red.** `doctor` exits non-zero on anything it reports, so
+  previewing four more families means rules you have had for a year can now fail that step — while
+  `check()` still passes them. Your enforcement gates are unaffected; there is deliberately no
+  per-finding suppression, and `baseline` will refuse these. If you cannot work through the list now,
+  drop the `doctor` step or pin to `0.58.x`.
 
   `check()` behaviour is unchanged in this release. **The next minor makes an examined count of zero fail
   at `check()` time** (plan 0099) — so treat what `doctor` reports now as the list that goes red then.
 
-### Added
-
 - **`diagnose()` and `doctor` report `zero-subjects`** — a rule whose project loaded files but whose
-  own narrowing left it **nothing to examine**, so it can never fail. Five families now count the units
-  they examined: both smell detectors, `correspondence`, and both GraphQL builders.
+  own narrowing left it **nothing to examine**, so it can never fail. This landed first for five
+  families — both smell detectors, `correspondence`, and both GraphQL builders — and the entry above
+  adds the remaining four, so **all nine report it in this release**. The two entries are one shipped
+  behaviour described in the order it was built.
 
   This is the **preview surface for the same release's gate**. `doctor`, or
   `expect(diagnose(rules)).toEqual([])` inside your own suite, answers the question _before_ your build
