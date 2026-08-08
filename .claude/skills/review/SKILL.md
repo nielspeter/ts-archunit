@@ -80,7 +80,7 @@ The prompt to each agent should include:
 
 **IMPORTANT**: If multiple personas are selected, spawn ALL agents in a single message (parallel execution). Do NOT spawn them one at a time.
 
-**Isolation**: reviewers run concurrently against one checkout and several will want to run gates or sabotage patches. Tell each: *"Do not modify the shared working tree. If you need to patch, build or run a sabotage matrix, use `git worktree add` on a temp path and work there; clean it up before you write your review."* Without this, one reviewer's probe files and sabotage edits land in another's gate run — and in the user's `git status`.
+**Isolation**: reviewers run concurrently against one checkout and several will want to run gates or sabotage patches. Tell each: _"Do not modify the shared working tree. If you need to patch, build or run a sabotage matrix, use `git worktree add` on a temp path and work there; clean it up before you write your review."_ Without this, one reviewer's probe files and sabotage edits land in another's gate run — and in the user's `git status`.
 
 ### Recovering a reviewer that returned nothing
 
