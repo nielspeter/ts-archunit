@@ -155,6 +155,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   said otherwise and are corrected. Selections are memoized per builder, so a `diagnose()` followed by
   a `check()` does the work once.
 
+### Fixed
+
+- **A false `.expectEmpty()` no longer swallows the violations underneath it.** `RuleBuilder.evaluate`
+  returned as soon as it saw a declared-empty selection that turned out non-empty, so the rule's
+  conditions were never evaluated. Harmless while a declaration names one rule; not harmless with plan
+  0089's preset carrier, where one id can construct many rules. Measured on a two-package
+  `restrictedPackages` config where one selection was empty and one was not: a genuine
+  `imports "lodash" which matches forbidden [lodash]` **disappeared**, replaced by a config error. The
+  user had made the run stricter and lost a finding. Both are now reported, configuration first.
+
+- **Every remedy that offers a declaration now names one the reader can actually make.** A preset user
+  holds no builder, so `.expectEmpty()` is a call they cannot reach — yet it was the only spelling the
+  empty-selection and false-declaration findings ever printed, and neither carried the rule id (the
+  terminal formatter prints the chain description, never `ruleId`). When the id begins `preset/`, both
+  now say `expectEmpty: ['<id>']` — which is also exactly the argument to type — and the
+  false-declaration finding carries its `ruleId` and a `Fix:` distinct from its message, where it
+  previously had no `Fix:` line at all because the two strings were identical. ADR-008 rule 2: a remedy
+  impossible on the path that produced it is worse than none.
+
+- **`publish.yml` refuses a patch release carrying feature-level change.** The "next release is a minor"
+  constraint existed only as prose in this file; the workflow checked the tag against `package.json` and
+  that a changelog section existed, **both of which pass for `v0.58.1`** — and the release-notes
+  extractor would then have printed this file's own "not a patch" note into the release body, after the
+  immutable publish. Now a script gate, failing closed including on an unknown baseline, with its own
+  tests.
+
+- **The unbound-`expectEmpty` remedy stops de-duplicating by hand what it never de-duplicated.** The
+  "this preset constructed:" list repeated an id once per boundary/layer/pair — measured at 31 entries
+  naming 4 unique ids, `test-isolation` twenty times consecutively. And when the preset constructed
+  _nothing_, "correct the id" was simply false: the id is usually right and the cause is upstream, so
+  that branch now names the discovery glob and the `off` overrides instead.
+
 ### Changed (⚠️ BREAKING — `correspondence().allowEmpty()` is now `.expectEmpty()`)
 
 - **The declared-empty grammar reaches every family.** `.expectEmpty()` and `.expectNonEmpty()` moved
