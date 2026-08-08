@@ -6,9 +6,9 @@
  * The other fourteen were shipped, documented, and never pointed at this repo,
  * including every family plan 0099's floor newly gated: a release whose subject
  * is "a check that examined nothing is a lie" went out with its own detectors
- * unexercised on its own corpus. With this file the count is **14 of 18**.
+ * unexercised on its own corpus. With this file the count is **13 of 18**.
  *
- * The four still uncovered are excluded for a reason, so that "we thought about
+ * The five still uncovered are excluded for a reason, so that "we thought about
  * this" and "we forgot this" do not look the same — and because a rule pointed
  * at a corpus this repo does not have is precisely the vacuous pass 0099 now
  * fails:
@@ -17,6 +17,9 @@
  *    tsconfig (see the root tsconfig's `exclude`).
  *  - `graphql:schema` / `graphql:resolvers` — no schema and no resolvers here.
  *  - `presets:dataLayerIsolation` — no data layer.
+ *  - `smells.duplicateBodies` — the detector itself is broken (bug 0076); the
+ *    row is present and skipped rather than absent, so the gap is visible in
+ *    the run. This is the one exclusion that is about our code, not our corpus.
  *
  * ## What each rule asserts, and why it is not one thing
  *
@@ -55,6 +58,8 @@ import {
   ArchRuleError,
 } from '../../src/index.js'
 import type { ArchViolation } from '../../src/index.js'
+import type { DiagnosableRule } from '../../src/core/diagnose.js'
+import { diagnose } from '../../src/core/diagnose.js'
 // Through the `./presets` barrel, not the individual modules: that subpath is
 // what the exports map publishes and what an adopter imports, so a preset
 // dropped from the barrel breaks this file rather than passing unnoticed.
@@ -68,51 +73,80 @@ import {
 const p = project('tsconfig.json')
 const root = path.resolve(import.meta.dirname, '../..')
 
+/** A rule that can be run at error severity. `warn` is deliberately absent. */
+interface Checkable {
+  check: () => void
+}
+
+const BUILT: DiagnosableRule[] = []
+
+/**
+ * The same gate `arch-rules.test.ts` uses, and for the same reason.
+ *
+ * This file shipped without it and was wrong to: every rule below was reachable
+ * at `.warn()`, which is the regression plan 0084 exists to prevent —
+ * `arch/no-cycles` sat at `.warn()` for months, could not fail, and let a cycle
+ * in overnight. Handing back only `.check()` makes the downgrade fail twice, at
+ * `npm run typecheck` and at runtime.
+ *
+ * Registering into `BUILT` also puts these rules under the `diagnose()`
+ * pre-flight at the bottom of this file, so a dead glob here is caught before
+ * `check()` rather than by whichever assertion happens to notice.
+ */
+function gate<T extends DiagnosableRule & Checkable>(rule: T): Checkable {
+  BUILT.push(rule)
+  return {
+    check: () => {
+      rule.check()
+    },
+  }
+}
+
 describe('tsconfig: the toolchain ADR-001 pins', () => {
   it('the compiler options ADR-001 requires are actually set', () => {
     // ADR-001 and the CLAUDE.md "Key Implementation Rules" both state these.
     // Stated in prose in two places and enforced in none, until here.
-    tsconfig(p)
-      .requires({ strict: true, noUncheckedIndexedAccess: true })
-      .because('ADR-001: strict mode with noUncheckedIndexedAccess')
-      .check()
+    gate(
+      tsconfig(p)
+        .requires({ strict: true, noUncheckedIndexedAccess: true })
+        .because('ADR-001: strict mode with noUncheckedIndexedAccess'),
+    ).check()
   })
 })
 
-/**
- * Today's duplicate-body count on `src/`, at the DEFAULT `minLines`.
- *
- * A ceiling that may only go down — not a threshold tuned until the code
- * agrees with it. The first draft of this file moved `minLines` 5 → 12 to get
- * from 484 pairs to 95, which is detector-tuning: the number falls, the
- * duplication does not, and the suite reports green over real rot. That is the
- * exact move ADR-008 exists to forbid, so the knob stays at its default and the
- * debt is stated as a number instead.
- *
- * The bulk is genuine and known:
- *
- *  - `src/conditions/body-analysis.ts`, `body-analysis-function.ts` and
- *    `body-analysis-module.ts` are three near-identical copies of the same
- *    condition logic, one per entry point — `functionNotContain` is **98%**
- *    similar to `classNotContain`, `classContain` **98%** to
- *    `haveCallbackContaining`. This is the copy-pasted-parser rot from the
- *    project's own origin story, in its own source.
- *  - The immutable fluent-builder withers (`const next = this.copy()` …) that
- *    ADR-003 mandates, which are idiom rather than rot.
- *
- * Separating those two and paying down the first is its own piece of work.
- * Until then this number may fall and must never rise.
- */
-const DUPLICATE_BODIES_CEILING = 484
-
 describe('smells: the detectors the floor lives by', () => {
-  it('duplicate bodies in src do not increase', () => {
+  /**
+   * DISABLED — the detector is broken, not this repository.
+   *
+   * See [bug 0076](../../bugs/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md).
+   * `Fingerprint.kinds` is a sequence of `SyntaxKind` numbers and
+   * `computeSimilarity` is LCS over it, so identifiers never reach the
+   * comparison. These three bodies are reported as **100% similar**:
+   *
+   *     const next = this.copy()      const next = this.copy()      const next = this.copy()
+   *     next._ignoreTests = true      next._checkComplete = true    next._groupByFolder = true
+   *     return next                   return next                   return next
+   *
+   * They differ only in the assigned field, which is the whole of what they do.
+   * ADR-003 mandates that shape for every wither, so on this codebase the
+   * detector pairs each one with every other: 484 findings on `src/`, almost
+   * all false.
+   *
+   * Left as `skip` rather than deleted, and rather than pinned at a ceiling of
+   * 484. A ceiling would have read as coverage while reporting green over both
+   * the false positives and any real duplication beneath them, and tuning
+   * `minLines` to 12 — which was tried, and cuts 484 to 95 — buys the drop by
+   * refusing to look at short functions, where copy-paste actually collects.
+   * A skip shows up as not-covered in the run, which is the truth.
+   *
+   * Re-enable with bug 0076. There is genuine duplication here for the fixed
+   * detector to find: `src/conditions/body-analysis.ts`, `-function.ts` and
+   * `-module.ts` are three copies of one condition family.
+   */
+  it.skip('duplicate bodies in src do not increase', () => {
     const rule = smells.duplicateBodies(p).inFolder('**/src/**').ignoreTests()
-    // `inFolder` matches the WHOLE file path, so `inFolder('src')` matches
-    // nothing and this would report a dead glob instead of a smell. Measured,
-    // not assumed — that is exactly the mistake this file exists to catch.
     expect(rule.examinedUnits()).toBeGreaterThan(0)
-    expect(rule.violations().length).toBeLessThanOrEqual(DUPLICATE_BODIES_CEILING)
+    expect(rule.violations()).toEqual([])
   })
 })
 
@@ -148,13 +182,14 @@ describe('correspondence: the surfaces that must stay in step', () => {
     // `beComplete()`, not `haveNoOrphans()`: the invariant is one-directional.
     // Every builder needs a test; extra test files (`within`, the object-literal
     // and identified-by-arg cases) are additional coverage, not orphans.
-    correspondence(p)
-      .side('builder', builders)
-      .side('test', tests)
-      .should()
-      .beComplete()
-      .because('a builder with no test file is a surface nothing exercises')
-      .check()
+    gate(
+      correspondence(p)
+        .side('builder', builders)
+        .side('test', tests)
+        .should()
+        .beComplete()
+        .because('a builder with no test file is a surface nothing exercises'),
+    ).check()
   })
 })
 
@@ -167,7 +202,7 @@ describe('the rule-builder grammar we never turned on ourselves', () => {
       .haveNameMatching(/^[A-Z]/)
       .because('exported type names are public API')
     expect(rule.examinedUnits()).toBeGreaterThan(0)
-    rule.check()
+    gate(rule).check()
   })
 
   it('calls resolve against a non-empty corpus', () => {
@@ -224,7 +259,7 @@ describe('crossLayer: the family most likely to look healthy while empty', () =>
       .because('a test file that does not import its builder is covering something else')
 
     expect(rule.examinedUnits()).toBeGreaterThan(0)
-    rule.check()
+    gate(rule).check()
   })
 })
 
@@ -318,5 +353,48 @@ describe('presets: the surface an adopter actually installs', () => {
     // which is the notification, not a nuisance — flip it to `.not.toThrow()`.
     const rules = recommended(p, { include: '**/src/**' })
     expect(() => checkAll(rules)).toThrow(ArchRuleError)
+  })
+})
+
+// ─── The pre-flight over this file's own gated rules ────────────────
+//
+// Declared LAST on purpose: `BUILT` fills as the `it()` callbacks above run, so
+// this must see all of them.
+//
+// There is deliberately NO cross-check of the `BUILT` population here.
+// `arch-rules.test.ts` has one — it scans its own source for `.check()`
+// terminals — and it earns it: 39 rules, one uniform call shape, and a real
+// chance of one silently dropping out. Copying it here was a mistake. This file
+// mixes `).check()` with single-line `gate(rule).check()`, so the regex had to
+// be widened, which pulled in `gate()`'s own forwarding call, which then needed
+// a string-equality exclusion; the replacement — a hand-written list of the
+// four rule names — would have been transcribed from the failure output. A
+// derivation adjusted until it agrees with the thing it checks is the first
+// derivation retyped, and labelling it "ADR-008 rule 5" makes it worse, because
+// then it looks guarded. Four rules on one screen do not need it.
+
+describe('the gated rules in this file can all enforce something', () => {
+  it('diagnoses every gated rule, and finds nothing wrong', () => {
+    // Identities, never a count — ADR-008 rule 4.
+    const findings = diagnose(BUILT).map(
+      (f) =>
+        `${f.kind}: ${f.rule}${f.glob === undefined ? '' : ` [${f.position ?? '?'} ${f.glob}]`}`,
+    )
+    expect(findings).toEqual([])
+  })
+
+  it('would report a fault if one were introduced', () => {
+    // `toEqual([])` above is exactly what a `diagnose()` that had stopped
+    // working would also produce, so without this control that zero is evidence
+    // of nothing.
+    const deadSelector = types(p)
+      .that()
+      .resideInFolder('**/no-such-folder-anywhere/**')
+      .should()
+      .beExported()
+    expect(diagnose([deadSelector]).map((f) => f.kind)).toEqual(['dead-glob'])
+    // And a healthy rule stays silent, or the control would pass for a
+    // `diagnose()` that simply reported everything.
+    expect(diagnose([BUILT[0] as DiagnosableRule])).toEqual([])
   })
 })
