@@ -112,10 +112,13 @@ the remedy text, so they are fixed here rather than in the seam PR:
   people most likely to adopt an architecture tool early, and they meet this on day one. Either soften
   the ranking for the relational families, or accept that `.expectEmpty()` is the ordinary answer for a
   not-yet-populated layer and stop calling it an exception.
-- **One paragraph per finding does not scale.** ~70 words repeated across a dozen findings is a wall.
-  Split it: a short per-finding form carrying the facts, and the shared explanation printed **once** at
-  the end of the run. The per-family spelling from `emptyDeclarationAdvice()` still substitutes into the
-  per-finding form.
+- **One paragraph per finding does not scale** — ~70 words repeated across a dozen findings is a wall.
+  **Split out to [0101](./0101-the-shared-explanation-is-printed-once.md)**, because it is the one defect
+  of the four that is not text inside a producer: it needs a run-level channel that **does not exist**
+  (measured — no renderer emits a footer today) threaded through four renderers that disagree about
+  advice already. Keeping it here made this plan two plans wearing one number, which is exactly how 0098
+  was split out of it. 0099 ships the long form; 0101 splits it. The ordering is deliberate — 0101 cannot
+  be designed against a message that has not settled, and the first three defects settle it here.
 
 **Per-cause remedies** (ADR-009 part 4). Three causes, three remedies, and rule 2 forbids naming one as
 universal: empty project → point at the tsconfig holding the sources, and **never** offer `.expectEmpty()`;
@@ -291,4 +294,20 @@ tag, so the claim goes live before the version does.
 
 The CLI beyond what the root conversion reaches (0095 measures it; a fix beyond that gets its own number).
 Bug 0056's fail-open half. `defineCondition` internal vacuity. ADR-010's contract fixture. The preset seam —
-[0100](./0100-a-preset-that-constructs-nothing.md).
+[0100](./0100-a-preset-that-constructs-nothing.md). Splitting the message into a per-finding form and a
+run-level explanation — [0101](./0101-the-shared-explanation-is-printed-once.md).
+
+## Scope, measured 2026-08-08 — why this is one PR
+
+The plan's own unknown was its own CI: _"after this plan such a rule reds our own CI in the same PR as the
+flip"_, with the blast radius recorded as unknown until measured. **Measured: 37 rules built, all 37 carry
+`examinedUnits()` after 0098, and exactly one examines zero** — `api/no-single-glob-predicates`, the rule
+0098's amendment already named. So the dogfood cost is one rule, not a list of unknown length.
+
+With that resolved and 0101 split out, everything remaining is the floor and the things this plan's own
+text forces into the **same commit** as the floor: the matrix expiry-gate repair and the `KNOWN_FAIL_OPEN`
+shrink (the floor breaks that gate otherwise), bug 0066's fix (ADR-009's one red event), and the remedy
+text the floor prints. Two later additions belong for the same reason — the floor **reads**
+`declaresEmpty()`, which the smell family answers `true` with nothing setting it
+([bug 0073](../bugs/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md)), and the floor **prints**
+the preset-shaped remedy whose mechanism is the design correction above.
