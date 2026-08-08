@@ -88,7 +88,26 @@ Four rulings that are not obvious from the code and must not be re-derived by wh
   findings **bypass baselines**. Name the concrete remedy (`include:`) in the changelog and fix that
   paragraph's scope.
 
-**Lead the changelog with the pre-upgrade preview, the way 0.34.0 did.** `docs/upgrading.md`'s 0.34.0
+**CORRECTED 2026-08-08 — the 0.34.0 precedent does not transfer, and this instruction was wrong.**
+Measured: `git grep -l "zero-subjects" v0.58.0 -- src/` returns **nothing**; the kind exists only at
+HEAD. `DiagnosticFinding['kind']` at 0.58.0 is `dead-glob | project-unknown | project-empty |
+no-condition | orphan-exclusion | unanchored`. Plan 0096 sits in `completed/` but its changelog entry is
+in `[Unreleased]` — **the preview and the gate ship in the same release**.
+
+0.34.0 worked because its preview shipped a release _earlier_, which is what let it say "run `doctor` on
+0.33.x first". That sentence cannot be written here, and writing it invites a reader to run `doctor` on
+0.58.x, see nothing, and conclude they are unaffected — on the very class this release is built around
+(a live glob whose narrowing empties). `docs/upgrading.md`'s recipe step "Steps 1–3 happen on your
+**current** version" is wrong for this row for the same reason, and it is in the same atomically-coupled
+commit.
+
+The honest instruction, which is still good: **install 0.59.0, then run `doctor` (or
+`expect(diagnose(rules)).toEqual([])`) before letting CI run `check`.** `doctor` and `check` are separate
+commands and both read `zeroSubjectsAdvice()` structurally, so the preview is complete _within_ 0.59.0.
+
+The paragraph below is kept for the reasoning it records, and superseded by the two above.
+
+**~~Lead the changelog with the pre-upgrade preview, the way 0.34.0 did.~~** `docs/upgrading.md`'s 0.34.0
 entry — the closest precedent for this exact break — opens with _"Run `ts-archunit doctor` on 0.33.x
 first, and fix what it reports before you upgrade."_ 0096 shipped precisely that preview. The inventory
 row "`diagnose()` and `check()` agree" is what makes the preview **complete** rather than hopeful, so
