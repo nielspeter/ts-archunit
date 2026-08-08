@@ -60,13 +60,50 @@ The prompt to each agent should include:
 3. Request to structure findings as: **Critical** / **Important** / **Minor** / **Praise**
 4. **Abstain instruction**: If the changes are outside the persona's domain and they have nothing meaningful to contribute, they should abstain with a single line (e.g., "No devops concerns — abstaining.") rather than forcing low-value findings
 
-5. **Deliverable instruction** (verbatim, every prompt): "Your final message is the review itself — the complete findings, not a status note or a promise. It is the only thing the coordinator receives."
+5. **Deliverable instruction** (verbatim, every prompt):
+
+> "**How to deliver.** Only your FINAL message reaches the coordinator. Nothing you write mid-run is
+> delivered — not a review you emit and then keep working past, not a summary inside your reasoning.
+>
+> So: the moment your findings are ready, write the complete review as one message and **STOP**. Do not
+> call another tool after writing it. Do not verify one more thing, tidy a worktree, or re-read a file
+> — a tool call after the review means the review was not your final message and the coordinator
+> receives nothing.
+>
+> Budget your run so this always happens. If you are running long or approaching a limit, stop
+> investigating immediately and emit what you have, marking unfinished threads as such. **A partial
+> review that arrives beats a thorough one that does not.** Returning nothing is the single worst
+> outcome — worse than a shallow review, worse than an abstention.
+>
+> Your final message is the review itself: the complete findings, not a status note, not a promise, not
+> a file path pointing at them."
 
 **IMPORTANT**: If multiple personas are selected, spawn ALL agents in a single message (parallel execution). Do NOT spawn them one at a time.
 
-**Stub returns**: if a reviewer comes back with a stub instead of a review — a bare "done"/"review complete", an empty result, or output missing the Critical/Important structure (an explicit one-line abstention is fine) — recover the review: continue that agent if the harness supports messaging a returned agent, otherwise respawn the persona with the same prompt, and wait for the full review. Never synthesize around a missing report, and never silently drop the persona: if it stays unrecoverable, the synthesis lists it as "no report received".
+**Isolation**: reviewers run concurrently against one checkout and several will want to run gates or sabotage patches. Tell each: *"Do not modify the shared working tree. If you need to patch, build or run a sabotage matrix, use `git worktree add` on a temp path and work there; clean it up before you write your review."* Without this, one reviewer's probe files and sabotage edits land in another's gate run — and in the user's `git status`.
+
+### Recovering a reviewer that returned nothing
+
+A reviewer that goes idle without delivering has usually **already written the review** as an intermediate message and then kept working past it. Do not re-run the review and do not report "no findings" — go read what it wrote:
+
+```
+~/.claude/projects/<project-slug>/<session-id>/subagents/agent-<name>-<hash>.jsonl
+```
+
+Extract the assistant text blocks (`message.role === 'assistant'`, `content[].type === 'text'`) and take the last substantial one — that is the review. Only if the transcript genuinely contains no findings (the agent was still mid-investigation when it stopped) is the persona "no report received".
+
+**Stub returns**: if a reviewer comes back with a stub — a bare "done"/"review complete", an empty result, or output missing the Critical/Important structure (an explicit one-line abstention is fine) — recover it the same way: read the transcript first, then message the agent asking for the findings verbatim, and only respawn if both fail. Never synthesize around a missing report, and never silently drop the persona: if it stays unrecoverable, the synthesis lists it as "no report received".
 
 ## 4. Synthesize
+
+You are the **gatekeeper**, not a relay. Reviewers supply findings; you decide what is real. Before
+promoting any finding to Critical or acting on it, verify it against the code yourself — reviewers
+report plausible-but-wrong findings, and a persona's confidence is not evidence. Equally, do not demote
+a finding because you did not find it first.
+
+Never present a synthesis as though reports arrived when they did not. If you did the analysis yourself
+because a persona returned nothing, say so plainly and up front, rather than filing your own work under
+a heading that implies a panel agreed.
 
 After all agents return, write a synthesis:
 
