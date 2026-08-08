@@ -28,7 +28,7 @@ export default [
 ]
 ```
 
-`check` exits non-zero only when there are **error**-severity violations; warnings are reported but never fail the build. Use `warn` for rules with legitimate exceptions (best-effort cleanup, no-op callbacks) or for a rule you're rolling out gradually before promoting it to `error`.
+`check` exits non-zero only when there are **error**-severity violations; warnings are reported but never fail the build. **One exception, since 0.34.0 and now much easier to meet:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob or one that examined zero units — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not. Use `warn` for rules with legitimate exceptions (best-effort cleanup, no-op callbacks) or for a rule you're rolling out gradually before promoting it to `error`.
 
 ## Enforce your compiler options upstream
 

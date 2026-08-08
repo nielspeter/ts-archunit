@@ -49,7 +49,7 @@ A violation throws an `ArchRuleError` with the same rich message (why + fix + co
 
 ### Presets in a test file — `checkAll`
 
-Presets return an array of rules. `checkAll` is the test-file terminal: it runs the whole array and throws one aggregated error if any **error**-severity violation is found (warns are reported but never fail):
+Presets return an array of rules. `checkAll` is the test-file terminal: it runs the whole array and throws one aggregated error if any **error**-severity violation is found (warns are reported but never fail — with the configuration-finding exception below):
 
 ```typescript
 import { checkAll } from '@nielspeter/ts-archunit'

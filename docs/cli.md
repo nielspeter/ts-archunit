@@ -36,7 +36,7 @@ It creates:
 | `--force`           | Overwrite existing files. Without it, `init` refuses and lists conflicts.                                     |
 | `--dry-run`         | Print what would be created; write nothing.                                                                   |
 
-`init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do.
+`init` is non-destructive by default: if any target file exists it refuses and tells you to re-run with `--force` or `--dry-run`. **Adopting on an existing codebase:** the empty baseline does not protect the first CI run — the `recommended` floor includes `error` rules (`no-eval`, `no-function-constructor`) that fail on legacy code. Run `npm run arch:baseline` to snapshot current violations, commit it, then gate CI on `arch`. Warnings never fail the build; only errors do. **One exception, since 0.34.0 and now much easier to meet:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob or one that examined zero units — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not.
 
 A shape preset scaffolds `arch.rules.ts` with the `recommended` floor **plus** the chosen architecture preset, pre-filled with example folder globs. Pick by your architecture:
 
@@ -255,7 +255,7 @@ export default [...myPreset(p)]
 ```
 
 `check` exits non-zero only when there are **error**-severity violations; warnings
-are reported but never fail the run.
+are reported but never fail the run. **One exception, since 0.34.0 and now much easier to meet:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob or one that examined zero units — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not.
 
 ::: warning Leave rule-file builders un-terminated
 In a rule file, entries in the `export default [...]` array must be **builders**,
