@@ -40,6 +40,10 @@ rather than letting a dependent build on an accident.
    the spike's dialect compiled clean under TS 5.9 strict against the published `.d.ts` with no
    ts-morph anywhere in sight.
 
+   That enumeration is **as measured on 0.57.0**, and the surface has grown since — rule 1's table,
+   not this paragraph, is the contract. The growth is itself evidence for this ADR: two members
+   were added and one widened in the following cycle, none of them noticed by a mechanism.
+
 3. **A consumer that gates is an asset.** eess's ADR-009 rule 4 commits it to failing _its own
    build_ when this surface drifts, at bump time. That is ADR-008's philosophy pointed back at us
    as upstream: our most demanding consumer becomes a continuous, loud audit of exactly the
@@ -54,17 +58,33 @@ rather than letting a dependent build on an accident.
 
 On `TerminalBuilder` (`src/core/terminal-builder.ts`):
 
-| Member                                     | Role in a dialect                                                 |
-| ------------------------------------------ | ----------------------------------------------------------------- |
-| `copy()`                                   | copy-on-write carrier — override to clone the dialect's own lists |
-| `collectViolations()`                      | the one abstract member: filter, evaluate, return violations      |
-| `assertsSomething()` / `assertionAdvice()` | feed the assertion gate; the dialect states its own remedy        |
-| `_reason` / `_metadata`                    | read-only from the subclass, when building its `ConditionContext` |
+| Member                                     | Visibility  | Role in a dialect                                                     |
+| ------------------------------------------ | ----------- | --------------------------------------------------------------------- |
+| `copy()`                                   | `protected` | copy-on-write carrier — override to clone the dialect's own lists     |
+| `collectViolations()`                      | `protected` | the one abstract member: filter, evaluate, return violations          |
+| `_reason` / `_metadata`                    | `protected` | read-only from the subclass, when building its `ConditionContext`     |
+| `assertsSomething()` / `assertionAdvice()` | **public**  | feed the assertion gate; the dialect states its own remedy            |
+| `declaresEmpty()`                          | **public**  | whether the author declared this rule empty — read by the gate        |
+| `emptyDeclarationAdvice()`                 | **public**  | how _this_ dialect spells that declaration, so the remedy is callable |
 
 plus the public vocabulary listed in Context §2, which is already covered by the export-surface
 guarantee. `RuleBuilder<T>`'s subclass surface (`addPredicate`/`addCondition`, `getElements()`,
 `filterElements()`, `fork()`) **joins the contract when rule 3(b) lands** and not before — today
 it requires an `ArchProject`, which a non-TypeScript dialect can only stub.
+
+**Why the split in visibility is forced, not chosen.** The lower three are the dialect's own
+machinery and stay `protected` for the reason Alternative 4 gives. The upper three are read by
+`diagnose()` through the **structural** interface `DiagnosableRule`, and a `protected` member
+cannot satisfy a structural interface — so their visibility is decided by the reader, not by
+preference. That is the line Alternative 4 draws: a member exists publicly when something outside
+the class must read it, never merely because a subclass finds it convenient.
+
+**The last two pairs are load-bearing together, and forgetting either fails silently in opposite
+directions.** A dialect that omits `declaresEmpty()` inherits the whole-rule flag, which is wrong
+for any dialect whose declaration is per-part — it then reports an author for not declaring what
+they declared. A dialect that overrides `expectEmpty()` (rule 3(a)) but not `emptyDeclarationAdvice()`
+ships a remedy that throws when followed. `CorrespondenceBuilder` is both cases in-repo:
+`expectEmpty()` there is per side and the zero-arg form is a `TypeError`.
 
 A change that breaks a conforming dialect — signature, visibility, or _semantics_ — is a breaking
 change and is versioned and changelogged as one, exactly as if it had touched `src/index.ts`.
@@ -77,10 +97,12 @@ same commit. External dialect authors are pointed at the reference, not at prose
 
 ### Rule 3 — Two amendments the first consumer surfaced, accepted
 
-- **(a) Hoist `expectNonEmpty()` / `expectEmpty()` from `RuleBuilder<T>` to `TerminalBuilder`**
-  (`src/core/rule-builder.ts:140`). Terminal-pattern dialects currently get the assertion gate
-  but not the declared-empty / expect-non-empty opt-ins — which ADR-009 (fail closed) wants on
-  every check constructor anyway. One mechanism, both ADRs served.
+- **(a) Hoist `expectNonEmpty()` / `expectEmpty()` from `RuleBuilder<T>` to `TerminalBuilder`**.
+  Terminal-pattern dialects got the assertion gate but not the declared-empty / expect-non-empty
+  opt-ins — which ADR-009 (fail closed) wants on every check constructor anyway. One mechanism,
+  both ADRs served. **Landed** (plan 0097), ahead of ratification: the hoist was a prerequisite for
+  ADR-009's evidence work, and holding it would have blocked that on a two-repo ceremony. The
+  members are on `TerminalBuilder` today, and 0096 added the two readers the table now names.
 - **(b) Make `RuleBuilder<T>`'s `ArchProject` constructor argument optional**, so a non-TS
   dialect can extend the full builder (filterElements, silent exclusions, glob diagnosis)
   without stubbing a two-member interface. Once true, rule 1's table grows accordingly.
@@ -139,9 +161,16 @@ change.
   cheap to run and exists to be inconvenient at exactly the right moments.
 - **Rule 3 changes this API for a consumer's sake.** Two surface changes whose need arose in
   another repo — external pressure on this repo's shape, accepted knowingly.
-- **The rule 1 table can rot relative to the fixture.** Mitigation is rule 4's derivation
-  direction (fixture from table) plus review; the honest statement is that the fixture, not the
-  prose, is the enforcement.
+- **The rule 1 table can rot relative to the fixture — and it did, before either existed.**
+  Within one unreleased cycle the surface gained three members (`declaresEmpty()`,
+  `emptyDeclarationAdvice()`, and a `protected`→`public` widening of the first) and the table
+  named none of them. Nothing mechanical noticed; a reviewer did, which is the mitigation this
+  bullet already predicted and not a reassuring one. Two things follow. **Rule 4's fixture is the
+  enforcement and the table is only its input**, so the fixture cannot be deferred indefinitely
+  without this bullet compounding. And the gap is wider than the table: per
+  [bug 0071](../bugs/0071-nothing-guards-the-published-method-surface.md), **no existing gate sees
+  a public method appear or vanish at all** — the vacuity matrix is a behavioural truth table over
+  constructors and never opens a `.d.ts`. That bug and rule 4 are plausibly one piece of work.
 
 ## Alternatives Considered
 
@@ -168,13 +197,24 @@ thing they cannot know.
 
 ### Alternative 4: Make the extension members `public` instead of contracting `protected`
 
-**Rejected.** The fluent DSL's phase discipline exists so a _rule author_ cannot call
-`collectViolations()` or mutate metadata mid-chain; publicizing the members would trade a
-declared dialect-author contract for an undeclared rule-author footgun. `protected` +
-this contract keeps both audiences honest.
+**Rejected as a blanket move.** The fluent DSL's phase discipline exists so a _rule author_ cannot
+call `collectViolations()` or mutate metadata mid-chain; publicizing those would trade a declared
+dialect-author contract for an undeclared rule-author footgun. `protected` + this contract keeps
+both audiences honest.
+
+The rejection is of publicizing **by preference**, and rule 1's table is not a counter-example: the
+members that are public there are read from **outside** the class, through a structural interface
+that `protected` cannot satisfy. The test is the reader, not the author — "a subclass finds this
+handy" is the case this alternative rejects; "`diagnose()` cannot see it otherwise" is not.
 
 ## Notes
 
+- **The table above was verified against the published `.d.ts`, not against the source, on the day
+  it was written** — all eight members present with the stated visibility. That is a one-off
+  measurement and deliberately not a test: bug 0071 and rule 4 want the same instrument, and
+  building half of it here would make the harder half look done. What the measurement establishes
+  is that ratification is being asked for on a table that was true when read, rather than on one
+  reconstructed from memory — which is the failure the Negative bullet above describes.
 - The twin: eess `adr/009-adopt-ts-archunit-retire-the-fork.md` (in the eess repo). Its Tier-5
   enforcement row conditions its own acceptance on this ADR's acceptance — the ratification is
   deliberately two-sided so neither repo can bless the arrangement alone.
