@@ -32,7 +32,21 @@
  */
 export const UNSUPPRESSABLE =
   "This finding cannot be suppressed: not by .warn(), .asSeverity('warn'), " +
-  '.excluding(), a `// ts-archunit-exclude` comment, a baseline, or diff-aware mode.'
+  '.excluding(), a `// ts-archunit-exclude` comment, a baseline, or diff-aware mode. ' +
+  // The seventh thing an agent tries, and the one you least want it to learn.
+  // Measured: `recommended(p)` over a mis-scoped project reports four findings,
+  // each carrying the sentence above; adding `overrides: { id: 'off' }` reports
+  // three. One config line removed a finding that had just told the reader, in a
+  // sentence guarded by a parity test, that it could not be removed.
+  //
+  // Naming it here rather than leaving it discoverable by elimination: an agent
+  // that hits six walls and then finds `'off'` documented in `docs/presets.md`
+  // will stamp it, which is ADR-008 rule 1's trained-suppression dynamic produced
+  // by our own gate. It is NOT added to `UNSUPPRESSABLE_MECHANISMS`, because that
+  // list is the set the parity guard proves DO refuse — and this one does not.
+  "A preset's overrides: { id: 'off' } does remove it, by deleting the rule " +
+  'entirely — that is not a suppression, it is a permanent decision that never ' +
+  'expires. If the rule genuinely has nothing to check, declare that instead.'
 
 /** The mechanism names the sentence claims to refuse, for the parity guard. */
 export const UNSUPPRESSABLE_MECHANISMS = [

@@ -102,6 +102,25 @@ describe('the unsuppressability sentence is true and complete', () => {
     }
   })
 
+  it("names overrides: 'off' as the exit that DOES work, and why it is wrong", () => {
+    // The under-claim direction the parity guard cannot reach. It proves every
+    // mechanism that REFUSES is named; `'off'` does not refuse, it succeeds — so
+    // the guard is blind to it by construction, and it operates a layer up at
+    // preset construction rather than at filtering.
+    //
+    // Measured: `recommended(p)` over a mis-scoped project reports four findings,
+    // each ending with this sentence; adding `overrides: { id: 'off' }` reports
+    // three. A config line removed a finding that had just said it could not be
+    // removed. An agent that hits the six named walls and then finds `'off'` in
+    // the docs will stamp it — the trained-suppression dynamic, produced by our
+    // own gate.
+    expect(UNSUPPRESSABLE).toContain("overrides: { id: 'off' }")
+    expect(UNSUPPRESSABLE).toContain('deleting the rule')
+    expect(UNSUPPRESSABLE).toContain('never')
+    // And it stays OUT of the refuses-list, because it does not refuse.
+    expect(UNSUPPRESSABLE_MECHANISMS.some((m) => m.includes('overrides'))).toBe(false)
+  })
+
   it('VACUITY: the probe set is non-empty and the sentence is not', () => {
     expect(Object.keys(refuses).length).toBeGreaterThanOrEqual(6)
     expect(UNSUPPRESSABLE_MECHANISMS.length).toBe(Object.keys(refuses).length)
