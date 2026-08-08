@@ -22,6 +22,7 @@ import type { ArchProject } from '../../src/core/project.js'
 import { layeredArchitecture } from '../../src/presets/layered.js'
 import { functions } from '../../src/builders/function-rule-builder.js'
 import { functionNoEval } from '../../src/rules/security.js'
+import { correspondence } from '../../src/builders/correspondence-builder.js'
 
 function inMemory(files: Record<string, string>): ArchProject {
   const tsm = new Project({ useInMemoryFileSystem: true })
@@ -58,6 +59,30 @@ describe('a false declaration does not swallow the findings under it', () => {
     expect(real.map((v) => v.message ?? '')).toContainEqual(
       expect.stringContaining('matches forbidden'),
     )
+  })
+
+  it('the OTHER family too: correspondence, whose sides declare independently', () => {
+    // `RuleBuilder` and `CorrespondenceBuilder` had the same early return, and
+    // fixing one would have been the "covers the families someone remembered"
+    // shape ADR-009 names. Measured before the fix: 2 real
+    // `has no matching` findings became 0 the moment a side was falsely declared.
+    //
+    // The asymmetry that stays: a side that is GENUINELY empty still
+    // short-circuits, because an empty side makes the comparison vacuous. Only a
+    // declared-empty side that FILLED keeps going — there, both sides have
+    // content and the correspondence is perfectly computable.
+    const p = inMemory({ '/src/one.ts': 'export const one = 1\n' })
+    const messages = correspondence(p)
+      // `files` has a key `registry` lacks, so `beComplete()` has a real finding
+      // to make — and `files` is plainly not empty, so declaring it is FALSE.
+      .side('files', ['one', 'two'])
+      .side('registry', ['one'])
+      .expectEmpty('files')
+      .beComplete()
+      .violations()
+      .map((v) => v.message)
+    expect(messages[0]).toContain('was declared empty')
+    expect(messages.join('\n')).toContain('has no matching registry')
   })
 
   it('the declaration is reported FIRST — configuration before findings produced under it', () => {

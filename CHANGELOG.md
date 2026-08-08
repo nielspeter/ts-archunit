@@ -165,6 +165,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `imports "lodash" which matches forbidden [lodash]` **disappeared**, replaced by a config error. The
   user had made the run stricter and lost a finding. Both are now reported, configuration first.
 
+  **`correspondence()` had the identical early return, and it is fixed in the same release.** A side
+  declared empty that turned out full short-circuited the whole comparison: measured, two genuine
+  `services "OrderService" has no matching registry` findings became zero. Fixing only the rule builders
+  would have been the "covers the families someone remembered" shape ADR-009 exists to name. The
+  asymmetry that remains is deliberate — a side that is _genuinely_ empty still stops the comparison,
+  because an empty side makes it vacuous; only a **false declaration** now keeps going, since there both
+  sides have content and the correspondence is computable.
+
 - **Every remedy that offers a declaration now names one the reader can actually make.** A preset user
   holds no builder, so `.expectEmpty()` is a call they cannot reach — yet it was the only spelling the
   empty-selection and false-declaration findings ever printed, and neither carried the rule id (the
