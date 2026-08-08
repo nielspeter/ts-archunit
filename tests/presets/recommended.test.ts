@@ -188,14 +188,26 @@ describe('expectEmpty reaches the rules a preset constructs (plan 0089)', () => 
     )
   })
 
-  it('declaring one rule clears ONLY that rule', () => {
+  it('declaring one rule clears ONLY that rule — by NAME, not by count', () => {
     // A blanket silencer would clear all four here. Non-vacuity for the row
     // above, which cannot tell "reached every rule" from "silenced everything".
+    //
+    // Asserted as a SET of surviving ids, because the count alone cannot tell
+    // "reached the right rule" from "reached *a* rule". Measured: rotating the
+    // carrier's key by one — declaring `no-eval` declares the next rule instead —
+    // preserves every count in this file and passed 871/871. ADR-008 rule 5:
+    // compare identities, not integers. Once 0099's floor lands, a mis-bound
+    // carrier leaves the declared rule failing while a DIFFERENT rule is silently
+    // declared empty and stays so — the mute button the carrier must never be.
     const one = recommended(p, {
       include: EMPTY,
       expectEmpty: ['preset/recommended/no-eval'],
     })
-    expect(configFindings(one)).toHaveLength(ALL_IDS.length - 1)
+    expect(
+      configFindings(one)
+        .map((v) => v.ruleId)
+        .sort(),
+    ).toEqual(ALL_IDS.filter((id) => id !== 'preset/recommended/no-eval').sort())
   })
 
   it('a DEAD glob is not declarable — the carrier does not silence a config error', () => {
@@ -210,7 +222,15 @@ describe('expectEmpty reaches the rules a preset constructs (plan 0089)', () => 
   it('declaring is not a mute button — a declaration that is FALSE fails', () => {
     // Over the real corpus these rules DO select subjects, so declaring them
     // empty is a false statement. This is the half 0099's expiry branch reads.
-    expect(configFindings(recommended(p, { expectEmpty: [...ALL_IDS] })).length).toBeGreaterThan(0)
+    //
+    // The SET, not a count: `toBeGreaterThan(0)` passed when one rule of four
+    // expired, so three carriers could quietly do nothing and the row still read
+    // green. All four are false over this corpus, so all four must say so.
+    expect(
+      configFindings(recommended(p, { expectEmpty: [...ALL_IDS] }))
+        .map((v) => v.ruleId)
+        .sort(),
+    ).toEqual([...ALL_IDS].sort())
   })
 
   it('a rule switched off is NOT constructed, so declaring it is dead', () => {

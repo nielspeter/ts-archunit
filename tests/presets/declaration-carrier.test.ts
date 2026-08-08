@@ -58,41 +58,50 @@ const p = loadTestProject()
 const configFindings = (rules: RuleBuilderLike[]): ArchViolation[] =>
   rules.flatMap((r) => r.violations()).filter((v) => v.bypassFilters === true)
 
+/**
+ * The surviving rule ids, sorted — an identity assertion rather than a count.
+ *
+ * Counts cannot tell "the carrier reached the RIGHT rule" from "it reached *a*
+ * rule". Measured: rotating the carrier's key by one, so declaring `no-eval`
+ * declares the next rule instead, preserves every count in this file and passed
+ * 871/871. ADR-008 rule 5 — compare identities, not integers.
+ */
+const ids = (rules: RuleBuilderLike[]): string[] =>
+  configFindings(rules)
+    .map((v) => v.ruleId ?? '')
+    .sort()
+
 describe('the carrier reaches every construction path (plan 0089)', () => {
   it('PATH 1 — the inline loop: recommended', () => {
-    const ids = ['preset/recommended/no-eval', 'preset/recommended/no-empty-bodies'] as const
-    expect(configFindings(recommended(p, { include: EMPTY }))).toHaveLength(4)
-    // One at a time, so "reached every rule" cannot pass as "silenced everything".
-    expect(configFindings(recommended(p, { include: EMPTY, expectEmpty: [ids[0]] }))).toHaveLength(
-      3,
+    const ALL = [
+      'preset/recommended/no-eval',
+      'preset/recommended/no-function-constructor',
+      'preset/recommended/no-silent-catch',
+      'preset/recommended/no-empty-bodies',
+    ] as const
+    expect(ids(recommended(p, { include: EMPTY }))).toEqual([...ALL].sort())
+    // One at a time, so "reached every rule" cannot pass as "silenced everything"
+    // — and by NAME, so "reached the right rule" cannot pass as "reached a rule".
+    expect(ids(recommended(p, { include: EMPTY, expectEmpty: [ALL[0]] }))).toEqual(
+      ALL.filter((id) => id !== ALL[0]).sort(),
     )
-    expect(
-      configFindings(
-        recommended(p, {
-          include: EMPTY,
-          expectEmpty: [
-            'preset/recommended/no-eval',
-            'preset/recommended/no-function-constructor',
-            'preset/recommended/no-silent-catch',
-            'preset/recommended/no-empty-bodies',
-          ],
-        }),
-      ),
-    ).toEqual([])
+    expect(ids(recommended(p, { include: EMPTY, expectEmpty: [...ALL] }))).toEqual([])
   })
 
   it('PATH 2 — the local push helper: agentGuardrails', () => {
     // The path a carrier wired only into `collectRule` would have missed
     // entirely, with every other preset still passing.
     const opts = { src: EMPTY, noEmptyBodies: true, noStubs: true }
-    expect(configFindings(agentGuardrails(p, opts))).toHaveLength(2)
+    expect(ids(agentGuardrails(p, opts))).toEqual([
+      'preset/agent/no-empty-bodies',
+      'preset/agent/no-stubs',
+    ])
+    // By name: the survivor must be the rule NOT declared.
     expect(
-      configFindings(
-        agentGuardrails(p, { ...opts, expectEmpty: ['preset/agent/no-empty-bodies'] }),
-      ),
-    ).toHaveLength(1)
+      ids(agentGuardrails(p, { ...opts, expectEmpty: ['preset/agent/no-empty-bodies'] })),
+    ).toEqual(['preset/agent/no-stubs'])
     expect(
-      configFindings(
+      ids(
         agentGuardrails(p, {
           ...opts,
           expectEmpty: ['preset/agent/no-empty-bodies', 'preset/agent/no-stubs'],
