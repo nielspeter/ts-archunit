@@ -120,6 +120,19 @@ describe('importOptions reaches beFreeOfCycles (plan 0089)', () => {
     ).toContain('preset/boundaries/no-cycles')
   })
 
+  it('flips it through layeredArchitecture too — the split-row twin', () => {
+    // `boundaries`' textually identical edit was covered and `layered`'s was not.
+    // ADR-008: if a revert row touches more than one call site it is at least two
+    // rows — split, one half was unguarded, and the plan's own Test inventory
+    // item 1 says "reaches `beFreeOfCycles` in BOTH presets".
+    const p = twoSlices(TYPE_ONLY_CYCLE.a, TYPE_ONLY_CYCLE.b)
+    const layers = { a: '**/src/a/**', b: '**/src/b/**' }
+    expect(ruleIds(layeredArchitecture(p, { layers }))).not.toContain('preset/layered/no-cycles')
+    expect(
+      ruleIds(layeredArchitecture(p, { layers, importOptions: { ignoreTypeImports: false } })),
+    ).toContain('preset/layered/no-cycles')
+  })
+
   it('CONTROL: the same two slices in a VALUE cycle report either way', () => {
     // Proves the row above turns on the erasure rather than on the cycle
     // detection being off in this fixture.
