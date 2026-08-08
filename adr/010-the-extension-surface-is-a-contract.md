@@ -58,14 +58,32 @@ rather than letting a dependent build on an accident.
 
 On `TerminalBuilder` (`src/core/terminal-builder.ts`):
 
-| Member                                     | Visibility  | Role in a dialect                                                     |
-| ------------------------------------------ | ----------- | --------------------------------------------------------------------- |
-| `copy()`                                   | `protected` | copy-on-write carrier — override to clone the dialect's own lists     |
-| `collectViolations()`                      | `protected` | the one abstract member: filter, evaluate, return violations          |
-| `_reason` / `_metadata`                    | `protected` | read-only from the subclass, when building its `ConditionContext`     |
-| `assertsSomething()` / `assertionAdvice()` | **public**  | feed the assertion gate; the dialect states its own remedy            |
-| `declaresEmpty()`                          | **public**  | whether the author declared this rule empty — read by the gate        |
-| `emptyDeclarationAdvice()`                 | **public**  | how _this_ dialect spells that declaration, so the remedy is callable |
+| Member                                     | Visibility  | Role in a dialect                                                                                                  |
+| ------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------ |
+| `copy()`                                   | `protected` | copy-on-write carrier — override to clone the dialect's own lists                                                  |
+| `collectViolations()`                      | `protected` | the one abstract member: filter, evaluate, return `{ violations, examined }`                                       |
+| `_reason` / `_metadata`                    | `protected` | read-only from the subclass, when building its `ConditionContext`                                                  |
+| `assertsSomething()` / `assertionAdvice()` | **public**  | feed the assertion gate; the dialect states its own remedy                                                         |
+| `declaresEmpty()`                          | **public**  | whether the author declared this rule empty — read by the gate                                                     |
+| `emptyDeclarationAdvice()`                 | **public**  | how _this_ dialect spells that declaration, so the remedy is callable                                              |
+| `zeroSubjectsAdvice()`                     | **public**  | the sentence for a rule that examined nothing — `diagnose()` reports it verbatim, so preview and gate cannot drift |
+| `narrowingHint()` / `examinedUnitNoun()`   | `protected` | what this dialect narrowed by, and what it counts — both feed `zeroSubjectsAdvice()`                               |
+
+**`collectViolations()`'s semantics changed in 0.59.0, and that is a rule 1 break.** It returned
+`ArchViolation[]` before [plan 0098](../plans/completed/0098-the-evidence-seam-and-the-floor.md) and now
+returns `CollectResult`. More consequentially, [plan 0099](../plans/0099-the-floor-no-family-can-be-born-below.md)
+made `examined` **behaviour-defining**: a dialect that satisfied the type with a constant `0` was
+previously unobserved and now hard-fails every rule it runs. 0098's own docstring recorded the
+equivalence as expiring "in the commit that gives the claim its first reader"; this is that commit.
+Migration: `examined` must be a real count of the units the dialect examined, from the same
+materialization `collectViolations()` uses.
+
+`zeroSubjectsAdvice()`, `narrowingHint()` and `examinedUnitNoun()` join in the same release. The
+visibility split is forced by the same test as the rows above: `diagnose()` reads the first through the
+structural `DiagnosableRule`, and a `protected` member cannot satisfy a structural interface; the other
+two are read only by `zeroSubjectsAdvice()` from inside the class. A dialect that leaves
+`examinedUnitNoun()` alone prints "subjects" for units that are not subjects — the category error the
+in-repo families each override it to avoid.
 
 plus the public vocabulary listed in Context §2, which is already covered by the export-surface
 guarantee. `RuleBuilder<T>`'s subclass surface (`addPredicate`/`addCondition`, `getElements()`,

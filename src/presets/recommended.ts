@@ -12,6 +12,7 @@ import {
   overrideFindings,
   validateOverrides,
   declareEmptyIfListed,
+  presetDeclarationSpelling,
   declaredEmptyFindings,
 } from './shared.js'
 
@@ -128,7 +129,7 @@ export function recommended(p: ArchProject, options: RecommendedOptions = {}): R
           .resideInFile(include)
           .should()
           .satisfy(condition)
-          .rule(meta)
+          .rule({ ...meta, declarationSpelling: presetDeclarationSpelling(meta.id) })
           .asSeverity(sev),
         meta.id,
         options,

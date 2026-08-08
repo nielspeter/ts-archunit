@@ -215,20 +215,14 @@ export abstract class TerminalBuilder {
    * together rather than trusting the next author to remember.
    */
   emptyDeclarationAdvice(): string {
-    // A preset user holds no builder, so `.expectEmpty()` is a call they cannot
-    // make — the same "impossible on the path that produced it" fault this method
-    // exists to fix for `CorrespondenceBuilder`, in the population that meets it
-    // most. Plan 0089 shipped the reachable spelling; without this, every message
-    // that would send them to it still named the unreachable one, and none of them
-    // printed the id they would have to type (the default formatter prints the
-    // chain description, never `ruleId`).
-    //
-    // The id is the discriminator because it is also the argument: a preset rule
-    // id is exactly what goes in the array.
-    const id = this._metadata?.id
-    return id !== undefined && id.startsWith('preset/')
-      ? `expectEmpty: ['${id}'] in this preset's options`
-      : '.expectEmpty()'
+    // The AUTHOR states it; core does not guess. This branched on
+    // `id.startsWith('preset/')`, which core cannot verify — false for a
+    // hand-written `.rule({ id: 'preset/...' })`, for a third-party preset that
+    // never extended `PresetBaseOptions`, and for one that forwards `overrides`
+    // but not `expectEmpty`. The method exists precisely to stop advice naming a
+    // call the reader cannot make, so deriving it from a string prefix gave up
+    // the discipline it was added to enforce.
+    return this._metadata?.declarationSpelling ?? '.expectEmpty()'
   }
 
   /**

@@ -51,7 +51,8 @@ export function collectRule(
   // conditionally, so "known" and "constructed" differ by exactly the ids a
   // declaration must not silently bind to.
   constructed?.push(meta.id)
-  return [declareEmptyIfListed(builder.rule(meta).asSeverity(effective), meta.id, config)]
+  const stamped = { ...meta, declarationSpelling: presetDeclarationSpelling(meta.id) }
+  return [declareEmptyIfListed(builder.rule(stamped).asSeverity(effective), meta.id, config)]
 }
 
 /**
@@ -68,6 +69,23 @@ export function declareEmptyIfListed<T extends PresetRule>(
   config: PresetBaseOptions | undefined,
 ): T {
   return config?.expectEmpty?.includes(id) === true ? builder.expectEmpty() : builder
+}
+
+/**
+ * The spelling a PRESET user must type to declare this rule empty — plan 0099.
+ *
+ * This is the single site that knows both facts the remedy needs: the rule's id,
+ * and that the caller is a preset which accepts `expectEmpty`. Core knows only
+ * the id, and used to guess from its `preset/` prefix — a naming convention, not
+ * a capability, and false for a hand-written rule or a third-party preset that
+ * never accepted the option.
+ *
+ * Applied to every preset rule, not only declared ones: the advice is printed on
+ * a rule that examined nothing, which is exactly the rule that has NOT been
+ * declared yet.
+ */
+export function presetDeclarationSpelling(id: string): string {
+  return `expectEmpty: ['${id}'] in this preset's options`
 }
 
 /**
