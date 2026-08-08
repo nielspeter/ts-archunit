@@ -42,7 +42,7 @@ export abstract class SmellBuilder extends TerminalBuilder {
     if (this._ignoreTests) applied.push('ignoreTests()')
     return (
       `Its own narrowing removed them: ${applied.join(', ')}` +
-      ` — minLines defaults to 5 even if you did not set it.`
+      ` — minLines defaults to 5, a default you did not write.`
     )
   }
 

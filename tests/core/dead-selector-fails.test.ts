@@ -248,8 +248,11 @@ describe('an empty selection is a fault by default (plan 0074, emptyIsPass)', ()
     expect(matched).toBeGreaterThan(0)
 
     const [finding] = rule.violations()
-    expect(finding?.message).toContain('.expectEmpty() asserted this selector matches nothing')
-    expect(finding?.message).toContain(`matched ${String(matched)}`)
+    expect(finding?.message).toContain('.expectEmpty() asserted this rule examines nothing')
+    // `examinedUnits()` is `filterElements().length` — the same number `matched`
+    // was — so the property this row asserts (the message reports the REAL count,
+    // never a hard-coded one) survives plan 0099's rewording verbatim.
+    expect(finding?.message).toContain(`examined ${String(matched)} subjects`)
     expect(finding?.bypassFilters).toBe(true)
   })
 
@@ -342,7 +345,10 @@ describe('the cardinality exemption cannot be forged (bug 0050)', () => {
    * what distinguishes the empty-selection gate from every other producer.
    */
   const gateFindings = (condition: Condition<ClassDeclaration>): string[] =>
-    configFindings(condition).map((v) => `${v.element} :: ${v.message.split(',')[0] ?? ''}`)
+    configFindings(condition).map(
+      (v) =>
+        `${v.element} :: ${v.message.includes('examined 0 subjects') ? 'examined 0 subjects' : v.message}`,
+    )
 
   const configFindings = (condition: Condition<ClassDeclaration>): ArchViolation[] =>
     classes(emptyProject())
@@ -365,7 +371,7 @@ describe('the cardinality exemption cannot be forged (bug 0050)', () => {
       evaluate: () => [],
     }
     expect(gateFindings(honest)).toEqual([
-      'that have name matching /NoSuchClassAnywhere/ should asserts nothing :: Selector matched 0 subjects',
+      'that have name matching /NoSuchClassAnywhere/ should asserts nothing :: examined 0 subjects',
     ])
   })
 
@@ -378,7 +384,7 @@ describe('the cardinality exemption cannot be forged (bug 0050)', () => {
       evaluate: () => [],
     }
     expect(gateFindings(forged)).toEqual([
-      'that have name matching /NoSuchClassAnywhere/ should a copy of every own property notExist() exposes :: Selector matched 0 subjects',
+      'that have name matching /NoSuchClassAnywhere/ should a copy of every own property notExist() exposes :: examined 0 subjects',
     ])
   })
 

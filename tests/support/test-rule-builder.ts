@@ -1,3 +1,4 @@
+import { Project } from 'ts-morph'
 import { RuleBuilder } from '../../src/core/rule-builder.js'
 import type { ArchProject } from '../../src/core/project.js'
 import type { Predicate } from '../../src/core/predicate.js'
@@ -52,10 +53,31 @@ export class TestRuleBuilder extends RuleBuilder<TestElement> {
 // --- Stub project (no real ts-morph project needed) ---
 
 /**
- * An empty ArchProject stub for tests that only exercise
- * the builder pipeline and never touch the AST.
+ * An `ArchProject` stub for tests that exercise the builder pipeline without
+ * touching the AST — but which **loads files**, and that is load-bearing.
+ *
+ * It was `{} as ArchProject`. Plan 0099's floor calls `getSourceFiles()` on a
+ * path the old code never reached (`deadSelectorFindings()` returns early when
+ * `globs()` is empty, which it is for `TestRuleBuilder`), so the stub raised a
+ * `TypeError` in five tests rather than failing an assertion.
+ *
+ * The obvious repair — `getSourceFiles: () => []` — is a TRAP that review
+ * measured: an empty list makes `loadedNothing()` true, so `.check() FAILS when
+ * no elements match predicates` would start passing on the **empty-project**
+ * branch instead of the empty-selection one, and its stated subject ("the
+ * condition here is `alwaysFail`, and it never ran") would silently stop being
+ * guarded. The files below exist so the project is genuinely loaded and the
+ * selection is what is empty.
  */
-export const stubProject = {} as ArchProject
+const stubTsMorph = new Project({ useInMemoryFileSystem: true })
+stubTsMorph.createSourceFile('/stub/a.ts', 'export const a = 1\n')
+stubTsMorph.createSourceFile('/stub/b.ts', 'export const b = 2\n')
+
+export const stubProject: ArchProject = {
+  tsConfigPath: '/stub/tsconfig.json',
+  _project: stubTsMorph,
+  getSourceFiles: () => stubTsMorph.getSourceFiles(),
+}
 
 // --- Predicate helpers ---
 

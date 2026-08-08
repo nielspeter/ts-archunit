@@ -192,7 +192,7 @@ describe('the remedy names a call the reader can actually make', () => {
       .rule({ id: 'preset/recommended/no-eval', because: 'b', suggestion: 's' })
       .violations()
       .find((x) => x.bypassFilters === true)
-    expect(v?.message ?? '').toContain('matched 0 subjects')
+    expect(v?.message ?? '').toContain('examined 0 subjects')
     expect(v?.suggestion ?? '').toContain("expectEmpty: ['preset/recommended/no-eval']")
   })
 })
