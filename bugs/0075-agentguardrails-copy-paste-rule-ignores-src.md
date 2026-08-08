@@ -5,7 +5,7 @@
 (customer persona, round 1). Pre-existing — 0089 did not introduce it, but 0089's new documentation
 teaches users to make a statement about the scope this rule does not use.
 **Severity:** **Low today, and it becomes an expiry hazard when
-[plan 0099](../plans/0099-the-floor-no-family-can-be-born-below.md) lands.**
+[plan 0099](../plans/completed/0099-the-floor-no-family-can-be-born-below.md) lands.**
 
 ## What happens
 
@@ -47,7 +47,7 @@ the documented example asserts something narrower than what the rule measures. O
 declaration expire, it will expire on a duplicate in a test fixture or a build script — code the author
 deliberately excluded — and the remedy will name a scope that had no effect.
 
-That interacts with [bug 0073](./0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md), which is
+That interacts with [bug 0073](./fixed/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md), which is
 about the same rule and the same example from the other direction: 0073 is "the declaration does
 nothing", this is "and when it does something, it will be measuring the wrong files".
 

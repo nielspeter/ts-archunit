@@ -8,7 +8,7 @@ added five rulings the first draft left open: presets, the empty-project precede
 seam binding, and the enumeration source). This is the mechanical subset
 [ADR-008](./008-agent-first-failure-surfaces.md)'s Alternatives section said to watch for — _"worth
 revisiting if a mechanical subset emerges"_ — emerging on the fourth recurrence of the vacuous-pass class
-([bug 0066](../bugs/0066-a-smell-detector-over-zero-files-passes.md)). It does not amend ADR-008. It
+([bug 0066](../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md)). It does not amend ADR-008. It
 promotes one consequence of it — a check that examined nothing must not read as green — from
 review-enforced to **unrepresentable**.
 

@@ -309,7 +309,7 @@ true` and neither on by default. The larger affected population is direct `smell
   four fail open** — `smells.duplicateBodies`, `smells.inconsistentSiblings`, and **both shipped
   presets** when a smell rule is the only one enabled. A fifth, `dataLayerIsolation`, constructs zero
   rules from a valid option. Full table in
-  [bug 0066](https://github.com/nielspeter/ts-archunit/blob/main/bugs/0066-a-smell-detector-over-zero-files-passes.md);
+  [bug 0066](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md);
   the fixes are [plan 0098](https://github.com/nielspeter/ts-archunit/blob/main/plans/completed/0098-the-evidence-seam-and-the-floor.md).
 
   Runs post-build in CI and publish, and via `npm run test:matrix`. It imports `dist` on purpose — the

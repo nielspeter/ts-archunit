@@ -6,7 +6,7 @@
  * whose filters excluded everything, or whose corpus never loaded still returned
  * green from `check()`, and the suite counted it as coverage — the statement
  * ADR-008 opens with, and the reason
- * [bug 0066](../../bugs/0066-a-smell-detector-over-zero-files-passes.md) reported
+ * [bug 0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md) reported
  * 401 findings as clean.
  *
  * The floor lives at the ROOT (`TerminalBuilder.collectWithAssertionGuard`), not

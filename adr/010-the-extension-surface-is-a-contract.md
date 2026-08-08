@@ -71,7 +71,7 @@ On `TerminalBuilder` (`src/core/terminal-builder.ts`):
 
 **`collectViolations()`'s semantics changed in 0.59.0, and that is a rule 1 break.** It returned
 `ArchViolation[]` before [plan 0098](../plans/completed/0098-the-evidence-seam-and-the-floor.md) and now
-returns `CollectResult`. More consequentially, [plan 0099](../plans/0099-the-floor-no-family-can-be-born-below.md)
+returns `CollectResult`. More consequentially, [plan 0099](../plans/completed/0099-the-floor-no-family-can-be-born-below.md)
 made `examined` **behaviour-defining**: a dialect that satisfied the type with a constant `0` was
 previously unobserved and now hard-fails every rule it runs. 0098's own docstring recorded the
 equivalence as expiring "in the commit that gives the claim its first reader"; this is that commit.

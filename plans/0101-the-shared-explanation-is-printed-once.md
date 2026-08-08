@@ -1,9 +1,9 @@
 # Plan 0101 — the shared explanation is printed once, not per finding
 
 **Status:** Open, READY. Filed 2026-08-08, split out of
-[0099](./0099-the-floor-no-family-can-be-born-below.md) — it was the fourth of that plan's four
+[0099](./completed/0099-the-floor-no-family-can-be-born-below.md) — it was the fourth of that plan's four
 advice-string defects, and the only one that is not text inside a producer.
-**Depends on:** [0099](./0099-the-floor-no-family-can-be-born-below.md). Not for the code — this change
+**Depends on:** [0099](./completed/0099-the-floor-no-family-can-be-born-below.md). Not for the code — this change
 stands alone — but for the **need**: until the floor fires at check time, the long explanation is printed
 by `doctor` only, where a reader asked for a report and a wall of prose is the point. The floor is what
 turns it into `check` output, repeated once per failing rule.
@@ -89,6 +89,6 @@ whichever run-level type candidate (1) needs, `docs/cli.md` (sample output), `CH
 
 ## Out of scope
 
-The floor itself and its per-cause remedies — [0099](./0099-the-floor-no-family-can-be-born-below.md).
+The floor itself and its per-cause remedies — [0099](./completed/0099-the-floor-no-family-can-be-born-below.md).
 The wording of the explanation's content, which 0099 settles; this plan moves it, and changes it only
 where the split forces a seam.
