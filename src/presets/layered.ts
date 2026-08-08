@@ -30,7 +30,10 @@ export interface LayeredArchitectureOptions extends PresetBaseOptions<LayeredArc
   restrictedPackages?: Record<string, string[]>
   /**
    * This project's answer to "is a type-only edge a dependency?", applied to
-   * **every** rule this preset constructs — plan 0089.
+   * every rule this preset constructs **whose condition takes one** — plan 0089:
+   * `layer-order`, `no-cycles`, `innermost-isolation`, `restricted-packages`.
+   * `type-imports-only` is excluded because `onlyHaveTypeImportsFrom` asks about
+   * type imports *as its subject* — there is no answer for this bag to give it.
    *
    * The conditions disagree by default, deliberately: `beFreeOfCycles` ignores
    * type-only imports because it asks whether the module is *evaluated*, and an
@@ -134,7 +137,7 @@ function applyRestrictedPackages(
 
     builders.push(
       ...collectRule(
-        builder.should().notImportFrom(pkg),
+        builder.should().notImportFromWithOptions([pkg], config.importOptions ?? {}),
         {
           id: 'preset/layered/restricted-packages',
           because:
@@ -227,7 +230,12 @@ export function layeredArchitecture(
             .that()
             .resideInFolder(innermostGlob)
             .should()
-            .onlyImportFrom(...allowedGlobs),
+            // Forwarded, like `respectLayerOrder` and `beFreeOfCycles`. This is
+            // an isolation rule and `docs/presets.md` promises the option reaches
+            // them; measured before the fix, `{ ignoreTypeImports: true }` cleared
+            // `layer-order` and left `innermost-isolation` reporting the SAME
+            // erased edge — one preset answering the project's one question twice.
+            .onlyImportFromWithOptions(allowedGlobs, options.importOptions ?? {}),
           {
             id: 'preset/layered/innermost-isolation',
             because:

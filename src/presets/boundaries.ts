@@ -30,7 +30,9 @@ export interface StrictBoundariesOptions extends PresetBaseOptions<StrictBoundar
   noCopyPaste?: boolean
   /**
    * This project's answer to "is a type-only edge a dependency?", applied to
-   * **every** rule this preset constructs — plan 0089.
+   * every rule this preset constructs **whose condition takes one** — plan 0089:
+   * `no-cycles`, `no-cross-boundary`, `shared-isolation`, `test-isolation`.
+   * `no-copy-paste` is excluded because it compares function bodies, not imports.
    *
    * The conditions disagree by default, deliberately: `beFreeOfCycles` ignores
    * type-only imports because it asks whether the module is *evaluated*, and an
@@ -78,7 +80,7 @@ function applySharedIsolation(
             .that()
             .satisfy(atPath<SourceFile>(sharedGlob, 'shared'))
             .should()
-            .notImportFrom(`${dir}/**`),
+            .notImportFromWithOptions([`${dir}/**`], config.importOptions ?? {}),
           {
             id: 'preset/boundaries/shared-isolation',
             because:
@@ -116,7 +118,11 @@ function applyTestIsolation(
     for (const otherTestGlob of otherBoundaryTests) {
       builders.push(
         ...collectRule(
-          modules(p).that().resideInFile(testPattern).should().notImportFrom(otherTestGlob),
+          modules(p)
+            .that()
+            .resideInFile(testPattern)
+            .should()
+            .notImportFromWithOptions([otherTestGlob], config.importOptions ?? {}),
           {
             id: 'preset/boundaries/test-isolation',
             because:
@@ -262,7 +268,11 @@ export function strictBoundaries(
           .that()
           .resideInFolder(boundaryPattern)
           .should()
-          .onlyImportFrom(...allowedGlobs),
+          // Forwarded, like `beFreeOfCycles`. Measured before the fix, a
+          // type-only cross-boundary edge failed this rule identically with and
+          // without `{ ignoreTypeImports: true }` — the option documented as
+          // reaching the isolation rules reached only the cycle rule.
+          .onlyImportFromWithOptions(allowedGlobs, options.importOptions ?? {}),
         {
           id: 'preset/boundaries/no-cross-boundary',
           // This rule is folder-level: the allow list is this boundary plus the

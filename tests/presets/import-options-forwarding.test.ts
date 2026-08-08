@@ -134,3 +134,97 @@ describe('importOptions reaches beFreeOfCycles (plan 0089)', () => {
     ).toContain('preset/boundaries/no-cycles')
   })
 })
+
+/**
+ * The rules the bag reached only in the documentation.
+ *
+ * `docs/presets.md` names "the layer / **isolation** rules" in its table and
+ * both option docstrings said "**every** rule this preset constructs". Measured,
+ * the bag reached `respectLayerOrder` and `beFreeOfCycles` and nothing else: the
+ * four rules below took their conditions' defaults whatever was passed.
+ *
+ * The sharpest one is `innermost-isolation`. With `{ ignoreTypeImports: true }`
+ * the SAME erased edge cleared `layer-order` and still failed
+ * `innermost-isolation` — one preset call answering the project's one question
+ * both ways, which is the exact disagreement plan 0089 was filed to end.
+ *
+ * Each row asserts a DIFFERENT outcome per value, per the plan's standard: a row
+ * that reads the same either way proves nothing.
+ */
+describe('importOptions reaches the isolation conditions too (plan 0089)', () => {
+  const inMemory = (files: Record<string, string>): ArchProject => {
+    const tsm = new Project({ useInMemoryFileSystem: true })
+    for (const [name, text] of Object.entries(files)) tsm.createSourceFile(name, text)
+    return {
+      tsConfigPath: '/tsconfig.json',
+      _project: tsm,
+      getSourceFiles: () => tsm.getSourceFiles(),
+    }
+  }
+
+  it('layered: innermost-isolation — the rule that disagreed with layer-order', () => {
+    const p = inMemory({
+      '/src/routes/h.ts': 'export type Ctx = { n: number }\nexport const h = 1\n',
+      '/src/core/c.ts': "import type { Ctx } from '../routes/h.js'\nexport type Z = Ctx\n",
+    })
+    const opts = { layers: { routes: '**/routes/**', core: '**/core/**' }, strict: true }
+    expect(ruleIds(layeredArchitecture(p, opts))).toContain('preset/layered/innermost-isolation')
+    const ignored = ruleIds(
+      layeredArchitecture(p, { ...opts, importOptions: { ignoreTypeImports: true } }),
+    )
+    expect(ignored).not.toContain('preset/layered/innermost-isolation')
+    // And it now agrees with layer-order rather than contradicting it.
+    expect(ignored).not.toContain('preset/layered/layer-order')
+  })
+
+  it('layered: restricted-packages', () => {
+    const p = inMemory({
+      '/src/routes/h.ts': "import type { Knex } from 'knex'\nexport type Z = Knex\n",
+      '/src/repositories/r.ts': 'export const r = 1\n',
+    })
+    const opts = {
+      layers: { routes: '**/routes/**', repositories: '**/repositories/**' },
+      restrictedPackages: { '**/repositories/**': ['knex'] },
+    }
+    expect(ruleIds(layeredArchitecture(p, opts))).toContain('preset/layered/restricted-packages')
+    expect(
+      ruleIds(layeredArchitecture(p, { ...opts, importOptions: { ignoreTypeImports: true } })),
+    ).not.toContain('preset/layered/restricted-packages')
+  })
+
+  it('boundaries: no-cross-boundary', () => {
+    const p = inMemory({
+      '/src/a/index.ts': "import type { Beta } from '../b/index.js'\nexport type R = Beta\n",
+      '/src/b/index.ts': 'export type Beta = { n: number }\nexport const beta = 1\n',
+    })
+    const opts = { folders: '**/src/*' }
+    expect(ruleIds(strictBoundaries(p, opts))).toContain('preset/boundaries/no-cross-boundary')
+    expect(
+      ruleIds(strictBoundaries(p, { ...opts, importOptions: { ignoreTypeImports: true } })),
+    ).not.toContain('preset/boundaries/no-cross-boundary')
+  })
+
+  it('boundaries: shared-isolation', () => {
+    const p = inMemory({
+      '/src/shared/s.ts': "import type { Beta } from '../b/index.js'\nexport type R = Beta\n",
+      '/src/b/index.ts': 'export type Beta = { n: number }\nexport const beta = 1\n',
+    })
+    const opts = { folders: '**/src/b', shared: ['**/shared/**'] }
+    expect(ruleIds(strictBoundaries(p, opts))).toContain('preset/boundaries/shared-isolation')
+    expect(
+      ruleIds(strictBoundaries(p, { ...opts, importOptions: { ignoreTypeImports: true } })),
+    ).not.toContain('preset/boundaries/shared-isolation')
+  })
+
+  it('boundaries: test-isolation', () => {
+    const p = inMemory({
+      '/src/a/a.test.ts': "import type { F } from '../b/b.test.js'\nexport type R = F\n",
+      '/src/b/b.test.ts': 'export type F = { n: number }\nexport const f = 1\n',
+    })
+    const opts = { folders: '**/src/*', isolateTests: true }
+    expect(ruleIds(strictBoundaries(p, opts))).toContain('preset/boundaries/test-isolation')
+    expect(
+      ruleIds(strictBoundaries(p, { ...opts, importOptions: { ignoreTypeImports: true } })),
+    ).not.toContain('preset/boundaries/test-isolation')
+  })
+})

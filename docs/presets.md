@@ -99,7 +99,11 @@ purpose**:
 
 Holding a builder you choose per condition, where the distinction is visible. Through a preset it is
 invisible — so `importOptions` is one bag meaning **this project's answer to "is a type-only edge a
-dependency?"**, applied to every rule the preset constructs.
+dependency?"**, applied to every rule the preset constructs whose condition takes one.
+
+Two rules are excluded, because the bag has no answer to give them: `preset/layered/type-imports-only`
+(`onlyHaveTypeImportsFrom` asks about type imports _as its subject_) and `preset/boundaries/no-copy-paste`
+(it compares function bodies, not imports). Every other rule in both presets is covered.
 
 Passing it moves exactly one side, and which side depends on the value:
 
