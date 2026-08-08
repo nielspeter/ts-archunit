@@ -42,6 +42,22 @@ if [ -z "${LATEST//[[:space:]]/}" ]; then
   exit 1
 fi
 
+# Refuse what this gate does not model, rather than waving it through.
+#
+# `${VERSION%.*}` strips at the LAST dot, so `0.58.1-rc.1` becomes `0.58.1-rc`,
+# which never equals `0.58` — a prerelease walked straight past the patch test.
+# Worse, `publish.yml` passes no `--tag`, so it would publish to `latest`, and
+# `npm view … version` then returns the prerelease as the baseline: measured,
+# `0.58.2` over a published `0.58.1-rc.1` was also waved through. One prerelease
+# disabled the gate for the release after it.
+case "$VERSION$LATEST" in
+  *-*)
+    echo "Error: this gate does not model prereleases ($VERSION over $LATEST)." >&2
+    echo "Publishing a prerelease with no --tag would also move 'latest'. Teach the gate first." >&2
+    exit 1
+    ;;
+esac
+
 # Ordering first. `${VERSION%.*} != ${LATEST%.*}` tests INEQUALITY, never order,
 # so it waved through a downgrade: measured, `0.57.0` over a published `0.58.0`
 # printed "is a minor or major bump" and exited 0. On a gate over an irreversible
@@ -62,18 +78,43 @@ if [ "${VERSION%.*}" != "${LATEST%.*}" ]; then
   exit 0
 fi
 
-# `^### (Added|Changed|Removed)` — Keep a Changelog's feature-level sections.
-# Fixed/Security are what a patch is FOR, so they do not trip this.
-if grep -qE '^### (Added|Changed|Removed)' "$NOTES_FILE"; then
-  echo "Error: $VERSION is a patch over $LATEST, but its changelog section has Added/Changed/Removed." >&2
+# INVERTED: refuse unless every heading is known patch-safe.
+#
+# The first cut listed the forbidden headings (`Added|Changed|Removed`), which
+# fails OPEN on anything nobody anticipated. Measured against this repo's own
+# history: `### Deprecated` (a Keep a Changelog heading, and feature-level),
+# `### Breaking` (shipped here in 0.10.0) and a section with bare bullets and no
+# `###` heading at all were all waved through. A section whose heading the gate
+# does not recognise is exactly when it should stop.
+PATCH_SAFE='^### (Fixed|Security|Internal|Docs|Documentation|Documented|Notes|Known|Upgrad)'
+HEADINGS=$(grep -cE '^### ' "$NOTES_FILE" || true)
+OFFENDING=$(grep -E '^### ' "$NOTES_FILE" | grep -vE "$PATCH_SAFE" || true)
+
+if [ "$HEADINGS" -eq 0 ] || [ -n "$OFFENDING" ]; then
+  if [ "$HEADINGS" -eq 0 ]; then
+    echo "Error: $VERSION is a patch over $LATEST, but its changelog section has no '### ' heading." >&2
+    echo "This gate classifies a patch by its headings; an unclassified section is not a pass." >&2
+  else
+    echo "Error: $VERSION is a patch over $LATEST, and these headings are not patch-safe:" >&2
+    echo "$OFFENDING" >&2
+  fi
   echo "" >&2
   echo "Pre-1.0, ^${LATEST} resolves inside ${LATEST%.*}.x — a patch reaches every consumer" >&2
   echo "with an unchanged lockfile, so a behaviour change lands in pipelines nobody upgraded." >&2
   LATEST_MAJOR="${LATEST%%.*}"
   LATEST_REST="${LATEST#*.}"
   LATEST_MINOR="${LATEST_REST%%.*}"
-  echo "Bump the minor instead: ${LATEST_MAJOR}.$((LATEST_MINOR + 1)).0 or later." >&2
+  echo "" >&2
+  # The tag already exists — this gate fires from a tag push. Re-tagging without
+  # deleting silently does nothing, so an agent that skips this step retries into
+  # the identical failure. Replaying the heading test over this repo's history,
+  # 8 of 26 real patch releases would have landed here, so this IS the common path.
+  echo "To recover:" >&2
+  echo "  1. git push --delete origin v${VERSION} && git tag -d v${VERSION}" >&2
+  echo "  2. set package.json to ${LATEST_MAJOR}.$((LATEST_MINOR + 1)).0 (or later) and rename the" >&2
+  echo "     CHANGELOG heading to match" >&2
+  echo "  3. commit, then tag and push the new version" >&2
   exit 1
 fi
 
-echo "OK: $VERSION is a patch over $LATEST and carries only Fixed/Security."
+echo "OK: $VERSION is a patch over $LATEST and every heading is patch-safe."
