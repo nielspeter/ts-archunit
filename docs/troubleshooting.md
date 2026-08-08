@@ -229,7 +229,7 @@ Expected. [`tsconfig()`](/config-rules) checks the resolved options object, whic
 
 ## Warnings show up but CI still passes
 
-That's by design for **severity** warnings. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. **One exception, since 0.34.0 and now much easier to meet:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob or one that examined zero units — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
+That's by design for **severity** warnings. Rules marked `.asSeverity('warn')` (and warn-severity preset rules) are reported but never fail the build — `check` exits non-zero only on **error**-severity violations. **One exception:** a _configuration_ finding — a rule that cannot enforce anything, such as a dead glob (since 0.34.0) or one that examined **zero units** (since 0.59.0) — is `error` regardless of severity and fails the build. `'warn'` grades violations of a rule that works; it does not grade a rule that does not. Promote a rule to failing with `.asSeverity('error')` (the default) or by removing the `warn` override.
 
 A rule that **asserts nothing** is the one thing `warn` cannot cover: through 0.22.0 it
 reported nothing at all, and since 0.23.0 it fails at `error` severity whatever you asked
