@@ -455,25 +455,34 @@ export abstract class RuleBuilder<T> extends TerminalBuilder {
     // The TEXT comes from the shared producer; the ATTRIBUTION stays here.
     //
     // Plan 0099 keeps this family's block because it is the better-attributed
-    // implementation — it can name the chain and carries the author's `because`.
+    // implementation — it names the chain and carries the author's `because`.
     // What it must not keep is its own wording: two texts for one state is the
-    // plan-0070 drift shape, and this one carried the three defects 0098's
-    // user-perspective review found ("can never fail" overstates for a folder
-    // empty in a young repo; it hedged about defaults it could have printed; and
-    // it ranked declaring below widening for the greenfield adopters who cannot
-    // widen because the code does not exist yet).
+    // plan-0070 drift shape, and its copy carried the three defects 0098's
+    // user-perspective review found.
+    //
+    // Fields are assigned LITERALLY rather than spread, and that is not style.
+    // The config-finding census scans for a `bypassFilters: true`
+    // PropertyAssignment and for a literal `suggestion`; a spread made this
+    // producer invisible to it, which silently dropped its census row — through
+    // the exact route the census docstring claims is impossible ("no spreads that
+    // introduce the flag"). Review measured that regression.
     //
     // `element` keeps the rule id: unlike the expiry finding, N rules that cannot
     // enforce ARE one edit, so `dedupeConfigFindings` collapsing them is correct.
     const shared = this.zeroSubjectsViolation(this.project)
     return {
-      ...shared,
       rule: description,
+      ruleId: this._metadata?.id,
       element: this._metadata?.id ?? description,
+      file: '',
+      line: 0,
+      message: shared.message,
+      suggestion: shared.suggestion,
       // The author's rationale, which the shared producer has no access to. Not
       // their `suggestion`/`docs` (bug 0021): this finding says the selector
       // matched nothing, and the author's remedy is for a violation of the rule.
       because: this._reason,
+      bypassFilters: true,
     }
   }
 

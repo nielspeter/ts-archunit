@@ -105,6 +105,11 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     verified:
       'behavioural: exclusion-comments-reach-every-condition.test.ts — adding a reason clears it and keeps the exemption',
   },
+  'src/core/rule-builder.ts::emptySelectionViolation': {
+    remedy: 'own',
+    verified:
+      'behavioural: dead-selector-fails.test.ts and the-floor.test.ts — it delegates its text to zeroSubjectsViolation (one text for one state) while keeping its own attribution, and the shared remedy is proven to remediate there',
+  },
   'src/core/terminal-builder.ts::zeroSubjectsViolation': {
     remedy: 'own',
     verified:
