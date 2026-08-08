@@ -137,6 +137,18 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
    * 'unnamed'. Uses `describe()` rather than a call-site locator for the same
    * reason as `SliceRuleBuilder`: `explain --format agent` reads this field.
    */
+  /**
+   * This detector counts sibling FILES, not function bodies — plan 0099.
+   *
+   * It inherited `SmellBuilder`'s noun while `examinedUnits()` sums
+   * `files.length`, so the message read "examined 0 function bodies" for a
+   * file-counting detector: the category error this plan exists to remove, in the
+   * family sitting directly under the override.
+   */
+  protected override examinedUnitNoun(): string {
+    return 'sibling files'
+  }
+
   override describeRule(): RuleDescription {
     return {
       ...super.describeRule(),

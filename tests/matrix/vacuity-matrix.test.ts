@@ -171,8 +171,20 @@ const EXPIRES_AT_VERSION = '0.62.0'
  * a release.
  */
 export function expiryFailure(
-  version: string,
   list: Readonly<Record<string, Verdict>>,
+  // DEFAULTED, so the gate has no version expression to revert. The control
+  // asserted `readPackageVersion()` directly, which proved the function but never
+  // the gate's choice to call it: reverting only the call site to
+  // `process.env.npm_package_version ?? '0.0.0'` left the matrix 43/43 green.
+  // A defaulted parameter removes the seam instead of adding a row to watch it.
+  version: string = readPackageVersion(),
+  // The deadline is injectable for one reason: without it the default `version`
+  // is unfalsifiable. Both the real version (0.58.0) and the broken '0.0.0'
+  // fallback sit BEFORE 0.62.0, so every assertion returns undefined either way —
+  // measured, reverting the default to `process.env.npm_package_version ?? '0.0.0'`
+  // left the matrix 43/43 green. Driving a deadline below the real version is what
+  // separates them.
+  deadline: string = EXPIRES_AT_VERSION,
 ): string | undefined {
   // Everything still VACUOUS, not only `'fail-open'`. Plan 0099 converts all four
   // `'fail-open'` cells, so a gate counting only those reaches zero and can never
@@ -180,10 +192,10 @@ export function expiryFailure(
   // CLOSED — `./graphql:schema` refuses an empty corpus, which is the wanted
   // behaviour, not a debt.
   const vacuous = Object.values(list).filter((v) => v === 'fail-open' || v === 'no-checks').length
-  if (vacuous === 0 || !past(version, EXPIRES_AT_VERSION)) return undefined
+  if (vacuous === 0 || !past(version, deadline)) return undefined
   return (
     `${String(vacuous)} cells are still vacuous at ${version}. Plan 0100 was ` +
-    `due by ${EXPIRES_AT_VERSION}; a stalled programme must red the audit rather than live behind it.`
+    `due by ${deadline}; a stalled programme must red the audit rather than live behind it.`
   )
 }
 
@@ -231,7 +243,7 @@ describe('the vacuity matrix (plan 0095)', () => {
 
   it('the known-fail-open list may only shrink, and expires', () => {
     expect(Object.keys(KNOWN_FAIL_OPEN).filter((k) => !(k in AUDIT_2026_08))).toEqual([])
-    const failure = expiryFailure(readPackageVersion(), KNOWN_FAIL_OPEN)
+    const failure = expiryFailure(KNOWN_FAIL_OPEN)
     if (failure !== undefined) throw new Error(failure)
   })
 
@@ -241,15 +253,15 @@ describe('the vacuity matrix (plan 0095)', () => {
 
     // 1. The numeric compare. Lexicographically '0.100.0' < '0.62.0', so the old
     //    form returned undefined here and the deadline quietly stopped existing.
-    expect(expiryFailure('0.100.0', KNOWN_FAIL_OPEN)).toBeDefined()
-    expect(expiryFailure('0.61.9', KNOWN_FAIL_OPEN)).toBeUndefined()
+    expect(expiryFailure(KNOWN_FAIL_OPEN, '0.100.0')).toBeDefined()
+    expect(expiryFailure(KNOWN_FAIL_OPEN, '0.61.9')).toBeUndefined()
 
     // 2. The vacuity predicate. A list whose only debt is 'no-checks' must still
     //    expire — counting 'fail-open' alone made the gate unreachable the moment
     //    this plan converted those four cells.
-    expect(expiryFailure('0.100.0', { x: 'no-checks' })).toBeDefined()
+    expect(expiryFailure({ x: 'no-checks' }, '0.100.0')).toBeDefined()
     // ...and 'other-throw' is not debt: it fails closed.
-    expect(expiryFailure('0.100.0', { x: 'other-throw' })).toBeUndefined()
+    expect(expiryFailure({ x: 'other-throw' }, '0.100.0')).toBeUndefined()
 
     // 3. The version source. `process.env.npm_package_version ?? '0.0.0'` failed
     //    open twice: the fallback is past no deadline, and the variable is unset
@@ -266,6 +278,15 @@ describe('the vacuity matrix (plan 0095)', () => {
     try {
       expect(readPackageVersion()).not.toBe('0.0.0')
       expect(readPackageVersion()).toMatch(/^\d+\.\d+\.\d+/)
+      // The DEFAULT is what the gate uses, so prove it directly: with the env
+      // var gone, a '0.0.0' default would never be past any deadline and the
+      // call below would return undefined.
+      // The DEFAULT version, against a deadline below the real one. With the
+      // env var gone, a '0.0.0' fallback is not past 0.1.0 and this returns
+      // undefined; the real 0.58.0 is, and it returns a message. That is the
+      // assertion that separates the two defaults.
+      expect(expiryFailure({ x: 'no-checks' }, undefined, '0.1.0')).toBeDefined()
+      expect(expiryFailure({ x: 'no-checks' })).toBeUndefined()
     } finally {
       if (saved !== undefined) process.env.npm_package_version = saved
     }

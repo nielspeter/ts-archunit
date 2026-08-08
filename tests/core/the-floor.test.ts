@@ -23,6 +23,7 @@ import { functions } from '../../src/builders/function-rule-builder.js'
 import { classes } from '../../src/builders/class-rule-builder.js'
 import { functionNoEval } from '../../src/rules/security.js'
 import { smells } from '../../src/smells/index.js'
+import { call } from '../../src/helpers/matchers.js'
 import { agentGuardrails } from '../../src/presets/agent-guardrails.js'
 import { dataLayerIsolation } from '../../src/presets/data-layer.js'
 import { schemaFromSDL } from '../../src/graphql/index.js'
@@ -453,6 +454,19 @@ describe('the message names the right unit, in the right number', () => {
     expect(gql?.message).toContain('0 schema types')
     // The bug this replaces: every family inherited the base noun.
     expect(gql?.message).not.toContain('0 subjects')
+
+    // The three the first version of this row left unpinned — deleting any of
+    // their overrides kept the whole suite green, measured. The plan's own
+    // framing names exactly these as the families that printed "subjects".
+    const sib = smells
+      .inconsistentSiblings(p)
+      .forPattern(call('this.nothing'))
+      .minLines(999)
+      .violations()[0]
+    expect(sib?.message).toContain('0 sibling files')
+    // It inherited "function bodies" while counting FILES — the category error
+    // this seam exists to remove, in the family sitting under the override.
+    expect(sib?.message).not.toContain('function bodies')
   })
 
   it('singular when there is one of it — the likeliest expiry case', () => {
