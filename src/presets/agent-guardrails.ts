@@ -71,6 +71,13 @@ export function agentGuardrails(
   const overrideProblems = overrideFindings(options.overrides, collectRuleIds(options))
 
   const builders: RuleBuilderLike[] = []
+  // Recorded HERE, at the one place a rule is actually built — the same argument
+  // `collectRule` makes for its `constructed` parameter ("the known-id list
+  // cannot answer this"). Deriving it instead from `collectRuleIds()` filtered by
+  // severity restates the construction conditionals a second time; the two agree
+  // today only because they are kept in step by hand, and the first rule added to
+  // one and not the other makes a declaration bind to a rule that was never built.
+  const constructed: string[] = []
   const push = (
     builder: FunctionRuleBuilder | DuplicateBodiesBuilder,
     meta: RuleMetadata & { id: string },
@@ -81,6 +88,7 @@ export function agentGuardrails(
     // preset builds through its own helper, and a carrier that reached only the
     // shared path would cover the families someone remembered.
     if (sev !== 'off') {
+      constructed.push(meta.id)
       builders.push(declareEmptyIfListed(builder.rule(meta).asSeverity(sev), meta.id, options))
     }
   }
@@ -156,11 +164,7 @@ export function agentGuardrails(
 
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
-  // Constructed, not merely known: a rule whose option was never enabled, or
-  // that was overridden `off`, is not built — so a declaration naming it is dead.
-  const constructed = collectRuleIds(options).filter(
-    (id) => lookup(options.overrides, id) !== 'off',
-  )
+  // `constructed` is recorded at the `push` site above, not re-derived here.
   return [
     ...overrideProblems,
     ...declaredEmptyFindings(options.expectEmpty, constructed),
