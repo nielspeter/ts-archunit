@@ -194,6 +194,30 @@ export function declaredEmptyFindings(
   const unbound = [...new Set(expectEmpty)].filter((id) => !built.has(id))
   if (unbound.length === 0) return []
 
+  // De-duplicated, because `boundaries` and `layered` push the same id once per
+  // boundary / layer / pair. Un-deduplicated this degenerates exactly where the
+  // reader needs it most: measured at 5 boundaries + 1 shared glob +
+  // `isolateTests`, the list ran to 31 entries naming 4 unique ids, with
+  // `test-isolation` repeated 20 consecutive times and the answer buried inside
+  // it. `overrideFindings` never had this problem only because it is handed
+  // `RULE_IDS`, which is unique by construction.
+  const uniqueConstructed = [...new Set(constructedIds)]
+
+  // When the preset built NOTHING, "correct the id" is a false remedy — the id
+  // is usually right and the cause is upstream (a discovery glob that matched
+  // no folders, or every rule overridden `off`). An agent that obeys it deletes
+  // a correct declaration, and plan 0099's floor then demands the declaration
+  // back: bug 0017's loop, which ADR-008 rule 2 forbids us to reintroduce.
+  const suggestion =
+    uniqueConstructed.length === 0
+      ? `This preset constructed NO rules, so the cause is upstream of this id — check the ` +
+        `discovery glob that finds this preset's subjects, and whether every rule was set to 'off'. ` +
+        `Fix that first: the declaration is probably correct and will bind once rules exist. ` +
+        UNSUPPRESSABLE
+      : `Correct the id, or remove it. This preset constructed: ${uniqueConstructed.join(', ')}. ` +
+        `Note that a rule set to 'off' is not constructed, so a declaration naming it is dead. ` +
+        UNSUPPRESSABLE
+
   const violations: ArchViolation[] = unbound.map((id) => ({
     rule: `preset expectEmpty '${id}'`,
     ruleId: `preset/expect-empty/${id}`,
@@ -206,10 +230,7 @@ export function declaredEmptyFindings(
     because:
       'a declaration that binds to no rule is not a weaker assertion, it is no assertion — ' +
       'and it reads in the config as though the empty state has been accounted for',
-    suggestion:
-      `Correct the id, or remove it. This preset constructed: ${constructedIds.join(', ') || '(no rules)'}. ` +
-      `Note that a rule set to 'off' is not constructed, so a declaration naming it is dead. ` +
-      UNSUPPRESSABLE,
+    suggestion,
     bypassFilters: true,
   }))
   return [{ violations: () => violations }]
@@ -233,8 +254,21 @@ export interface PresetBaseOptions<TRuleId extends string = string> {
    * compile error rather than a silent no-op. **An id here that binds to no
    * constructed rule is a failing configuration finding**, never a warning — see
    * {@link declaredEmptyFindings}.
+   *
+   * ## One id can name several constructed rules
+   *
+   * `boundaries` and `layered` construct some ids many times — `no-cross-boundary`
+   * once per boundary, `restricted-packages` once per package, `test-isolation`
+   * once per boundary pair. Declaring such an id applies the assertion to **every**
+   * instance, so it holds only while all of them examine nothing, and the day one
+   * fills you get a false-declaration finding for that instance. The rule's real
+   * violations are still reported alongside it — `RuleBuilder.evaluate` used to
+   * discard them, which is how a genuine `imports "lodash"` finding went missing
+   * behind a declaration.
+   *
+   * `readonly` so a caller's `as const` list is accepted.
    */
-  expectEmpty?: TRuleId[]
+  expectEmpty?: readonly TRuleId[]
 }
 
 /**
