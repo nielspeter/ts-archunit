@@ -32,7 +32,7 @@ export interface StrictBoundariesOptions extends PresetBaseOptions<StrictBoundar
    * This project's answer to "is a type-only edge a dependency?", applied to
    * every rule this preset constructs **whose condition takes one** — plan 0089:
    * `no-cycles`, `no-cross-boundary`, `shared-isolation`, `test-isolation`.
-   * `no-copy-paste` is excluded because it compares function bodies, not imports.
+   * `no-duplicate-bodies` is excluded because it compares function bodies, not imports.
    *
    * The conditions disagree by default, deliberately: `beFreeOfCycles` ignores
    * type-only imports because it asks whether the module is *evaluated*, and an

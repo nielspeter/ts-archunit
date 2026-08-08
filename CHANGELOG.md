@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   edge a dependency?", applied everywhere.** It moves exactly one side, and which side depends on the
   value — `docs/presets.md` carries the table. Two rules are excluded because the bag has no answer to
   give them: `preset/layered/type-imports-only`, whose condition asks about type imports as its subject,
-  and `preset/boundaries/no-copy-paste`, which compares function bodies rather than imports. Every other
+  and `preset/boundaries/no-duplicate-bodies`, which compares function bodies rather than imports. Every other
   rule in both presets is covered, isolation rules included — reviewed against a measurement, because the
   first cut reached `respectLayerOrder` and `beFreeOfCycles` only, and `{ ignoreTypeImports: true }` then
   cleared `layer-order` while the same erased edge still failed `innermost-isolation`.
