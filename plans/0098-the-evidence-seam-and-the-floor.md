@@ -1,6 +1,11 @@
-# Plan 0098 — the evidence seam, and the floor no family can be born below
+# Plan 0098 — the evidence seam every family is born with
 
-**Status:** Open, not started. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
+**Status:** Open, READY. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
+**Amended 2026-08-08 — narrowed to the seam.** The floor moved to
+[0099](./0099-the-floor-no-family-can-be-born-below.md); the preset gap this amendment measured is
+[0100](./0100-a-preset-that-constructs-nothing.md). See **Amendment** below for the measurement that
+forced it. Everything from "Convert at the root" onward now belongs to 0099 and is kept here only as
+the design 0099 inherits.
 **Depends on:** [0096](./completed/0096-evidence-at-every-seam.md) (families must produce the evidence before the
 seam can require it), [0097](./completed/0097-the-declared-empty-grammar.md) (the floor reads the mint it lifts),
 [0089](./0089-presets-forward-their-options.md) (preset declarations need somewhere to be threaded), and
@@ -13,6 +18,40 @@ one release even though they are separate PRs.
 **Blast radius:** **Published API — top row** of [ADR-008](../adr/008-agent-first-failure-surfaces.md)
 rule 6. Every entry point, plus an extension-contract break. Guard the guard: adversarial review of the
 seam, sabotage per detector, and the 0095 matrix as the independent behavioural check.
+
+## Amendment — two things measured on 2026-08-08, before any code
+
+**1. This cannot be one PR, and the house rule is that a plan completes in the one it was built in.**
+The retype has one consumer (`terminal-builder.ts:338`) and **eight producers** — a good shape. But
+only three of the eight can answer today (`correspondence`, both graphql builders). The other five
+need their examined unit **designed, not threaded**: what is the examined unit of a `tsconfig` check,
+of a `crossLayer` rule, of the whole `RuleBuilder<T>` family? And `SmellBuilder` — the class that
+actually implements the seam — cannot see its own detectors' `examinedUnits()`, because that hook was
+added to the detector subclasses and `collectViolations()` delegates through `detect()`. Five
+definitions plus a floor plus ten documentation files is two plans wearing one number.
+
+**2. The floor cannot empty `KNOWN_FAIL_OPEN`, and this plan claimed it would.** Measured against the
+matrix's own recipes on its own empty fixture:
+
+| entry                         | rules constructed | a per-rule floor reaches it |
+| ----------------------------- | ----------------- | --------------------------- |
+| `smells.duplicateBodies`      | 1                 | yes                         |
+| `smells.inconsistentSiblings` | 1                 | yes                         |
+| `presets:agentGuardrails`     | 1                 | yes                         |
+| `presets:strictBoundaries`    | 2                 | yes                         |
+| `presets:dataLayerIsolation`  | **0**             | **no — nothing to floor**   |
+| `graphql:schema`              | —                 | already fails CLOSED        |
+
+**Two** of the five published presets construct zero rules at their minimal type-correct call
+(`agentGuardrails({ src })` and `dataLayerIsolation({ repositories })`) — the matrix caught one of them
+only because that recipe happened to pass fewer options. A preset that constructs zero rules has no
+`collectViolations()` to floor, so
+the invariant this programme is built on stops one level short of it: ∀ over ∅ at the **preset** seam
+rather than the rule seam. That is ADR-009's own Context table repeating — four waves each closed
+their enumeration and the next family was outside it — and this plan's enumeration was "families
+implementing the seam". A preset is not one. Filed as [0100](./0100-a-preset-that-constructs-nothing.md)
+rather than absorbed, because the mechanism is different: nothing about `CollectResult` reaches a
+function that returned `[]`.
 
 ## Problem
 
