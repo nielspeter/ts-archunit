@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+> **This release is `0.59.0`, not a patch.** It carries breaking changes to the extension surface and
+> makes `doctor` report — and therefore exit non-zero on — cases it previously ignored. Pre-1.0,
+> `^0.58.0` resolves anywhere inside `0.58.x`, so shipping this as `0.58.1` would reach every consumer
+> with an unchanged lockfile and a red pipeline.
+
 ### Added
 
 - **Every rule family now reports what it examined** — plan 0098. `collectViolations()` returns
@@ -15,11 +20,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   guards have each closed their own enumeration only for the next family to land outside it, and an
   optional hook is one you can forget. A required return type is not.
 
-  ⚠️ **Breaking for external dialects.** `collectViolations()` is the one abstract member that ADR-010 rule 1 names, so a subclass must return the
-  new shape. The compile error names the member — migration is `return { violations: <what you returned
-before>, examined: <your own unit> }`. Pick the unit at **your own seam**: the set your conditions
-  receive, never a file count, because counting one layer too high reads healthy on exactly the input this
-  exists to catch.
+  ⚠️ **Breaking for external dialects.** `collectViolations()` is the one abstract member that ADR-010
+  rule 1 names, so a subclass must return the new shape. The compile error names the member.
+
+  ```ts
+  // The signature:
+  protected abstract collectViolations(): { violations: ArchViolation[]; examined: number }
+
+  // Before:
+  protected collectViolations(): ArchViolation[] {
+    const subjects = this.selected()
+    return this.evaluateConditions(subjects)
+  }
+
+  // After — `examined` is a COUNT, not the collection:
+  protected collectViolations(): CollectResult {
+    const subjects = this.selected()
+    return { violations: this.evaluateConditions(subjects), examined: subjects.length }
+  }
+  ```
+
+  **Count at your own seam** — the set your conditions receive, **never a file count**, because counting
+  one layer too high reads healthy on exactly the input this exists to catch. **If your family compares or
+  pairs two sides, count the pairs, not either side**: a `crossLayer` rule whose two layers both select
+  files can still form zero pairs, and counting a side would report it healthy.
+
+  A family whose empty state can be legitimate must also override `declaresEmpty()` and
+  `emptyDeclarationAdvice()` — same job, same commit. See the ⚠️ below.
 
   ⚠️ **`assertsCardinality()` is public**, joining `assertsSomething()`, `declaresEmpty()` and
   `emptyDeclarationAdvice()` on the contract root, for the same structural reason: `diagnose()` reads it
@@ -32,7 +59,14 @@ before>, examined: <your own unit> }`. Pick the unit at **your own seam**: the s
   matches **is** reported, because pairs are what that family examines and layers selecting files says
   nothing about whether any pair was formed.
 
-  `check()` behaviour is unchanged. Plan 0099 is the release that makes an examined count of zero fail.
+  ⚠️ **This can turn a green CI step red on a patch upgrade.** `doctor` exits non-zero on anything it
+  reports, so previewing four more families means rules you have had for a year can now fail that step —
+  while `check()` still passes them. What to do about it is under the `doctor` bullet below; the short
+  version is that your enforcement gates are unaffected, and there is no per-finding suppression by
+  design.
+
+  `check()` behaviour is unchanged in this release. **The next minor makes an examined count of zero fail
+  at `check()` time** (plan 0099) — so treat what `doctor` reports now as the list that goes red then.
 
 ### Added
 
@@ -57,7 +91,14 @@ before>, examined: <your own unit> }`. Pick the unit at **your own seam**: the s
   now six — `orphan-exclusion` had been missing since 0.43.0 as well.
 
   ⚠️ **`doctor` exits non-zero on anything it reports**, so a pipeline running it goes red for rules
-  that are green today, while `check()` still passes them. That gap is the point — you can run
+  that are green today, while `check()` still passes them.
+
+  **If this reddens a pipeline you cannot fix today:** `check()` is unaffected, so your enforcement gates
+  still run — drop the `doctor` step or pin to `0.58.x` while you work through the list. There is
+  deliberately **no per-finding suppression**, and `ts-archunit baseline` will refuse these: a rule that
+  enforces nothing is the one thing this tool will not let you accept quietly. That is a considered
+  position rather than an oversight, and it is stated here so you meet it in the changelog instead of in a
+  non-zero exit from `baseline`. That gap is the point — you can run
   `diagnose()`/`doctor` on demand and see the list before a later release makes the same state fail.
 
   The runtime advice deliberately does **not** name the release that flips it. An earlier draft said
