@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.59.0] - 2026-08-08
 
 > **This release is `0.59.0`, not a patch.** It carries breaking changes to the extension surface and
 > makes `doctor` report — and therefore exit non-zero on — cases it previously ignored. Pre-1.0,
