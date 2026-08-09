@@ -1,6 +1,7 @@
 # Plan 0099 — the floor no family can be born below
 
-**Status:** Open, not started. Filed 2026-08-08, split out of [0098](./0098-the-evidence-seam-and-the-floor.md)
+**Status:** **DONE 2026-08-08.** Shipped in **v0.59.0** (PR #49). Filed 2026-08-08, split out of
+[0098](./0098-the-evidence-seam-and-the-floor.md)
 when that plan's own amendment measured it as two plans wearing one number.
 **Depends on:** [0098](./0098-the-evidence-seam-and-the-floor.md) (the floor reads `CollectResult.examined`,
 which does not exist until the seam lands), [0097](./0097-the-declared-empty-grammar.md) (the floor
@@ -308,6 +309,59 @@ that a declaration "states a fact about today that a later release can hold you 
 and, right now, false for the one the docs use as their example. This plan is the release that makes the
 sentence true; say so in the docs when it ships, and note the docs site deploys on merge rather than on
 tag, so the claim goes live before the version does.
+
+## Outcome
+
+**DONE.** Shipped in v0.59.0. One floor, at one seam, in `collectWithAssertionGuard()` — the single
+consumer every published family's terminal path already flowed through. Seven families that had no
+zero-unit gate now have one.
+
+**The floor defers rather than enumerates, and that is the ruling worth keeping.** It fires only on
+`violations.length === 0 && examined === 0`, so a family with a better-attributed finding of its own
+wins — `SliceRuleBuilder` has failed closed since 0067 and the floor never reaches it. Precedence is
+asked **of the builder** (`ownsDiscoveryDiagnosis()`, `assertsCardinality()`, `declaresEmpty()`)
+rather than listed at the root, which is what keeps the next family from falling outside an
+enumeration. Four previous waves each closed their enumeration and were followed by a family outside
+it; this one has no list to fall outside of.
+
+**Closed two bugs as a by-product.** [0066](../../bugs/fixed/0066-a-smell-detector-over-zero-files-passes.md)
+is the plan's own subject. [0073](../../bugs/fixed/0073-a-declaration-binds-to-a-smell-rule-that-ignores-it.md)
+closed because moving the expiry branch to the root deleted the duplicate that carried the defect.
+
+**`KNOWN_FAIL_OPEN` went from six entries to two**, and the two that remain cannot be closed by any
+per-rule floor: `graphql:schema` fails closed in its own loader, and `dataLayerIsolation` constructs
+zero rules, so there is no rule for a floor to reach — [plan 0100](../0100-a-preset-that-constructs-nothing.md).
+Repairing the matrix's own expiry gate was forced into the same commit, and found three silent
+failures in it.
+
+### Where the plan was wrong, and what the nine review rounds cost
+
+**Nine rounds, and every round found defects in the previous round's fixes.** The recurring shape was
+not bad code, it was guards that could not fail: floor tests that passed against `main`, a matrix
+control that copied the gate rather than driving it, a dedupe guard that differed by the one field
+the code rendered, and a docs guard that went vacuous the moment the heading it scanned was renamed.
+For a plan whose subject is _"a check that cannot fail is counted as coverage, and that is a lie"_,
+that is the expected result rather than an ironic one, and it is the argument for asking rule 5's
+question against a revert list derived from the **diff**.
+
+**Two of the plan's own claims were falsified while executing it.** `recommended` turned out to be
+zero blast radius, and the `doctor` preview could not ship a release early. Both were corrected in
+the plan text rather than quietly dropped.
+
+**Split, mid-flight.** [Plan 0101](../0101-the-shared-explanation-is-printed-once.md) came out of
+this one: it was the fourth of this plan's four advice-string defects, and the only one that is not
+text inside a producer — the floor is what turns a `doctor`-only wall of prose into `check` output
+repeated once per failing rule. Plans close in the PR their work was done in, so the alternative was
+a half-plan.
+
+### Found afterwards, by dogfooding
+
+Pointing the shipped families at this repository for the first time found two limits of the standard
+this plan implements, both recorded in
+[bug 0077](../../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md): a
+non-empty examined count establishes neither that the rule **could** fail, nor that it examined the
+**intended** tree. Neither is an argument against the floor — bug 0066's failure mode is genuinely
+unreachable now — but the floor is necessary and not sufficient, and this plan did not say so.
 
 ## Out of scope
 

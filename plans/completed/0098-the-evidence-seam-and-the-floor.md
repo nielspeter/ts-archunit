@@ -1,6 +1,7 @@
 # Plan 0098 — the evidence seam every family is born with
 
-**Status:** Open, READY. Filed 2026-08-07, split out of plan 0095's Phase 2a/2b/2d.
+**Status:** **DONE 2026-08-08.** Shipped in **v0.59.0** (PR #47). Filed 2026-08-07, split out of
+plan 0095's Phase 2a/2b/2d. See **Outcome** below.
 **Amended 2026-08-08 — narrowed to the seam.** The floor moved to
 [0099](./0099-the-floor-no-family-can-be-born-below.md); the preset gap this amendment measured is
 [0100](../0100-a-preset-that-constructs-nothing.md). See **Amendment** below for the measurement that
