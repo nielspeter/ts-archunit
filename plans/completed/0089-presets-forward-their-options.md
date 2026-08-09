@@ -1,6 +1,7 @@
 # Plan 0089 — presets forward their options, and upgrade notes name the presets
 
-**Status:** Open, not started. Filed 2026-08-04 from the v0.47.0–v0.49.0 review.
+**Status:** **DONE 2026-08-08.** Shipped in **v0.59.0** (PR #48). Filed 2026-08-04 from the
+v0.47.0–v0.49.0 review. See **Outcome** below.
 **Priority:** Medium. The population most exposed to the three behaviour changes has the least control
 over them.
 **Effort:** Small-medium. Threading one options bag; the care is in not multiplying the surface.
