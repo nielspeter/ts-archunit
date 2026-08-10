@@ -55,8 +55,8 @@ majority/minority split to build its message. At the moment it decides "no minor
 holding the two numbers that prove it could not have reported anything **for the corpus exactly as it
 stands**: **4 of 11 hold the pattern, so no file can diverge from a majority that does not exist.**
 
-The qualifier matters and is kept honest below: "no majority" is impossibility for the corpus *as it
-is*, not under a one-unit edit. A 2-of-4 folder crosses the 0.6 threshold in one flip; the 4-of-11
+The qualifier matters and is kept honest below: "no majority" is impossibility for the corpus _as it
+is_, not under a one-unit edit. A 2-of-4 folder crosses the 0.6 threshold in one flip; the 4-of-11
 case satisfies both readings only because you would need 7 of 11. The finding reports the former —
 structural impossibility given the current corpus — which is the question the predicate actually
 answers. The stronger "no possible single-unit edit" reading is open question #1, and the measurement
@@ -201,7 +201,7 @@ which is the shape the false-positive risk forbids.
   not be masked by the new finding).
 - **The fold:** the finding is raised iff `examined > 0 && violations.length === 0 && !anyFolderHadMajority`.
   A mixed-folder corpus — where some folders have a majority and others do not — does **not** raise the
-  inert finding, because the rule *can* fire. A test spans `inFolder('**/src/**')` across a folder with
+  inert finding, because the rule _can_ fire. A test spans `inFolder('**/src/**')` across a folder with
   a majority and a folder without, asserts no inert finding, and the real violation still fires.
 - **Both remedies are verified.** "Choose a shared pattern" (the `validateOverrides` replacement,
   above) clears the inert finding. "Widen the folder" — a rule inert at `inFolder('**/src/builders/**')`
@@ -219,12 +219,12 @@ migration corollary — the one ADR-009 cites for its own migration — mandates
 finding reports through `diagnose()`/`doctor` on release N, then fails on N+1. A warning is something
 you hope is read; a command is something someone ran, and `warn` is invisible in a test run (bug
 0024). The proposal follows that pattern: **diagnose-first on N, fail on N+1.** The "minor release
-with an upgrading row" in an earlier draft was the *flip*, not the *preview*; the project's own
+with an upgrading row" in an earlier draft was the _flip_, not the _preview_; the project's own
 corollary requires the preview.
 
 ### The no-majority escape hatch
 
-A team mid-migration may want a forward-looking rule — catch divergence *once a majority forms* — over
+A team mid-migration may want a forward-looking rule — catch divergence _once a majority forms_ — over
 a corpus where no majority exists yet. The finding is technically correct ("inert now"), but both
 offered remedies may be wrong for them: the folder is the scope they want, the pattern is the one they
 care about, and their only recourse today is disabling the rule entirely — the trained-suppression
@@ -254,7 +254,7 @@ rule.
    Context table documents four times does not apply — there is one instance by measurement, not by
    assumption.
 3. **Severity.** ~~Rule 1 says a finding the reader must judge should warn.~~ **Closed.** `bypassFilters:
-   true` → `error` via `severityFor` (`violation.ts:175`), same as the floor. "Your rule cannot fire" is
+true` → `error` via `severityFor` (`violation.ts:175`), same as the floor. "Your rule cannot fire" is
    not optional; it is the same class as "your rule examined nothing." A `.warn()`-level inert finding is
    invisible in a test run (bug 0024) and trains suppression. The migration above uses diagnose-first,
    not `warn()`, to give the reader a preview.
