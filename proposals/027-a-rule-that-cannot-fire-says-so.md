@@ -6,11 +6,15 @@
 is today filed as review-enforced residue. Every guard we own is green on the failure it describes.
 **Affects:** `smells.inconsistentSiblings` only. `correspondence` and `crossLayer` were measured and
 excluded (see §"The honesty line"). One new configuration-finding cause; no new public API.
+**Blast radius:** changes `check()` for rules that pass today → published-API-surface row of
+ADR-008 rule 6, with a diagnose-first migration (report on N, fail on N+1) per rule 1's corollary.
 **Related:** [ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) (whose evidence standard this
 extends), [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 1 and rule 2,
 [plan 0099](../plans/completed/0099-the-floor-no-family-can-be-born-below.md) (the floor this sits one
 level above), [proposal 026](./026-sabotage-is-a-command-not-a-ritual.md) (the other half — 026
-mechanises _checking_ falsifiability, this mechanises _reporting_ it).
+mechanises _checking_ falsifiability, this mechanises _reporting_ it). 027's regression guard
+("deleting `validateOverrides` still reds") is itself a 026-shaped sabotage; 026 first mechanises that
+guard, 027 first leaves it hand-run.
 **Evidence:** measured 2026-08-09 while writing `tests/archunit/dogfood.test.ts` (the
 `examined: 11 / violations: 0` case); re-measured 2026-08-10 against the `correspondence` and
 `crossLayer` source to test the staging claim, which did not survive (see §"The honesty line").
@@ -111,17 +115,32 @@ its cost" — is the outcome the code supports. The proposal claims one family, 
 
 ## Design
 
-A fourth cause for the configuration finding the floor already emits, raised **by the family** rather
-than at the root — the same inversion plan 0099 chose, and for the same reason: the root cannot
-enumerate what "inert" means per family, and any list it holds will be missing the next one.
+A new configuration finding raised **by the family inside `detect()`**, not a new cause for the
+floor's finding. The floor (`terminal-builder.ts:385`) fires only when `violations === 0 && examined
+=== 0`; the 4-of-11 case has `examined = 11`, so the floor never sees it. The finding is raised after
+`detect()`'s per-folder loop, when the family has computed the split and can see that no folder held a
+majority. This is the established pattern for findings a family discovers while doing its work —
+`correspondence-builder.ts:572,601,626` and `cross-layer.ts:128,167` raise `bypassFilters: true`
+findings inside their own `collectViolations`/`evaluate`, after family logic runs. The assertion gate
+(`assertsSomething`/`assertionAdvice`) is reserved for findings that make `detect()` meaningless (no
+assertion, no pattern); the inert finding needs the split `detect()` computes, so it sits there.
+
+The same inversion plan 0099 chose, and for the same reason: the root cannot enumerate what "inert"
+means per family, and any list it holds will be missing the next one.
 
 ```
 This rule examined 11 sibling files, but its pattern is held by 4 of them. It reports a
 file that diverges from what its siblings do, so with no majority present it cannot
 produce a finding as written today. Either widen the folder so a majority forms, or
-choose a pattern the siblings already share — `validateOverrides` is held by 5 of 7 in
-src/presets. This finding cannot be suppressed …
+choose a pattern the siblings already share. This finding cannot be suppressed …
 ```
+
+The message names only the counts the family already computed for its own per-folder message. It does
+**not** bake in a positive example from another folder: `detect()` iterates folders and emits
+per-folder, so it has no corpus-wide "a folder where a majority exists" to suggest, and hardcoding one
+project's internals into a stranger's CI output is a product defect. The remedy ends at "choose a
+pattern the siblings already share" and lets the author find one; an earlier draft named
+`validateOverrides` in `src/presets`, which is this project's corpus, not the reader's.
 
 Three properties it must have, each from an existing standard:
 
@@ -165,6 +184,10 @@ which is the shape the false-positive risk forbids.
   family that has one. This is the line the
   [bug 0076](../bugs/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md)
   detector crossed to become noise; the measurement above keeps 027 on the near side of it.
+- **Partial inertness is out of scope.** `detect()` evaluates the majority/minority split **per
+  folder**. A rule that fires in some folders and is inert in others reports nothing — the finding is
+  corpus-level only, raised when **no** folder held a majority. A folder-level "this folder is inert"
+  finding is a different species and is not claimed here.
 - **It changes `check()` behaviour** for rules that pass today, so it is a minor release with an
   upgrading row, on the 0.59.0 pattern.
 
@@ -176,21 +199,62 @@ which is the shape the false-positive risk forbids.
   with `index.ts` and `shared.ts` ignored — stays green.
 - Deleting `validateOverrides` from one preset still turns that rule red (the existing sabotage must
   not be masked by the new finding).
+- **The fold:** the finding is raised iff `examined > 0 && violations.length === 0 && !anyFolderHadMajority`.
+  A mixed-folder corpus — where some folders have a majority and others do not — does **not** raise the
+  inert finding, because the rule *can* fire. A test spans `inFolder('**/src/**')` across a folder with
+  a majority and a folder without, asserts no inert finding, and the real violation still fires.
+- **Both remedies are verified.** "Choose a shared pattern" (the `validateOverrides` replacement,
+  above) clears the inert finding. "Widen the folder" — a rule inert at `inFolder('**/src/builders/**')`
+  widened to `inFolder('**/src/**')` so a majority forms — also clears the inert finding and produces
+  real violations.
+- The finding has a distinct `identity` for `checkAll` dedup —
+  `inconsistent-siblings-inert::${patternDesc}` — separate from the per-file `inconsistent-sibling::`
+  identity, so an inert finding and real findings never collide.
 - A vacuity-matrix row for the new cause, and the finding is `error` under `.warn()`.
+
+## Migration
+
+This turns a rule that is green today (examined 11, violations 0) red on upgrade. ADR-008 rule 1's
+migration corollary — the one ADR-009 cites for its own migration — mandates diagnostic-first: the
+finding reports through `diagnose()`/`doctor` on release N, then fails on N+1. A warning is something
+you hope is read; a command is something someone ran, and `warn` is invisible in a test run (bug
+0024). The proposal follows that pattern: **diagnose-first on N, fail on N+1.** The "minor release
+with an upgrading row" in an earlier draft was the *flip*, not the *preview*; the project's own
+corollary requires the preview.
+
+### The no-majority escape hatch
+
+A team mid-migration may want a forward-looking rule — catch divergence *once a majority forms* — over
+a corpus where no majority exists yet. The finding is technically correct ("inert now"), but both
+offered remedies may be wrong for them: the folder is the scope they want, the pattern is the one they
+care about, and their only recourse today is disabling the rule entirely — the trained-suppression
+dynamic ADR-008 rule 1 exists to prevent. This is a real limitation and is not solved by a suppression
+comment (`bypassFilters` findings are unsuppressable by design). The honest answer is that this intent
+is better served by a different rule shape — `correspondence` or a custom condition that asserts the
+positive fact ("every builder calls `copy`") rather than waiting for a majority to form and then
+policing divergence from it. The proposal does **not** add a declaration escape hatch (that would be
+new public API, contra the "no new public API" claim, and would let an inert rule opt out of being
+called inert). The limitation is documented; the remedy for the forward-looking intent is a different
+rule.
 
 ## Open questions for review
 
 1. **Is "no majority" the right predicate, or "no possible single-file edit produces a finding"?** The
    measurement settled that the cheap predicate answers the weaker question — impossibility for the
    corpus as it stands, not under a one-unit edit. The 4-of-11 case satisfies both readings; a 2-of-4
-   folder would satisfy only the weaker one. The proposal claims the weaker, because that is what the
-   predicate proves. Review should confirm that "this rule cannot fire on the corpus you gave it" is
-   worth a finding even when a different corpus would let it fire.
+   folder would satisfy only the weaker one, and for 2-of-4 the fitting remedy is "one more file
+   adopting the pattern" or "lower the threshold," not the two remedies the message names. The
+   proposal claims the weaker, because that is what the predicate proves; the message remedies fit the
+   4-of-11 shape. Review should confirm either that the weaker scope is worth a finding, or that the
+   predicate should be narrowed to exclude one-edit-falsifiable cases (which drops the 2-of-4 case and
+   its mismatched remedy with it).
 2. ~~Does this belong to the family or to `SmellBuilder`?~~ **Closed by measurement.** No second family
    shares the threshold-over-held-counts shape, so there is nothing to share with. A per-family answer
    inside `inconsistentSiblings` is correct, and the "designing a hook from one instance" trap ADR-009's
    Context table documents four times does not apply — there is one instance by measurement, not by
    assumption.
-3. **Severity.** Rule 1 says a finding the reader must judge should warn. Is "your rule cannot fire"
-   a judgement call, or is it the non-optional class the floor already treats as `error`? The draft
-   assumes the latter; it is the most contestable claim here.
+3. **Severity.** ~~Rule 1 says a finding the reader must judge should warn.~~ **Closed.** `bypassFilters:
+   true` → `error` via `severityFor` (`violation.ts:175`), same as the floor. "Your rule cannot fire" is
+   not optional; it is the same class as "your rule examined nothing." A `.warn()`-level inert finding is
+   invisible in a test run (bug 0024) and trains suppression. The migration above uses diagnose-first,
+   not `warn()`, to give the reader a preview.

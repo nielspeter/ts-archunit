@@ -5,9 +5,11 @@
 fail, and it is performed by hand, differently each time, with no check that the sabotage itself
 worked. Two false verdicts have already been recorded and retracted.
 **Affects:** a new `scripts/sabotage.mjs` and `tests/sabotage/*.ts` spec files. No `src/` change, no
-published surface.
+published surface — internal tooling for the ts-archunit project, not a framework primitive.
+**Blast radius:** an internal check over a corpus we control (ADR-008 rule 6) — prove each detector
+fires once, then stop. Each of the four checks carries a positive and a negative case in Acceptance.
 **Related:** [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 5 (the question sabotage
-answers), [bug 0045](../bugs/fixed/0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md)
+answers) and rule 6 (the blast radius this sits in), [bug 0045](../bugs/fixed/0045-two-tests-fail-by-environment-and-corrupt-sabotage-verdicts.md)
 (why this cannot be vitest tests), [bug 0077](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md)
 (the class of defect only sabotage found).
 **Evidence:** the 2026-08-09 dogfooding session, where seven sabotages were run by hand against
@@ -72,7 +74,15 @@ A CLI, serial, operating in a throwaway `git worktree` so the shared tree is nev
 npm run sabotage -- tests/sabotage/dogfood.ts
 ```
 
-Specs are typed TS beside the tests they attack, not prose parsed out of markdown:
+This is **internal tooling for the ts-archunit project**, not a published framework primitive. It lives
+in `scripts/` and `tests/sabotage/` and adds nothing to `src/` or the public API. Exposing it as a user
+command (`ts-archunit sabotage`) is a separate decision with its own blast radius (published API,
+ADR-006's separate-package rule); this proposal does not make it.
+
+Specs are typed TS beside the tests they attack, not prose parsed out of markdown — for the reason the
+ADR-008 Context table documents eight times: hand-maintained matrices in `bugs/*.md` stop being true
+the moment the code moves, and parsing fenced blocks out of markdown is that shape. A link from the bug
+file to the spec keeps claim and proof associated without prose parsing.
 
 ```ts
 export const SABOTAGES: Sabotage[] = [
@@ -81,7 +91,11 @@ export const SABOTAGES: Sabotage[] = [
     file: 'tests/builders/type-rule-builder.test.ts',
     find: '../../src/builders/type-rule-builder.js',
     replace: '../../src/index.js',
-    expectRed: 'paired with the test file', // vitest -t filter
+    // The stable `identity` field on the ArchViolation the guard is expected to
+    // raise — not a vitest test title (brittle to renames) and not an exit code
+    // (indistinguishable from "no test matched"). The runner reads structured
+    // vitest --reporter=json output and asserts this identity is among the failures.
+    expectRed: 'cross-layer::missing-counterpart',
   },
 ]
 ```
@@ -92,10 +106,24 @@ The runner enforces the four things a human does inconsistently:
    silent-no-op above; matching several is a patch whose blast radius the author did not intend.
 2. **Compiles** — `tsc --noEmit` on the patched worktree. A non-parsing patch exits non-zero for the
    compiler, and a runner that only reads exit codes scores that as CAUGHT.
-3. **Red, and for the right reason** — the named test fails, and the failure is an assertion, not a
-   collection error.
+3. **Red, and for the right reason** — the named finding identity is among the failures in vitest's
+   structured JSON output (`--reporter=json`). **Not** an exit code: `vitest -t "..."` exits 1 both when
+   the named test fails an assertion AND when no test matches the filter — ADR-008 rule 5's "unquoted
+   `$SUITE`" scar, where a nonexistent filter scored every MISSED as CAUGHT. The runner rejects a RED
+   verdict when zero tests matched the filter (`numTotalTests > 0` for the filtered subset), and asserts
+   the failure is the expected identity, not a collection error.
 4. **Reverted** — by worktree disposal, verified with a tree hash rather than a grep. Grep asks "is
    the string back", which is what produced the false `REVERT FAILED`.
+
+The runner's own preconditions get the same four-check discipline, not just the sabotage verdict. This
+follows `scripts/regen-frozen-baseline.sh`'s precedent: `git worktree add` failure (dirty state,
+branch in use, ENOSPC) aborts before any patch is applied — every `execFileSync` is checked, the
+equivalent of `set -euo pipefail`, with a `trap cleanup EXIT` so a failure or interrupt disposes the
+worktree. `tsc` absent from PATH fails the run with a named cause ("tsc not found; run npm install"),
+never scored as "patch did not compile". An empty `SABOTAGES` array, or a spec file that exports
+nothing, fails the run rather than passing 0/0 CAUGHT — the runner's own vacuity guard, the same shape
+as the floor's `0 === 0` refusal. The runner is ADR-005-clean plain JS, same as
+`scripts/verify-package.mjs`: JSDoc-typed structs for `Sabotage`, no `any`/`as`-shaped casts.
 
 Output is a matrix in the shape the bug files already use, so it can be pasted back as evidence with a
 commit sha attached.
@@ -112,7 +140,9 @@ commit sha attached.
 ## Non-goals / risks
 
 - **Not a CI gate.** It mutates, it is slow, and a flaky sabotage would be disabled within a week.
-  On-demand, plus optionally one scheduled run that reports rather than fails.
+  On-demand only for v1. A scheduled reporting run (drift in the recorded matrices) adds a second
+  delivery channel — cron, notification, its own failure modes — and is scope creep for a first
+  version; deferred to a separate proposal if wanted.
 - **Not a coverage metric.** The number of sabotages is not a score; a spec file with fifty trivial
   entries is worse than one with three that matter. This is the mistake made with a coverage count in
   the session that motivated this proposal.
@@ -121,18 +151,34 @@ commit sha attached.
 
 ## Acceptance
 
+ADR-008 rule 6's row for this work is "an internal check over a corpus we control": prove each detector
+fires once, then stop. Each of the four checks gets a positive case (it CAUGHTs a real sabotage) **and**
+a negative case (it fails rather than scoring a wrong verdict).
+
 - Running the runner against `tests/archunit/dogfood.test.ts`'s six sabotages reproduces the six
   CAUGHT verdicts recorded in PR #50, from a clean checkout, with no hand steps.
-- A spec whose `find` string is absent **fails** the run and names the spec.
-- A spec whose patch does not compile **fails** the run and is not reported as CAUGHT.
-- Killing the runner mid-sabotage leaves `git status` clean in the shared tree.
+- **Applied:** a spec whose `find` string is absent **fails** the run and names the spec. A spec whose
+  `find` matches two places **fails** the run (blast radius the author did not intend).
+- **Compiles:** a spec whose patch does not compile **fails** the run and is not reported as CAUGHT.
+  `tsc` absent from PATH **fails** the run with a named cause, not scored as "did not compile".
+- **Red, for the right reason:** a spec whose `expectRed` names a finding identity that is **not**
+  among the failures (e.g. a nonexistent test, or a test that fails for a different reason) **fails**
+  the run. A spec where the patch makes vitest fail to **collect** (not assert) — zero tests matched
+  the filter — **fails** the run and is not reported as CAUGHT. This is the row that pins the
+  RED-vs-not-found distinction, and it is the row that would have caught the "unquoted `$SUITE`" scar.
+- **Reverted:** killing the runner mid-sabotage leaves `git status` clean in the shared tree, verified
+  by tree hash. A spec whose worktree is not reverted (disposal fails) **fails** the run.
+- **Vacuity:** an empty `SABOTAGES` array or a spec exporting nothing **fails** the run rather than
+  passing 0/0 CAUGHT.
 
 ## Open questions for review
 
-1. **Spec location.** Typed files in `tests/sabotage/` (refactorable, type-checked, but separate from
-   the claim), or fenced blocks parsed out of the `bugs/*.md` matrices (claim and proof together, but
-   prose parsing)? The draft above assumes the former with a link from the bug.
-2. **Should `expectRed` name a test, or a finding identity?** A test name is simple and couples to test
-   titles; a finding identity is stabler and needs the runner to read structured output.
-3. **Is one scheduled run worth it**, reporting drift in the recorded matrices, or does on-demand carry
-   the whole value?
+1. ~~Spec location: typed files vs parsing `bugs/*.md` fences?~~ **Closed.** Typed files in
+   `tests/sabotage/`, with a link from the bug file. Parsing markdown is the hand-maintained-artifact
+   shape ADR-008's Context table documents failing; a link keeps claim and proof associated without it.
+2. ~~Should `expectRed` name a test or a finding identity?~~ **Closed.** A finding identity — the
+   stable `identity` field on `ArchViolation`, already used for dedup. A test title is brittle to
+   renames and indistinguishable from "no test matched" via exit code; a finding identity needs the
+   structured-output read the runner already requires for check 3.
+3. ~~Is one scheduled run worth it?~~ **Deferred.** On-demand carries v1; a scheduled reporting run is
+   a separate proposal.
