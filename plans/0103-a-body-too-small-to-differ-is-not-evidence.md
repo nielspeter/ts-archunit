@@ -209,9 +209,17 @@ survives, can satisfy the letter of Phase 0 while barely moving the practical pr
 | 10    | 121 (24%)                                                                             | excluded                                                   | pairs                            |
 | 12    | 95 (19%)                                                                              | excluded                                                   | pairs                            |
 
+**Re-measured post-implementation: 163, not 161.** The 161 figure above was measured before Files
+Changed's own edits landed — `src/smells/duplicate-bodies.ts` and `src/smells/fingerprint.ts` are
+themselves inside `src/`, and the new `minDistinctVocabulary()` wither is one more instance of the exact
+shape this plan fixes, so the corpus itself shifted by the time of shipping. 161 is the number that
+justified the floor choice; 163 is what a reader running the same command today will see. Neither changes
+the conclusion (still a minority of floor 0's count, still comfortably above the two named populations)
+but a table read as authoritative should say which.
+
 **Chosen: 8.** Lowest floor satisfying all three criteria: (a) `npm run test` is fully green at this floor,
 once the third-fixture finding below is fixed; (b) the known-genuine pair survives (at every candidate, in
-fact); (c) materially reduced — 495 → 161 is the point where surviving pairs first become a minority of the
+fact); (c) materially reduced — 495 → ~161 is the point where surviving pairs first become a minority of the
 unfixed count, a natural, principled cutoff rather than an arbitrary stop. Floors 10 and 12 cut further with
 no measured evidence of losing anything genuine, but "lowest that satisfies (a)-(c)" is what step 4 asks for,
 not "most aggressive that still works" — a higher floor is a config change any adopter can make, documented
@@ -539,9 +547,22 @@ by the floor, going from a true positive to silently nothing. This is the same s
 accepts — a real detection trade, not a new risk category — and is why Phase 0's triage optimizes for the
 _lowest_ floor that clears the known false positives, not the highest.
 
-No `.excluding()`, baseline, or suppression semantics change. No new `DiagnosticFinding` kind. No
-`bypassFilters` involved — this is a detector getting more accurate, not a new adequacy floor in ADR-008's
-sense.
+No `.excluding()` or suppression MECHANISM changes. No new `DiagnosticFinding` kind. No `bypassFilters`
+involved — this is a detector getting more accurate, not a new adequacy floor in ADR-008's sense.
+
+**Correction (review: architect) — baseline IDENTITY does move, and the sentence above originally denied
+it.** `describe()` gains `minDistinctVocabulary >= N` (Phase 1), and `hashViolation` is
+`sha256(rule::subject)` where `rule` is `describe()`'s output when no `.rule({id})` is set
+(`src/smells/duplicate-bodies.ts`'s `describeRule()` override) — so every existing `duplicateBodies`
+baseline entry stops matching the moment this ships, the same "text changed, identity changed" shape
+`baseline.ts`'s own history comment records as a past mistake to not repeat (bug 0028: "that conflated
+text-stability with baseline-stability and was wrong"). `HASH_VERSION` correctly does NOT bump — the
+formula is untouched, and per that same history a bump is for when `hashViolation`'s FORMULA changes, not
+when a producer's own description text does (a description-text move has always moved a hash, with no
+version bump, since before this plan). The producer-set `duplicate-pair::…` `identity` field itself is
+unchanged, so `unmatchedBaselineFinding`'s "the rule's description changed → regenerate" branch fires
+correctly rather than reporting a false "fixed" silence. `docs/upgrading.md`'s row (Release, above) must
+say this plainly for baseline users, not just for `.excluding()` users.
 
 **"No version-gated migration" is not the same claim as "no release communication," and this plan owes both.**
 `docs/upgrading.md` already documents this exact direction of change in general ("the release can report

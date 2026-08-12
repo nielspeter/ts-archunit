@@ -198,6 +198,52 @@ describe('smells.duplicateBodies()', () => {
       expect(violations.length).toBeGreaterThan(0)
     })
 
+    it('the floor reads Math.min, not Math.max — an ASYMMETRIC pair is required to prove it', () => {
+      // The plan's own sabotage matrix names this row explicitly: "a symmetric
+      // pair can't distinguish Math.min from Math.max at all." Every other
+      // fixture in this describe block IS symmetric (two functions sharing one
+      // body string), so none of them can catch `Math.max` swapped in — found
+      // by review, verified independently by reverting to `Math.max` and
+      // confirming the pair below is the one that reds.
+      //
+      // Same shape, same nodeCount, near-identical kinds (so similarity clears
+      // the 0.85 default) — but distinctVocabulary 5 vs 11.
+      const tsm = new Project({ useInMemoryFileSystem: true })
+      tsm.createSourceFile(
+        '/src/asymmetric.ts',
+        [
+          'export function low(): number {',
+          '  const s1 = 9',
+          '  const s2 = s1 + s1',
+          '  const s3 = s2 + s2',
+          '  const s4 = s3 + s3',
+          '  return s4',
+          '}',
+          'export function high(alpha: number, beta: number, gamma: number, delta: number, epsilon: number, zeta: number): number {',
+          '  const t1 = 91',
+          '  const t2 = alpha + beta',
+          '  const t3 = gamma + delta',
+          '  const t4 = epsilon + zeta',
+          '  return t4',
+          '}',
+        ].join('\n'),
+      )
+      const asymmetric: ArchProject = {
+        tsConfigPath: '/tsconfig.json',
+        _project: tsm,
+        getSourceFiles: () => tsm.getSourceFiles(),
+      }
+
+      // Between the two vocabularies (5 and 11): Math.min excludes, Math.max
+      // would include.
+      const violations = smells
+        .duplicateBodies(asymmetric)
+        .minLines(2)
+        .minDistinctVocabulary(8)
+        .violations()
+      expect(violations).toEqual([])
+    })
+
     it('.minDistinctVocabulary(0) is a real config no-op, not a config no-op for the OTHER knob', () => {
       // Proves the gate is additive to withMinSimilarity, not a replacement: at
       // floor 0 the pair is exactly today's (broken) behaviour — it still pairs
@@ -240,7 +286,14 @@ describe('smells.duplicateBodies()', () => {
       // `.minDistinctVocabulary(9999)` can zero every finding while
       // `examinedUnits() > 0` — indistinguishable from a genuinely clean corpus.
       // Accepted risk (Release): the same shape `withMinSimilarity(1.0)` already
-      // has today. Proven as parity, not merely asserted.
+      // has today. Proven as parity, not merely asserted — both arms must
+      // actually SUPPRESS a real finding, or the comparison proves nothing
+      // (review: testing — `fixturePair()` originally measured similarity 1.0,
+      // so the `withMinSimilarity(1.0)` arm never excluded anything and this
+      // test's "parity" claim was untested on that side).
+      const control = smells.duplicateBodies(fixturePair()).minLines(3).violations()
+      expect(control.length).toBeGreaterThan(0)
+
       const byVocab = smells
         .duplicateBodies(fixturePair())
         .minLines(3)
@@ -254,6 +307,7 @@ describe('smells.duplicateBodies()', () => {
       expect(byVocab.filter((v) => v.bypassFilters === true)).toEqual([])
       expect(bySimilarity.filter((v) => v.bypassFilters === true)).toEqual([])
       expect(byVocab.filter((v) => v.bypassFilters !== true)).toEqual([])
+      expect(bySimilarity.filter((v) => v.bypassFilters !== true)).toEqual([])
     })
 
     it('a real body with ZERO distinct vocabulary never pairs again once the floor is set', () => {
@@ -298,7 +352,13 @@ describe('smells.duplicateBodies()', () => {
   })
 })
 
-/** A fresh in-memory near-clone pair, similarity < 1.0, well above the vocabulary floor. */
+/**
+ * A fresh in-memory near-clone pair, similarity genuinely < 1.0 (review: testing
+ * — an earlier version differed only in STRING LITERAL content, which
+ * `computeSimilarity`'s kinds-only LCS cannot see, so it measured 1.0 and the
+ * parity test below it asserted nothing on that arm). `beta` has one extra
+ * statement `alpha` does not, so the `kinds` sequences genuinely diverge.
+ */
 function fixturePair(): ArchProject {
   const tsm = new Project({ useInMemoryFileSystem: true })
   tsm.createSourceFile(
@@ -314,6 +374,7 @@ function fixturePair(): ArchProject {
       'export function beta(raw: number) {',
       '  const scaled = raw * 2',
       '  const shifted = scaled + 1',
+      '  const noise = 1',
       '  const bounded = shifted > 100 ? 100 : shifted',
       '  const labeled = bounded > 0 ? "affirmative" : "negative"',
       '  return { bounded, labeled }',

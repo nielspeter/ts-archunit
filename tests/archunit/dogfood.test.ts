@@ -6,9 +6,11 @@
  * The other fourteen were shipped, documented, and never pointed at this repo,
  * including every family plan 0099's floor newly gated: a release whose subject
  * is "a check that examined nothing is a lie" went out with its own detectors
- * unexercised on its own corpus. With this file the count is **12 of 18**.
+ * unexercised on its own corpus. With this file the count is **13 of 18** —
+ * `smells.duplicateBodies` joined the covered side once plan 0103 fixed the
+ * detector (bug 0076); it is no longer in the excluded list below.
  *
- * The six still uncovered are excluded for a reason, so that "we thought about
+ * The five still uncovered are excluded for a reason, so that "we thought about
  * this" and "we forgot this" do not look the same — and because a rule pointed
  * at a corpus this repo does not have is precisely the vacuous pass 0099 now
  * fails:
@@ -17,9 +19,6 @@
  *    tsconfig (see the root tsconfig's `exclude`).
  *  - `graphql:schema` / `graphql:resolvers` — no schema and no resolvers here.
  *  - `presets:dataLayerIsolation` — no data layer.
- *  - `smells.duplicateBodies` — the detector itself is broken (bug 0076); the
- *    row is present and skipped rather than absent, so the gap is visible in
- *    the run. This is the one exclusion that is about our code, not our corpus.
  *  - `calls` — no invariant of this codebase is naturally expressed with it. A
  *    row existed and was deleted: `expect(calls(p).examinedUnits())
  *    .toBeGreaterThan(0)`, which asserts the corpus is non-empty and nothing
@@ -162,21 +161,44 @@ describe('smells: the detectors the floor lives by', () => {
 
     const identities = rule.violations().map((v) => v.identity ?? '')
 
+    // Positive control, checked FIRST: the three wither methods must still be
+    // in the examined corpus at all (via a zero-floor pass), or a rename of any
+    // of them would make every negative assertion below vacuously true — found
+    // by review: the qualified identity is `#ClassName.methodName`, not
+    // `#methodName`, so `#ignoreTests` (bare) never matches anything and the
+    // negatives passed for the wrong reason until this was corrected.
+    const allIdentities = rule
+      .minDistinctVocabulary(0)
+      .violations()
+      .map((v) => v.identity ?? '')
+    const witherNames = [
+      '#SmellBuilder.ignoreTests',
+      '#SmellBuilder.groupByFolder',
+      '#CorrespondenceBuilder.beComplete',
+    ]
+    for (const name of witherNames) {
+      expect(
+        allIdentities.some((id) => id.includes(name)),
+        `${name} must still exist in the examined corpus (control for the negatives below)`,
+      ).toBe(true)
+    }
+
     // The motivating false positive — bug 0076's full three-way tie, not just
     // one edge of it. If the mechanism works it kills all three simultaneously
     // (a per-function property, applied symmetrically), so asserting only one
     // pair would pass even if a second edge of the same triangle regressed.
     const pairs: [string, string][] = [
-      ['#ignoreTests', '#groupByFolder'],
-      ['#ignoreTests', '#beComplete'],
-      ['#groupByFolder', '#beComplete'],
+      ['#SmellBuilder.ignoreTests', '#SmellBuilder.groupByFolder'],
+      ['#SmellBuilder.ignoreTests', '#CorrespondenceBuilder.beComplete'],
+      ['#SmellBuilder.groupByFolder', '#CorrespondenceBuilder.beComplete'],
     ]
     for (const [a, b] of pairs) {
       const stillPairs = identities.some((id) => id.includes(a) && id.includes(b))
       expect(stillPairs, `${a} / ${b} must no longer pair`).toBe(false)
     }
 
-    // The motivating genuine duplicate — must survive.
+    // The motivating genuine duplicate — must survive. Both are top-level
+    // functions (no owning class), so the qualified identity is the bare name.
     const realDuplicate = identities.some(
       (id) => id.includes('#classContain') && id.includes('#functionContain'),
     )

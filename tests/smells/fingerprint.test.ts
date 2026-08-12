@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Project } from 'ts-morph'
 import path from 'node:path'
 import { buildFingerprint, computeSimilarity } from '../../src/smells/fingerprint.js'
+import type { Node } from 'ts-morph'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
 
@@ -45,11 +46,20 @@ describe('Fingerprint', () => {
     })
 
     it('counts DISTINCT identifier/literal texts, not occurrences (plan 0103)', () => {
-      // `id`/`amount`/`currency` are each read twice (declared, then returned) —
-      // a count of occurrences would differ from a count of distinct texts.
-      const fp = buildFingerprint(getBody('parseWebhookOrder'))
-      expect(fp.distinctVocabulary).toBeGreaterThan(0)
-      expect(fp.distinctVocabulary).toBeLessThan(fp.kinds.length)
+      // Pinned to an exact number, not a bound (review: testing — a bare
+      // `> 0` / `< kinds.length` check also passes for an occurrence count, a
+      // constant, or `kinds.length - 1`, none of which is what this claims).
+      // `x` is read three times (declared, then twice on the right of `y`) and
+      // `y` twice (declared, then returned) — an occurrence count would be
+      // higher; the DISTINCT count is exactly 3: {x, 1, y}.
+      const tsm = new Project({ useInMemoryFileSystem: true })
+      tsm.createSourceFile(
+        '/src/small.ts',
+        'export function f() {\n  const x = 1\n  const y = x + x\n  return y\n}\n',
+      )
+      const body = tsm.getSourceFiles()[0]!.getFunctions()[0]!.getBody() as Node
+      const fp = buildFingerprint(body)
+      expect(fp.distinctVocabulary).toBe(3)
     })
   })
 

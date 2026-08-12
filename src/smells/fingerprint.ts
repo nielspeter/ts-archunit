@@ -1,5 +1,11 @@
 import { SyntaxKind, type Node, Node as NodeClass } from 'ts-morph'
 
+// Deliberately not exhaustive over every text-bearing kind — `TemplateHead`/
+// `TemplateMiddle`/`TemplateTail` (interpolated templates), `BigIntLiteral` and
+// `RegularExpressionLiteral` are omitted. Every omission UNDERcounts vocabulary,
+// which only makes the floor (plan 0103) more conservative — fewer pairs
+// compared, never a false positive from a body that reads as emptier than it
+// is. Widen this set if a real interpolated-template-heavy corpus needs it.
 const TEXT_KINDS = new Set<SyntaxKind>([
   SyntaxKind.Identifier,
   SyntaxKind.PrivateIdentifier,
