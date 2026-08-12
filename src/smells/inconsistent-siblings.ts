@@ -18,6 +18,23 @@ const TEST_PATTERNS = ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**']
 
 const selectionOf = selectionMemo<[string, SourceFile[]]>()
 
+/**
+ * 0102: diagnostic-first. N ships false (diagnose previews, check passes); the
+ * flip release sets true (check fails). Not a warn-first migration — a
+ * warning is invisible in a test run (bug 0024) and trains suppression.
+ * The N+1 flip is tracked in a separate plan, referenced from this constant
+ * once that plan is filed.
+ */
+const INERT_FINDING_EMIT = false
+
+/** The corpus split for one pattern — the single type both surfaces share. */
+type Assessment = {
+  matching: number
+  total: number
+  canFireSoon: boolean
+  folders: { folder: string; matching: SourceFile[]; nonMatching: SourceFile[] }[]
+}
+
 export class InconsistentSiblingsBuilder extends SmellBuilder {
   private _pattern?: ExpressionMatcher
 
@@ -95,6 +112,47 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
       }
     }
     return { matching, nonMatching }
+  }
+
+  /**
+   * Pure recomputation of the corpus split — never accumulated on `this`. It is
+   * the SINGLE source the finding's message, the gate, and the diagnostic preview
+   * all read, so the preview and the finding cannot diverge, and calling it twice
+   * cannot double-count (each call recomputes). Mirrors `examinedUnits()`: one
+   * derivation, not an instance field.
+   *
+   * `canFireSoon` is true when any folder is at or within ONE edit of a majority —
+   * such a folder can fire, so it is not inert even though it does not fire today.
+   *
+   * The GUARD lives here, not at the emit site. A preview read through this
+   * accessor can then never report on a rule that can fire: a healthy control
+   * (majority present, `editsToMajority <= 1`) gets `canFireSoon = true`, and the
+   * hook below returns the empty string for it. The check-time emit and the
+   * diagnostic preview share this one predicate by construction.
+   */
+  private inertAssessment(pattern: ExpressionMatcher): Assessment {
+    let matching = 0
+    let total = 0
+    let canFireSoon = false
+    const folders: Assessment['folders'] = []
+    for (const [folder, files] of this.selected()) {
+      const { matching: m, nonMatching } = this.partitionByPattern(files, pattern)
+      const t = m.length + nonMatching.length
+      // Unreachable today: selected() already filters to files.length >= 2
+      // and partitionByPattern drops nothing, so t always equals a folder's
+      // file count and is never 0 here. Kept as future-proofing against a
+      // change to selected(), not a live branch.
+      if (t === 0) continue
+      matching += m.length
+      total += t
+      folders.push({ folder, matching: m, nonMatching })
+      // A folder at or within one edit of a majority is a live tripwire. Latched
+      // regardless of nonMatching===0: a fully-conforming majority folder is one
+      // divergent file away from firing, so it must suppress the inert finding.
+      const editsToMajority = Math.ceil(MAJORITY_THRESHOLD * t) - m.length
+      if (editsToMajority <= 1) canFireSoon = true
+    }
+    return { matching, total, canFireSoon, folders }
   }
 
   /** Build violations for non-matching files in a folder where the majority matches. */
@@ -176,26 +234,26 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
 
     const ruleDescription = this.describe()
     const patternDesc = pattern.description
-
-    // THE shared selection — plan 0096. This method used to re-group and
-    // re-apply `files.length < 2` inline, which made the evidence a second
-    // derivation of the same threshold: reviewers rewrote `selected()` to
-    // `sourceFiles.length` and the whole suite stayed green. Both readers now
-    // take the comparable folders from one place.
-    // The spread COPIES before the sort below. `selected()` returns the memoized
-    // array itself, and `.sort()` is in-place — sorting it would reorder shared
-    // evidence for every later reader (`element-cache.ts` states this as a rule).
-    const folderEntries = [...this.selected()]
-    if (this._groupByFolder) {
-      folderEntries.sort((a, b) => a[0].localeCompare(b[0]))
-    }
-
     const violations: ArchViolation[] = []
 
-    for (const [folder, files] of folderEntries) {
-      const { matching, nonMatching } = this.partitionByPattern(files, pattern)
+    // ONE assessment — the single partition walk. It returns the aggregate
+    // (matching/total/canFireSoon) AND the per-folder partitions; detect() uses
+    // both. Do NOT call partitionByPattern again below: the searchFunctionBody
+    // walk is the dominant cost and must run once per check().
+    const a = this.inertAssessment(pattern)
+
+    // Preserves groupByFolder()'s existing violation-ordering contract
+    // (tests/integration/coverage-gaps.test.ts: "groupByFolder produces
+    // violations sorted by directory"). Sorting the returned folder array is
+    // O(k log k) on folder COUNT, not a second AST walk: inertAssessment()'s
+    // searchFunctionBody pass already ran once, above, and this sort touches
+    // only its already-computed output.
+    const folders = this._groupByFolder
+      ? [...a.folders].sort((x, y) => x.folder.localeCompare(y.folder))
+      : a.folders
+
+    for (const { folder, matching, nonMatching } of folders) {
       const total = matching.length + nonMatching.length
-      if (total === 0) continue
       if (matching.length / total < MAJORITY_THRESHOLD) continue
       if (nonMatching.length === 0) continue
 
@@ -204,7 +262,110 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
       )
     }
 
+    // The adequacy floor, VERSION-GATED and SHARED-SOURCE. NOT a floor extension —
+    // the real floor fires at violations===0 && examined===0; this fires at
+    // violations===0 && examined>0 && no folder is within one edit of a majority.
+    // The guard lives in the shared advice function, not here: the emit and the
+    // diagnostic preview are the same derivation, so the preview can never report
+    // on a rule that can fire. detect() passes the assessment it ALREADY computed
+    // (no second partition walk); the empty-string return means "not inert".
+    const advice = this.inertAdviceFor(a)
+    if (violations.length === 0 && this.inertEmitEnabled() && advice !== '') {
+      return [this.inertViolation(advice), ...violations]
+    }
     return violations
+  }
+
+  /**
+   * The `DiagnosableRule` hook — public, no-arg, exactly the shape the
+   * interface requires. Recomputes `inertAssessment()` fresh, so `diagnose()`
+   * on a builder that never ran `check()` still gets truthful numbers.
+   */
+  inertAdvice(): string {
+    const pattern = this._pattern
+    if (!pattern) return ''
+    return this.inertAdviceFor(this.inertAssessment(pattern))
+  }
+
+  /**
+   * THE single derivation for both surfaces, and the guard. Returns the empty
+   * string unless the rule is genuinely inert (`matching > 0 && !canFireSoon`),
+   * so a healthy control (majority present, or within one edit of one) gets
+   * `''` and diagnose() reports nothing for it. Both `inertAdvice()` above and
+   * `detect()`'s emit call this with an `Assessment` — the SAME guard and the
+   * SAME message either way, so the preview and the finding cannot diverge.
+   */
+  private inertAdviceFor(a: Assessment): string {
+    if (a.matching === 0 || a.canFireSoon) return '' // the GUARD lives here
+    return this.inertMessage(a, this._pattern?.description ?? 'unknown pattern')
+  }
+
+  /** Single source of the inert message. Pure — takes the assessment, returns text. */
+  private inertMessage(a: { matching: number; total: number }, patternDesc: string): string {
+    return (
+      `This detector examined ${String(a.total)} sibling files, but only ${String(a.matching)} of them ` +
+      `hold the pattern '${patternDesc}', and no folder is within an edit of a majority — so as written it ` +
+      `cannot produce a finding today. It reports a file that diverges from what its siblings do; with no ` +
+      `majority reachable by adopting files, there is no divergence to report. ` +
+      `If this rule asserts a convention the codebase is still adopting, replace it with ` +
+      `correspondence().side(...).beComplete(), which fails the day a file falls short — until adoption is ` +
+      `complete, so expect that red. If the intent is to police divergence rather than the convention itself, ` +
+      `widen the folder so a majority forms, or choose a pattern the sibling files already share.`
+    )
+  }
+
+  private inertViolation(advice: string): ArchViolation {
+    return {
+      rule: this.describe(),
+      ruleId: this._metadata?.id,
+      element: this.inertElement(),
+      file: '',
+      line: 0,
+      message: advice,
+      // Its own remedy, never the author's (bug 0021): the message IS the remedy.
+      suggestion: advice,
+      because: this._reason,
+      // Adequacy finding: the rule enforces nothing, which is not a severity the
+      // author grades (ADR-008 rule 1). Config-level: no file to attribute, so it
+      // must survive diff/baseline or the guard re-greens under standard CI.
+      bypassFilters: true,
+    }
+  }
+
+  /**
+   * Dedupe key for the inert finding. `dedupeConfigFindings` keys on
+   * `${file} ${ruleId ?? rule} ${element}`; `file` is always `''` here and
+   * `rule`/`ruleId` fall back to `describe()`, which is scope-blind (reads
+   * `_pattern` only). So without a scope-aware `element`, two same-pattern/
+   * different-scope inert detectors with no explicit `.rule({id})` would
+   * collapse into one finding under `checkAll`.
+   *
+   * Folds in every field `groupFilesByFolder()`/`fileMatchesPattern()` read to
+   * decide what's examined — `_folders`, `_ignorePaths`, `_ignoreTests`,
+   * `_minLines` — sorted so option order cannot split one semantic scope into
+   * two keys. Two rules with identical scope correctly collapse to one finding
+   * (one edit fixes both); two rules differing in ANY of these stay distinct.
+   */
+  private inertElement(): string {
+    const patternDesc = this._pattern?.description ?? 'unknown pattern'
+    const folders = [...this._folders].sort().join('|')
+    const ignorePaths = [...this._ignorePaths].sort().join('|')
+    return `inert:${patternDesc}:${folders}:${ignorePaths}:${String(this._ignoreTests)}:${String(this._minLines)}`
+  }
+
+  /**
+   * `&& !this.declaresEmpty()` is the `_expectEmpty` precedence: a
+   * declared-empty rule reports its expiry, not the inert finding, so the two
+   * never double-report.
+   *
+   * `INERT_FINDING_EMIT` is deliberately a bare, non-exported module `const` —
+   * not an env var, constructor option, or per-project override. The
+   * `bypassFilters: true` / unsuppressable design above depends on there being
+   * no configuration surface a future contributor could "helpfully" expose,
+   * which would undermine it silently.
+   */
+  protected inertEmitEnabled(): boolean {
+    return INERT_FINDING_EMIT && !this.declaresEmpty()
   }
 
   protected describe(): string {

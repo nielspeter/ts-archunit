@@ -99,6 +99,20 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * for why this is separate from `declaresEmpty()`.
    */
   assertsCardinality?: () => boolean
+
+  /**
+   * This rule's own adequacy advice — plan 0102.
+   *
+   * Distinct from `zeroSubjectsAdvice`: that covers `examinedUnits() === 0`.
+   * This covers a rule whose evidence is non-empty but which is structurally
+   * unable to ever produce a finding as configured (bug 0077(A) — a
+   * divergence-policing detector on a majority-less corpus). Returns the empty
+   * string for any rule that is not inert, so `diagnose()` reports nothing for
+   * a healthy control. Reported VERBATIM, exactly as `zeroSubjectsAdvice` is,
+   * for the same plan-0070 reason: the preview and the check-time finding must
+   * carry the same string by construction, not two texts for one state.
+   */
+  inertAdvice?: () => string
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -130,6 +144,16 @@ export interface DiagnosticFinding {
      * runs inside the consumer's own suite.
      */
     | 'zero-subjects'
+    /**
+     * A rule whose evidence is non-empty but which is structurally unable to
+     * ever produce a finding as configured — plan 0102. Distinct from
+     * `'zero-subjects'`: that fires when `examinedUnits() === 0`; this fires
+     * when `examinedUnits() > 0` but the family's own adequacy predicate
+     * (`inertAdvice?()`) says the rule can never fail regardless. ADR-009's
+     * Notes hand this class to ADR-008 explicitly: "a check can examine 500
+     * subjects and still assert nothing worth knowing."
+     */
+    | 'inert'
     /**
      * An inline `// ts-archunit-exclude` comment naming a rule id no rule
      * declares, so it suppresses nothing — [bug 0044](../../bugs/fixed/0044-an-inline-exclusion-comment-has-no-feedback-channel.md).
@@ -374,6 +398,17 @@ export function diagnose(
       const evidence = zeroSubjectsFinding(rule, name)
       if (evidence !== undefined) findings.push(evidence)
     }
+
+    // A DISTINCT branch, not folded into the zeroSubjectsFinding guard above:
+    // inertAdvice() only returns non-empty when examinedUnits() > 0 (plan
+    // 0102's own guard requires `matching > 0`), so the two are structurally
+    // mutually exclusive and this never doubles up with the zero-subjects
+    // finding above. Unconditional (not gated on `findings.length === before`)
+    // because the emptiness precedence above governs a different axis
+    // (evidence present vs. absent); this axis is evidence present vs.
+    // adequate, and nothing else in this loop speaks to it.
+    const inert = inertFinding(rule, name)
+    if (inert !== undefined) findings.push(inert)
   }
   return findings
 }
@@ -431,6 +466,22 @@ function zeroSubjectsFinding(rule: DiagnosableRule, name: string): DiagnosticFin
       rule.zeroSubjectsAdvice?.() ??
       'this rule examined 0 units, so it enforces nothing as written today.',
   }
+}
+
+/**
+ * A rule whose evidence is non-empty but which is structurally unable to ever
+ * produce a finding as configured — plan 0102, bug 0077(A).
+ *
+ * Mirrors `zeroSubjectsFinding`'s shape: returns `undefined` unless the family
+ * answers `inertAdvice()` and answers non-empty. No fallback literal, for the
+ * same reason `zeroSubjectsFinding` has none — a family that cannot answer has
+ * no advice to report, which is honest; core does not invent a sentence for an
+ * adequacy predicate it does not own.
+ */
+function inertFinding(rule: DiagnosableRule, name: string): DiagnosticFinding | undefined {
+  const advice = rule.inertAdvice?.()
+  if (advice === undefined || advice === '') return undefined
+  return { kind: 'inert', rule: name, advice }
 }
 
 /**

@@ -289,8 +289,11 @@ describe('inconsistentSiblings: the second detector the floor gates', () => {
     // files … use call to X"), so the pattern has to be one the majority
     // already follows or the rule can examine a full folder and still be
     // incapable of failing. The first draft used `call('copy')` over
-    // `src/builders`: 11 files examined, 4 with the pattern, therefore no
-    // majority and no possible finding — green, and worth nothing.
+    // `src/builders`: 11 files examined, 0 with the pattern (the call sites are
+    // `this.copy()` and `call()` matches callee text exactly — see the
+    // `forPattern(call('this.copy'))` row below, plan 0102's re-measurement of
+    // this exact case), therefore no possible finding — green, and worth
+    // nothing.
     //
     // `validateOverrides` over `src/presets` is the real invariant: every
     // preset must reject an override naming a rule it does not construct, or
@@ -304,6 +307,34 @@ describe('inconsistentSiblings: the second detector the floor gates', () => {
       .forPattern(call('validateOverrides'))
     expect(rule.examinedUnits()).toBeGreaterThan(0)
     expect(rule.violations()).toEqual([])
+    // Plan 0102's C1 regression + latch-placement test: this rule is
+    // ALL-CONFORMING (5 of 5 call validateOverrides, nonMatching === 0) — the
+    // shape that must NOT be reported inert regardless, since the latch is
+    // computed from editsToMajority alone, before nonMatching === 0 enters.
+    expect(rule.inertAdvice()).toBe('')
+  })
+
+  it('plan 0102: the poisoned row, re-measured — bug 0077(A) liquidated', () => {
+    // Bug 0077(A) and this plan's Problem section both measured this exact
+    // rule with a bare `call('copy')`, which never matches `this.copy()` — see
+    // the corrected numbers in both documents. `call('this.copy')` is what
+    // actually reaches the AST match: 11 files examined, 4 hold the pattern,
+    // no folder within one edit of a 60% majority (3 > 1) — genuinely inert,
+    // not a dead-pattern false negative.
+    const rule = smells
+      .inconsistentSiblings(p)
+      .inFolder('**/src/builders/**')
+      .forPattern(call('this.copy'))
+    expect(rule.examinedUnits()).toBe(11)
+    expect(rule.violations()).toEqual([])
+    // N-phase: INERT_FINDING_EMIT is false, so check() still passes today —
+    // this is what lets N ship without breaking an adopter's green build.
+    expect(() => gate(rule).check()).not.toThrow()
+    // The diagnose-first preview carries the real numbers regardless of the
+    // gate — this is the liquidation: a showcase rule this repo ships, pinned
+    // as inert rather than reported as coverage.
+    expect(rule.inertAdvice()).toContain('examined 11 sibling files')
+    expect(rule.inertAdvice()).toContain('only 4 of them')
   })
 })
 
@@ -407,13 +438,17 @@ describe('presets: the surface an adopter actually installs', () => {
 // then it looks guarded. Four rules on one screen do not need it.
 
 describe('the gated rules in this file can all enforce something', () => {
-  it('diagnoses every gated rule, and finds nothing wrong', () => {
-    // Identities, never a count — ADR-008 rule 4.
+  it('diagnoses every gated rule, and finds exactly the one poisoned row — plan 0102', () => {
+    // Identities, never a count — ADR-008 rule 4. Not `toEqual([])`: this file
+    // deliberately gates one rule known to be inert (the `call('this.copy')`
+    // row above, bug 0077(A)'s exact case) — a green `diagnose(BUILT)` here
+    // would be the vacuous pass this plan exists to remove. `'inert'`, not
+    // `'zero-subjects'`: examinedUnits() is 11, not 0.
     const findings = diagnose(BUILT).map(
       (f) =>
         `${f.kind}: ${f.rule}${f.glob === undefined ? '' : ` [${f.position ?? '?'} ${f.glob}]`}`,
     )
-    expect(findings).toEqual([])
+    expect(findings).toEqual(["inert: Sibling files should consistently use call to 'this.copy'"])
   })
 
   it('would report a fault if one were introduced', () => {

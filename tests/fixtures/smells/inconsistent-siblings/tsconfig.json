@@ -7,5 +7,5 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["repositories/**/*.ts"]
+  "include": ["repositories/**/*.ts", "mixed-alpha/**/*.ts", "mixed-beta/**/*.ts"]
 }

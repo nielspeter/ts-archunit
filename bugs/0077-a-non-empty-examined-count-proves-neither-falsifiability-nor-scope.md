@@ -27,9 +27,16 @@ units could have produced a finding.
 Measured:
 
 ```ts
-smells.inconsistentSiblings(p).inFolder('**/src/builders/**').forPattern(call('copy'))
+smells.inconsistentSiblings(p).inFolder('**/src/builders/**').forPattern(call('this.copy'))
 // examined: 11   violations: 0
 ```
+
+(Corrected 2026-08-12, during plan 0102's implementation: the call sites are `this.copy()`, and `call()`
+does exact-text matching, so the original bare `call('copy')` matched zero of them — a `matching === 0`
+dead-pattern reading, not the `matching: 4` no-majority reading this section describes. The "cannot fail"
+conclusion holds either way; the mechanism it holds for does not. `grep` confirms which files mention
+`copy(` as text; it does not confirm what the AST matcher matches, which is the gap that produced the
+original claim.)
 
 Eleven files examined — every file in the folder — and the rule **cannot fail**. `inconsistentSiblings`
 reports a _minority diverging from its siblings_ ("5 of 7 files use call to X"), and only 4 of the 11

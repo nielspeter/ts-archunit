@@ -46,19 +46,25 @@ Do not inherit "strangers depend on it"; the measured surface is a direct caller
 A detector whose stated purpose is "green must mean something" shipped a green that means nothing.
 
 ```ts
-smells.inconsistentSiblings(p).inFolder('**/src/builders/**').forPattern(call('copy'))
+smells.inconsistentSiblings(p).inFolder('**/src/builders/**').forPattern(call('this.copy'))
 // examined: 11   violations: 0
 ```
 
 `inconsistentSiblings` reports a **minority diverging from its majority**. Only 4 of 11 builders call
-`copy()` — `4/11 = 0.36 < 0.6` — so there is no majority for anyone to diverge from, and the rule is
+`this.copy()` — `4/11 = 0.36 < 0.6` — so there is no majority for anyone to diverge from, and the rule is
 structurally incapable of a finding. Every guard passes it: the floor (0099) sees `examined = 11 ≠ 0`;
 ADR-009's evidence seam is satisfied (counted, correctly provenanced); `diagnose()` is silent because the
 glob is alive; the compiler is silent because evidence is present.
 
-**Measured 2026-08-10 (this repo):** `examined: 11 / violations: 0`, exactly 4 of 11 builders call
-`copy()` — confirmed by `grep` over `src/builders/`. The rule passes today, and the test file that shipped it
-green has nothing to say about it.
+**Measured 2026-08-10 (this repo), corrected 2026-08-12 during implementation:** `examined: 11 /
+violations: 0`, exactly 4 of 11 builders call `this.copy()`. The original text wrote the pattern as
+`call('copy')` (bare) and verified the file count with `grep`, which confirms which files contain the
+text `copy(` but not what the AST matcher actually matches: `call()` does exact-text equality against the
+callee expression, and every call site here is `this.copy()`, so `call('copy')` matches **zero** of them
+— a silent `matching === 0` (dead-pattern) rather than the intended `matching: 4` (no-majority) case. Running
+the rule, not grepping the files, is what this plan's own thesis says to do; re-running it against
+`call('this.copy')` reproduces the claimed numbers exactly. The rule passes today either way, and the
+test file that shipped it green has nothing to say about it.
 
 **This is not discovery; it is liquidation.** [Bug 0077(A)](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md)
 filed this exact case — the identical rule, the identical measurement, all four guards green — on 2026-08-09,
@@ -383,7 +389,7 @@ reader who cannot self-serve the swap is stuck.** `correspondence()`'s `.side()`
 `KeyFn` per side (`docs/api-reference.md:378`); there is no existing predicate for "selection by call-body
 content," only conditions (`contain()`/`notContain()`), so the second side has to come from the `calls()`
 entry point with a hand-written `KeyFn`. For the measured case (`inFolder('**/src/builders/**')
-.forPattern(call('copy'))`), the replacement that makes the same intent falsifiable is:
+.forPattern(call('this.copy'))`), the replacement that makes the same intent falsifiable is:
 
 ```ts
 import { correspondence, classes, calls, byName, type KeyFn } from '@nielspeter/ts-archunit'
@@ -535,7 +541,7 @@ a future change makes the matrix track adequacy too, that is out of scope here.
 ## Test inventory
 
 **The measured case fails with the numbers in the message.** `inFolder('**/src/builders/**')
-.forPattern(call('copy'))` → the inert finding, `examined: 11` / `matching: 4` readable in the message.
+.forPattern(call('this.copy'))` → the inert finding, `examined: 11` / `matching: 4` readable in the message.
 (Replaces today's green assertion on exactly this rule.)
 
 **The healthy control stays green — and can fire.** `forPattern(call('validateOverrides'))` over

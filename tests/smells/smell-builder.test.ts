@@ -74,8 +74,12 @@ describe('SmellBuilder.ignorePaths()', () => {
       .inconsistentSiblings(p)
       .forPattern(call('this.extractCount'))
       .minLines(2)
-      .ignorePaths('**/legacy-repo.ts')
-    // A SUBSET again: the inconsistent sibling is the ignored file, so the
+      // Both files that don't call extractCount — plan 0102 added
+      // archive-repo.ts alongside legacy-repo.ts (a second parseInt caller, so
+      // that pattern is 2-of-5 rather than 1-of-4). Ignoring only legacy-repo.ts
+      // would leave archive-repo.ts as a new odd-one-out.
+      .ignorePaths('**/legacy-repo.ts', '**/archive-repo.ts')
+    // A SUBSET again: the inconsistent siblings are the ignored files, so the
     // finding disappears while the other repositories are still examined.
     expect(builder.violations().filter((v) => v.bypassFilters !== true)).toEqual([])
     expect(builder.examinedUnits()).toBeGreaterThan(0)

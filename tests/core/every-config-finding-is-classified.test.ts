@@ -134,6 +134,13 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     remedy: 'own',
     verified: 'behavioural: a-dead-discovery-glob-fails.test.ts — a live glob produces no finding',
   },
+  'src/smells/inconsistent-siblings.ts::inertViolation': {
+    remedy: 'own',
+    verified:
+      'behavioural: inconsistent-siblings.test.ts — "choose a shared pattern" (the message’s second ' +
+      'remedy) clears the inert finding on a real fixture and replaces it with a normal, real violation ' +
+      '(plan 0102)',
+  },
   'src/helpers/baseline.ts::descriptionChangeFinding': {
     remedy: 'own',
     verified: 'behavioural: baseline-description-change.test.ts — regenerating clears it',
