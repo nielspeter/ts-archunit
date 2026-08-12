@@ -126,7 +126,7 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
       file,
       JSON.stringify({
         generatedAt: '2026-07-28T00:00:00.000Z',
-        hashVersion: 4,
+        hashVersion: 5,
         count: 1,
         violations: [{ rule: 'r', file: 'a.ts', line: 1, hash: 'deadbeefdeadbeef' }],
       }),
@@ -159,12 +159,13 @@ describe('a v1 baseline that still matches must not be failed (review C1)', () =
     // what `withBaseline` treats as current. Any bump is caught here — the
     // suite once pinned only "older than current", so a bump was caught by
     // nothing. Updated deliberately at 3 -> 4 (bug 0012: metric findings carry
-    // an identity and an accepted measurement, so their hashes moved).
+    // an identity and an accepted measurement, so their hashes moved), and at
+    // 4 -> 5 (plan 0104: cycle findings carry a per-edge identity).
     const root = scratch('.git')
     const file = path.join(root, 'baseline.json')
     generateBaseline([pathFree], file, { root })
     const written: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'))
-    expect(JSON.stringify(written)).toContain('"hashVersion":4')
+    expect(JSON.stringify(written)).toContain('"hashVersion":5')
     // Same file, read back: matches, and produces no meta-finding.
     expect(withBaseline(file, { root }).filterNew([pathFree])).toEqual([])
   })

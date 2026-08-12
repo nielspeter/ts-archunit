@@ -283,4 +283,70 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
       expect(applyFilters([normal], { exclusions: [/src\/services/] })).toHaveLength(0)
     })
   })
+
+  describe('plan 0104: an over-broad exclusion on cycle edges is caught mechanically', () => {
+    /**
+     * Cycle-edge-shaped violations, the way `beFreeOfCycles` produces them: every edge
+     * in one SCC shares the SAME "part of a cycle with: ..." membership clause.
+     */
+    function cycleEdge(from: string, to: string, members: readonly string[]): ArchViolation {
+      return makeViolation({
+        element: `${from} -> ${to}`,
+        file: `/src/${from}/index.ts`,
+        message: `Cycle detected: "${from}" imports "${to}", part of a cycle with: ${members.join(', ')}`,
+        identity: `cycle-edge::${from}->${to}`,
+      })
+    }
+
+    it('a regex matching 2+ distinct cycle edges warns, naming every matched edge', () => {
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+      const members = ['a', 'b', 'c']
+      const violations = [
+        cycleEdge('a', 'b', members),
+        cycleEdge('b', 'c', members),
+        cycleEdge('c', 'a', members),
+      ]
+      // A loose regex over the still-present "part of a cycle with: ..." clause —
+      // exactly the loophole a migrator reaching for a whole-component pattern hits.
+      applyFilters(violations, {
+        exclusions: [/part of a cycle with: a, b, c/],
+        metadata: { id: 'test/no-cycles' },
+      })
+      const text = warn.mock.calls.map((call) => String(call[0])).join('\n')
+      expect(text).toContain('matched 3 distinct cycle edges')
+      expect(text).toContain('a -> b')
+      expect(text).toContain('b -> c')
+      expect(text).toContain('c -> a')
+      expect(text).toContain(".excluding('a -> b', 'b -> c', 'c -> a')")
+    })
+
+    it('CONTROL: an exact-string exclusion matching exactly one cycle edge does not warn', () => {
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+      const members = ['a', 'b', 'c']
+      const violations = [cycleEdge('a', 'b', members), cycleEdge('b', 'c', members)]
+      applyFilters(violations, {
+        exclusions: ['a -> b'],
+        metadata: { id: 'test/no-cycles' },
+      })
+      const text = warn.mock.calls.map((call) => String(call[0])).join('\n')
+      expect(text).not.toContain('distinct cycle edges')
+    })
+
+    it('CONTROL: a broad exclusion in an unrelated (non-cycle) family does not warn', () => {
+      // The check reads the `cycle-edge::` identity prefix, not "matched more than one
+      // thing" in general — a legitimate broad exclusion in any other family (no
+      // `identity` set at all, here) must not false-positive.
+      const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+      const violations = [
+        makeViolation({ file: '/src/a.ts', message: 'notDependOn: a depends on b' }),
+        makeViolation({ file: '/src/b.ts', message: 'notDependOn: b depends on c' }),
+      ]
+      applyFilters(violations, {
+        exclusions: [/depends on/],
+        metadata: { id: 'test/no-deps' },
+      })
+      const text = warn.mock.calls.map((call) => String(call[0])).join('\n')
+      expect(text).not.toContain('distinct cycle edges')
+    })
+  })
 })

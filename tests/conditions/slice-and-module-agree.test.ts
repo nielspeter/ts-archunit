@@ -161,7 +161,7 @@ describe('but a cycle is still an initialization question — the discrimination
       "import { old } from '../legacy/index.js'\nexport const used = old",
       "import { fresh } from '../feature/index.js'\nexport const back = fresh",
     )
-    expect(cycles(p)).toEqual(['[feature, legacy]'])
+    expect(cycles(p)).toEqual(['feature -> legacy', 'legacy -> feature'])
   })
 })
 

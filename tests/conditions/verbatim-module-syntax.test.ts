@@ -159,7 +159,7 @@ describe('ON DISK: the same source, two tsconfigs (plan 0087)', () => {
     // `a` reaches `b` only through `import { type Beta }`, and `b` imports `a` by
     // value. Under this tsconfig that emits `import {} from '../b/index.js'`, so both
     // modules are evaluated and the cycle is real.
-    expect(cyclesIn(project(path.join(ON, 'tsconfig.json')))).toEqual(['[a, b]'])
+    expect(cyclesIn(project(path.join(ON, 'tsconfig.json')))).toEqual(['a -> b', 'b -> a'])
 
     // And it must be LOCATED. Changing only the DETAILS call's question to
     // 'type-bindings' — leaving the graph correct — is caught by nothing: the graph
@@ -173,9 +173,11 @@ describe('ON DISK: the same source, two tsconfigs (plan 0087)', () => {
       .rule({ id: 'test/no-cycles', because: 'cycles break module init order' })
       .violations()
       .filter((v) => v.bypassFilters !== true)
-    expect(located).toHaveLength(1)
+    expect(located).toHaveLength(2)
     expect(located[0]!.file).toMatch(/src\/a\/index\.ts$/)
     expect(located[0]!.line).toBeGreaterThan(0)
+    expect(located[1]!.file).toMatch(/src\/b\/index\.ts$/)
+    expect(located[1]!.line).toBeGreaterThan(0)
   })
 
   it('the flag OFF: the same source has NO cycle', () => {
@@ -352,7 +354,7 @@ describe('the erasure fields, per form (plan 0087)', () => {
 describe('cycles through each flag-dependent form (plan 0087)', () => {
   it('the inline-type IMPORT closes a cycle only under the flag', () => {
     const decl = "import { type Beta } from '../b/index.js'"
-    expect(cyclesIn(inMemory(true, decl))).toEqual(['[a, b]'])
+    expect(cyclesIn(inMemory(true, decl))).toEqual(['a -> b', 'b -> a'])
     expect(cyclesIn(inMemory(false, decl))).toEqual([])
   })
 
@@ -361,7 +363,7 @@ describe('cycles through each flag-dependent form (plan 0087)', () => {
     // import emit rules, which is why plan 0085 refused to guess and plan 0087 made it
     // Phase 3. It does match — `export { type Beta } from` emits `export {} from`.
     const decl = "export { type Beta } from '../b/index.js'"
-    expect(cyclesIn(inMemory(true, decl))).toEqual(['[a, b]'])
+    expect(cyclesIn(inMemory(true, decl))).toEqual(['a -> b', 'b -> a'])
     expect(cyclesIn(inMemory(false, decl))).toEqual([])
   })
 
@@ -375,7 +377,7 @@ describe('cycles through each flag-dependent form (plan 0087)', () => {
 
   it('CONTROL: a value import closes a cycle under either flag', () => {
     const decl = "import { beta } from '../b/index.js'"
-    expect(cyclesIn(inMemory(true, decl))).toEqual(['[a, b]'])
-    expect(cyclesIn(inMemory(false, decl))).toEqual(['[a, b]'])
+    expect(cyclesIn(inMemory(true, decl))).toEqual(['a -> b', 'b -> a'])
+    expect(cyclesIn(inMemory(false, decl))).toEqual(['a -> b', 'b -> a'])
   })
 })

@@ -45,6 +45,16 @@ import { byCodepoint } from '../core/violation.js'
  * recovers a REAL path (bug 0055's fuller fix), direction becomes genuine information
  * again — and then the right shape is a sorted member set for the identity with the path
  * carried in the message, not a return to rotation.
+ *
+ * **`identity`/`element` moved off the member set entirely — plan 0104.** One violation
+ * per SCC (keyed by the sorted member set above) let `.excluding()` waive a whole tangled
+ * component with one pattern, so a brand-new edge between two already-waived members was
+ * silently absorbed — a second, doubly fail-open bug in the same family. Each internal
+ * edge of the component now gets its own violation, `identity`, and `element`
+ * (`cycle-edge::${from}->${to}`, `${from} -> ${to}`) — every such edge provably lies on
+ * some cycle, because the component's own connectivity supplies a return path. The sorted
+ * `members` set computed above still exists and is still load-bearing: it now serves the
+ * MESSAGE's "part of a cycle with: ..." context only, not identity or element.
  */
 
 /**
@@ -123,62 +133,80 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
         // order, so the sequence is an artefact of traversal: reordering two imports moved
         // the element from `[a, c, b]` to `[a, b, c]`, which reddened CI on a cosmetic edit
         // and printed "it may be stale after a rename" about a rename that never happened.
-        // `.excluding()` matches element/file/message, so sorting the ELEMENT is what fixes
-        // that — `canonicalizeCycle`'s rotation could not, because both spellings were
-        // already rotated to start at `a`.
+        // Unchanged by plan 0104: `members`/sorting now serves the MESSAGE only — identity
+        // and element moved to the edge, below — but the order-independence this sort buys
+        // still matters there too (`internalEdges` is itself sorted the same way).
         const members = [...new Set(scc.map((i) => sliceNames[i] ?? ''))].sort(byCodepoint)
-
-        // **Locate the finding on an edge that EXISTS** — bug 0055. This used to ask for
-        // details on `members[0] -> members[1]`, the first two members of a SET, which need
-        // not be an edge at all: on a 4-ring it reported `unknown:0`, and when the pair
-        // happened to be an edge the location was a perfectly legal import. Search the
-        // component for a real edge instead.
         const inCycle = new Set(members)
-        // SORTED, not `.find()`. `edges` is built by walking the file list, so taking the
-        // first match made the example edge — and therefore the message — depend on
-        // filesystem order: measured, a reversed walk turned "a imports b" into
-        // "c imports a". Bug 0010's portability test caught it, which is the test that
-        // exists because machine-dependent output gives one finding two identities.
-        const realEdge = edges
+
+        // **Every internal edge, not just one** — plan 0104. Provably meaningful, not a
+        // heuristic: for a strongly connected component, any edge `u -> v` where both `u`
+        // and `v` are members lies on SOME cycle, because the component's own connectivity
+        // supplies a return path `v -> ... -> u`. So every edge this filter finds is a real,
+        // substantiated cycle-membership fact — bug 0055 already established there is no
+        // single, order-independent answer to "the" closing edge, so this reports the
+        // provable superset instead of guessing at one. SORTED for the same portability
+        // reason the old single-`realEdge` selection needed (bug 0010): `edges` is built by
+        // walking the file list, so an unsorted iteration order would make which edge is
+        // "first" — and therefore, before this plan, the only reported one — depend on
+        // filesystem order.
+        const internalEdges = edges
           .filter((e) => inCycle.has(e.from) && inCycle.has(e.to))
-          .sort((a, b) => byCodepoint(a.from, b.from) || byCodepoint(a.to, b.to))[0]
-        const details =
-          realEdge === undefined
-            ? []
-            : // Through the graph, so the question and the options cannot diverge from the
-              // ones it was built with. Passing 'type-bindings' here used to be writable,
-              // and it turned this finding into "dynamically imports ... at line 1" —
-              // pointing the reader at the construct that FIXES cycles.
-              graph.detailsFor(realEdge.from, realEdge.to)
-        // Same reason, one level down: `details` follows the slice's file order.
-        const site = [...details].sort(
-          (a, b) =>
-            byCodepoint(a.sourceFile.getFilePath(), b.sourceFile.getFilePath()) ||
-            a.importLine - b.importLine,
-        )[0]
+          .sort((a, b) => byCodepoint(a.from, b.from) || byCodepoint(a.to, b.to))
 
-        // **A member list, not a path** — bug 0055's other half. The old message joined the
-        // members with ` -> ` and appended the first again, presenting a SET as a traversal:
-        // on a real ring `a→b→c→d→a` it printed `a -> d -> c -> b -> a`, every arrow
-        // reversed, and on this repo's own source two of four arrows did not exist. Naming
-        // the members and one real edge asserts only what can be substantiated.
-        const closing =
-          site === undefined
-            ? ''
-            : ` (e.g. ${realEdge?.from} ${edgeVerb(site.edge.kind)} ${realEdge?.to} at ${site.sourceFile.getBaseName()}:${site.importLine})`
+        for (const edge of internalEdges) {
+          // Through the graph, so the question and the options cannot diverge from the
+          // ones it was built with. Passing 'type-bindings' here used to be writable, and
+          // it turned this finding into "dynamically imports ... at line 1" — pointing the
+          // reader at the construct that FIXES cycles. Called once per edge rather than
+          // once per SCC: each call walks `fromSlice.files`, which is cheap — the AST work
+          // underneath is cached per file by `edgesOf` (module-edges.ts) regardless of call
+          // count (Out of scope: performance, reasoned not benchmarked).
+          const details = graph.detailsFor(edge.from, edge.to)
+          // Same reason as the old single-edge lookup, one level down: `details` follows
+          // the slice's file order, and each edge computes its OWN site — never a hoisted
+          // one shared across edges in the same SCC, which would silently reintroduce a
+          // shared-location regression this plan's own test inventory guards against.
+          const site = [...details].sort(
+            (a, b) =>
+              byCodepoint(a.sourceFile.getFilePath(), b.sourceFile.getFilePath()) ||
+              a.importLine - b.importLine,
+          )[0]
 
-        violations.push({
-          rule: context.rule,
-          element: `[${members.join(', ')}]`,
-          file: site ? site.sourceFile.getFilePath() : 'unknown',
-          line: site ? site.importLine : 0,
-          // The sorted member SET, so the identity is a function of membership alone —
-          // independent of traversal order (bug 0056) and of the message text, which is what
-          // frees the message above to be rewritten at all (plan 0088).
-          identity: `cycle::${members.join(',')}`,
-          message: `Cycle detected between: ${members.join(', ')}${closing}`,
-          because: context.because,
-        })
+          violations.push({
+            rule: context.rule,
+            // The edge ITSELF, not the component — plan 0104. `.excluding('helpers -> builders')`
+            // now names exactly this fact and nothing else in the component. Deliberately
+            // NOT decorated with the member list: folding membership in here would move
+            // every edge's element whenever the component's shape changes, even for edges
+            // that did not themselves change — see plan 0104's "Why per-edge" for the case
+            // analysis this avoids.
+            element: `${edge.from} -> ${edge.to}`,
+            file: site ? site.sourceFile.getFilePath() : 'unknown',
+            line: site ? site.importLine : 0,
+            // A pure function of the two slice names — no path, no line, no message text.
+            // Distinct prefix from the old `cycle::` scheme (bug 0056) so an old-format
+            // baseline entry cannot accidentally collide with a new-format one — see
+            // `HASH_VERSION`'s bump in `src/helpers/baseline.ts`.
+            identity: `cycle-edge::${edge.from}->${edge.to}`,
+            // "Cycle detected" stays the leading words —
+            // tests/presets/cycle-claims-match-behaviour.test.ts filters on
+            // `message.startsWith('Cycle detected')` and must keep matching. The named
+            // edge is a real, substantiated fact for THIS finding (not an "e.g." example of
+            // the component, as the pre-plan-0104 message had it) — every edge pushed here
+            // provably closes some cycle, per the proof above.
+            message: site
+              ? `Cycle detected: "${edge.from}" ${edgeVerb(site.edge.kind)} "${edge.to}" at ` +
+                `${site.sourceFile.getBaseName()}:${String(site.importLine)}, part of a cycle with: ` +
+                `${members.join(', ')}`
+              : // Unreachable given `graph`'s options/question binding — kept for the same
+                // defensive reason the pre-plan-0104 code kept its own `'unknown'`/`0`
+                // fallback.
+                `Cycle detected: "${edge.from}" depends on "${edge.to}", part of a cycle with: ` +
+                `${members.join(', ')} (location unknown)`,
+            because: context.because,
+          })
+        }
       }
 
       return violations

@@ -230,14 +230,27 @@ slices(p)
   .check()
 ```
 
-When a cycle is detected, the finding names the slices involved:
+When a cycle is detected, **one finding is reported per internal edge of the tangled
+component**, not one for the whole component — every edge between two members of a
+strongly-connected component provably lies on some cycle, so each is a substantiated,
+independently-actionable fact:
 
 ```
 Architecture Violation [arch/no-feature-cycles]
 
-  Cycle detected: billing -> notifications -> billing
-  src/features/billing/service.ts:5 — [billing, notifications]
+  Cycle detected: "billing" imports "notifications" at service.ts:5, part of a cycle with: billing, notifications
+  src/features/billing/service.ts:5 — billing -> notifications
+
+Architecture Violation [arch/no-feature-cycles]
+
+  Cycle detected: "notifications" imports "billing" at service.ts:12, part of a cycle with: billing, notifications
+  src/features/notifications/service.ts:12 — notifications -> billing
 ```
+
+This is the minimal-diff property: a slice joining or leaving the component moves only
+the edges that actually changed — every other edge's `element`/`identity` stays
+byte-identical, so `.excluding('billing -> notifications')` waives exactly that one
+edge and nothing else in the component.
 
 ::: warning Read the arrows as a member list, not a path
 This page showed a per-edge listing until v0.49.1 — two extra lines naming each edge and its

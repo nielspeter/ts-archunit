@@ -103,7 +103,7 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
   it('a runtime cycle still IS one', () => {
     // The control that stops the fix from being "report nothing". By identity —
     // which slices — because a count cannot tell a real cycle from a phantom.
-    expect(cycles(twoSlices(VALUE_B, VALUE_A))).toEqual(['[a, b]'])
+    expect(cycles(twoSlices(VALUE_B, VALUE_A))).toEqual(['a -> b', 'b -> a'])
   })
 
   it('a HALF type-only pair is not a cycle at all, in either direction', () => {
@@ -126,14 +126,17 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
     // type-only. `isTypeOnlyImport` requires EVERY named specifier to be type-only,
     // and this row is what pins that rather than trusting the docstring.
     const p = twoSlices("import { type Beta, beta } from '../b/index.js'", VALUE_A)
-    expect(cycles(p)).toEqual(['[a, b]'])
+    expect(cycles(p)).toEqual(['a -> b', 'b -> a'])
   })
 
   it('ignoreTypeImports: false still reports the type-only cycle', () => {
     // The option proven in BOTH positions. Without this row the default could be
     // hard-wired and every test above would still pass — the flag would be
     // decoration, which is the shape ADR-008 rule 5 is about.
-    expect(cycles(twoSlices(TYPE_B, TYPE_A), { ignoreTypeImports: false })).toEqual(['[a, b]'])
+    expect(cycles(twoSlices(TYPE_B, TYPE_A), { ignoreTypeImports: false })).toEqual([
+      'a -> b',
+      'b -> a',
+    ])
   })
 
   it('the DEFAULT ignores type-only edges', () => {
@@ -192,8 +195,8 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
       "export { beta } from '../b/index.js'",
       "export { alpha } from '../a/index.js'",
     )
-    expect(cycles(valueReExport)).toEqual(['[a, b]'])
-    expect(cycles(valueReExport, { ignoreTypeImports: false })).toEqual(['[a, b]'])
+    expect(cycles(valueReExport)).toEqual(['a -> b', 'b -> a'])
+    expect(cycles(valueReExport, { ignoreTypeImports: false })).toEqual(['a -> b', 'b -> a'])
 
     // And the type-only re-export is still erased, which is the pairing that proves
     // the new path consults `isTypeOnlyReExport` rather than counting every export.
@@ -202,18 +205,19 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
       "export type { Alpha } from '../a/index.js'",
     )
     expect(cycles(typeReExport)).toEqual([])
-    expect(cycles(typeReExport, { ignoreTypeImports: false })).toEqual(['[a, b]'])
+    expect(cycles(typeReExport, { ignoreTypeImports: false })).toEqual(['a -> b', 'b -> a'])
   })
 
-  it('MIGRATION: the option changes cycle membership, so it changes baseline identity', () => {
-    // The row plan 0082 promised and omitted, which is how a wrong migration note
-    // shipped in v0.46.0. Asserted through the real `hashViolation`, not a hand-built
-    // string, because the hash is what a baseline file actually contains.
+  it('MIGRATION: the option changes cycle MEMBERSHIP, but only the affected edges move (plan 0104)', () => {
+    // Under plan 0104, `identity`/`element` are per-edge, not per-component — so this row's
+    // original claim ("the whole element moves") is no longer the interesting fact. The
+    // interesting fact is the minimal-diff property: `c` joins/leaves the component by TWO
+    // type-only edges (`b -> c`, `c -> a`); the pre-existing `a <-> b` edges are entirely
+    // unaffected by whether those two are counted.
     //
-    // `c` is joined to the a↔b cycle by type-only edges. Counting them, the cycle is
-    // three slices; erasing them, the SAME cycle is two — a different `element`, so a
-    // different identity. An adopter's baseline entry does not "move", it STOPS
-    // MATCHING, and the narrower cycle is reported as new.
+    // `c` is joined to the a<->b cycle by type-only edges. Counting them (`before`), the SCC
+    // is three slices with four internal edges; erasing them (`after`, the default), the
+    // SAME two `a <-> b` edges remain, unchanged, and `c`'s two edges simply disappear.
     const p = threeSlices(
       "import type { Gamma } from '../c/index.js'",
       "import type { Alpha } from '../a/index.js'",
@@ -222,20 +226,27 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
     const before = threeSliceCycles(p, { ignoreTypeImports: false })
     const after = threeSliceCycles(p)
 
-    // **`['[a, b, c]']`, sorted — changed from `['[a, c, b]']` by bug 0056.**
-    //
-    // This row used to pin `canonicalizeCycle`'s ROTATION, and the v0.49.2 review flagged
-    // it precisely: pinning DFS-pop order as the baseline identity certifies the unstable
-    // thing, and *"when 0056 is fixed, both rows must change, and they are the two an agent
-    // is most likely to 'correct' to green"*. So this is that change, made on purpose:
-    // membership is sorted now, because an SCC is a set and its stored order was a
-    // traversal artefact that reddened CI when two imports were reordered.
-    expect(before.map((v) => v.element)).toEqual(['[a, b, c]'])
-    expect(after.map((v) => v.element)).toEqual(['[a, b]'])
+    expect(before.map((v) => v.element)).toEqual(['a -> b', 'b -> a', 'b -> c', 'c -> a'])
+    expect(after.map((v) => v.element)).toEqual(['a -> b', 'b -> a'])
 
-    // The upgrade note's actual claim, as a measurement.
-    const hashes = (vs: ArchViolation[]): string[] => vs.map((v) => hashViolation(v))
-    expect(hashes(before)).not.toEqual(hashes(after))
+    // The surviving edges — both `element` AND `hashViolation`, byte-identical. Both
+    // fixtures share the SAME `.assignedFrom({ a, b, c })` slice definition (only the
+    // `beFreeOfCycles(options)` argument differs), so `context.rule` is identical between
+    // them and `hashViolation` is directly comparable here.
+    const surviving = (vs: ArchViolation[]) => vs.slice(0, 2)
+    expect(surviving(after).map((v) => v.element)).toEqual(surviving(before).map((v) => v.element))
+    expect(surviving(after).map((v) => hashViolation(v))).toEqual(
+      surviving(before).map((v) => hashViolation(v)),
+    )
+
+    // `c`'s two edges are exactly what disappears — an adopter's baseline entry for THOSE
+    // two edges stops matching; the `a <-> b` entries keep matching unchanged.
+    expect(before.map((v) => v.identity)).toEqual(
+      expect.arrayContaining(['cycle-edge::b->c', 'cycle-edge::c->a']),
+    )
+    expect(after.map((v) => v.identity)).not.toEqual(
+      expect.arrayContaining(['cycle-edge::b->c', 'cycle-edge::c->a']),
+    )
   })
 
   it('an EMPTY options object behaves as no argument at all', () => {
@@ -248,7 +259,7 @@ describe('beFreeOfCycles() and type-only imports (plan 0084)', () => {
     expect(cycles(p)).toEqual([])
 
     // The pairing, so the fix is not "ignore the argument".
-    expect(cycles(p, { ignoreTypeImports: false })).toEqual(['[a, b]'])
+    expect(cycles(p, { ignoreTypeImports: false })).toEqual(['a -> b', 'b -> a'])
   })
 
   it('an options object built elsewhere, not restating the field, keeps the default', () => {

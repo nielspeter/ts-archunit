@@ -66,7 +66,17 @@ import { writeStderr } from '../core/stderr.js'
 //     no migration treatment — that conflated text-stability with baseline-stability
 //     and was wrong. The bump is what lets `unmatchedBaselineFinding` name the real
 //     cause instead of guessing at a re-resolved root.
-const HASH_VERSION = 4
+//
+// 5 — plan 0104. `beFreeOfCycles` gains a producer-set `identity` PER INTERNAL EDGE
+//     (`cycle-edge::${from}->${to}`), replacing the old per-component `cycle::${members}`
+//     scheme wholesale — so every existing cycle finding's identity changes, whether or
+//     not its underlying edges did. The v3/v4 precedent applies exactly: `hashViolation`'s
+//     FORMULA is untouched and one of its inputs moved, and the identity of existing
+//     entries actually changes, for that family and no other — a baseline with no cycle
+//     entries is byte-identical and keeps matching. Distinct prefix (`cycle-edge::` vs.
+//     `cycle::`) also means an old-format entry cannot accidentally still match a
+//     new-format finding by coincidence, independent of this version bump.
+const HASH_VERSION = 5
 
 /**
  * A single entry in the baseline file.

@@ -65,11 +65,11 @@ describe('the slice graph sees re-export edges (plan 0085)', () => {
     // this is a cycle. It reported NOTHING before this plan, and that is the whole
     // defect: the emitted JavaScript for `export { beta } from '../b/index.js'`
     // imports the module.
-    expect(cycles(twoSlices(VALUE_RE_B, VALUE_IMPORT_A))).toEqual(['[a, b]'])
+    expect(cycles(twoSlices(VALUE_RE_B, VALUE_IMPORT_A))).toEqual(['a -> b', 'b -> a'])
   })
 
   it('two value re-exports are a cycle — barrel to barrel', () => {
-    expect(cycles(twoSlices(VALUE_RE_B, VALUE_RE_A))).toEqual(['[a, b]'])
+    expect(cycles(twoSlices(VALUE_RE_B, VALUE_RE_A))).toEqual(['a -> b', 'b -> a'])
   })
 
   it('`export * from` is an edge', () => {
@@ -78,7 +78,7 @@ describe('the slice graph sees re-export edges (plan 0085)', () => {
     // `specifiers.length > 0 && every(...)` guard is what keeps it from being
     // classified as erased. Drop that length check and this row still passes while
     // `export type * from` breaks — which is why both are tested.
-    expect(cycles(twoSlices(STAR_RE_B, STAR_RE_A))).toEqual(['[a, b]'])
+    expect(cycles(twoSlices(STAR_RE_B, STAR_RE_A))).toEqual(['a -> b', 'b -> a'])
   })
 
   it('a type-only re-export is NOT an edge by default, and IS with the option off', () => {
@@ -86,7 +86,8 @@ describe('the slice graph sees re-export edges (plan 0085)', () => {
     // other row here would pass with `isTypeOnlyReExport` never consulted.
     expect(cycles(twoSlices(TYPE_RE_B, TYPE_RE_A))).toEqual([])
     expect(cycles(twoSlices(TYPE_RE_B, TYPE_RE_A), { ignoreTypeImports: false })).toEqual([
-      '[a, b]',
+      'a -> b',
+      'b -> a',
     ])
   })
 
@@ -326,8 +327,12 @@ describe('the graph and the details lookup must agree (plan 0085)', () => {
         .rule({ id: 'test/no-cycles', because: 'cycles break module init order' })
         .violations(),
     )
-    expect(found.map((v) => v.element)).toEqual(['[a, b]'])
+    expect(found.map((v) => v.element)).toEqual(['a -> b', 'b -> a'])
+    // The a -> b edge is real only via the value import on line 2, not the type-only
+    // one on line 1.
     expect(found[0]!.line).toBe(2)
+    // b -> a's own site is unaffected by a's erased import — still line 1.
+    expect(found[1]!.line).toBe(1)
   })
 
   it('respectLayerOrder asks the COUPLING question, not the cycle question', () => {
@@ -604,27 +609,22 @@ describe('what the new edges do to identity and to vacuity (plan 0085)', () => {
     )
 
     // `b → c` is the re-export; `c → a` and `a → b` are imports. All three are in one
-    // SCC only because the re-export is now an edge.
-    // **`['[a, b, c]']`, sorted — changed from `['[a, c, b]']` by bug 0056.**
-    //
-    // This row used to pin `canonicalizeCycle`'s ROTATION, and the v0.49.2 review flagged
-    // it precisely: pinning DFS-pop order as the baseline identity certifies the unstable
-    // thing, and *"when 0056 is fixed, both rows must change, and they are the two an agent
-    // is most likely to 'correct' to green"*. So this is that change, made on purpose:
-    // membership is sorted now, because an SCC is a set and its stored order was a
-    // traversal artefact that reddened CI when two imports were reordered.
-    expect(found.map((v) => v.element)).toEqual(['[a, b, c]'])
+    // SCC only because the re-export is now an edge — and under plan 0104 that SCC
+    // reports one violation PER INTERNAL EDGE, not one for the whole component: all
+    // four edges (`a → b`, `b → a`, `b → c`, `c → a`) provably lie on some cycle.
+    expect(found.map((v) => v.element)).toEqual(['a -> b', 'b -> a', 'b -> c', 'c -> a'])
 
-    // A narrower cycle is a different finding — and since plan 0088 the thing that decides
-    // that is `identity`, not `element`/`message`.
+    // A different edge is a different finding — proven through `identity`, not
+    // `element`/`message`.
     //
-    // This row used to build `narrower` by overriding `element` and `message`, which was
-    // already weak (the v0.49.2 review: it proves `hashViolation` is sensitive to `element`,
-    // not what v0.46.1 reported) and is now simply **wrong** — the hash ignores both fields
-    // when an identity is present, so the old assertion compared a value to itself and
-    // passed for that reason. Overriding the identity is the honest form.
-    const narrower: ArchViolation = { ...found[0]!, identity: 'cycle::a,b' }
-    expect(hashViolation(found[0]!)).not.toBe(hashViolation(narrower))
+    // This row used to compare against a HAND-BUILT `identity: 'cycle::a,b'` (the old
+    // whole-component scheme). Under plan 0104's `cycle-edge::` prefix that comparison
+    // would be vacuous — the two sides would differ trivially by PREFIX alone, proving
+    // nothing about edge-sensitivity. Compare against a same-prefix, different-EDGE
+    // identity instead, so the assertion still proves what it claims: `hashViolation`
+    // is sensitive to which edge `identity` names, not merely to its prefix.
+    const differentEdge: ArchViolation = { ...found[0]!, identity: 'cycle-edge::a->c' }
+    expect(hashViolation(found[0]!)).not.toBe(hashViolation(differentEdge))
 
     // **The limit, stated rather than papered over.** What this does NOT measure is what
     // v0.46.1 actually reported, and it cannot: no option turns re-export edges off, so the
@@ -646,9 +646,11 @@ describe('what the new edges do to identity and to vacuity (plan 0085)', () => {
         .rule({ id: 'test/no-cycles', because: 'cycles break module init order' })
         .violations(),
     )
-    expect(found).toHaveLength(1)
+    expect(found).toHaveLength(2)
     expect(found[0]!.file).toMatch(/src\/a\/index\.ts$/)
     expect(found[0]!.line).toBe(1)
+    expect(found[1]!.file).toMatch(/src\/b\/index\.ts$/)
+    expect(found[1]!.line).toBe(1)
   })
 
   it('VACUITY: the fixtures really resolve two slices with files in each', () => {

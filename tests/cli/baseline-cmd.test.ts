@@ -198,7 +198,7 @@ describe('runBaseline', () => {
 
       expect(output).toContain('(+2, −2)')
       expect(output).toContain('No entry survived')
-      expect(output).toContain('The identity format changed (v1 → v4)')
+      expect(output).toContain('The identity format changed (v1 → v5)')
     })
 
     /**

@@ -135,6 +135,15 @@ export function applyFilters(
     const matchedPatterns = new Set<number>()
     /** Patterns that matched a meta-finding, which cannot be excluded. */
     const refusedPatterns = new Set<number>()
+    // Per exclusion-pattern index, the DISTINCT `element` values it matched among
+    // violations whose `identity` starts with `cycle-edge::` (plan 0104). A plain
+    // string-prefix read of a field every violation already carries — no cycle-specific
+    // import here, so this stays family-agnostic in spirit even though today only one
+    // family sets that prefix. One pattern matching more than one distinct cycle edge is
+    // the exact loophole a whole-component `.excluding()` waiver reopens: it silently
+    // absorbs any FUTURE edge the pattern also happens to match, which is the same
+    // fail-open shape plan 0104's `element`-per-edge change exists to close.
+    const matchedCycleEdges = new Map<number, Set<string>>()
     result = result.filter((v) => {
       // Config-level meta-findings (empty selector / empty discovery) are never
       // excludable: they report that the rule checks NOTHING, so silencing one
@@ -167,6 +176,11 @@ export function applyFilters(
       )
       if (matchIndex >= 0) {
         matchedPatterns.add(matchIndex)
+        if (v.identity?.startsWith('cycle-edge::') === true) {
+          const set = matchedCycleEdges.get(matchIndex) ?? new Set<string>()
+          set.add(v.element)
+          matchedCycleEdges.set(matchIndex, set)
+        }
         return false
       }
       return true
@@ -186,6 +200,23 @@ export function applyFilters(
           `[ts-archunit] Unused exclusion '${String(pattern)}' in rule '${ruleId}'. ` +
             `It matched zero violations — it may be stale after a rename.`,
         )
+      } else {
+        // A pattern matching more than one distinct cycle edge silently absorbs any
+        // future edge it also happens to match — the loose-regex loophole plan 0104's
+        // per-edge `element` reopens for anyone matching on `file`/`message` instead of an
+        // exact `element` string (an exact string can only equal one edge, by
+        // construction). Advisory, matching "Unused exclusion" one line above it: not a
+        // second unsuppressable gate stacked onto an already-large migration.
+        const edges = matchedCycleEdges.get(index)
+        if (edges !== undefined && edges.size > 1) {
+          const sorted = [...edges].sort()
+          writeStderr(
+            `[ts-archunit] Exclusion '${String(pattern)}' in rule '${ruleId}' matched ${String(sorted.length)} ` +
+              `distinct cycle edges (${sorted.join(', ')}). A pattern matching more than one edge silently ` +
+              `absorbs any future cycle among the edges it matches — name each edge separately: ` +
+              `.excluding(${sorted.map((e) => `'${e}'`).join(', ')}).`,
+          )
+        }
       }
     })
   }

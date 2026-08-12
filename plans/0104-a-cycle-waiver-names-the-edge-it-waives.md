@@ -1,6 +1,10 @@
 # Plan 0104 — A Cycle Waiver Names The Edge It Waives
 
-**Status:** PROPOSED. Revised once, by a five-persona review (2026-08-12) that found two Critical gaps — the
+**Status:** Implemented on `main`, unreleased. Phases 1–2 (mechanism + test migration) and Phase 3's
+`docs/slices.md` example are done; the `docs/upgrading.md` row and `CHANGELOG.md` entry are drafted
+below (Release) and land at actual release time, not before — consistent with this project's convention
+that a version-keyed doc row names a version that has shipped. Revised once, by a five-persona review
+(2026-08-12) that found two Critical gaps — the
 KNOWN LIMIT/minimal-diff tests asserted `identity` or "still present" without asserting `element`/"absent,"
 which a completely broken `.excluding()` or a sabotaged `element` would both pass; and an incorrectly-cited
 `HASH_VERSION` precedent (the plan argued against a bump using the exact premise `baseline.ts`'s own history

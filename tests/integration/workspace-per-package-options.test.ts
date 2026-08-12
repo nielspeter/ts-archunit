@@ -68,7 +68,7 @@ describe('workspace() resolves verbatimModuleSyntax per package (bug 0058)', () 
   })
 
   it('each package alone gives the right answer — the control', () => {
-    expect(cyclesIn(project(cfg(ON)), ON)).toEqual(['[a, b]'])
+    expect(cyclesIn(project(cfg(ON)), ON)).toEqual(['a -> b', 'b -> a'])
     expect(cyclesIn(project(cfg(OFF)), OFF)).toEqual([])
   })
 
@@ -76,7 +76,7 @@ describe('workspace() resolves verbatimModuleSyntax per package (bug 0058)', () 
     // Was a FALSE NEGATIVE — the real cycle vanished, because the primary's `false`
     // was applied to a package whose own tsconfig says `true`.
     const ws = workspace([cfg(ON), cfg(OFF)])
-    expect(cyclesIn(ws, ON)).toEqual(['[a, b]'])
+    expect(cyclesIn(ws, ON)).toEqual(['a -> b', 'b -> a'])
     expect(cyclesIn(ws, OFF)).toEqual([])
   })
 
@@ -85,7 +85,7 @@ describe('workspace() resolves verbatimModuleSyntax per package (bug 0058)', () 
     // runtime, whose remedy cannot be applied.
     const ws = workspace([cfg(ON_FIRST), cfg(OFF_SECOND)])
     expect(cyclesIn(ws, OFF_SECOND)).toEqual([])
-    expect(cyclesIn(ws, ON_FIRST)).toEqual(['[a, b]'])
+    expect(cyclesIn(ws, ON_FIRST)).toEqual(['a -> b', 'b -> a'])
   })
 
   it('the edge classification itself is per package, not just the cycle verdict', () => {
@@ -108,7 +108,7 @@ describe('workspace() resolves verbatimModuleSyntax per package (bug 0058)', () 
   it('a UNIFORM workspace is unaffected', () => {
     // Per-file resolution must not break the common case, where every package agrees.
     const ws = workspace([cfg(ON), cfg(ON_FIRST)])
-    expect(cyclesIn(ws, ON)).toEqual(['[a, b]'])
-    expect(cyclesIn(ws, ON_FIRST)).toEqual(['[a, b]'])
+    expect(cyclesIn(ws, ON)).toEqual(['a -> b', 'b -> a'])
+    expect(cyclesIn(ws, ON_FIRST)).toEqual(['a -> b', 'b -> a'])
   })
 })
