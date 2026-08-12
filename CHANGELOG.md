@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.59.1] - 2026-08-12
+
+### Fixed
+
+- **`requireGraphQL()` reported "not installed" for every load failure, not just a missing package.**
+  Found by running `preset/recommended/no-silent-catch` over this repo's own `src/` for the first time
+  (plan 0102). A `graphql` install that's present but broken — a corrupt install, a version mismatch, a
+  throw during `graphql`'s own module initialisation — was told to run `npm install graphql`, an install
+  that cannot fix any of those, while the actual cause was discarded.
+
+  Now distinguishes the two: Node's `MODULE_NOT_FOUND` names the specifier it failed to resolve, so
+  `Cannot find module 'graphql'` (the package itself is missing) still gets the install instruction, and
+  everything else — including a `MODULE_NOT_FOUND` naming one of `graphql`'s own internal files, the
+  corrupt-install case this fix was written for — gets a message carrying the real cause instead. Both
+  paths now attach `{ cause }`, which the original code discarded entirely.
+
 ## [0.59.0] - 2026-08-08
 
 > **If your CI just went red on this upgrade:** a rule that runs and examines **zero units** now fails

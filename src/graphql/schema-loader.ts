@@ -72,7 +72,8 @@ interface GraphQLPackage {
 let cachedGraphQL: GraphQLPackage | undefined
 
 /**
- * Load the graphql package synchronously. Throws a clear error if not installed.
+ * Load the graphql package synchronously. Throws a clear error describing why
+ * the package could not be used.
  *
  * Uses createRequire for synchronous loading since schema loading is synchronous.
  */
@@ -90,15 +91,27 @@ function requireGraphQL(): GraphQLPackage {
     cachedGraphQL = esmRequire('graphql') as GraphQLPackage
     return cachedGraphQL
   } catch (cause) {
-    // MODULE_NOT_FOUND is the only failure the install instruction answers.
-    // Every other cause — a corrupt install, a version mismatch, a throw from
-    // `graphql`'s own module initialisation — used to be reported as "not
-    // installed", which sends the reader to run an install that cannot help and
-    // discards the one line that would have told them what actually happened.
-    // Found by running `preset/recommended/no-silent-catch` over our own `src/`
-    // for the first time.
-    const missing = cause instanceof Error && 'code' in cause && cause.code === 'MODULE_NOT_FOUND'
-    if (missing) {
+    // The install instruction only answers "the `graphql` package itself is
+    // missing". Node's own MODULE_NOT_FOUND names the specifier it failed to
+    // resolve: requiring the missing top-level package throws
+    // "Cannot find module 'graphql'", while requiring an installed-but-corrupt
+    // package (one of ITS internal files missing) throws naming that internal
+    // file instead — same code, different specifier. Checking the message for
+    // the exact top-level specifier (verified against Node's actual output,
+    // see the fixture in tests/graphql/schema-loader-require-errors.test.ts)
+    // is what keeps a corrupt install from being told to run an install that
+    // cannot fix it. Every other cause — that corrupt-internal-file case, a
+    // version mismatch, a throw from `graphql`'s own module initialisation —
+    // used to be reported as "not installed" too, discarding the one line
+    // that would have told the reader what actually happened. Found by
+    // running `preset/recommended/no-silent-catch` over our own `src/` for
+    // the first time.
+    const notInstalled =
+      cause instanceof Error &&
+      'code' in cause &&
+      cause.code === 'MODULE_NOT_FOUND' &&
+      /Cannot find module 'graphql'/.test(cause.message)
+    if (notInstalled) {
       throw new Error(
         '[ts-archunit/graphql] The "graphql" package is required but not installed.\n' +
           'Install it with: npm install graphql',
