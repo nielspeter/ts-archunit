@@ -150,6 +150,13 @@ export function beFreeOfCycles(options?: ImportOptions): Condition<Slice> {
         // walking the file list, so an unsorted iteration order would make which edge is
         // "first" — and therefore, before this plan, the only reported one — depend on
         // filesystem order.
+        // INVARIANT (review: architect): every `scc` reaching this point has 2+
+        // members (`tarjanSCC` only returns components of size > 1) and `adjacency`
+        // is built from the same `edges` array this filter reads, so `internalEdges`
+        // is never empty here — a size-2+ strongly connected component always has at
+        // least one internal edge by construction. Not asserted at runtime: an empty
+        // result would silently emit zero violations for a real cycle, so if this
+        // invariant is ever wrong it fails open rather than throwing.
         const internalEdges = edges
           .filter((e) => inCycle.has(e.from) && inCycle.has(e.to))
           .sort((a, b) => byCodepoint(a.from, b.from) || byCodepoint(a.to, b.to))

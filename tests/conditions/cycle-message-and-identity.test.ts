@@ -28,7 +28,7 @@
  * inverted). Every internal edge of the component now gets its own violation, `element`,
  * and `identity`.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { Project, ts } from 'ts-morph'
 import type { ArchProject } from '../../src/core/project.js'
 import type { ArchViolation } from '../../src/core/violation.js'
@@ -339,10 +339,23 @@ describe('a cycle identity is a function of its edges (bug 0056, plan 0104)', ()
 
   it('the identity prefix is distinct at the point of collision, not just in the abstract', () => {
     // An old-format `cycle::` entry must not accidentally "match" a new-format
-    // `cycle-edge::` finding by coincidence.
+    // `cycle-edge::` finding by coincidence — and this has to be a MINIMAL pair
+    // (same edge spec, only the prefix differs), or the test proves hash
+    // injectivity over two arbitrary strings instead of prefix-sensitivity
+    // (review: testing — comparing against `'cycle::a,b'`, the OLD
+    // member-list notation, differs from the real identity in both prefix AND
+    // notation, so the assertion would still pass even if `slice.ts` were
+    // sabotaged to reuse the `cycle::` prefix on the NEW edge notation — the
+    // exact sabotage row this test is named for. Verified: reverting the
+    // prefix to `cycle::` in `slice.ts` now reds this test; it did not before).
     const [violation] = cyclesOf(ring(['a', 'b']), ['a', 'b'])
-    const oldFormat: ArchViolation = { ...violation!, identity: 'cycle::a,b' }
-    expect(hashViolation(oldFormat)).not.toBe(hashViolation(violation!))
+    // Derived from `element` (unaffected by the sabotage row this guards),
+    // NOT by string-editing `violation!.identity` — deriving from `identity`
+    // would make this comparator track whatever prefix production code
+    // happens to use, defeating the whole point of an independent check.
+    const edgeSpec = violation!.element.replace(' -> ', '->')
+    const samePrefixOldScheme: ArchViolation = { ...violation!, identity: `cycle::${edgeSpec}` }
+    expect(hashViolation(samePrefixOldScheme)).not.toBe(hashViolation(violation!))
   })
 
   it('the message still starts with "Cycle detected"', () => {
@@ -407,5 +420,44 @@ describe('a cycle identity is a function of its edges (bug 0056, plan 0104)', ()
       .filter((v) => v.bypassFilters !== true)
 
     expect(filtered.map((v) => v.element)).toEqual(['c -> b'])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('a loose regex over the message clause warns against REAL beFreeOfCycles output, not just a synthetic fixture', () => {
+    // The mechanical over-broad-exclusion check (execute-rule.ts) has its own
+    // unit test in tests/core/excluding-matching.test.ts, built from a
+    // hand-maintained `cycleEdge()` helper whose identity/element/message are a
+    // copy of the producer's shape (review: architect + testing, independently
+    // — nothing exercised the check against the REAL producer's actual output,
+    // so a future drift between the two copies — e.g. `slice.ts` renaming the
+    // `cycle-edge::` prefix — would silently stop firing while that unit test
+    // stayed green). This is that missing integration test: a real 3-ring,
+    // through the real chain, with the exact loose-regex loophole the plan's
+    // own Problem section names.
+    const names = ['a', 'b', 'c']
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const filtered = slices(ring(names))
+      .assignedFrom(definition(names))
+      .should()
+      .beFreeOfCycles()
+      .rule({ id: 'test/no-cycles', because: 'cycles break module init order' })
+      .excluding(/part of a cycle with: a, b, c/)
+      .violations()
+      .filter((v) => v.bypassFilters !== true)
+
+    // The loose regex still silently absorbs all three edges — that half of
+    // the loophole is real and unchanged by the mechanical check.
+    expect(filtered).toEqual([])
+
+    const text = warn.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(text).toContain('matched 3 distinct cycle edges')
+    expect(text).toContain('a -> b')
+    expect(text).toContain('b -> c')
+    expect(text).toContain('c -> a')
+    expect(text).toContain(".excluding('a -> b', 'b -> c', 'c -> a')")
   })
 })

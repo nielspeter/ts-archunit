@@ -252,19 +252,6 @@ the edges that actually changed — every other edge's `element`/`identity` stay
 byte-identical, so `.excluding('billing -> notifications')` waives exactly that one
 edge and nothing else in the component.
 
-::: warning Read the arrows as a member list, not a path
-This page showed a per-edge listing until v0.49.1 — two extra lines naming each edge and its
-location. **That output has never existed**; it was aspirational documentation from v0.1.0.
-
-What the arrows actually contain is the strongly-connected component's **members**, not a traversal.
-For a two-slice cycle that reads correctly. For three or more it does not: the order is an artefact
-of the cycle-detection algorithm, so the arrows can name pairs that are not edges at all, and the
-reported location may be an import that is perfectly legal — or missing entirely. Treat the list as
-"these slices are mutually entangled" and find the offending edge yourself.
-
-Being fixed; the per-edge output above is what it should say.
-:::
-
 ### `respectLayerOrder(...layers)` · `respectLayerOrder(layers, options)`
 
 Asserts that dependencies between slices follow the declared order. The first layer may depend on the second, the second on the third, and so on -- but not in reverse.

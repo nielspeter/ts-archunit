@@ -336,10 +336,18 @@ describe('BUG-0001: .excluding() matches element, file, and message', () => {
       // The check reads the `cycle-edge::` identity prefix, not "matched more than one
       // thing" in general — a legitimate broad exclusion in any other family (no
       // `identity` set at all, here) must not false-positive.
+      //
+      // `element` MUST differ between the two violations (review: testing — the
+      // original version gave both `element: 'CallExpression'` via
+      // `makeViolation`'s default, so `matchedCycleEdges`'s Set held one distinct
+      // value regardless of the identity-prefix check, and this control passed
+      // for the wrong reason: it proved the `edges.size > 1` size gate, not that
+      // the check is family-scoped. Verified by reverting the `cycle-edge::`
+      // check entirely and confirming this row now reds without the fix below).
       const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       const violations = [
-        makeViolation({ file: '/src/a.ts', message: 'notDependOn: a depends on b' }),
-        makeViolation({ file: '/src/b.ts', message: 'notDependOn: b depends on c' }),
+        makeViolation({ element: 'a', file: '/src/a.ts', message: 'notDependOn: a depends on b' }),
+        makeViolation({ element: 'b', file: '/src/b.ts', message: 'notDependOn: b depends on c' }),
       ]
       applyFilters(violations, {
         exclusions: [/depends on/],

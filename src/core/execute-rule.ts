@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import type { ArchViolation } from './violation.js'
-import { severityFor, disambiguateIdentities } from './violation.js'
+import { severityFor, disambiguateIdentities, byCodepoint } from './violation.js'
 import type { CheckOptions, OutputFormat } from './check-options.js'
 import type { RuleMetadata } from './rule-metadata.js'
 import { ArchRuleError } from './errors.js'
@@ -205,11 +205,24 @@ export function applyFilters(
         // future edge it also happens to match — the loose-regex loophole plan 0104's
         // per-edge `element` reopens for anyone matching on `file`/`message` instead of an
         // exact `element` string (an exact string can only equal one edge, by
-        // construction). Advisory, matching "Unused exclusion" one line above it: not a
-        // second unsuppressable gate stacked onto an already-large migration.
+        // construction). Advisory (`writeStderr`), not a `DiagnosticFinding` or a
+        // second unsuppressable gate. Review flagged the asymmetry directly rather
+        // than let it pass as settled: "Unused exclusion" above it warns about a
+        // pattern that silences NOTHING (fail-closed — the finding still fires, CI is
+        // still red), while this warns about a pattern that silences MULTIPLE real
+        // findings and every future one on the same edges (fail-open — a green
+        // `check()`, one stderr line). ADR-008 states the primary consumer does not
+        // read warnings. Kept advisory here, matching plan 0104's own review
+        // resolution — but the asymmetry is real and worth re-litigating if this
+        // loophole is measured firing in practice, not settled by the precedent
+        // alone.
         const edges = matchedCycleEdges.get(index)
         if (edges !== undefined && edges.size > 1) {
-          const sorted = [...edges].sort()
+          // byCodepoint, not the default comparator — this is user-facing (the
+          // suggested `.excluding(...)` line) and the same determinism class
+          // bug 0010 named for every other sorted, filesystem-adjacent output
+          // in this family (review: architect).
+          const sorted = [...edges].sort(byCodepoint)
           writeStderr(
             `[ts-archunit] Exclusion '${String(pattern)}' in rule '${ruleId}' matched ${String(sorted.length)} ` +
               `distinct cycle edges (${sorted.join(', ')}). A pattern matching more than one edge silently ` +
