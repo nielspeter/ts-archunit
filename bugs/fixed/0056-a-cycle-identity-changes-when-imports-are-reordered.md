@@ -1,8 +1,8 @@
 # Bug 0056: a cycle's identity changes when imports are reordered
 
-**Reported:** 2026-08-04 · **Fixed:** **half** — the fail-red half shipped in v0.52.0; the fail-open half is still open, see below
+**Reported:** 2026-08-04 · **Fixed:** v0.60.0 (fail-red half shipped in v0.52.0)
 **Found in:** every version since `beFreeOfCycles` shipped — latent until
-[plan 0084](../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) put
+[plan 0084](../../plans/completed/0084-cycle-detection-that-ignores-type-only-imports.md) put
 `arch/no-cycles` at `.check()` and told users to baseline cycle findings.
 **Severity:** **High.** A cosmetic edit reds CI, and the diagnostic it prints sends the reader after a
 cause that does not exist. Also silently fail-OPEN in the other direction, which is worse.
@@ -37,14 +37,14 @@ component: adding a brand-new cycle between two slices _already in_ it leaves th
 byte-identical, so an existing exclusion silences it.
 
 Our own waiver covers `[builders, conditions, helpers, predicates]` — **4 of the 6 gated slices** — so
-any new cycle confined to those four is now invisible. [Bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md)
+any new cycle confined to those four is now invisible. [Bug 0054](./0054-within-makes-helpers-depend-on-builders.md)
 claims _"any other cycle now fails the build"_ and `tests/archunit/arch-rules.test.ts` claims the
 exclusion is _"the fail-closed direction"_. Both are false, and both need correcting when this is fixed.
 
 Underneath sits a published-API gap: `beFreeOfCycles` emits **one violation per SCC**, so `.excluding()`
 can only waive a whole component. There is no way to waive _the `helpers → builders` edge_ and
 keep the rest red. That is fail-open by construction and belongs to
-[plan 0104](../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md).
+[plan 0104](../../plans/completed/0104-a-cycle-waiver-names-the-edge-it-waives.md).
 
 ## Why `canonicalizeCycle` does not already fix this
 
@@ -55,7 +55,7 @@ case. Rotation cannot canonicalise a **set** whose stored order is a DFS artifac
 ## Fix
 
 **Sort the member list.** For an SCC the order carries no information — see
-[bug 0055](./fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md), where printing it as a path is the
+[bug 0055](./0055-a-cycle-finding-names-edges-that-do-not-exist.md), where printing it as a path is the
 bug — so sorting loses nothing and makes the identity a function of membership alone.
 
 That deliberately reverses `canonicalizeCycle`'s stated reason for preserving direction. That reason is
@@ -81,11 +81,11 @@ lands with plan 0088.
 
 ## Related
 
-- [Bug 0055](./fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause.
-- [Plan 0104](../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md) — per-edge identity, which retires
+- [Bug 0055](./0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause.
+- [Plan 0104](../../plans/completed/0104-a-cycle-waiver-names-the-edge-it-waives.md) — per-edge identity, which retires
   the whole-component waiver. Split out of plan 0088 Phase 4, whose infrastructure (Phases 1–3) this
   depends on.
-- [Bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md) — its fail-closed claim is disproven here.
+- [Bug 0054](./0054-within-makes-helpers-depend-on-builders.md) — its fail-closed claim is disproven here.
 
 ## Half shipped in v0.52.0
 
@@ -103,10 +103,34 @@ That is pinned as a **known limit** in `tests/conditions/cycle-message-and-ident
 builds a ring, then the same ring plus a genuinely new `b↔c` cycle, and asserts the two produce the same
 identity. It is written as a limit rather than a fix so the row _inverts_ when granularity lands.
 
-The blast radius shrank in the same release: [bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md)
+The blast radius shrank in the same release: [bug 0054](./0054-within-makes-helpers-depend-on-builders.md)
 was fixed and our own four-slice waiver deleted, so nothing in this repository is currently absorbed. The
 mechanism remains for any adopter who waives a component.
 
 **The remaining fix is waiver granularity** — one finding per offending _edge_, or an exclusion that can
-name an edge — which is [plan 0104](../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md) (split out of
-plan 0088 Phase 4). This bug stays open until that lands.
+name an edge — which is [plan 0104](../../plans/completed/0104-a-cycle-waiver-names-the-edge-it-waives.md) (split
+out of plan 0088 Phase 4). This bug stays open until that lands.
+
+## Fix as shipped
+
+**v0.60.0.** `beFreeOfCycles` (`src/conditions/slice.ts`) now emits one violation **per internal edge** of
+the strongly-connected component, not one per whole component — every edge between two members of an SCC
+provably lies on some cycle (the component's own connectivity supplies the return path), so this is a
+provable superset, not a heuristic single "closing edge." `element` becomes `${from} -> ${to}` and
+`identity` becomes `cycle-edge::${from}->${to}` (replacing the old `cycle::${members}` scheme — distinct
+prefix, so an old-format baseline entry cannot collide with a new one). `HASH_VERSION` bumped 4 → 5, since
+this moves the identity of every existing cycle finding, for that family and no other.
+
+The fail-open half is now demonstrably closed: waiving a component's known edges
+(`.excluding('a -> b', 'b -> c', 'c -> a')`) no longer silences a genuinely new edge inside it
+(`'c -> b'` still reports) — proven live, asserting the filtered result contains only the new edge, not
+merely that it's "also" present alongside the waived ones (a no-op `.excluding()` would satisfy that
+weaker form too). A new mechanical check (`src/core/execute-rule.ts`) also warns when one `.excluding()`
+pattern matches more than one distinct cycle edge — closing the specific loophole where a migrator reaches
+for a loose regex over the still-present "part of a cycle with: …" message clause instead of naming each
+edge, which would otherwise silently re-absorb the whole component again.
+
+Full design and the ~27-site test migration: [plan 0104](../../plans/completed/0104-a-cycle-waiver-names-the-edge-it-waives.md).
+**Sabotage matrix:** that plan's own Test inventory section, including two-persona (architect + testing)
+review that found and fixed a vacuous test control before this shipped — see the plan's Files Changed /
+Test inventory for the reconciled set.

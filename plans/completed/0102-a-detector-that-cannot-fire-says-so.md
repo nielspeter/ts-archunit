@@ -1,8 +1,9 @@
 # Plan 0102 — A Detector That Cannot Fire Says So
 
-**Status:** PROPOSED. Phases 1–4 implemented. The N+1 flip (`INERT_FINDING_EMIT = true`) is tracked
-separately in [plan 0105](./0105-the-inert-finding-flipped.md), per this plan's own Release section.
-**Implements:** [proposal 027](../proposals/027-a-rule-that-cannot-fire-says-so.md). Corrected twice since:
+**Status:** DONE (v0.60.0). Phases 1–4 implemented and shipped. The N+1 flip (`INERT_FINDING_EMIT = true`)
+is out of this plan's own scope by design — tracked separately in
+[plan 0105](../0105-the-inert-finding-flipped.md), per this plan's own Release section.
+**Implements:** [proposal 027](../../proposals/027-a-rule-that-cannot-fire-says-so.md). Corrected twice since:
 once against the proposal itself (see "The framing, corrected from the proposal" below), and once by a
 five-persona review of this plan (2026-08-12) that found a compile error in the Phase 3 code sample (verified
 against this repo's own `tsc`), a silently-dropped `groupByFolder()` ordering contract, an existing test this
@@ -10,10 +11,10 @@ plan's own predicate would break at the flip with no mention in Files Changed, a
 two" performance claim, and a release-mechanism gap (nothing forces the N+1 flip to happen, and the plan
 originally mis-cited 0.59.0 as precedent for a shape 0.59.0 did not use). All five are fixed inline below
 rather than left for the implementer to rediscover.
-**Depends on:** the plan for [proposal 026](../proposals/026-sabotage-is-a-command-not-a-ritual.md) — 027's
+**Depends on:** the plan for [proposal 026](../../proposals/026-sabotage-is-a-command-not-a-ritual.md) — 027's
 regression guard ("deleting `validateOverrides` still reds") is itself a 026-shaped sabotage; 026 mechanises
 that class of guard first, 027 leaves it hand-run. File together; 026 unblocks 027's guard, not its construction.
-**Priority:** High — liquidates [bug 0077(A)](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md),
+**Priority:** High — liquidates [bug 0077(A)](../../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md),
 an on-record High-severity fail-open the vacuity matrix already audits, and the offending rule is this
 project's own dogfood corpus's worked example of the exact failure the tool exists to prevent. Priority and
 blast radius sit on different axes and are not in tension: priority tracks the severity of the lie (a
@@ -32,7 +33,7 @@ export and this flips currently-green rules red on the flip release, so ADR-008 
 (diagnose-first on N, fail on N+1) applies and the finding is error / unsuppressable. But it has **no preset
 conduit** (only `duplicateBodies` reaches presets). **Citation corrected by review:** the "used ~zero times"
 figure does not come from ADR-009's context table — it traces to
-[`plans/ROADMAP.md:162`](../plans/ROADMAP.md) (proposal 018's discovery-surface measurement), and it is a
+[`plans/ROADMAP.md:162`](../ROADMAP.md) (proposal 018's discovery-surface measurement), and it is a
 **combined** count for `duplicateBodies` **and** `inconsistentSiblings` together against one external corpus,
 not a detector-specific figure. No evidence contradicting "small adoptership" turned up elsewhere in this
 repo (README, spec, tests, docs — only dogfood usage found), but the number itself is secondhand and
@@ -67,7 +68,7 @@ the rule, not grepping the files, is what this plan's own thesis says to do; re-
 `call('this.copy')` reproduces the claimed numbers exactly. The rule passes today either way, and the
 test file that shipped it green has nothing to say about it.
 
-**This is not discovery; it is liquidation.** [Bug 0077(A)](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md)
+**This is not discovery; it is liquidation.** [Bug 0077(A)](../../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md)
 filed this exact case — the identical rule, the identical measurement, all four guards green — on 2026-08-09,
 and its "why it probably cannot be mechanised" section proposed the candidate: _"a rule is falsifiable if some
 single-element perturbation of its examined set changes its verdict, which is expensive but not obviously
@@ -701,7 +702,7 @@ as 0.59.0.
     tracked in plan NNNN"), so the flip is a scheduled deliverable with an owner and a landing point — not a
     property of this plan's prose. The N+1 test (`check()` fails with the identical string `diagnose()`
     previewed on N) cannot be written until that PR exists; it belongs to that PR's own test inventory, not
-    to this one's. **Filed: [plan 0105](./0105-the-inert-finding-flipped.md).**
+    to this one's. **Filed: [plan 0105](../0105-the-inert-finding-flipped.md).**
 
 The gate is a single module constant, so the flip is one owned, reviewed line and the sabotage matrix can pin
 it (row: reverting the gate to false makes the N+1 tests green — the flip is not masked).

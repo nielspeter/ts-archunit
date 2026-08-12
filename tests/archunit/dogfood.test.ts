@@ -134,7 +134,7 @@ describe('smells: the detectors the floor lives by', () => {
   /**
    * RE-ENABLED — plan 0103 fixed the detector.
    *
-   * See [bug 0076](../../bugs/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md).
+   * See [bug 0076](../../bugs/fixed/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md).
    * `Fingerprint.kinds` was a sequence of `SyntaxKind` numbers and
    * `computeSimilarity` LCS over it, so identifiers never reached the
    * comparison — three bodies differing only in one assigned field's name

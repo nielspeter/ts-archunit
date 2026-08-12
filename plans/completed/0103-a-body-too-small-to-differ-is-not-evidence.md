@@ -1,8 +1,8 @@
 # Plan 0103 — A Body Too Small To Differ Is Not Evidence
 
-**Status:** Implemented on `main`, unreleased. Phase 0's triage, Phase 1's mechanism, and Phase 2's dogfood
-re-enable are all done; `docs/upgrading.md` and `CHANGELOG.md` land at actual release time, not before —
-same convention plan 0104 follows. Five-persona review (2026-08-12) independently reproduced this plan's central numbers
+**Status:** DONE (v0.60.0). Phase 0's triage, Phase 1's mechanism, and Phase 2's dogfood re-enable all
+shipped, with `docs/upgrading.md` and `CHANGELOG.md` entries added at release time. Five-persona review
+(2026-08-12) independently reproduced this plan's central numbers
 against the real, unmodified detector and confirmed them — and found that Phase 0 as originally scoped could
 land a default that breaks two of this repo's own existing tests (measured: a shared fixture at
 `distinctVocabulary = 7`, another pair with exactly one token of margin against the plan's own highest
@@ -10,7 +10,7 @@ candidate floor), that its selection criterion was satisfiable at a floor leavin
 that the proposed performance test risked a vacuous pass, and one code sketch (`describe()`) would have silently
 regressed plan 0099's dedupe-identity fix if pasted as shown. All fixed inline below, not left for the
 implementer to rediscover.
-**Fixes:** [bug 0076](../bugs/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md) — duplicate-body
+**Fixes:** [bug 0076](../../bugs/fixed/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md) — duplicate-body
 similarity erases identifiers, so every wither pairs with every other wither.
 **Priority:** Medium-high — reconciled against a fact that contradicts a first-draft "High," not asserted from
 this repo alone. In favor: `smells.duplicateBodies` is a root export (`export { duplicateBodies }` via

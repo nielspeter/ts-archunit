@@ -14,7 +14,7 @@
  *     hash. `edgeVerb()` had returned `'re-exports'` since v0.28.0 and no slice condition
  *     could use it without invalidating every baseline.
  *  3. The cycle identity carried traversal order —
- *     [bug 0056](../../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md).
+ *     [bug 0056](../../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md).
  *
  * This is [bug 0028](../../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md)'s
  * shape in the family that never got the fix. `docs/upgrading.md`'s own 0.28.0 row says it

@@ -90,7 +90,7 @@ cycle per SCC. Then locate the finding on an edge that exists — ideally the on
 
 Minimum viable, if the above is deferred: stop asserting arrows. `Cycle detected between: builders,
 conditions, helpers, predicates` is honest about being a member list, and a sorted list also fixes
-[bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md).
+[bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md).
 
 **Do not** fix the location by widening the details lookup to "any pair in the component" — that
 returns a legal import for most components and reintroduces defect 2 in a form that looks correct.
@@ -114,7 +114,7 @@ this bug is filed separately from the plan.
 
 ## Related
 
-- [Bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md) — same root, different
+- [Bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md) — same root, different
   symptom: the member order is a DFS artifact, so the identity is unstable.
 - [Plan 0088](../../plans/0088-a-slice-finding-identifies-itself.md) — unblocks the message rewrite.
 - [Bug 0054](./0054-within-makes-helpers-depend-on-builders.md) — the real closing edge in our own

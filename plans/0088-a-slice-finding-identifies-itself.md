@@ -5,7 +5,7 @@
 conclusion from different directions. Phase 4 outgrew a phase — a measured 27+-call-site test ripple, its
 own migration story, and a design finding (a fix touching only `identity` would leave `.excluding()` itself
 still fail-open) neither this document nor bug 0056 had stated — and is now
-[plan 0104](./0104-a-cycle-waiver-names-the-edge-it-waives.md), split out the same way plan 0093 split from
+[plan 0104](./completed/0104-a-cycle-waiver-names-the-edge-it-waives.md), split out the same way plan 0093 split from
 plan 0083 Phase 3.
 **Priority:** High. It is the keystone: three filed bugs cannot be fixed properly until it lands, and one
 of them is a live false green.
@@ -38,7 +38,7 @@ the warning now applies to a family that has no `identity` and no warning.
 message — and it means the message we shipped by accident is the message we are stuck with.
 
 **3. The cycle identity carries traversal order.** `element` is the SCC member list in DFS-pop order, so it
-changes when imports are reordered ([bug 0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md)).
+changes when imports are reordered ([bug 0056](../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md)).
 An identity that is not a function of the graph is not an identity.
 
 ## Phase 1 — decide what each finding IS
@@ -84,7 +84,7 @@ src/barrel.ts:3)`. `edgeVerb()` already returns `'re-exports'` and no slice cond
 
 ## Phase 4 — waiver granularity
 
-Split into [plan 0104](./0104-a-cycle-waiver-names-the-edge-it-waives.md). `beFreeOfCycles` emitted one
+Split into [plan 0104](./completed/0104-a-cycle-waiver-names-the-edge-it-waives.md). `beFreeOfCycles` emitted one
 violation per SCC, so `.excluding()` could only waive a whole component — bug 0056's fail-open half, "the
 more important row." Plan 0104 resolves the "in scope here or its own plan" question this section left
 open: standalone, and its own document states why.
@@ -115,12 +115,12 @@ open: standalone, and its own document states why.
 ## Related
 
 - [Bug 0055](../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md),
-  [0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md),
+  [0056](../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md),
   [0060](../bugs/fixed/0060-a-pattern-change-silently-invalidates-every-baselined-finding.md) — the three this
   unblocks.
 - [Bug 0028](../bugs/fixed/0028-two-findings-in-one-file-can-share-a-baseline-identity.md) — the same
   collapse, already solved once for another family.
 - `src/helpers/baseline.ts` (`hashViolation`, `normalizeIdentityText`, `HASH_VERSION`),
   `src/conditions/slice.ts`, `src/core/violation.ts`.
-- [Plan 0104](./0104-a-cycle-waiver-names-the-edge-it-waives.md) — Phase 4's split-out successor, waiver
+- [Plan 0104](./completed/0104-a-cycle-waiver-names-the-edge-it-waives.md) — Phase 4's split-out successor, waiver
   granularity for cycle findings.

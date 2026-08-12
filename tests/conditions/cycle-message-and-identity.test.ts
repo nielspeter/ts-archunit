@@ -1,8 +1,8 @@
 /**
  * A cycle finding says only what it can substantiate —
  * [bug 0055](../../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md),
- * [bug 0056](../../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md), and
- * [plan 0104](../../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md).
+ * [bug 0056](../../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md), and
+ * [plan 0104](../../plans/completed/0104-a-cycle-waiver-names-the-edge-it-waives.md).
  *
  * `beFreeOfCycles` printed a strongly-connected **component** as if it were a **path**:
  * `[...members, members[0]].join(' -> ')`. An SCC is a set, and `tarjanSCC` pops in

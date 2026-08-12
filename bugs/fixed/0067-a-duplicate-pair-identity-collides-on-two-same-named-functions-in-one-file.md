@@ -190,7 +190,7 @@ Candidates, none measured:
   literal in one function, which is not legal TypeScript for a plain literal — so it may be total.
 - **An ordinal among same-endpoint functions** (`#errorResponseBuilder#2`), in declaration order. Stable
   under edits elsewhere in the file, unstable under reordering the literals themselves — the shape
-  [bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md) is about. Do not ship this
+  [bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md) is about. Do not ship this
   without reading 0056 first.
 
 Whichever is chosen, it moves identities for the affected findings, so it carries a migration row. Per

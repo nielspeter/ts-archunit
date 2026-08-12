@@ -182,7 +182,7 @@ which is the shape the false-positive risk forbids.
   subset test, falsifiable by one insertion always; "silent today" is mere absence. Only a
   **threshold** predicate over held counts has an inert region, and `inconsistentSiblings` is the
   family that has one. This is the line the
-  [bug 0076](../bugs/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md)
+  [bug 0076](../bugs/fixed/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md)
   detector crossed to become noise; the measurement above keeps 027 on the near side of it.
 - **Partial inertness is out of scope.** `detect()` evaluates the majority/minority split **per
   folder**. A rule that fires in some folders and is inert in others reports nothing — the finding is

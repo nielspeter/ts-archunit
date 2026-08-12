@@ -314,7 +314,7 @@ that counts what was handed to it. Unrepresentable vacuity is the floor, not the
 [Bug 0077](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md) measures
 Adequacy and Provenance against worked examples (`inconsistentSiblings`'s majority arithmetic; a preset
 `include` glob matching the absolute path) rather than arguing them in the abstract — and finds Adequacy
-partly mechanisable per-family where a cheap proxy exists ([plan 0102](../plans/0102-a-detector-that-cannot-fire-says-so.md)),
+partly mechanisable per-family where a cheap proxy exists ([plan 0102](../plans/completed/0102-a-detector-that-cannot-fire-says-so.md)),
 without contradicting that the general case stays review-enforced.
 
 Prose-named cases become matrix rows (ADR-008's omission corollary — no diff will ever produce them):

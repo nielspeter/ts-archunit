@@ -155,7 +155,7 @@ control") have consistently declined to pay for a signal that is itself only a l
 proof. Recorded as declined rather than silently dropped, matching this project's convention for
 rejected alternatives (see e.g. plan 0103's rejected LCS-augmentation options).
 
-**A is partly mechanised already, and that is consistent, not contradictory.** [Plan 0102](../plans/0102-a-detector-that-cannot-fire-says-so.md)
+**A is partly mechanised already, and that is consistent, not contradictory.** [Plan 0102](../plans/completed/0102-a-detector-that-cannot-fire-says-so.md)
 ships a cheap, family-specific falsifiability check for exactly the measured instance this bug's Part A
 used as its worked example (`inconsistentSiblings`'s majority-threshold arithmetic) — proving a cheap
 proxy CAN exist for a specific family's specific shape, while the general case (arbitrary

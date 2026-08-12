@@ -134,7 +134,7 @@ migration and is not:
 The middle row is disqualifying: paying the debt down reds CI. `disambiguateIdentities` does not
 help — it repairs collisions, not churn.
 
-It also inherits the defect keeping [bug 0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md)
+It also inherits the defect keeping [bug 0056](../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md)
 open, which is **not** the edge-absorption half but the waiver half: `beFreeOfCycles` emits one
 violation per SCC, so `.excluding()` can only waive a whole component. One finding per group
 means one exclusion pattern waives a clique of 11 and every future duplication among them,

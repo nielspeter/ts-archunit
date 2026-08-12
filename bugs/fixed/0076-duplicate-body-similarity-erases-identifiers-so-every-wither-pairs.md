@@ -1,6 +1,6 @@
 # Bug 0076: duplicate-body similarity erases identifiers, so every wither pairs with every other wither
 
-**Reported:** 2026-08-09 · **Fixed:** not yet
+**Reported:** 2026-08-09 · **Fixed:** v0.60.0
 **Found in:** dogfooding `smells.duplicateBodies` on this repo for the first time, while writing
 `tests/archunit/dogfood.test.ts` — the detector is published and had never been pointed at `src/`.
 **Severity:** **High.** `smells.duplicateBodies` is published at the root export, and it is one of the
@@ -86,3 +86,32 @@ The `body-analysis` triple is **genuine** duplication — `functionNotContain` a
 differ only in how they name the element and build the violation. That one was found by reading, not
 by the detector, and it stands as its own piece of work. This bug is that the detector cannot tell
 that case apart from 470-odd withers.
+
+## Fix as shipped
+
+**v0.60.0.** Chose option 3 from the sketch above, after measuring all three against real bodies in this
+repository (not assumed from reading the code — see [plan 0103](../../plans/completed/0103-a-body-too-small-to-differ-is-not-evidence.md)'s
+Problem section for the full measurement, including why the two identifier-augmented-LCS options were
+rejected: neither threshold separates the false-positive triple from the genuine `body-analysis*.ts`
+duplicate). `Fingerprint` (`src/smells/fingerprint.ts`) gains a `distinctVocabulary` field — the count of
+distinct identifier/literal texts in a body, computed in the same AST walk `buildFingerprint()` already
+does. `DuplicateBodiesBuilder` gains `minDistinctVocabulary(n)` (default **8**, chosen by an
+implementation-time triage against the real, unmodified detector run over `src/`: floor 0 → 495 pairs,
+floor 8 → 161/163 — the lowest candidate where survivors first become a minority of the unfixed count,
+while the known false-positive triple is excluded at every floor ≥ 4 and the known genuine duplicate
+survives at every floor tested). The gate runs as a pairwise pre-filter, before AST similarity is even
+computed — `computeSimilarity()` itself is deliberately unchanged.
+
+This does **not** drive false positives to zero — a second, narrower false-positive class (unrelated
+condition functions sharing this codebase's own generic `evaluate()` skeleton) survives and is explicitly
+out of scope, to be filed as its own bug now that the corpus reflects this fix. `tests/archunit/dogfood.test.ts`
+is re-enabled against named, specific pairs (matched on `identity`, not a count) rather than asserting
+`.toEqual([])`, consistent with ADR-008 rule 5 — a count ceiling would read as coverage while a real
+regression hides under it.
+
+Full design and the Phase 0 triage record: [plan 0103](../../plans/completed/0103-a-body-too-small-to-differ-is-not-evidence.md).
+**Sabotage matrix:** that plan's Test inventory section. Two-persona (architect + testing) review of the
+shipped code found and fixed two vacuous tests before release — the re-enabled dogfood assertion checked
+an identity substring format that could never match (`#ignoreTests` vs. the real `#SmellBuilder.ignoreTests`),
+and no test distinguished `Math.min` from `Math.max` in the pairwise gate (both landed with symmetric
+fixtures only) — both verified fixed by reverting the guard and confirming the corresponding test reds.

@@ -1,9 +1,8 @@
 # Plan 0104 — A Cycle Waiver Names The Edge It Waives
 
-**Status:** Implemented on `main`, unreleased. Phases 1–2 (mechanism + test migration) and Phase 3's
-`docs/slices.md` example are done; the `docs/upgrading.md` row and `CHANGELOG.md` entry are drafted
-below (Release) and land at actual release time, not before — consistent with this project's convention
-that a version-keyed doc row names a version that has shipped. Revised once, by a five-persona review
+**Status:** DONE (v0.60.0). Phases 1–2 (mechanism + test migration) and Phase 3's `docs/slices.md` example
+shipped, with the `docs/upgrading.md` row and `CHANGELOG.md` entry added at release time. Revised once,
+by a five-persona review
 (2026-08-12) that found two Critical gaps — the
 KNOWN LIMIT/minimal-diff tests asserted `identity` or "still present" without asserting `element`/"absent,"
 which a completely broken `.excluding()` or a sabotaged `element` would both pass; and an incorrectly-cited
@@ -12,15 +11,15 @@ uses to justify bumping) — plus a real, previously-unmitigated loophole (a loo
 silently reopens the exact bug this plan fixes) that now gets a mechanical check instead of documentation
 alone. All three, plus a stale release-count figure, an under-enumerated file list, and several
 migration-communication gaps, are fixed inline below rather than left for the implementer to rediscover.
-**Splits out of:** [plan 0088](./0088-a-slice-finding-identifies-itself.md) Phase 4, once Phases 1–3
+**Splits out of:** [plan 0088](../0088-a-slice-finding-identifies-itself.md) Phase 4, once Phases 1–3
 shipped in v0.52.0 without it — same shape as
-[plan 0093](./0093-a-reference-consumer-for-the-presets.md) splitting out of plan 0083 Phase 3 when
+[plan 0093](../0093-a-reference-consumer-for-the-presets.md) splitting out of plan 0083 Phase 3 when
 that phase's hard requirements shipped without its wrapper. Phase 4's own text left this decision open
 ("Decide deliberately whether this is in scope here or its own plan"); this plan decides it, in its own
 document, for the reasons under **Why standalone**, below.
-**Fixes:** [bug 0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md)'s fail-open
+**Fixes:** [bug 0056](../../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md)'s fail-open
 half — the bug stays open, by its own text, until this lands. Corrects the disproven "fail-closed" claim
-[bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) made and bug 0056 already retracted.
+[bug 0054](../../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) made and bug 0056 already retracted.
 **Reconciled against bug 0056's own Test inventory (review: product, asked whether this plan fully closes
 it)**: rows 1/3/5 already closed by the fail-red half (v0.52.0); row 2 ("a new cycle... is REPORTED") is what
 this plan closes; row 4 ("the `.excluding()` example in `arch-rules.test.ts` still matches, fail-closed
@@ -52,7 +51,7 @@ migrated. Rate the work by the surface, per plan 0102's own instruction to do so
 names a cycle, and this is the second cycle-identity-affecting release for the same family within 8 days /
 **13 releases** (0.52.0 → 0.59.1, re-measured from `CHANGELOG.md` directly — the original draft's "7" was
 stale; review: architect).** Top row of
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6: guard the guard, adversarial review, mutate. The
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6: guard the guard, adversarial review, mutate. The
 tight-succession cost is real and is argued explicitly in **Release**, below, rather than assumed away —
 0.52.0's own CHANGELOG "Known limits" section pre-announced this exact follow-up by name, which is the
 strongest mitigation available and is cited there.
@@ -114,7 +113,7 @@ inCycle.has(e.to))`) is genuinely, verifiably "part of a cycle" — not an examp
 _single_ canonical "the closing edge" instead would require a minimum feedback-arc-set computation, which is
 NP-hard in general and, worse, non-canonical: different valid minimum sets exist for the same graph, and
 which one an algorithm returns depends on traversal order — reintroducing exactly the order-dependence bug
-0056 already fixed once, one layer up. [Bug 0055](../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md)'s
+0056 already fixed once, one layer up. [Bug 0055](../../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md)'s
 own residual ("recovering a real path") is this plan's own load-bearing distinction: it deferred exactly
 this "true minimal cycle" computation, for the same reason. This plan does not attempt it either — see
 **Out of scope**.
@@ -478,7 +477,7 @@ list exhaustive in practice regardless of what's enumerated here in advance.
 | `docs/upgrading.md`                                                          | new row: affected population, exact `.excluding()` rewrite, the loose-regex warning, the skip-migration pointer to the 0.52.0 row                                                                                                                     |
 | `CHANGELOG.md`                                                               | new `### Changed` entry citing 0.52.0's "Known limits" pre-announcement                                                                                                                                                                               |
 | `plans/0088-a-slice-finding-identifies-itself.md`                            | Status/Phase-4 section updated to reference this plan instead of carrying the open question itself                                                                                                                                                    |
-| `bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md`           | "The remaining fix" section's self-references to "plan 0088 Phase 4" updated to this plan's number                                                                                                                                                    |
+| `bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md`     | "The remaining fix" section's self-references to "plan 0088 Phase 4" updated to this plan's number                                                                                                                                                    |
 | `plans/ROADMAP.md`                                                           | new open-work row; plan 0088's row corrected to stop describing Phase 4 as open under 0088                                                                                                                                                            |
 
 No change to `src/helpers/slice-graph.ts`, `src/helpers/tarjan.ts`, `src/core/module-edges.ts`, or
@@ -734,12 +733,12 @@ change and not a new `DiagnosticFinding` kind.
 
 ## Related
 
-- [Bug 0056](../bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — the bug this plan closes.
-- [Bug 0055](../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause; its
+- [Bug 0056](../../bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — the bug this plan closes.
+- [Bug 0055](../../bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause; its
   residual ("recovering a real path") stays open and separate, see Out of scope.
-- [Bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) — the disproven "fail-closed"
+- [Bug 0054](../../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) — the disproven "fail-closed"
   claim this plan's mechanism actually delivers on.
-- [Plan 0088](./0088-a-slice-finding-identifies-itself.md) — Phases 1–3 (identity infrastructure,
+- [Plan 0088](../0088-a-slice-finding-identifies-itself.md) — Phases 1–3 (identity infrastructure,
   message rewrite), which this plan builds directly on; Phase 4 splits into this document.
 - [Plan 0102](./0102-a-detector-that-cannot-fire-says-so.md) — the two-phase gated-migration shape
   this plan deliberately does not use, with the distinction argued in Release.

@@ -126,7 +126,7 @@ was reintroduced to prove the rules still fire. Both red:
 ## The claim in this report that was wrong
 
 It said _"any other cycle now fails the build"_ and the suite called the exclusion _"the fail-closed
-direction"_. [Bug 0056](../0056-a-cycle-identity-changes-when-imports-are-reordered.md) disproved both:
+direction"_. [Bug 0056](./0056-a-cycle-identity-changes-when-imports-are-reordered.md) disproved both:
 an SCC absorbs new intra-component edges without changing its name, so a new cycle among those four
 slices was silently accepted. Deleting the waiver removes the instance; the mechanism is 0056's
 fail-open half and remains open.
