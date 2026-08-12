@@ -42,9 +42,9 @@ claims _"any other cycle now fails the build"_ and `tests/archunit/arch-rules.te
 exclusion is _"the fail-closed direction"_. Both are false, and both need correcting when this is fixed.
 
 Underneath sits a published-API gap: `beFreeOfCycles` emits **one violation per SCC**, so `.excluding()`
-can only waive a whole component. There is no way to waive _the `helpers/within.ts → builders` edge_ and
+can only waive a whole component. There is no way to waive _the `helpers → builders` edge_ and
 keep the rest red. That is fail-open by construction and belongs to
-[plan 0088](../plans/0088-a-slice-finding-identifies-itself.md).
+[plan 0104](../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md).
 
 ## Why `canonicalizeCycle` does not already fix this
 
@@ -82,8 +82,9 @@ lands with plan 0088.
 ## Related
 
 - [Bug 0055](./fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — same root cause.
-- [Plan 0088](../plans/0088-a-slice-finding-identifies-itself.md) — per-edge identity, which retires the
-  whole-component waiver.
+- [Plan 0104](../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md) — per-edge identity, which retires
+  the whole-component waiver. Split out of plan 0088 Phase 4, whose infrastructure (Phases 1–3) this
+  depends on.
 - [Bug 0054](./fixed/0054-within-makes-helpers-depend-on-builders.md) — its fail-closed claim is disproven here.
 
 ## Half shipped in v0.52.0
@@ -107,5 +108,5 @@ was fixed and our own four-slice waiver deleted, so nothing in this repository i
 mechanism remains for any adopter who waives a component.
 
 **The remaining fix is waiver granularity** — one finding per offending _edge_, or an exclusion that can
-name an edge — which is [plan 0088](../plans/0088-a-slice-finding-identifies-itself.md) Phase 4. This bug
-stays open until that lands.
+name an edge — which is [plan 0104](../plans/0104-a-cycle-waiver-names-the-edge-it-waives.md) (split out of
+plan 0088 Phase 4). This bug stays open until that lands.

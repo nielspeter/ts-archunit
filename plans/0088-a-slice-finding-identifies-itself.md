@@ -1,7 +1,12 @@
 # Plan 0088 — a slice finding identifies itself
 
-**Status:** **Phases 1–3 DONE (v0.52.0). Phase 4 (waiver granularity) not started** — it is bug 0056's remaining fail-open half. Filed 2026-08-04, Filed 2026-08-04 from the five-persona review of v0.47.0–v0.49.0, where
-three reviewers reached the same conclusion from different directions.
+**Status:** **Phases 1–3 DONE (v0.52.0). Phase 4 (waiver granularity) split into its own plan.** Filed
+2026-08-04 from the five-persona review of v0.47.0–v0.49.0, where three reviewers reached the same
+conclusion from different directions. Phase 4 outgrew a phase — a measured 27+-call-site test ripple, its
+own migration story, and a design finding (a fix touching only `identity` would leave `.excluding()` itself
+still fail-open) neither this document nor bug 0056 had stated — and is now
+[plan 0104](./0104-a-cycle-waiver-names-the-edge-it-waives.md), split out the same way plan 0093 split from
+plan 0083 Phase 3.
 **Priority:** High. It is the keystone: three filed bugs cannot be fixed properly until it lands, and one
 of them is a live false green.
 **Effort:** Medium. The mechanism is one field; the work is choosing what each finding's identity _is_ and
@@ -79,14 +84,10 @@ src/barrel.ts:3)`. `edgeVerb()` already returns `'re-exports'` and no slice cond
 
 ## Phase 4 — waiver granularity
 
-`beFreeOfCycles` emits one violation per SCC, so `.excluding()` can only waive a **whole component**. Ours
-covers 4 of 6 gated slices, which means a new cycle among those four is silently accepted
-(bug 0056's fail-open half). Once a cycle finding names its closing edge, an exclusion can name that edge
-instead — which is what [bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md)'s waiver
-actually wants and cannot express.
-
-Decide deliberately whether this is in scope here or its own plan; it is the difference between a waiver
-that is fail-open by construction and one that is not.
+Split into [plan 0104](./0104-a-cycle-waiver-names-the-edge-it-waives.md). `beFreeOfCycles` emitted one
+violation per SCC, so `.excluding()` could only waive a whole component — bug 0056's fail-open half, "the
+more important row." Plan 0104 resolves the "in scope here or its own plan" question this section left
+open: standalone, and its own document states why.
 
 ## Test inventory
 
@@ -121,3 +122,5 @@ that is fail-open by construction and one that is not.
   collapse, already solved once for another family.
 - `src/helpers/baseline.ts` (`hashViolation`, `normalizeIdentityText`, `HASH_VERSION`),
   `src/conditions/slice.ts`, `src/core/violation.ts`.
+- [Plan 0104](./0104-a-cycle-waiver-names-the-edge-it-waives.md) — Phase 4's split-out successor, waiver
+  granularity for cycle findings.
