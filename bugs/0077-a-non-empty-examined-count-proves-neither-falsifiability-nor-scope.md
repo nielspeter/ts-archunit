@@ -121,3 +121,55 @@ Whatever is decided, the guard for A already exists as a worked example and shou
 `inconsistentSiblings` row in `tests/archunit/dogfood.test.ts` carries the whole story in its comment
 — the `call('copy')` version that examined 11 and could not fail, and the `validateOverrides` version
 that replaced it, which a one-line deletion from any preset turns red (sabotage: CAUGHT).
+
+## Resolution (2026-08-12)
+
+**A is review-enforced residue, and ADR-009 already says so — it was not a gap in the ADR, it was a gap
+in reading the ADR's own Notes section against this bug.** `adr/009-a-pass-is-constructed-from-evidence.md`'s
+Notes name three honest limits explicitly: **Adequacy** ("a check can examine 500 subjects and still
+assert nothing worth knowing; ADR-008's rules own that"), **Provenance** ("evidence wired from the wrong
+layer... lives between them, and only review catches it, family by family"), and **User conditions** (a
+`defineCondition` body that internally skips every subject is invisible to a seam that counts what was
+handed to it). Part A of this bug **is** Adequacy — restated with a measured worked example rather than
+argued in the abstract. Part B **is** Provenance — restated with a measured worked example too (the
+`include: '**/src/**'` absolute-path collision). Both were already scoped out of ADR-009's unrepresentable-vacuity
+floor, on the day the ADR was drafted, for the reason this bug's own "Why it probably cannot be
+mechanised" section re-derives independently: falsifiability and intended-scope are properties of the
+interaction between a condition's semantics and a specific corpus, which the type system cannot see and
+a structural seam cannot audit for every family in advance.
+
+**Recommendation: ratify ADR-009 (Proposed → Accepted).** Its own stated gate — "goes to Accepted on
+0095's measurement" (`plans/ROADMAP.md`) — has been satisfied since 0095 shipped; the status line is
+stale, not blocked. Ratifying should add one line to the Notes section citing this bug by number next to
+Adequacy and Provenance, so a future reader finds the measured instance next to the limit it measures,
+rather than rediscovering the same gap a third time. **Not done unilaterally here** — an ADR is binding
+project policy (`CLAUDE.md`), so the status flip is left for the user to confirm rather than executed as
+a side effect of closing this bug.
+
+**A's "cheaper mechanical proxy" candidate (single-element perturbation of the examined set changes the
+verdict) — considered and declined, not adopted.** It only ever answers the question for the ONE corpus
+state under test, not the corpus the rule will actually run against next; it requires re-evaluating the
+condition N times per rule (N = examined-set size) on every `check()`, which is the kind of per-run cost
+this project's own performance-sensitive families (ADR-008 rule 6, "an internal check over a corpus we
+control") have consistently declined to pay for a signal that is itself only a local approximation, not a
+proof. Recorded as declined rather than silently dropped, matching this project's convention for
+rejected alternatives (see e.g. plan 0103's rejected LCS-augmentation options).
+
+**A is partly mechanised already, and that is consistent, not contradictory.** [Plan 0102](../plans/0102-a-detector-that-cannot-fire-says-so.md)
+ships a cheap, family-specific falsifiability check for exactly the measured instance this bug's Part A
+used as its worked example (`inconsistentSiblings`'s majority-threshold arithmetic) — proving a cheap
+proxy CAN exist for a specific family's specific shape, while the general case (arbitrary
+`defineCondition` bodies, arbitrary predicates) still cannot be audited structurally. "Review-enforced
+residue in general, mechanised per-family where a cheap proxy is found" is the honest state, not
+"review-enforced, full stop" — and it matches how ADR-009 itself was built (wave by wave, family by
+family, per its own Context table).
+
+**B needs a plan, not a decision made here.** The "project-root anchor" sketch above is a real, new,
+generic API surface (every family's `include`/`inFolder`/discovery glob would need to state and be
+checked against an intended root) — exactly the shape this project's `review-proposal` skill exists to
+survey before a plan is drafted, and inventing the mechanism from this one bug's instance is the same
+narrow-enumeration mistake ADR-009's own Context table names four times over. **Not filed as a plan in
+this pass** — recommend a proposal survey first (does `within()`, `assignedFrom()`, or any existing
+project-root resolution already give this for free? `src/core/identity-root.ts` resolves a root today for
+baseline portability and may be the seam to extend rather than a new one to invent) before committing to
+the sketch verbatim.

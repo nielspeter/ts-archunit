@@ -311,6 +311,11 @@ present and the matrix checks the zero-file cell; evidence wired from the wrong 
 (`examined: sourceFiles.length`) lives between them, and only review catches it, family by family.
 **User conditions**: a `defineCondition` body that internally skips every subject is invisible to a seam
 that counts what was handed to it. Unrepresentable vacuity is the floor, not the ceiling.
+[Bug 0077](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md) measures
+Adequacy and Provenance against worked examples (`inconsistentSiblings`'s majority arithmetic; a preset
+`include` glob matching the absolute path) rather than arguing them in the abstract — and finds Adequacy
+partly mechanisable per-family where a cheap proxy exists ([plan 0102](../plans/0102-a-detector-that-cannot-fire-says-so.md)),
+without contradicting that the general case stays review-enforced.
 
 Prose-named cases become matrix rows (ADR-008's omission corollary — no diff will ever produce them):
 bug 0066's "Not measured" items — `inconsistentSiblings`, `.expectEmpty()` reachability on a smell
