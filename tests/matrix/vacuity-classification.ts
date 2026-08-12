@@ -164,6 +164,12 @@ export const CHECKS: Record<string, CheckEntry> = {
     recipe: (c) => layeredArchitecture(c.project, { layers: { a: '**/a/**', b: '**/b/**' } }),
   },
   './presets:dataLayerIsolation': {
+    // Plan 0100: this minimal call constructs ZERO rules — `unit` describes the
+    // OTHER presets' verdict shape, and stays accurate for what this recipe
+    // would have measured before 0100. Since 0100, `verdictOf()`'s
+    // `hasManufacturedFinding` branch reports this cell's actual verdict
+    // (`'config-finding'`, not one-per-rule) — see `KNOWN_FAIL_OPEN`'s comment
+    // in vacuity-matrix.test.ts.
     unit: 'per constructed rule',
     recipe: (c) => dataLayerIsolation(c.project, { repositories: '**/repo/**' }),
   },

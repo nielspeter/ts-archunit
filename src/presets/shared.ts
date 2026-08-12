@@ -254,6 +254,62 @@ export function declaredEmptyFindings(
   return [{ violations: () => violations }]
 }
 
+/**
+ * Guard a preset's *construction* step (plan 0100): every rule this preset can
+ * build sits behind its own optional flag, and the required field is only the
+ * selector — so satisfying the type completely can still enable nothing.
+ * Measured: `agentGuardrails({ src })` and `dataLayerIsolation({ repositories })`
+ * both construct zero rules, on every corpus, and report nothing — the loop a
+ * user holds runs zero times and every gate is green.
+ *
+ * `attempted` is the id list the caller's OPTIONS asked for, computed BEFORE
+ * `overrides` is consulted — the same distinction plan 0099's floor draws
+ * between zero-subjects and declared-empty:
+ *
+ * - `attempted.length === 0` — no rule was ever enabled. A mistake: fire.
+ * - `attempted.length > 0` and nothing was constructed — every enabled rule
+ *   was explicitly turned off (`overrides: { id: 'off' }`), which
+ *   {@link UNSUPPRESSABLE}'s own text already treats as a permanent, legitimate
+ *   decision, not a suppression. Silent.
+ *
+ * Fires only when `otherFindings` — every other config-finding builder this
+ * preset already produced (unknown override keys, unbound `expectEmpty`, a
+ * discovery guard) — is also empty, so a preset with a more specific cause
+ * reports that cause once, not this one stacked on top of it. Same ordering
+ * the zero-examined producer already states: report last, and only when
+ * nothing else already explained the emptiness.
+ *
+ * Returns the same `{ violations }`-only shape as {@link assertDiscovered} and
+ * {@link overrideFindings} — sufficient for both real consumers of a preset's
+ * `RuleBuilderLike[]` (`checkAll()`, `src/cli/load-rules.ts`), which call only
+ * `.violations()` on every array element, never `.check()`/`.warn()` on one
+ * item in isolation.
+ */
+export function assertEnabled(
+  attempted: readonly string[],
+  otherFindings: readonly RuleBuilderLike[],
+  finding: { id: string; presetName: string; optionsHint: string },
+): RuleBuilderLike[] {
+  if (attempted.length > 0 || otherFindings.length > 0) return []
+  const violation: ArchViolation = {
+    rule: finding.id,
+    ruleId: finding.id,
+    element: finding.id,
+    file: '',
+    line: 0,
+    message:
+      `${finding.presetName}(...) satisfied every required option and constructed 0 rules — every ` +
+      `rule it can build sits behind an optional flag, and none was set, so this call enforces ` +
+      `nothing while every gate reports it as healthy.`,
+    because:
+      'a preset that constructs no rules has nothing for the fail-closed floor to reach — a ' +
+      'function returning [] never calls collectViolations(), so no per-rule guard sees it',
+    suggestion: `Set at least one of: ${finding.optionsHint}. ` + UNSUPPRESSABLE,
+    bypassFilters: true,
+  }
+  return [{ violations: () => [violation] }]
+}
+
 export interface PresetBaseOptions<TRuleId extends string = string> {
   overrides?: Partial<Record<TRuleId, RuleSeverity>>
 

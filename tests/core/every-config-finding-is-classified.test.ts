@@ -163,6 +163,14 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     verified:
       'behavioural: recommended.test.ts — correcting the key clears it, and a correct key takes effect',
   },
+  'src/presets/shared.ts::assertEnabled': {
+    remedy: 'own',
+    verified:
+      'behavioural: agent-guardrails.test.ts and data-layer.test.ts (plan 0100) — the truly-minimal ' +
+      'call reports it, enabling exactly one flag named in the suggestion clears it, and enabling a ' +
+      'flag then overriding it off is a legitimate declaration (UNSUPPRESSABLE’s own text) that ' +
+      'never reports it in the first place',
+  },
   // Takes `finding.remedy` from its caller, so the text a reader gets is written
   // at each `assertDiscovered(...)` call. Those are asserted separately below —
   // the census would otherwise see one row and never look at the two strings.

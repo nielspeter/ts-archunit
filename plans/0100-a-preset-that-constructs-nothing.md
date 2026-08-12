@@ -1,6 +1,10 @@
 # Plan 0100 — a preset that constructs nothing
 
-**Status:** Open, PROPOSED — the design is not settled; see **What this has to decide**.
+**Status:** Implemented and reviewed 2026-08-12 (architect + testing personas; both rounds' Important
+findings fixed and sabotage-verified — see **Review findings, fixed** below). On `main`, not yet
+released. Design settled the same day before implementation — see **Design, resolved** below, added
+before the code rather than after, per this project's own convention that a plan is the record of the
+decision, not a retrospective of it.
 Filed 2026-08-08 from [0098](./completed/0098-the-evidence-seam-and-the-floor.md)'s amendment, which measured that
 the fail-closed floor cannot reach this.
 **Depends on:** nothing structurally, but **coupled to 0099's release**: if this lands first, 0099's
@@ -140,6 +144,107 @@ Not settled, and the options are not equivalent:
   it. If enabling at least one rule were a **type** requirement — a required union, or the flags moved out of
   the optional bag — the fault would be unrepresentable rather than detected, which is the move ADR-009 makes
   everywhere else. That is a bigger break than (a)–(c) and may be the honest answer.
+
+## Design, resolved
+
+**Scope: `agentGuardrails` and `dataLayerIsolation` only.** Read every preset's construction code
+(2026-08-12) rather than assume the fault is general:
+
+- `strictBoundaries` and `layeredArchitecture` each construct at least one rule **unconditionally** once
+  discovery succeeds — `layer-order` and `no-cycles` are pushed outside any `if`, and
+  `no-cross-boundary` is pushed once per discovered boundary folder, not behind a flag. Zero discovered
+  folders is a DIFFERENT, already-guarded failure (`assertDiscovered`, shipped) — not this defect. So
+  `attempted` (below) cannot be `0` for either once discovery succeeds, and `{ layers: {} }` constructing
+  2 content-free rules is the "harder detector" the Problem section already named as unmeasured and
+  out of scope, not this one.
+- `recommended` iterates a fixed, unconditional `SPECS` array (4 rules, none flag-gated) — `attempted`
+  is always 4.
+- Only `agentGuardrails` and `dataLayerIsolation` have **every** rule behind an independent optional
+  flag with no unconditional floor rule — which is exactly the shape the Problem section measured as
+  silent. Applying a defensive check to the other three anyway would be validation for a state the code
+  cannot reach, which this project's own conventions ask not to write.
+
+**The attempted/constructed distinction, made concrete.** "Attempted" is the id list a preset's OWN
+OPTIONS request, computed **before** `overrides` is consulted — for `agentGuardrails` this is exactly
+the existing `collectRuleIds(options)`, already computed for override validation and reusable as-is; for
+`dataLayerIsolation`, a symmetric two-line list keyed on `options.baseClass` /
+`options.requireTypedErrors`. `constructed` is unchanged (built minus `'off'`).
+
+- `attempted.length === 0` → **no rule was ever enabled** → the defect: fire.
+- `attempted.length > 0 && constructed.length === 0` → **every enabled rule was explicitly turned off**
+  → already legitimate today (`UNSUPPRESSABLE`'s own text: `overrides: { id: 'off' }` "is not a
+  suppression, it is a permanent decision that never expires") → silent.
+- Fires **only** when no other finding this preset already produced explains the emptiness (unknown
+  override key, unbound `expectEmpty`, or — for a future preset that gains one — a discovery guard).
+  Matches the zero-examined producer's own stated order: "report last, and only when nothing else
+  already explained the emptiness."
+
+**Where it lives — (b), unchanged from the measurement above, made concrete as one function.**
+`assertEnabled()` in `src/presets/shared.ts`, same shape and same file as `assertDiscovered()`,
+`overrideFindings()` and `declaredEmptyFindings()`: takes `attempted`, the preset's already-assembled
+`otherFindings` array, and a `{ id, presetName, optionsHint }` descriptor; returns `RuleBuilderLike[]`
+(`[]` or one manufactured finding). Non-breaking, structural, no preset-signature change — option (c)
+from the Problem section stays rejected.
+
+**The manufactured finding is `{ violations: () => [...] }`, not a fuller terminal — deliberately, and
+this needed checking rather than assuming.** `RuleBuilderLike` requires only `.violations()`; the two
+real consumption paths (`checkAll()`, `src/cli/load-rules.ts`) both call only `.violations()` on every
+array element — never `.check()`/`.warn()` on an individual item. The Problem section's own
+`for (const rule of dataLayerIsolation(project, opts)) rule.check()` illustration does not typecheck
+against the actual `RuleBuilderLike[]` return type today (`.check` is not on the interface) — it is
+rhetorical, not a documented API guarantee, and `docs/presets.md`'s real taught patterns are
+`checkAll(...)` and the CLI spread. So a bare `.violations()`-only object is both consistent with the
+established `assertDiscovered`/`overrideFindings` precedent and sufficient for every real consumer.
+
+**The vacuity matrix cannot see that shape, and that has to change too.** `tests/matrix/vacuity-matrix.test.ts`'s
+`isProbeable()` requires `.check`/`.warn()` as functions — a bare `{ violations }` object fails it, same
+as `assertDiscovered`'s existing findings do today (unremarked, because nothing yet depended on the
+matrix seeing through it). Left alone, `dataLayerIsolation`'s `KNOWN_FAIL_OPEN` cell would stay
+`'no-checks'` forever even after this ships, contradicting plan 0099's own claim that this plan is what
+empties the list. `verdictOf()` needs one new branch: when `probeables(result)` is empty but `result`
+itself is not, and something in it is a `RuleBuilderLike` whose `.violations()` is non-empty, classify
+`'config-finding'` rather than `'no-checks'` — every existing use of the bare-object shape in this
+codebase carries a finding and nothing else, so that implication is safe. `KNOWN_FAIL_OPEN` then drops
+the `dataLayerIsolation` row, leaving only `'./graphql:schema'` (a different, deliberately-fails-closed
+verdict, not vacuity debt). The new branch gets its own direct test in the matrix file's existing
+`describe('controls — …')` block, matching how `probe()` and `past()` are already tested there, so a
+sabotage of the new branch fails independently of whether the preset fix itself also happens to be
+reverted at the same time.
+
+**What stays out of scope, restated.** The "harder detector" (`layeredArchitecture` constructing
+content-free rules over `{ layers: {} }`) is not this plan — Problem section already named it
+unmeasured, and it is not the shape either silent preset has. The rest of the option lattice for all
+five presets stays unmeasured, as the Problem section already disclosed.
+
+## Review findings, fixed
+
+Two-persona review (architect + testing) after implementation, both Important findings verified
+independently (reproduced against the pre-fix code, sabotaged the fix, confirmed the right tests red) rather
+than trusted at face value:
+
+1. **`agentGuardrails` misdiagnosed a real, correctly-spelled override id as unknown, and the wrong
+   finding silently suppressed the correct one.** Pre-existing bug (reproduced against the last release,
+   `f28f2db` — not introduced by this plan), but this plan is what made it consequential:
+   `overrideFindings`/`validateOverrides` were handed the flag-gated `attempted` list as "known ids," so
+   `overrides: { 'preset/agent/no-generic-errors': 'off' }` with the flag unset reported "matches no rule
+   in this preset" with an **empty** enumeration — and that finding's presence then made
+   `assertEnabled`'s `otherFindings.length > 0` guard defer to it, so the correct `constructs-nothing`
+   finding never fired. Fixed by splitting `knownOverrideIds()` (the four static ids, always known,
+   plus whatever `noInlineLogic` named — for override validation) from `collectRuleIds()` (flag-gated,
+   for `attempted`) — two different questions that were wrongly answered by one list.
+   `dataLayerIsolation` never had this bug; it already validated against its full static `RULE_IDS`.
+2. **The "defer to a more specific finding" guarantee had zero test coverage.** `assertEnabled`'s
+   `attempted.length > 0 || otherFindings.length > 0` is two independent clauses; only the first was
+   exercised (by the "override to off" tests, which are really testing `attempted.length > 0`). Sabotaging
+   the second clause alone (`otherFindings.length > 0`) passed the full suite. Fixed by adding a direct
+   test per preset using an unbound `expectEmpty` on a fully-unattempted call — a different config-finding
+   fires, and `constructs-nothing` correctly does not stack on top of it.
+
+Also tightened on review: `hasManufacturedFinding()` in the vacuity matrix checked only
+`.violations().length > 0`, which was safe only because every current bare-`{ violations }` producer in
+this codebase happens to carry manufactured findings — not structurally guaranteed. Now checks
+`bypassFilters === true`, the same kind of marker `probe()` reads off a thrown error's message, with a
+control test proving a violation without it is not misread.
 
 ## Not measured
 

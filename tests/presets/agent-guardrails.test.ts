@@ -86,6 +86,56 @@ describe('agentGuardrails preset', () => {
     expect(builders).toHaveLength(0)
   })
 
+  it('plan 0100: enabling a rule then overriding it off is a declaration, not silence', () => {
+    // Distinct from the truly-minimal call below: `noGenericErrors: true` means
+    // something WAS attempted, so `overrides: { …: 'off' }` is the reader
+    // explicitly declining it — UNSUPPRESSABLE's own text calls this "a
+    // permanent decision that never expires", not a suppression. No new
+    // finding should appear alongside the omitted builder.
+    const builders = agentGuardrails(p, {
+      src: SRC,
+      noGenericErrors: true,
+      overrides: { 'preset/agent/no-generic-errors': 'off' },
+    })
+    expect(builders).toEqual([])
+  })
+
+  it('plan 0100 review: overriding a real-but-not-yet-enabled id off reports constructs-nothing, not "unknown key"', () => {
+    // The flag is UNSET this time — the id is real (a compile-time member of
+    // AgentGuardrailsRuleId) but nothing attempted it, which is the truly-minimal
+    // call's own shape. Reviewer-found bug: `overrideFindings`/`validateOverrides`
+    // used to be handed the flag-gated `attempted` list as "known ids", so this
+    // correctly-spelled key was misdiagnosed "matches no rule in this preset"
+    // with an EMPTY enumeration — and that wrong finding then silently
+    // suppressed the correct one via `assertEnabled`'s `otherFindings` guard.
+    const builders = agentGuardrails(p, {
+      src: SRC,
+      overrides: { 'preset/agent/no-generic-errors': 'off' },
+    })
+    const violations = builders.flatMap((b) => b.violations())
+    expect(violations).toHaveLength(1)
+    expect(violations[0]?.ruleId).toBe('preset/agent/constructs-nothing')
+  })
+
+  it('plan 0100 review: a genuine override typo is still caught, with a non-empty enumeration', () => {
+    // The companion case to the one above — proves the fix narrowed the KNOWN
+    // set correctly rather than widening it to accept anything. Widened to
+    // `Record<string, …>` deliberately (same pattern as recommended.test.ts's
+    // 'no-evalz' case) — the typed key union already rejects this at compile
+    // time, which is bug 0038's OTHER guarantee; this test is about the
+    // runtime path a JS consumer (or a dynamically-built overrides object)
+    // still reaches.
+    const overrides: Partial<Record<string, 'error' | 'warn' | 'off'>> = {
+      'preset/agent/no-generic-errrors': 'off', // typo: errrors
+    }
+    const builders = agentGuardrails(p, { src: SRC, overrides })
+    const violations = builders.flatMap((b) => b.violations())
+    expect(violations[0]?.ruleId).toBe('preset/override/preset/agent/no-generic-errrors')
+    expect(violations[0]?.suggestion).toContain(
+      'preset/agent/no-generic-errors, preset/agent/no-stubs, preset/agent/no-empty-bodies, preset/agent/no-copy-paste',
+    )
+  })
+
   it('override to "warn" downgrades the severity', () => {
     const [builder] = agentGuardrails(p, {
       src: SRC,
@@ -117,9 +167,57 @@ describe('agentGuardrails preset', () => {
     expect(violations).toHaveLength(0)
   })
 
-  it('empty / omitted noInlineLogic generates no inline-logic rules', () => {
-    expect(agentGuardrails(p, { src: SRC, noInlineLogic: [] })).toHaveLength(0)
-    expect(agentGuardrails(p, { src: SRC })).toHaveLength(0)
+  it('empty / omitted noInlineLogic generates no inline-logic rules specifically', () => {
+    // A DIFFERENT flag stays on, so this is not the truly-minimal call below —
+    // it isolates the claim to `noInlineLogic` alone.
+    const builders = agentGuardrails(p, { src: SRC, noInlineLogic: [], noGenericErrors: true })
+    expect(idsOf(builders)).toEqual(['preset/agent/no-generic-errors'])
+  })
+
+  it('plan 0100: the truly minimal call constructs nothing, and says so', () => {
+    // Every rule sits behind an optional flag and none was set here — the
+    // exact silence bug 0100 measured: `agentGuardrails({ src })` used to
+    // return `[]`, a green build that enforced nothing.
+    const builders = agentGuardrails(p, { src: SRC })
+    expect(builders).toHaveLength(1)
+    const violations = builders[0]!.violations()
+    // Identity, not count: the ONE violation must be THIS finding, not some
+    // other config-finding that happens to also number one.
+    expect(violations).toHaveLength(1)
+    expect(violations[0]?.ruleId).toBe('preset/agent/constructs-nothing')
+    expect(violations[0]?.message).toContain('constructed 0 rules')
+    expect(violations[0]?.bypassFilters).toBe(true)
+  })
+
+  it('plan 0100: the remedy is proven — enabling one flag clears the finding', () => {
+    const idsOfViolations = (
+      builders: readonly { violations: () => { ruleId?: string }[] }[],
+    ): string[] => builders.flatMap((b) => b.violations()).map((v) => v.ruleId ?? '')
+
+    expect(idsOfViolations(agentGuardrails(p, { src: SRC }))).toContain(
+      'preset/agent/constructs-nothing',
+    )
+    // Applying exactly the stated remedy — "Set at least one of: noInlineLogic,
+    // noGenericErrors, …" — and nothing else about the call changes.
+    expect(idsOfViolations(agentGuardrails(p, { src: SRC, noGenericErrors: true }))).not.toContain(
+      'preset/agent/constructs-nothing',
+    )
+  })
+
+  it('plan 0100: a more specific finding on the same unattempted call reports ONCE, not stacked', () => {
+    // `expectEmpty` names a rule this call never attempts either — so
+    // `declaredEmptyFindings` fires its own "binds to nothing" finding, and
+    // `assertEnabled` (attempted.length === 0, same as the test above) must
+    // defer to it rather than pile a second, less specific finding on top.
+    // Reviewer-found gap: the ONLY existing test of the "otherFindings"
+    // guard used an override-key finding, whose knownIds bug this same
+    // review also fixed — this one is independent of that fix.
+    const builders = agentGuardrails(p, {
+      src: SRC,
+      expectEmpty: ['preset/agent/no-generic-errors'],
+    })
+    const ids = builders.flatMap((b) => b.violations()).map((v) => v.ruleId)
+    expect(ids).toEqual(['preset/expect-empty/preset/agent/no-generic-errors'])
   })
 
   it('generates a distinct rule id per noInlineLogic entry', () => {

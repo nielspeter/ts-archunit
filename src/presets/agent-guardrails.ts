@@ -15,6 +15,7 @@ import {
   declareEmptyIfListed,
   presetDeclarationSpelling,
   declaredEmptyFindings,
+  assertEnabled,
 } from './shared.js'
 import type { RuleSeverity } from './shared.js'
 
@@ -68,8 +69,14 @@ export function agentGuardrails(
   p: ArchProject,
   options: AgentGuardrailsOptions,
 ): RuleBuilderLike[] {
-  validateOverrides(options.overrides, collectRuleIds(options))
-  const overrideProblems = overrideFindings(options.overrides, collectRuleIds(options))
+  // Plan 0100's `attempted`: the ids the caller's OPTIONS ask for, before any
+  // override is consulted — every rule this preset can build sits behind an
+  // optional flag, so this can legitimately be `[]` (nothing was ever enabled).
+  // NOT what override validation uses below — see `knownOverrideIds`'s own doc.
+  const attempted = collectRuleIds(options)
+  const knownIds = knownOverrideIds(options)
+  validateOverrides(options.overrides, knownIds)
+  const overrideProblems = overrideFindings(options.overrides, knownIds)
 
   const builders: RuleBuilderLike[] = []
   // Recorded HERE, at the one place a rule is actually built — the same argument
@@ -174,14 +181,24 @@ export function agentGuardrails(
   // Unknown override keys FIRST: they say the configuration is wrong, which
   // the reader needs before any finding produced under it (bug 0038).
   // `constructed` is recorded at the `push` site above, not re-derived here.
-  return [
+  const otherFindings = [
     ...overrideProblems,
     ...declaredEmptyFindings(options.expectEmpty, constructed),
+  ]
+  return [
+    ...otherFindings,
+    // Plan 0100, LAST of the config-findings: only when nothing else above
+    // already explains the empty result (an unknown override key, an unbound
+    // `expectEmpty`) does "no rule was ever enabled" get to be the diagnosis.
+    ...assertEnabled(attempted, otherFindings, {
+      id: 'preset/agent/constructs-nothing',
+      presetName: 'agentGuardrails',
+      optionsHint: 'noInlineLogic, noGenericErrors, noStubs, noEmptyBodies, noCopyPaste',
+    }),
     ...builders,
   ]
 }
 
-/** All rule ids the given options would generate (for override validation). */
 /**
  * Widen the typed override map for a lookup by a runtime-built id.
  *
@@ -198,6 +215,52 @@ function lookup(
   return widened?.[id]
 }
 
+/**
+ * The four ids this preset can construct regardless of whether their flag is
+ * currently set — fixed, matching `AgentGuardrailsRuleId`'s own closed union
+ * members (everything but the open `no-inline-logic/${string}` arm).
+ */
+const STATIC_RULE_IDS = [
+  'preset/agent/no-generic-errors',
+  'preset/agent/no-stubs',
+  'preset/agent/no-empty-bodies',
+  'preset/agent/no-copy-paste',
+] as const
+
+/**
+ * Rule ids the given options WOULD generate if every flag were on — for
+ * override-key validation. Static ids are always known (a key for a rule not
+ * yet enabled is still a real rule, not a typo); `no-inline-logic/${api}` ids
+ * stay scoped to what `noInlineLogic` actually named, because that arm is open
+ * by construction and the only way to catch a typo in it is to compare against
+ * what the caller wrote.
+ *
+ * Deliberately NOT `attempted` below, which is flag-gated. Reusing `attempted`
+ * here was the bug plan 0100's review found: `overrides: { 'preset/agent/no-
+ * generic-errors': 'off' } }` with `noGenericErrors` unset reported "matches no
+ * rule in this preset" with an EMPTY enumeration — a real, correctly-spelled id
+ * misdiagnosed as unknown, and `otherFindings.length > 0` from that wrong
+ * finding then silently suppressed the correct `constructs-nothing` finding
+ * `assertEnabled` would otherwise have reported. `dataLayerIsolation` never had
+ * this bug: it already validates against the full static `RULE_IDS`, not its
+ * flag-gated `attempted`.
+ */
+function knownOverrideIds(options: AgentGuardrailsOptions): string[] {
+  const ids: string[] = [...STATIC_RULE_IDS]
+  for (const api of options.noInlineLogic ?? []) ids.push(`preset/agent/no-inline-logic/${api}`)
+  return ids
+}
+
+/**
+ * Ids plan 0100's `attempted` needs: the ones the caller's OPTIONS actually
+ * ask for, flag-gated — `assertEnabled` fires when this is empty. NOT for
+ * override validation; see {@link knownOverrideIds}.
+ *
+ * Kept in step with the five `if (options.x)` blocks in `agentGuardrails`
+ * itself BY HAND — same shape of fragility this file already notes for
+ * `constructed` (review: nothing enforces the two stay copy-identical as
+ * flags are added).
+ */
 function collectRuleIds(options: AgentGuardrailsOptions): string[] {
   const ids: string[] = []
   for (const api of options.noInlineLogic ?? []) ids.push(`preset/agent/no-inline-logic/${api}`)

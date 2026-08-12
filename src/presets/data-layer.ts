@@ -10,6 +10,7 @@ import {
   overrideFindings,
   validateOverrides,
   declaredEmptyFindings,
+  assertEnabled,
 } from './shared.js'
 
 /** This preset's rule ids, derived from `RULE_IDS` so the two cannot drift. */
@@ -41,6 +42,20 @@ export function dataLayerIsolation(
   const constructed: string[] = []
   validateOverrides(config.overrides, [...RULE_IDS])
   const overrideProblems = overrideFindings(config.overrides, RULE_IDS)
+
+  // Plan 0100's `attempted`: both rules sit behind an independent optional
+  // flag, so — unlike `strictBoundaries`/`layeredArchitecture`, which always
+  // construct at least one rule once discovery succeeds — this can
+  // legitimately be `[]`. Computed from the options directly, before
+  // `overrides` is consulted, same as `constructed` is computed after.
+  //
+  // Kept in step with the two `if` blocks below BY HAND — the same shape of
+  // fragility `constructed` already has here (review: nothing enforces
+  // `attempted.length === 0 ⟺` no rule gets built; it holds because both
+  // conditionals are copy-derived from the same two options).
+  const attempted: string[] = []
+  if (options.baseClass) attempted.push('preset/data/extend-base')
+  if (options.requireTypedErrors) attempted.push('preset/data/typed-errors')
 
   const builders: RuleBuilderLike[] = []
 
@@ -96,9 +111,19 @@ export function dataLayerIsolation(
   // the reader needs before any finding produced under it (bug 0038).
   // Constructed, not merely known: a rule whose option was never enabled, or that
   // was overridden `off`, is not built — so a declaration naming it is dead.
-  return [
+  const otherFindings = [
     ...overrideProblems,
     ...declaredEmptyFindings(config.expectEmpty, constructed),
+  ]
+  return [
+    ...otherFindings,
+    // Plan 0100, LAST: only when nothing above already explains the empty
+    // result does "neither flag was ever set" get to be the diagnosis.
+    ...assertEnabled(attempted, otherFindings, {
+      id: 'preset/data/constructs-nothing',
+      presetName: 'dataLayerIsolation',
+      optionsHint: 'baseClass, requireTypedErrors',
+    }),
     ...builders,
   ]
 }

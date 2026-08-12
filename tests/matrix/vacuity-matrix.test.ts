@@ -58,6 +58,43 @@ function probeables(result: unknown): Probeable[] {
 }
 
 /**
+ * The minimal shape a manufactured config-finding carries — `.violations()`
+ * only, same interface `RuleBuilderLike` requires. Narrower than `Probeable`:
+ * `assertDiscovered()` / `overrideFindings()` / plan 0100's `assertEnabled()`
+ * all return exactly this, and none of the three implement `.check()`/`.warn()`
+ * — both real consumers of a preset's array (`checkAll()`,
+ * `src/cli/load-rules.ts`) call only `.violations()` on each element, so
+ * neither method is needed for this shape to be a real, working finding.
+ */
+function isRuleBuilderLike(
+  value: unknown,
+): value is { violations: () => { bypassFilters?: boolean }[] } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof Reflect.get(value, 'violations') === 'function'
+  )
+}
+
+/**
+ * True when a recipe's result already carries a manufactured finding that the
+ * `.check()`/`.warn()` probe below cannot see — plan 0100. Checks
+ * `bypassFilters === true`, the same structural marker `probe()` above reads
+ * off a THROWN error's message (`'cannot be suppressed'`) — not merely
+ * non-empty `.violations()`. Review found the looser form was safe only
+ * inductively (every current bare-`{ violations }` producer in this codebase
+ * happens to carry only manufactured, unsuppressable findings), not
+ * structurally — a future bare-object producer returning real, non-manufactured
+ * violations would have been silently misclassified as `'config-finding'`.
+ */
+function hasManufacturedFinding(result: unknown): boolean {
+  const list = Array.isArray(result) ? result : [result]
+  return list.some(
+    (item) => isRuleBuilderLike(item) && item.violations().some((v) => v.bypassFilters === true),
+  )
+}
+
+/**
  * Run one construction and classify what came back.
  *
  * Three verdicts, not two. A probe that lumped every throw together would report a
@@ -94,10 +131,17 @@ function verdictOf(entryKey: string, ctx: Ctx, terminal: 'check' | 'warn'): Verd
       : 'other-throw'
   }
   const built = probeables(result)
-  // A preset that constructs NOTHING is its own verdict, not a harness error. Measured:
-  // `dataLayerIsolation({ repositories })` returns an empty array, so a user who configured it
-  // gets zero rules and a green build — vacuity one level up from the one this matrix probes.
-  if (built.length === 0) return 'no-checks'
+  // A preset that constructs NOTHING is its own verdict, not a harness error. Measured, before
+  // plan 0100: `dataLayerIsolation({ repositories })` returned an empty array, so a user who
+  // configured it got zero rules and a green build — vacuity one level up from the one this
+  // matrix probes via `.check()`/`.warn()`.
+  //
+  // Plan 0100 closed that for `dataLayerIsolation` (and `agentGuardrails`) by manufacturing a
+  // finding when nothing else explains the emptiness — but that finding is `{ violations }`-only,
+  // same shape `assertDiscovered()`/`overrideFindings()` already use, so `probeables()` above
+  // still filters it out (it has no `.check()`/`.warn()`). `built.length === 0` alone can no
+  // longer mean "nothing to report" — it can mean "something to report, just not Probeable".
+  if (built.length === 0) return hasManufacturedFinding(result) ? 'config-finding' : 'no-checks'
   // A preset builds many checks; the family fails open only if EVERY one of them does.
   const verdicts = built.map((b) => probe(() => (terminal === 'check' ? b.check() : b.warn())))
   return verdicts.every((v) => v === 'fail-open')
@@ -122,21 +166,24 @@ const AUDIT_2026_08: Readonly<Record<string, Verdict>> = {
   './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
 }
 /**
- * Today's truth, after plan 0099's floor. It may only SHRINK against
- * `AUDIT_2026_08` above, which is the dated measurement it is bounded by.
+ * Today's truth, after plan 0099's floor and plan 0100's construction guard. It
+ * may only SHRINK against `AUDIT_2026_08` above, which is the dated
+ * measurement it is bounded by.
  *
  * The four `'fail-open'` cells are gone: every one of them now reports a
  * configuration finding at both `check()` and `.warn()`. That is bug 0066 closed,
  * measured by an instrument written before the fix and untouched by it.
  *
- * It cannot be emptied, and the remaining entry names its own reason rather than
- * looking stalled: `dataLayerIsolation` constructs **zero rules** from a valid
- * option set, so no per-rule floor reaches it — a function that returned `[]` has
- * nothing to stand beneath. That is [plan 0100](../../plans/0100-a-preset-that-constructs-nothing.md).
+ * `dataLayerIsolation` is gone too — [plan 0100](../../plans/0100-a-preset-that-constructs-nothing.md)
+ * manufactures a finding at construction time when neither `baseClass` nor
+ * `requireTypedErrors` was ever set, so `dataLayerIsolation({ repositories })`
+ * now reports `'config-finding'` here instead of `'no-checks'`. The vacuity
+ * list is EMPTY: what remains is `graphql:schema`, a different verdict that was
+ * never vacuity debt — it fails CLOSED by refusing to build over an empty
+ * corpus, which is the wanted behaviour.
  */
 const KNOWN_FAIL_OPEN: Readonly<Record<string, Verdict>> = {
-  './presets:dataLayerIsolation': 'no-checks', // 0100 — constructs zero rules; no floor can reach it
-  './graphql:schema': 'other-throw', // the loader refuses an empty corpus — fails CLOSED
+  './graphql:schema': 'other-throw', // fails CLOSED by refusing an empty corpus — not vacuity debt
 }
 
 /** The release that must have emptied the list; past it, a stalled programme reds the audit. */
@@ -253,8 +300,11 @@ describe('the vacuity matrix (plan 0095)', () => {
 
     // 1. The numeric compare. Lexicographically '0.100.0' < '0.62.0', so the old
     //    form returned undefined here and the deadline quietly stopped existing.
-    expect(expiryFailure(KNOWN_FAIL_OPEN, '0.100.0')).toBeDefined()
-    expect(expiryFailure(KNOWN_FAIL_OPEN, '0.61.9')).toBeUndefined()
+    //    Driven by a synthetic vacuous list, not `KNOWN_FAIL_OPEN` — plan 0100
+    //    emptied its vacuity debt (only `'other-throw'` remains, which is not
+    //    debt), so `KNOWN_FAIL_OPEN` itself can no longer drive this repair.
+    expect(expiryFailure({ x: 'fail-open' }, '0.100.0')).toBeDefined()
+    expect(expiryFailure({ x: 'fail-open' }, '0.61.9')).toBeUndefined()
 
     // 2. The vacuity predicate. A list whose only debt is 'no-checks' must still
     //    expire — counting 'fail-open' alone made the gate unreachable the moment
@@ -291,7 +341,10 @@ describe('the vacuity matrix (plan 0095)', () => {
       if (saved !== undefined) process.env.npm_package_version = saved
     }
 
-    // And there is still something for the deadline to be about.
+    // `KNOWN_FAIL_OPEN` itself is not accidentally empty — its one remaining
+    // entry is `'other-throw'`, not vacuity debt (see repair 2, above), so
+    // this is a sanity check on the constant, not a claim that a deadline
+    // still applies to it.
     expect(Object.keys(KNOWN_FAIL_OPEN).length).toBeGreaterThan(0)
   })
 
@@ -336,6 +389,49 @@ describe('the vacuity matrix (plan 0095)', () => {
           throw new Error('ENOENT: no such file or directory')
         }),
       ).toBe('other-throw')
+    })
+  })
+
+  /**
+   * Plan 0100's addition: `built.length === 0` used to mean only "nothing to report" (`'no-checks'`).
+   * `assertEnabled()` manufactures a `{ violations }`-only finding that `probeables()` still
+   * cannot see (no `.check()`/`.warn()`), so the same empty-`built` state now has two real causes —
+   * these prove `hasManufacturedFinding` tells them apart, independently of whether the preset fix
+   * itself is also reverted at the same time.
+   */
+  describe('controls — a non-Probeable result is told apart from a truly empty one', () => {
+    it('an empty array stays no-checks', () => {
+      expect(hasManufacturedFinding([])).toBe(false)
+    })
+
+    it('a bare RuleBuilderLike with no violations is not a finding', () => {
+      expect(hasManufacturedFinding([{ violations: () => [] }])).toBe(false)
+    })
+
+    it('a bare RuleBuilderLike carrying a manufactured (bypassFilters) violation IS a finding', () => {
+      expect(
+        hasManufacturedFinding([
+          { violations: () => [{ message: 'constructed 0 rules', bypassFilters: true }] },
+        ]),
+      ).toBe(true)
+    })
+
+    it('a violation WITHOUT bypassFilters is not read as manufactured', () => {
+      // Review found the looser `.length > 0` form was safe only inductively —
+      // every current bare-object producer happens to carry only manufactured
+      // findings. This proves the guard now reads the STRUCTURAL marker, not
+      // merely non-emptiness, so a hypothetical future bare-object producer
+      // returning real violations would not be misclassified.
+      expect(
+        hasManufacturedFinding([{ violations: () => [{ message: 'a real violation' }] }]),
+      ).toBe(false)
+    })
+
+    it('does not mistake a Probeable, un-probed builder for a finding', () => {
+      // A real terminal builder has `.violations()` too — this proves the guard
+      // reads the VALUE, not merely the shape, so a real rule that simply
+      // has no violations yet does not get misread as a manufactured finding.
+      expect(hasManufacturedFinding([{ violations: () => [], check() {}, warn() {} }])).toBe(false)
     })
   })
 })

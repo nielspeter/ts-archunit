@@ -141,7 +141,7 @@ dataLayerIsolation(p, {
 | `preset/data/extend-base`  | All classes in repositories extend the base class   | error   |
 | `preset/data/typed-errors` | No `new Error()` in repositories — use typed errors | error   |
 
-Both rules are optional — omit `baseClass` to skip the extension check, omit `requireTypedErrors` to skip the error check.
+Both rules are optional — omit `baseClass` to skip the extension check, omit `requireTypedErrors` to skip the error check. Omitting **both** is different from skipping one: with neither flag set this call constructs zero rules, and reports a `preset/data/constructs-nothing` configuration finding rather than passing silently — the same finding `agentGuardrails` reports below, for the same reason. Set at least one flag to enforce anything.
 
 ## `strictBoundaries`
 
@@ -246,6 +246,8 @@ export default [
 | `preset/agent/no-copy-paste`         | No near-identical function bodies (≥ 0.9 similarity) | warn    |
 
 Uses function-variant rules, so standalone functions, arrow functions, and class methods are all covered. Each rule carries `because` / `suggestion` / `imperative` metadata so the agent gets an actionable fix in `explain --format agent` and `check --format json`. Accepts the same `overrides` map as every preset (below).
+
+Every rule above sits behind its own optional flag — nothing is unconditional. Calling `agentGuardrails(p, { src })` with none of them set constructs zero rules, and reports a `preset/agent/constructs-nothing` configuration finding rather than passing silently: satisfying the required `src` field is not the same as enforcing anything. Set at least one flag to enforce anything.
 
 > `agentGuardrails` overlaps a general `recommended` floor on empty bodies and `eval`. Running both double-reports those locations (different rule ids). For agent-focused projects, prefer `agentGuardrails` alone; otherwise override the duplicated ids to `'off'` in one preset.
 
