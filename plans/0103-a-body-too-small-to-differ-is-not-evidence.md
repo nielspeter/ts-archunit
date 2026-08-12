@@ -1,6 +1,8 @@
 # Plan 0103 — A Body Too Small To Differ Is Not Evidence
 
-**Status:** PROPOSED. Five-persona review (2026-08-12) independently reproduced this plan's central numbers
+**Status:** Implemented on `main`, unreleased. Phase 0's triage, Phase 1's mechanism, and Phase 2's dogfood
+re-enable are all done; `docs/upgrading.md` and `CHANGELOG.md` land at actual release time, not before —
+same convention plan 0104 follows. Five-persona review (2026-08-12) independently reproduced this plan's central numbers
 against the real, unmodified detector and confirmed them — and found that Phase 0 as originally scoped could
 land a default that breaks two of this repo's own existing tests (measured: a shared fixture at
 `distinctVocabulary = 7`, another pair with exactly one token of margin against the plan's own highest
@@ -196,6 +198,34 @@ survives, can satisfy the letter of Phase 0 while barely moving the practical pr
 5. Record the final default, the per-candidate table (counts and ratios, not just the winning row), and the
    full-suite-pass confirmation in this plan's Phase 1 (below), replacing the placeholder.
 
+**Triage record (measured against the real, unmodified detector, implementation time):**
+
+| Floor | Pairs surviving (of 495, real detector, `src/`)                                       | Wither triple (`ignoreTests`/`groupByFolder`/`beComplete`) | `classContain`/`functionContain` |
+| ----- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| 0     | 495                                                                                   | pairs (all three)                                          | pairs                            |
+| 4     | 448 (91% of floor 0 — the plan's own "insufficient" reading, confirmed)               | excluded                                                   | pairs                            |
+| 6     | 292 (59%)                                                                             | excluded                                                   | pairs                            |
+| 8     | 161 (33% — the lowest candidate where survivors become a MINORITY of floor 0's count) | excluded                                                   | pairs                            |
+| 10    | 121 (24%)                                                                             | excluded                                                   | pairs                            |
+| 12    | 95 (19%)                                                                              | excluded                                                   | pairs                            |
+
+**Chosen: 8.** Lowest floor satisfying all three criteria: (a) `npm run test` is fully green at this floor,
+once the third-fixture finding below is fixed; (b) the known-genuine pair survives (at every candidate, in
+fact); (c) materially reduced — 495 → 161 is the point where surviving pairs first become a minority of the
+unfixed count, a natural, principled cutoff rather than an arbitrary stop. Floors 10 and 12 cut further with
+no measured evidence of losing anything genuine, but "lowest that satisfies (a)-(c)" is what step 4 asks for,
+not "most aggressive that still works" — a higher floor is a config change any adopter can make, documented
+in `docs/smell-detection.md`.
+
+**Step 2 found a third fixture Problem A didn't name, exactly as designed.** `npm run test` at floor 8 red
+four test files, all for the same reason: three small, hand-written fixtures used by shipped-preset tests
+were below the floor. `tests/fixtures/presets/agent-guardrails/src/mistakes.ts` (`dupOne`/`dupTwo`, measured
+`distinctVocabulary = 7`, one token short) and `tests/fixtures/presets/boundaries/src/feature-{a,b}/helper.ts`
+(`helperA`/`helperB`, measured `distinctVocabulary = 5`) both feed the `noCopyPaste` preset option's own test
+coverage (`tests/presets/agent-guardrails.test.ts`, `tests/integration/agent-guardrails-check.test.ts`,
+`tests/presets/boundaries.test.ts`) and needed the same padding treatment as the two Problem-A fixtures —
+added to Files changed. After padding, `npm run test` is fully green at floor 8 (246 files, ~3359 tests).
+
 ## Phase 1 — `Fingerprint.distinctVocabulary` and the pairwise floor
 
 One new field, populated where `buildFingerprint` already walks every descendant — no second AST pass:
@@ -282,7 +312,7 @@ how _this_ detector's fingerprint works, same reasoning that keeps `withMinSimil
 
 ```ts
 // src/smells/duplicate-bodies.ts, class DuplicateBodiesBuilder
-private _minDistinctVocabulary = /* PLACEHOLDER — set by Phase 0's triage, not this draft */ 8
+private _minDistinctVocabulary = 8 // Phase 0's triage record, above — measured, not guessed
 
 /**
  * Minimum count of distinct identifier/literal text either body must carry

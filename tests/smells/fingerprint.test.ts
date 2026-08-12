@@ -43,6 +43,14 @@ describe('Fingerprint', () => {
       expect(fpA.kinds.length).toBeGreaterThan(0)
       expect(fpB.kinds.length).toBeGreaterThan(0)
     })
+
+    it('counts DISTINCT identifier/literal texts, not occurrences (plan 0103)', () => {
+      // `id`/`amount`/`currency` are each read twice (declared, then returned) —
+      // a count of occurrences would differ from a count of distinct texts.
+      const fp = buildFingerprint(getBody('parseWebhookOrder'))
+      expect(fp.distinctVocabulary).toBeGreaterThan(0)
+      expect(fp.distinctVocabulary).toBeLessThan(fp.kinds.length)
+    })
   })
 
   describe('computeSimilarity()', () => {
@@ -68,12 +76,12 @@ describe('Fingerprint', () => {
     })
 
     it('produces 1.0 for two empty fingerprints', () => {
-      const empty = { kinds: [], calls: [], nodeCount: 0 }
+      const empty = { kinds: [], calls: [], nodeCount: 0, distinctVocabulary: 0 }
       expect(computeSimilarity(empty, empty)).toBe(1.0)
     })
 
     it('produces 0.0 when one fingerprint is empty and the other is not', () => {
-      const empty = { kinds: [], calls: [], nodeCount: 0 }
+      const empty = { kinds: [], calls: [], nodeCount: 0, distinctVocabulary: 0 }
       const fpA = buildFingerprint(getBody('parseWebhookOrder'))
       expect(computeSimilarity(empty, fpA)).toBe(0.0)
       expect(computeSimilarity(fpA, empty)).toBe(0.0)

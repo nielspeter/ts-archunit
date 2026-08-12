@@ -24,6 +24,7 @@ const selectionOf = selectionMemo<ArchFunction>()
 
 export class DuplicateBodiesBuilder extends SmellBuilder {
   private _minSimilarity = 0.85
+  private _minDistinctVocabulary = 8
 
   constructor(project: ArchProject) {
     super(project)
@@ -33,6 +34,22 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
   withMinSimilarity(threshold: number): this {
     const next = this.copy()
     next._minSimilarity = threshold
+    return next
+  }
+
+  /**
+   * Minimum count of distinct identifier/literal text either body must carry
+   * before a pair is even compared — not raw line count, and not similarity.
+   * Two bodies can share a syntactic shape for no reason other than the shape
+   * being mandated (a wither, a getter, a boilerplate skeleton); below this
+   * threshold a "match" carries no information about what the code actually
+   * does. Default: 8 — see plan 0103's Phase 0 triage for how it was chosen.
+   * Tune down for a codebase with terser naming than this default assumes;
+   * tune up if short, low-vocabulary bodies keep surfacing as noise.
+   */
+  minDistinctVocabulary(n: number): this {
+    const next = this.copy()
+    next._minDistinctVocabulary = n
     return next
   }
 
@@ -72,7 +89,10 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
     // folders and similarity meant three detectors differing in `minLines` shared
     // one key: measured, 3 findings collapsed to 1 claiming they were "one edit",
     // and fixing the surviving threshold left the other two dead and green.
-    const filters = [`minLines >= ${String(this._minLines)}`]
+    const filters = [
+      `minLines >= ${String(this._minLines)}`,
+      `minDistinctVocabulary >= ${String(this._minDistinctVocabulary)}`,
+    ]
     if (this._ignorePaths.length > 0) filters.push(`ignoring ${this._ignorePaths.join(', ')}`)
     if (this._ignoreTests) filters.push('ignoring tests')
     return (
@@ -190,10 +210,21 @@ export class DuplicateBodiesBuilder extends SmellBuilder {
         const a = items[i]
         const b = items[j]
         if (!a || !b) continue
-        // Fast rejection: if node counts differ too much, similarity cannot reach threshold
+        // Fast rejection 1: if node counts differ too much, similarity cannot reach threshold
         const maxCount = Math.max(a.fingerprint.nodeCount, b.fingerprint.nodeCount)
         const minCount = Math.min(a.fingerprint.nodeCount, b.fingerprint.nodeCount)
         if (maxCount > 0 && minCount / maxCount < this._minSimilarity) {
+          continue
+        }
+        // Fast rejection 2 (plan 0103): neither body has enough distinct vocabulary
+        // for a match to be evidence of anything. `Math.min`, not sum or average —
+        // ONE small-vocabulary side is enough to make the pair uninformative
+        // regardless of the other side's size.
+        const minDistinct = Math.min(
+          a.fingerprint.distinctVocabulary,
+          b.fingerprint.distinctVocabulary,
+        )
+        if (minDistinct < this._minDistinctVocabulary) {
           continue
         }
         const similarity = computeSimilarity(a.fingerprint, b.fingerprint)

@@ -19,7 +19,7 @@ Smell detectors do not use the `.that().should()` chain grammar. Instead, they h
 
 ## `smells.duplicateBodies()`
 
-Detects functions with structurally similar bodies using AST fingerprinting. Two functions are flagged when their AST similarity exceeds a threshold (default: 85%).
+Detects functions with structurally similar bodies using AST fingerprinting. Two functions are flagged when their AST similarity exceeds a threshold (default: 85%) **and** each carries at least `minDistinctVocabulary` (default: 8) distinct identifier/literal texts — a low-vocabulary pair is never compared, however similar its shape.
 
 ```typescript
 import { project, smells } from '@nielspeter/ts-archunit'
@@ -39,15 +39,22 @@ smells
 
 Each detection run can be scoped, tuned, and filtered using these chainable methods. Start broad and tighten thresholds as you reduce duplicates.
 
-| Method                  | Default   | Description                                                               |
-| ----------------------- | --------- | ------------------------------------------------------------------------- |
-| `inFolder(glob)`        | all files | Scope detection to files matching the glob. Can be called multiple times. |
-| `minLines(n)`           | `5`       | Ignore functions shorter than N lines.                                    |
-| `ignoreTests()`         | `false`   | Exclude test files (`*.test.ts`, `*.spec.ts`, `__tests__/**`).            |
-| `ignorePaths(...globs)` | `[]`      | Exclude files matching the given glob patterns.                           |
-| `withMinSimilarity(n)`  | `0.85`    | AST similarity threshold (0--1). Lower values catch more pairs.           |
-| `groupByFolder()`       | `false`   | Group violation output by directory.                                      |
-| `because(reason)`       | --        | Explain why this smell check exists.                                      |
+| Method                     | Default   | Description                                                                                                                                                                                                                                   |
+| -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inFolder(glob)`           | all files | Scope detection to files matching the glob. Can be called multiple times.                                                                                                                                                                     |
+| `minLines(n)`              | `5`       | Ignore functions shorter than N lines.                                                                                                                                                                                                        |
+| `ignoreTests()`            | `false`   | Exclude test files (`*.test.ts`, `*.spec.ts`, `__tests__/**`).                                                                                                                                                                                |
+| `ignorePaths(...globs)`    | `[]`      | Exclude files matching the given glob patterns.                                                                                                                                                                                               |
+| `withMinSimilarity(n)`     | `0.85`    | AST similarity threshold (0--1). Lower values catch more pairs.                                                                                                                                                                               |
+| `minDistinctVocabulary(n)` | `8`       | Minimum count of distinct identifier/literal text either body must carry before a pair is even compared. Below this, a structural match carries no information — see [Why `minDistinctVocabulary` exists](#why-mindistinctvocabulary-exists). |
+| `groupByFolder()`          | `false`   | Group violation output by directory.                                                                                                                                                                                                          |
+| `because(reason)`          | --        | Explain why this smell check exists.                                                                                                                                                                                                          |
+
+### Why `minDistinctVocabulary` exists
+
+AST similarity alone can't tell a real copy-paste from a shape a framework mandates for every instance of something — a wither, a getter, a boilerplate skeleton. Two methods that both do `const next = this.copy(); next._x = true; return next` are structurally identical regardless of what `_x` is, because identifiers, property names and literals never reach the AST-kind comparison `withMinSimilarity` uses.
+
+`minDistinctVocabulary` gates the comparison itself: below this many distinct identifier/literal texts (on either side of the pair), the bodies are never compared at all, no matter how similar their shape is. Tune it down for a codebase with terser naming than the default assumes; tune it up if short, low-vocabulary bodies keep surfacing as noise.
 
 ### Terminal Methods
 
@@ -71,6 +78,7 @@ A fingerprint captures:
 - **Node kinds** -- the ordered sequence of `SyntaxKind` values in the body (e.g., `IfStatement`, `CallExpression`, `ReturnStatement`)
 - **Call targets** -- normalized call expression targets (e.g., `parseInt`, `this.extractCount`)
 - **Node count** -- total AST nodes, used for filtering
+- **Distinct vocabulary** -- the count of DISTINCT identifier/literal texts in the body (`Identifier`, `PrivateIdentifier`, `StringLiteral`, `NumericLiteral`, no-substitution template literals). Used only by the `minDistinctVocabulary` gate, not by the similarity score itself.
 
 Similarity is computed using the longest common subsequence (LCS) of the kinds arrays, normalized to `[0, 1]`:
 
@@ -84,6 +92,8 @@ This means:
 - Changing string literals does not affect similarity
 - Adding or removing statements reduces similarity
 - Reordering statements reduces similarity
+
+Identifiers and literals never reach the similarity score — that's deliberate, so renaming a variable doesn't hide a duplicate. It also means two bodies that share nothing but a mandated shape (a wither, a getter) can score 100% similar despite doing entirely different things. `minDistinctVocabulary` is a separate, earlier gate for exactly that case: a pair below the threshold is never even compared, regardless of how similar its shape turns out to be.
 
 ## `smells.inconsistentSiblings()`
 

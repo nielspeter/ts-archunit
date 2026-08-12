@@ -1,10 +1,27 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import path from 'node:path'
+import { Project } from 'ts-morph'
 import { project } from '../../src/core/project.js'
 import { smells } from '../../src/smells/index.js'
 import { ArchRuleError } from '../../src/core/errors.js'
+import type { ArchProject } from '../../src/core/project.js'
+import * as fingerprintModule from '../../src/smells/fingerprint.js'
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures/smells/duplicate-bodies')
+
+/** Two functions sharing one body — the vocabulary of `body` is fully controlled by the caller. */
+function twoFunctionsSharing(body: string): ArchProject {
+  const tsm = new Project({ useInMemoryFileSystem: true })
+  tsm.createSourceFile(
+    '/src/pair.ts',
+    `export function f1() {\n${body}\n}\nexport function f2() {\n${body}\n}\n`,
+  )
+  return {
+    tsConfigPath: '/tsconfig.json',
+    _project: tsm,
+    getSourceFiles: () => tsm.getSourceFiles(),
+  }
+}
 
 describe('smells.duplicateBodies()', () => {
   const p = project(path.join(fixturesDir, 'tsconfig.json'))
@@ -156,4 +173,156 @@ describe('smells.duplicateBodies()', () => {
     expect(groupedCount).toBe(plainCount)
     expect(plainCount).toBeGreaterThan(0)
   })
+
+  describe('plan 0103: minDistinctVocabulary()', () => {
+    // Exactly 5 distinct identifier/literal texts: alpha, 1, beta, 2, gamma.
+    const FIVE_TOKEN_BODY =
+      '  const alpha = 1\n  const beta = 2\n  const gamma = alpha + beta\n  return gamma'
+    const fiveTokenPair = twoFunctionsSharing(FIVE_TOKEN_BODY)
+
+    it('a below-floor pair does not pair', () => {
+      const violations = smells
+        .duplicateBodies(fiveTokenPair)
+        .minLines(2)
+        .minDistinctVocabulary(6)
+        .violations()
+      expect(violations).toEqual([])
+    })
+
+    it('an at-floor pair (exact boundary) does pair', () => {
+      const violations = smells
+        .duplicateBodies(fiveTokenPair)
+        .minLines(2)
+        .minDistinctVocabulary(5)
+        .violations()
+      expect(violations.length).toBeGreaterThan(0)
+    })
+
+    it('.minDistinctVocabulary(0) is a real config no-op, not a config no-op for the OTHER knob', () => {
+      // Proves the gate is additive to withMinSimilarity, not a replacement: at
+      // floor 0 the pair is exactly today's (broken) behaviour — it still pairs
+      // purely on similarity, regardless of how little vocabulary it carries.
+      const violations = smells
+        .duplicateBodies(fiveTokenPair)
+        .minLines(2)
+        .minDistinctVocabulary(0)
+        .violations()
+      expect(violations.length).toBeGreaterThan(0)
+    })
+
+    it('the floor participates in dedupe identity', () => {
+      // Same proof plan 0099 used for minLines/ignorePaths: two rules differing
+      // in exactly one field must not collapse into one describe() string, or
+      // dedupeConfigFindings silently discards one of them.
+      const a = smells.duplicateBodies(p).minDistinctVocabulary(4)
+      const b = smells.duplicateBodies(p).minDistinctVocabulary(8)
+      // describe() is protected; read it via the rule text a config finding carries.
+      const describeOf = (builder: ReturnType<typeof smells.duplicateBodies>): string => {
+        const configFinding = builder.minLines(1000).violations()[0]
+        return configFinding?.rule ?? ''
+      }
+      expect(describeOf(a)).not.toBe(describeOf(b))
+      expect(describeOf(a)).toContain('minDistinctVocabulary >= 4')
+      expect(describeOf(b)).toContain('minDistinctVocabulary >= 8')
+    })
+
+    it('examinedUnits() is unchanged by the floor — it gates pairing, not selection', () => {
+      const withFloor = smells.duplicateBodies(fiveTokenPair).minLines(2).minDistinctVocabulary(999)
+      const withoutFloor = smells
+        .duplicateBodies(fiveTokenPair)
+        .minLines(2)
+        .minDistinctVocabulary(0)
+      expect(withFloor.examinedUnits()).toBe(withoutFloor.examinedUnits())
+      expect(withFloor.examinedUnits()).toBeGreaterThan(0)
+    })
+
+    it('an absurdly high floor behaves like an absurdly high withMinSimilarity: silent, no config finding', () => {
+      // `.minDistinctVocabulary(9999)` can zero every finding while
+      // `examinedUnits() > 0` — indistinguishable from a genuinely clean corpus.
+      // Accepted risk (Release): the same shape `withMinSimilarity(1.0)` already
+      // has today. Proven as parity, not merely asserted.
+      const byVocab = smells
+        .duplicateBodies(fixturePair())
+        .minLines(3)
+        .minDistinctVocabulary(9999)
+        .violations()
+      const bySimilarity = smells
+        .duplicateBodies(fixturePair())
+        .minLines(3)
+        .withMinSimilarity(1.0)
+        .violations()
+      expect(byVocab.filter((v) => v.bypassFilters === true)).toEqual([])
+      expect(bySimilarity.filter((v) => v.bypassFilters === true)).toEqual([])
+      expect(byVocab.filter((v) => v.bypassFilters !== true)).toEqual([])
+    })
+
+    it('a real body with ZERO distinct vocabulary never pairs again once the floor is set', () => {
+      // Different from the hand-built empty-fingerprint case in fingerprint.test.ts:
+      // this is a real, non-empty body (kinds/nodeCount > 0) with no
+      // Identifier/*Literal descendants at all.
+      const trivial = twoFunctionsSharing('  return true')
+      const fp = fingerprintModule.buildFingerprint(
+        trivial._project.getSourceFiles()[0]!.getFunctions()[0]!.getBody()!,
+      )
+      expect(fp.distinctVocabulary).toBe(0)
+
+      const withoutFloor = smells
+        .duplicateBodies(trivial)
+        .minLines(1)
+        .minDistinctVocabulary(0)
+        .violations()
+      expect(withoutFloor.length).toBeGreaterThan(0)
+
+      const withFloor = smells
+        .duplicateBodies(trivial)
+        .minLines(1)
+        .minDistinctVocabulary(1)
+        .violations()
+      expect(withFloor).toEqual([])
+    })
+
+    it('fast rejection actually rejects computeSimilarity — verified, not assumed', () => {
+      // ADR-008 rule 5: spying on an internal, same-package collaborator is
+      // unprecedented in this codebase, so the mechanism is specified exactly
+      // (namespace import + vi.spyOn on the namespace property) rather than
+      // hedged, and its correctness is asserted directly rather than inferred
+      // from the surrounding tests passing.
+      const spy = vi.spyOn(fingerprintModule, 'computeSimilarity')
+      smells.duplicateBodies(fiveTokenPair).minLines(2).minDistinctVocabulary(6).violations()
+      expect(spy).not.toHaveBeenCalled()
+
+      spy.mockClear()
+      smells.duplicateBodies(fiveTokenPair).minLines(2).minDistinctVocabulary(5).violations()
+      expect(spy).toHaveBeenCalled()
+    })
+  })
 })
+
+/** A fresh in-memory near-clone pair, similarity < 1.0, well above the vocabulary floor. */
+function fixturePair(): ArchProject {
+  const tsm = new Project({ useInMemoryFileSystem: true })
+  tsm.createSourceFile(
+    '/src/pair.ts',
+    [
+      'export function alpha(raw: number) {',
+      '  const scaled = raw * 2',
+      '  const shifted = scaled + 1',
+      '  const bounded = shifted > 100 ? 100 : shifted',
+      '  const labeled = bounded > 0 ? "positive" : "non-positive"',
+      '  return { bounded, labeled }',
+      '}',
+      'export function beta(raw: number) {',
+      '  const scaled = raw * 2',
+      '  const shifted = scaled + 1',
+      '  const bounded = shifted > 100 ? 100 : shifted',
+      '  const labeled = bounded > 0 ? "affirmative" : "negative"',
+      '  return { bounded, labeled }',
+      '}',
+    ].join('\n'),
+  )
+  return {
+    tsConfigPath: '/tsconfig.json',
+    _project: tsm,
+    getSourceFiles: () => tsm.getSourceFiles(),
+  }
+}

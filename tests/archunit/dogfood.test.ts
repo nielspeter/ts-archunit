@@ -133,37 +133,54 @@ describe('tsconfig: the toolchain ADR-001 pins', () => {
 
 describe('smells: the detectors the floor lives by', () => {
   /**
-   * DISABLED — the detector is broken, not this repository.
+   * RE-ENABLED — plan 0103 fixed the detector.
    *
    * See [bug 0076](../../bugs/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md).
-   * `Fingerprint.kinds` is a sequence of `SyntaxKind` numbers and
-   * `computeSimilarity` is LCS over it, so identifiers never reach the
-   * comparison. These three bodies are reported as **100% similar**:
+   * `Fingerprint.kinds` was a sequence of `SyntaxKind` numbers and
+   * `computeSimilarity` LCS over it, so identifiers never reached the
+   * comparison — three bodies differing only in one assigned field's name
+   * were reported as **100% similar**, and every ADR-003 wither in this
+   * codebase paired with every other: 484 findings on `src/`, almost all
+   * false. Plan 0103 adds `minDistinctVocabulary()`, a pairwise floor on
+   * distinct identifier/literal text, gating the comparison before
+   * `computeSimilarity()` is even called.
    *
-   *     const next = this.copy()      const next = this.copy()      const next = this.copy()
-   *     next._ignoreTests = true      next._checkComplete = true    next._groupByFolder = true
-   *     return next                   return next                   return next
-   *
-   * They differ only in the assigned field, which is the whole of what they do.
-   * ADR-003 mandates that shape for every wither, so on this codebase the
-   * detector pairs each one with every other: 484 findings on `src/`, almost
-   * all false.
-   *
-   * Left as `skip` rather than deleted, and rather than pinned at a ceiling of
-   * 484. A ceiling would have read as coverage while reporting green over both
-   * the false positives and any real duplication beneath them, and tuning
-   * `minLines` to 12 — which was tried, and cuts 484 to 95 — buys the drop by
-   * refusing to look at short functions, where copy-paste actually collects.
-   * A skip shows up as not-covered in the run, which is the truth.
-   *
-   * Re-enable with bug 0076. There is genuine duplication here for the fixed
-   * detector to find: `src/conditions/body-analysis.ts`, `-function.ts` and
-   * `-module.ts` are three copies of one condition family.
+   * This does NOT assert `.toEqual([])` — Phase 0's own triage measured that
+   * a well-chosen floor does not drive false positives to zero (a second,
+   * narrower false-positive class survives, filed separately once this
+   * shipped), and pinning a count ceiling is exactly ADR-008 rule 5's
+   * anti-pattern: a ceiling reads as coverage while a real regression can
+   * still hide under it. Named, specific pairs instead — the motivating
+   * false positive must be gone, the motivating genuine duplicate must
+   * remain — matched on `identity`, which is deterministic and qualified by
+   * path (`buildViolations()`'s own doc comment warns against matching the
+   * message: the similarity percentage in it drifts as either body edits).
    */
-  it.skip('duplicate bodies in src do not increase', () => {
+  it('duplicate bodies: the wither triple no longer pairs, and the real duplicate still does', () => {
     const rule = smells.duplicateBodies(p).inFolder('**/src/**').ignoreTests()
     expect(rule.examinedUnits()).toBeGreaterThan(0)
-    expect(rule.violations()).toEqual([])
+
+    const identities = rule.violations().map((v) => v.identity ?? '')
+
+    // The motivating false positive — bug 0076's full three-way tie, not just
+    // one edge of it. If the mechanism works it kills all three simultaneously
+    // (a per-function property, applied symmetrically), so asserting only one
+    // pair would pass even if a second edge of the same triangle regressed.
+    const pairs: [string, string][] = [
+      ['#ignoreTests', '#groupByFolder'],
+      ['#ignoreTests', '#beComplete'],
+      ['#groupByFolder', '#beComplete'],
+    ]
+    for (const [a, b] of pairs) {
+      const stillPairs = identities.some((id) => id.includes(a) && id.includes(b))
+      expect(stillPairs, `${a} / ${b} must no longer pair`).toBe(false)
+    }
+
+    // The motivating genuine duplicate — must survive.
+    const realDuplicate = identities.some(
+      (id) => id.includes('#classContain') && id.includes('#functionContain'),
+    )
+    expect(realDuplicate).toBe(true)
   })
 })
 
