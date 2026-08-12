@@ -17,9 +17,9 @@ this from [0077](./0077-a-non-empty-examined-count-proves-neither-falsifiability
 > cheaper mechanical proxy exists before accepting it.
 
 This is that check, with a positive result for one shape. 0077 A's own example is
-**corpus-dependent** — `inconsistentSiblings` could not fail because *this* corpus had no majority to
+**corpus-dependent** — `inconsistentSiblings` could not fail because _this_ corpus had no majority to
 diverge from; a different corpus makes the same rule falsifiable. The case below is
-**corpus-independent**: the condition cannot fail for *any* corpus, because the subjects are types
+**corpus-independent**: the condition cannot fail for _any_ corpus, because the subjects are types
 that structurally cannot carry a property, and the condition asks about a property. No source edit
 anywhere can produce a finding.
 
@@ -59,31 +59,31 @@ right family and the wrong end of the relation: the `orderBy` **property** lives
 
 Against the consumer's real tree, on 0.59.0.
 
-| probe | result |
-| --- | --- |
-| `examinedUnits()` — Cell workspace | **3** |
-| `examinedUnits()` — IG workspace (after the author added unions there) | **9** |
-| `diagnose([rule])` | **`[]`** |
-| `check()` | passes |
-| mutation: `WebhookOrderByColumn = string` | **still passes** |
-| mutation: `CapacityTierOrderByColumn = string` | **still passes** |
+| probe                                                                  | result           |
+| ---------------------------------------------------------------------- | ---------------- |
+| `examinedUnits()` — Cell workspace                                     | **3**            |
+| `examinedUnits()` — IG workspace (after the author added unions there) | **9**            |
+| `diagnose([rule])`                                                     | **`[]`**         |
+| `check()`                                                              | passes           |
+| mutation: `WebhookOrderByColumn = string`                              | **still passes** |
+| mutation: `CapacityTierOrderByColumn = string`                         | **still passes** |
 
 The two mutations are the point. `= string` is the exact defect the rule names in its own `because`,
 introduced directly into a subject the rule examined, and the rule stayed green.
 
 Every existing guard is satisfied, for the same reason 0077's table gives:
 
-| guard | verdict |
-| --- | --- |
-| the floor (0099) | passes — `examined` is 3 and 9, not 0 |
-| `diagnose()` / `doctor` | **silent** — verified, returns `[]` |
-| dead-glob diagnosis (0.34) | silent — no glob involved; the predicate is a name regex |
-| zero-subjects gate (0.59) | silent — this is exactly the "non-zero" case it defers to |
+| guard                      | verdict                                                   |
+| -------------------------- | --------------------------------------------------------- |
+| the floor (0099)           | passes — `examined` is 3 and 9, not 0                     |
+| `diagnose()` / `doctor`    | **silent** — verified, returns `[]`                       |
+| dead-glob diagnosis (0.34) | silent — no glob involved; the predicate is a name regex  |
+| zero-subjects gate (0.59)  | silent — this is exactly the "non-zero" case it defers to |
 
 ⚠️ **0.59's gate is what makes this worth filing now rather than a curiosity.** The gate's arrival
 caused the consumer to audit their rules and mutation-test the ones it reddened. This rule was
 **not** reddened — it looked healthy by every signal the release added — and was found only because
-the author mutation-tested a *neighbouring* fix and then, on suspicion, mutated this one too. A user
+the author mutation-tested a _neighbouring_ fix and then, on suspicion, mutated this one too. A user
 who trusts the new gate as a completeness signal will conclude the opposite of the truth here.
 
 ## Why this shape is detectable
@@ -103,7 +103,7 @@ filed separately as [bug 0079](./0079-a-property-set-condition-on-a-primitive-ba
   reports 6 from `Number.prototype`. The decidable signal is "no source edit to this declaration can
   make `getProperty(name)` stop returning `undefined`," not "the apparent property set is empty" —
   conflating the two is exactly the mistake the correction below names;
-- ⇒ *`havePropertyType`-by-name ∧ every-examined-subject's-type-kind-cannot-ever-satisfy-that-lookup*
+- ⇒ _`havePropertyType`-by-name ∧ every-examined-subject's-type-kind-cannot-ever-satisfy-that-lookup_
   is a decidable predicate over the set the rule already materialises for `examinedUnits()`.
 
 That is one narrow rule, not a falsifiability solver. It would have reported this the day it was
@@ -112,9 +112,9 @@ whether it generalises to other condition/subject-kind mismatches, is the owner'
 [ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md) is `Proposed` and this is evidence for its
 ratification rather than a design.
 
-⚠️ **The generalisation is the trap, and 0077 already names it**: *"inventing a mechanism from the one
+⚠️ **The generalisation is the trap, and 0077 already names it**: _"inventing a mechanism from the one
 instance that bit us is how the four waves in ADR-009's Context table each closed an enumeration and
-missed the next family."* One instance is what this is. Worth checking against the other condition
+missed the next family."_ One instance is what this is. Worth checking against the other condition
 families before anything is built — which is exactly what caught the correction below.
 
 ## Correction (2026-08-12) — the "by extension" list was wrong
@@ -138,7 +138,7 @@ function getPropertySymbols(node: PropertyBearingNode): TsSymbol[] {
 
 `getProperties()` is the **apparent** property set, not a named lookup, and for a primitive-backed
 subject it is not empty — it is the boxed prototype's members (verified above: 21 for a string-literal
-union, 6 for a `number` alias). So these six do not vacuously *pass* on this subject shape; most of them
+union, 6 for a `number` alias). So these six do not vacuously _pass_ on this subject shape; most of them
 **fail noisily** instead, for reasons unrelated to the rule author's intent (e.g. `haveOnlyReadonlyProperties()`
 reports 20 "mutable" violations naming JS builtin methods like `toString`/`charAt` that the author never
 wrote). One of them, `havePropertyMatching`, **can** still pass silently — measured: `/^c/` matches the

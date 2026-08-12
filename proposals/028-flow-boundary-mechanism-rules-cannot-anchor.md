@@ -5,7 +5,7 @@
 difference between "your code does not contain the string" and "your code does not call what
 this function returns"; the concrete instance that surfaced it (a consumer session-write floor,
 BUG-055) was resolved by **not** adding a rule, so this is not an enabler for a waiting fix. It
-stands on the class: `call()` matches callee *text*, and there is today no way to express "a
+stands on the class: `call()` matches callee _text_, and there is today no way to express "a
 method invoked on the value a scoped call returned".
 **Affects:** the `calls()` predicate surface (`predicates/call.ts`, `models/arch-call.ts`) — a
 new predicate factory. No change to any existing matcher or predicate's behaviour — additive
@@ -20,7 +20,7 @@ and it does not alter any rule that passes today regardless of how that question
 factory on the `calls()` surface is, per ADR-008 rule 6's own table, the **top** row —
 "strangers depend on it, and we cannot fix it for them" — not the "internal check over a corpus
 we control" row an earlier draft of this proposal invoked in §Acceptance to justify a lighter
-guard; that citation was wrong and is corrected there. What keeps the *depth* proportionate is
+guard; that citation was wrong and is corrected there. What keeps the _depth_ proportionate is
 not the row (published API always gets "guard the guard, adversarial review, mutate") but the
 adoption facts: it cannot change the verdict of any rule that exists today (no existing predicate
 or matcher is touched), and adoption is zero — nothing in this repo or its docs calls it yet. So
@@ -37,10 +37,10 @@ it governs the protected dialect surface, not this ordinary export), `ts-archuni
 §4) and §6.3.1 (`symbolOf()`/`resolvesTo()`, a Phase-2 sketch aimed at the same alias escape this
 proposal leaves open — same section), and
 [proposal 021](./021-consumer-run-time-where-it-actually-goes.md) — which first measured the
-same seam from the other side. The concrete instance, bug 055 in the *frbkom-een-indgang*
+same seam from the other side. The concrete instance, bug 055 in the _frbkom-een-indgang_
 consumer repo (a Nuxt session floor), lives outside this repository; its measurement is
 reproduced in full under §Problem and cannot be linked internally.
-**Evidence:** measured 2026-08-10 in two places. (1) In the *frbkom-een-indgang* consumer repo
+**Evidence:** measured 2026-08-10 in two places. (1) In the _frbkom-een-indgang_ consumer repo
 (a Nuxt application's session floor), by spiking a candidate `call('useSession')` rule against
 four deliberate bypass forms — the numbers are in §Problem, reproduced against the source of
 `call()` while writing this proposal. (2) The base-rate measurement that decides priority, run
@@ -71,27 +71,30 @@ A candidate `call('useSession')` rule was spiked against four deliberate bypass 
 
 ```ts
 // M0 — aliased import, then method on the local
-const s = await useSessionAlias(event, cfg); await s.update({ user })
+const s = await useSessionAlias(event, cfg)
+await s.update({ user })
 
 // M1 — namespace import
 await h3.useSession(event, cfg).then((s) => s.update({ user }))
 
 // M2 — method destructured away; 'useSession' appears only as the import specifier
-const { update } = await useSessionAlias(event, cfg); await update({ user })
+const { update } = await useSessionAlias(event, cfg)
+await update({ user })
 
 // M3 — bare, cleanest form
-const s = await useSession(event, cfg); await s.update({ user })
+const s = await useSession(event, cfg)
+await s.update({ user })
 ```
 
-| pattern | `call('useSession')` verdict |
-|---|---|
-| M0 alias → `.update()` | **miss** |
-| M1 `h3.useSession(...)` → `.update()` | **miss** |
-| M2 destructure `{ update }` | **miss** |
-| M3 bare → `.update()` | catches the **acquisition call**, not the `update` |
+| pattern                               | `call('useSession')` verdict                       |
+| ------------------------------------- | -------------------------------------------------- |
+| M0 alias → `.update()`                | **miss**                                           |
+| M1 `h3.useSession(...)` → `.update()` | **miss**                                           |
+| M2 destructure `{ update }`           | **miss**                                           |
+| M3 bare → `.update()`                 | catches the **acquisition call**, not the `update` |
 
 The one it "caught" (M3) fired on `useSession(event, cfg)` — getting the handle — not on the
-actual write. And `call('update')` is worse: it matches the *bare* `update(...)` in M2 only,
+actual write. And `call('update')` is worse: it matches the _bare_ `update(...)` in M2 only,
 missing `s.update` (property access) in M0/M1/M3.
 
 ### 2. Why it is a class and not this one call site
@@ -99,12 +102,12 @@ missing `s.update` (property access) in M0/M1/M3.
 `call()` (and `access()`, `newExpr()`) match on **lexical text**. The body-analysis matchers
 under `notContain()`/`contain()`/`useInsteadOf()` walk `SyntaxKind.CallExpression` nodes and
 compare `node.getExpression().getText()` against the pattern (`matchers.ts:84-88`). That is a
-decision about *how the code spells the call*, not about *what value flows into it*. The two
+decision about _how the code spells the call_, not about _what value flows into it_. The two
 come apart the moment a value is bound to a name:
 
 ```ts
-const client = getClient()       // mechanism: 'getClient'
-client.query('...')              // spelling: 'client.query' — unreachable
+const client = getClient() // mechanism: 'getClient'
+client.query('...') // spelling: 'client.query' — unreachable
 ```
 
 This is the same boundary [proposal 021](./021-consumer-run-time-where-it-actually-goes.md)
@@ -115,7 +118,7 @@ intended semantic at all. Two consumers of one seam, opposite directions.
 
 The class matters because mechanism rules are the ones that carry security invariants — "writes
 must go through the wrapper", "this may only be reached through X" — and those invariants are
-exactly the ones stated in terms of *construction* ("call the wrapper") rather than *spelling*
+exactly the ones stated in terms of _construction_ ("call the wrapper") rather than _spelling_
 ("write no `setUserSession`") . Every `call()` ban on a command primitive is really a ban on
 "derive a value from this command outside the sanctioned path", and the language can only
 approximate that with "don't spell the command's name", which a single `const s = ...` defeats.
@@ -123,7 +126,7 @@ approximate that with "don't spell the command's name", which a single `const s 
 ### 3. The spelling hole is wider than aliasing
 
 The BUG-032 caveat ("`import { x as y }` escapes") is the **import** spelling. The flow hole is
-broader: it needs no alias and no exotic import — the *plain* way to use the function is to bind
+broader: it needs no alias and no exotic import — the _plain_ way to use the function is to bind
 its result to a name and call methods on it, which is M3 above, and M3 defeats the rule while
 spelling `useSession` correctly. Aliasing is a subset of binding. The rule language cannot
 distinguish "the code contains `useSession`" from "the code calls into a value derived from
@@ -132,17 +135,17 @@ distinguish "the code contains `useSession`" from "the code calls into a value d
 ### 4. Reconciling with spec §6.3.5 — this is not a new question for the project
 
 `ts-archunit-spec.md` §6.3.5 already rejected a same-scope data-flow feature once:
-`ensureValueIsProcessedBy()`, dropped because *"the semantics are ambiguous (what counts as
+`ensureValueIsProcessedBy()`, dropped because _"the semantics are ambiguous (what counts as
 'processed'? what about intermediate variables? what about calls that happen after the value is
 used?). Argument matching is precise, predictable, and sufficient for the real-world rules that
-motivated this feature."* §3.1's "Data-flow-lite rules (same function scope) are in scope" — the
+motivated this feature."_ §3.1's "Data-flow-lite rules (same function scope) are in scope" — the
 sentence an earlier draft of this proposal leaned on — sits in the same Non-Goals list as that
 rejection and does not survive quoting without it.
 
-The two features are not identical. `ensureValueIsProcessedBy()` tracked a *value* forward into
-becoming an *argument somewhere* — an open-ended "was this used" search, which is exactly where
+The two features are not identical. `ensureValueIsProcessedBy()` tracked a _value_ forward into
+becoming an _argument somewhere_ — an open-ended "was this used" search, which is exactly where
 "what about intermediate variables, what about calls after the value is used" bites. `onResultOf`
-tracks a *receiver* backward to its *producer* — one symbol, one declaration, one initializer,
+tracks a _receiver_ backward to its _producer_ — one symbol, one declaration, one initializer,
 unwrap one `await`: a bounded lookup with a fixed answer per call site, not an open-ended forward
 search. That is a narrower, more mechanical question, and it is why this proposal's own boundary
 (§Non-goals: const-only, single binding, same function, no reassignment) reads as a precise
@@ -150,7 +153,7 @@ answer to §6.3.5's objections rather than a repeat of them — reassignment and
 variables are named exclusions here, not unresolved ambiguity.
 
 But the reconciliation needs to be made explicitly, not stepped past. And §6.3.1 already sketches
-the project's planned answer to the *other* half of this problem — `symbolOf()`/`resolvesTo()`,
+the project's planned answer to the _other_ half of this problem — `symbolOf()`/`resolvesTo()`,
 type-checker-backed, tracing "through imports/re-exports" — aimed at exactly the M0 alias escape
 this proposal leaves open. Both features need the same binder plumbing (`Symbol`,
 `getDeclarations()`). Building `onResultOf`'s resolution ad hoc in `predicates/call.ts`, with no
@@ -163,24 +166,24 @@ proposal does not take a position on that question; a plan built from it should.
 ## The honesty line — what the spike does and does not claim
 
 **Measured:** the four-forms table above, against the real `call()` implementation, in the
-real consumer. That this is the *plain* use of the primitive, not an adversarial alias.
+real consumer. That this is the _plain_ use of the primitive, not an adversarial alias.
 
 **Measured (and retracted) — the four-forms claim did not survive the design.** An early draft
 of this proposal claimed `callResult` flags **all four** of M0–M3. It does not, and the
 retraction is the point (this is the ADR-008 "a pass is constructed from evidence" discipline,
-applied to a proposal). The design's *producer* match is **callee text** (`matchers.ts:84`), the
+applied to a proposal). The design's _producer_ match is **callee text** (`matchers.ts:84`), the
 same seam `call()` uses — and that is exactly why aliases escape: the design resolves the
 receiver's binding to its initializer (via ts-morph symbols), but does **not** resolve the
 initializer's own callee text through an import alias. Applying the boundary to the four:
 
-| pattern | with the design's text-matching boundary |
-|---|---|
-| M0 alias → `.update()` | **escapes** — callee is `useSessionAlias`, not `useSession`; the design does not resolve import aliases |
-| M1 `h3.useSession` → `.then(s => s.update())` | **escapes** — the receiver `s` is a `.then` callback *parameter*, explicitly out of scope |
-| M2 destructure `{ update }`, bare `update()` | **escapes** — a destructured binding and a bare call, not `receiver.method` |
-| M3 bare `const s = useSession(...); s.update()` | **caught** — and at the **write**, not the acquisition |
+| pattern                                         | with the design's text-matching boundary                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| M0 alias → `.update()`                          | **escapes** — callee is `useSessionAlias`, not `useSession`; the design does not resolve import aliases |
+| M1 `h3.useSession` → `.then(s => s.update())`   | **escapes** — the receiver `s` is a `.then` callback _parameter_, explicitly out of scope               |
+| M2 destructure `{ update }`, bare `update()`    | **escapes** — a destructured binding and a bare call, not `receiver.method`                             |
+| M3 bare `const s = useSession(...); s.update()` | **caught** — and at the **write**, not the acquisition                                                  |
 
-M3 is the meaningful improvement: `call('useSession')` caught M3 only at *acquisition* (the
+M3 is the meaningful improvement: `call('useSession')` caught M3 only at _acquisition_ (the
 `useSession(...)` call), while the new predicate catches `s.update(...)` — the actual write.
 M0/M1/M2 require alias-resolution, a flow through a callback parameter, or a
 destructure-then-bare-call — each a deliberate step beyond the plain idiom, and each is stated
@@ -192,11 +195,11 @@ ban on the bare name is noise. Hence the anchor is the **producer** (`useSession
 the method on its **result** — not the other way around.
 
 **Not claimed:** that this makes the consumer's rule-wise. The consumer resolved BUG-055 by
-*not* adding a rule — `useSession` is also a legitimately-read handle, so a flow rule would
+_not_ adding a rule — `useSession` is also a legitimately-read handle, so a flow rule would
 still flag reads, and the reviewer's honest recommendation was documentation. This proposal does
 not revive that decision. It is a language capability the class needs regardless of whether this
-one instance uses it: the next mechanism rule that *does* want enforcement (a write-only
-producer, e.g. a session *writer* rather than a read/write handle) currently has no way to say
+one instance uses it: the next mechanism rule that _does_ want enforcement (a write-only
+producer, e.g. a session _writer_ rather than a read/write handle) currently has no way to say
 "no method on this call's result."
 
 ## Design — at the predicate layer, where the machinery already is
@@ -242,12 +245,18 @@ calls(p).that().onResultOf('useSession').and().withMethod('update').should().not
 calls(p).that().onResultOf('useSession').should().notExist().check()
 ```
 
-A second domain, to substantiate the *class* rather than the one motivating case — nothing below
+A second domain, to substantiate the _class_ rather than the one motivating case — nothing below
 is session-specific:
 
 ```ts
 // A transaction handle must be committed through the audit-logging wrapper, not directly:
-calls(p).that().onResultOf('db.begin').and().withMethod('commit').should().notExist()
+calls(p)
+  .that()
+  .onResultOf('db.begin')
+  .and()
+  .withMethod('commit')
+  .should()
+  .notExist()
   .because('commits must go through commitTransaction() for audit logging')
   .check()
 ```
@@ -281,7 +290,7 @@ Semantics, scoped to the honest boundary (ADR-005 type guards throughout — `No
 3. **Only local, single-binding, `const` flows.** Reassignment, `let` (whose initializer is not
    provably the final value), closure capture, array/object property access, function
    parameters, `this.x = producer(); this.x.update()` (instance-field receiver), and
-   return-through are **out of scope** (§Non-goals). The point is to close the *plain* spelling,
+   return-through are **out of scope** (§Non-goals). The point is to close the _plain_ spelling,
    not to build a taint tracker.
 
 The predicate's `description` needs to be stable and human-readable, e.g.
@@ -300,8 +309,8 @@ confirming against `notExist()`'s actual identity derivation before the format i
 - **It is where receiver/method resolution already lives.** `onObject`/`withMethod` are
   `Predicate<ArchCall>` (`predicates/call.ts:25-61`); the value-flow question is the same shape,
   one more predicate. The first draft put it in the matcher layer, where the contract is a pure
-  `matches(node)` over a single AST node — a value-flow matcher there is the first *dataflow*
-  member of a purely *syntactic* tier, and pulls `getSymbol()` (binder-level work) into a layer
+  `matches(node)` over a single AST node — a value-flow matcher there is the first _dataflow_
+  member of a purely _syntactic_ tier, and pulls `getSymbol()` (binder-level work) into a layer
   that is today AST-only and cached. The predicate layer is where the type checker is already on
   the (opt-in) path.
 - **No parallel composition.** The first draft invented `.thenCall(update)` — a bespoke matcher
@@ -324,7 +333,7 @@ confirming against `notExist()`'s actual identity derivation before the format i
   single-handedly bootstrap that boundary would be disproportionate to its own scope. **The
   position taken here: defer engine-boundary compliance, but scope the resolution chain behind
   one small, named, private function** — `resolveReceiverProducer(node: Node): { calleeText:
-  string } | undefined` — **living in its own module**, so that if/when `src/core/engine/` lands,
+string } | undefined` — **living in its own module**, so that if/when `src/core/engine/` lands,
   migrating this predicate is a single-function swap, not a refactor of `predicates/call.ts`'s
   guts. That is a stated, deliberate trade-off, not an oversight — whoever ratifies this proposal
   should confirm or override it explicitly.
@@ -334,7 +343,7 @@ confirming against `notExist()`'s actual identity derivation before the format i
 - **It closes the plain-spelling hole, not just the alias.** M3 — the idiomatic way to use the
   function — is exactly what the new predicate catches and `call` cannot. That is the class's heart.
 - **It is the other half of proposal 021's discovery.** 021 found the seam produces a different
-  callee text than expected; this gives the rule language a way to state the invariant *despite*
+  callee text than expected; this gives the rule language a way to state the invariant _despite_
   the seam.
 - **ADR-008 rule 2's "remedy verified to remediate".** A rule built on `onResultOf` has a
   checkable remedy — "route the write through the wrapper" — and the positive case (M3 becomes
@@ -355,7 +364,7 @@ confirming against `notExist()`'s actual identity derivation before the format i
   They are residual by design, not unexamined.
 - **`this.x = producer(); this.x.update()` (instance-field receiver) is out of scope, and is
   stated as a named boundary.** It shares M3's plain-spelling quality — the highest-value
-  mechanism targets (a session *writer*) frequently live on instance fields — so it must not be
+  mechanism targets (a session _writer_) frequently live on instance fields — so it must not be
   silently assumed caught. Property receivers (`s.data.update()`) are likewise out of scope.
 - **Read-write distinction stays the author's problem.** `onResultOf` does not know whether
   `s.data` is a read. A consumer who must allow reads scopes with `withMethod('update')` or
@@ -382,7 +391,7 @@ confirming against `notExist()`'s actual identity derivation before the format i
   widening is a deliberate, visible decision.** const-only, single binding, same function, ≤1
   `await` is what `onResultOf` means today and, absent a documented reason otherwise, should keep
   meaning: widening it later (e.g. to close the M0 alias escape once `symbolOf()`/`resolvesTo()`
-  plumbing exists, per Problem §4) would change which calls an *existing* `.notExist()` rule
+  plumbing exists, per Problem §4) would change which calls an _existing_ `.notExist()` rule
   flags, with no name change to signal it — "a member's semantics shift under an unchanged name"
   is exactly the hazard ADR-010's own history treats as a breaking event, not a routine
   minor-version enhancement. If a future widening is wanted, it should get a new predicate name
@@ -406,7 +415,7 @@ confirming against `notExist()`'s actual identity derivation before the format i
 - **Residual (explicitly NOT flagged — the boundary):** M0 (import alias), M1 (flow through a
   `.then` callback parameter), M2 (destructure-then-bare-call). Each is stated as an escape in
   §Non-goals; they require a deliberate step past the plain idiom.
-- **Negative:** the same module's legitimate `db.select(...).update(...)` calls on a *different*
+- **Negative:** the same module's legitimate `db.select(...).update(...)` calls on a _different_
   producer are **not** flagged (the producer anchor holds); a `const b = a;` second-hop escape is
   **not** flagged (the honest boundary holds).
 - **Composition:** `onResultOf('useSession').and().withMethod('update')` narrows the M3 catch to
@@ -435,14 +444,14 @@ any existing published type.
    originating corpus — 281 of this project's own source files (cmless `packages/*/src`), 1,635
    method calls on a local identifier receiver:
 
-   | Class | Count | Share | `onResultOf` |
-   |---|---|---|---|
+   | Class                                                           | Count   | Share     | `onResultOf`                                   |
+   | --------------------------------------------------------------- | ------- | --------- | ---------------------------------------------- |
    | **M3** — receiver = direct `const/let` binding of a call result | **488** | **29.8%** | **caught** (97.7% same-function lexical scope) |
-   | M1-class — receiver is a parameter | 353 | 21.6% | escape |
-   | Unresolvable / other declarations | 294 | 18.0% | out of scope |
-   | Destructured receiver (`BindingElement`) | 118 | 7.2% | escape (plain-ish) |
-   | M2 — object-destructure of a call result (separate scan) | 131 | 8.0% | escape |
-   | Import / alias | 46 | 2.8% | escape |
+   | M1-class — receiver is a parameter                              | 353     | 21.6%     | escape                                         |
+   | Unresolvable / other declarations                               | 294     | 18.0%     | out of scope                                   |
+   | Destructured receiver (`BindingElement`)                        | 118     | 7.2%      | escape (plain-ish)                             |
+   | M2 — object-destructure of a call result (separate scan)        | 131     | 8.0%      | escape                                         |
+   | Import / alias                                                  | 46      | 2.8%      | escape                                         |
 
    **What the measurement clears:** M3 is the **largest single class** — 29.8% of all
    method-calls-on-locals, not a corner case, and almost entirely (97.7%) at the exact
@@ -451,8 +460,7 @@ any existing published type.
    passes on the weaker-but-sufficient claim: this is a frequent, plain, real spelling.
 
    **What the measurement refutes:** the proposal's own strong framing — "the naive spelling is
-   *the* accident." M3 is not a majority; the escape forms (M1 353 + destructured 118 + M2 131 ≈
-   602) outnumber it. A mechanism rule built on `onResultOf` catches roughly a third of the
+   _the_ accident." M3 is not a majority; the escape forms (M1 353 + destructured 118 + M2 131 ≈ 602) outnumber it. A mechanism rule built on `onResultOf` catches roughly a third of the
    corpus's real surface, not "the" pattern. So the honest claim is **"a frequent plain spelling,"
    not "the plain spelling."** A rule author must know the coverage ceiling (≈ the M3 share) or the
    green over-reads.
@@ -461,11 +469,12 @@ any existing published type.
    not false comfort (30% real coverage is not nothing), but it is **partial comfort** — the
    floor's job is done for the plain form, and the residual escapes (which outnumber it in total)
    are a stated, real ceiling, not an edge case.
+
 2. **Is the plain-spelling boundary the right line, or is any boundary short of a taint tracker
    false comfort?** The class's counter-argument — "if you can't catch the adversarial case,
    you shouldn't catch the naive one either" — is the one this proposal must answer in review.
    The position stands, narrowed by the measurement (open question 1): mechanism invariants fail
-   by *accident* far more often than by contempt (the project's own `why-ts-archunit.md` premise:
+   by _accident_ far more often than by contempt (the project's own `why-ts-archunit.md` premise:
    an agent optimises for green and has no reward signal for architecture, so it writes the plain
    form naturally, not the two-hop escape). The measured finding is that the plain form is the
    **largest single class at ~30%, not a majority** — so catching it is partial comfort, not
@@ -473,7 +482,7 @@ any existing published type.
    author must be told about, not an edge case to elide.
 3. **`await` elision:** §Design treats `await useSession(...)` + bind as one step (the await is
    beside the flow, not through it). Confirm that is the right line — the `.then(cb => cb(s))`
-   form (M1) is already settled as residual, so the open question is only whether the *plain*
+   form (M1) is already settled as residual, so the open question is only whether the _plain_
    `await`-then-bind should count, not whether the callback chain does.
 4. **Predicate description as the finding identity — mechanism unverified, needs checking before
    implementation.** An earlier draft of this proposal asserted `identifyMatches` keys
@@ -502,11 +511,11 @@ population, not all calls.
 **Classification traps (all three were hit, and each corrupts the number if missed):**
 
 1. **Destructure must be checked BEFORE the call-initializer check.** `const { update } =
-   useSession()` has an object-binding name *and* a call initializer; checking the initializer
+useSession()` has an object-binding name _and_ a call initializer; checking the initializer
    first misclassifies it as M3 (it is M2). The name-node pattern test must come first.
-2. **M2-destructure-then-*bare*-call is invisible to a method-call scan by construction.** M2's
+2. **M2-destructure-then-_bare_-call is invisible to a method-call scan by construction.** M2's
    call is `update({...})` — a bare call, not a `receiver.method` — so it never enters the 1,635.
-   M2 had to be counted with a *separate* scan over `VariableDeclaration`s whose name is an
+   M2 had to be counted with a _separate_ scan over `VariableDeclaration`s whose name is an
    object binding pattern and whose initializer is a call. The 131 figure is that scan.
 3. **Destructured receivers resolve to `BindingElement`, not `VariableDeclaration`.** A receiver
    bound via `const { client } = useSession()` (then `client.query()`) has a `BindingElement`
@@ -519,15 +528,22 @@ population, not all calls.
 import { Project, Node, SyntaxKind } from 'ts-morph'
 import { globSync } from 'node:fs'
 
-const files = globSync('/Users/nps/Documents/Projects/NielsPeter/cmless/packages/*/src/**/*.ts')
-  .filter((f) => !/\.(test|spec)\.ts$/.test(f))
+const files = globSync(
+  '/Users/nps/Documents/Projects/NielsPeter/cmless/packages/*/src/**/*.ts',
+).filter((f) => !/\.(test|spec)\.ts$/.test(f))
 const project = new Project({
   tsConfigFilePath: '/Users/nps/Documents/Projects/NielsPeter/cmless/tsconfig.json',
   skipAddingFilesFromTsConfig: true,
 })
 for (const f of files) project.addSourceFileAtPath(f)
 
-let total = 0, m3 = 0, sameFunction = 0, bindingElement = 0, aliasImport = 0, parameter = 0, otherDecl = 0
+let total = 0,
+  m3 = 0,
+  sameFunction = 0,
+  bindingElement = 0,
+  aliasImport = 0,
+  parameter = 0,
+  otherDecl = 0
 let m2Pattern = 0
 
 for (const sf of project.getSourceFiles()) {
@@ -545,13 +561,28 @@ for (const sf of project.getSourceFiles()) {
     if (!Node.isIdentifier(receiver)) continue
     total++
     const sym = receiver.getSymbol()
-    if (!sym) { otherDecl++; continue }
+    if (!sym) {
+      otherDecl++
+      continue
+    }
     const decls = sym.getDeclarations()
-    if (decls.length !== 1) { otherDecl++; continue }
+    if (decls.length !== 1) {
+      otherDecl++
+      continue
+    }
     const decl = decls[0]
-    if (Node.isImportSpecifier(decl) || Node.isNamespaceImport(decl) || Node.isImportClause(decl)) { aliasImport++; continue }
-    if (Node.isParameterDeclaration(decl)) { parameter++; continue }
-    if (Node.isBindingElement(decl)) { bindingElement++; continue }
+    if (Node.isImportSpecifier(decl) || Node.isNamespaceImport(decl) || Node.isImportClause(decl)) {
+      aliasImport++
+      continue
+    }
+    if (Node.isParameterDeclaration(decl)) {
+      parameter++
+      continue
+    }
+    if (Node.isBindingElement(decl)) {
+      bindingElement++
+      continue
+    }
     if (Node.isVariableDeclaration(decl)) {
       const nameNode = decl.getNameNode()
       if (Node.isObjectBindingPattern(nameNode) || Node.isArrayBindingPattern(nameNode)) continue
@@ -559,8 +590,12 @@ for (const sf of project.getSourceFiles()) {
       let target = init
       if (init && Node.isAwaitExpression(init)) target = init.getExpression()
       if (target && Node.isCallExpression(target)) {
-        const callFn = call.getFirstAncestorByKind(SyntaxKind.ArrowFunction) ?? call.getFirstAncestorByKind(SyntaxKind.FunctionExpression)
-        const declFn = decl.getFirstAncestorByKind(SyntaxKind.ArrowFunction) ?? decl.getFirstAncestorByKind(SyntaxKind.FunctionExpression)
+        const callFn =
+          call.getFirstAncestorByKind(SyntaxKind.ArrowFunction) ??
+          call.getFirstAncestorByKind(SyntaxKind.FunctionExpression)
+        const declFn =
+          decl.getFirstAncestorByKind(SyntaxKind.ArrowFunction) ??
+          decl.getFirstAncestorByKind(SyntaxKind.FunctionExpression)
         m3++
         if (callFn === declFn) sameFunction++
       }
@@ -575,8 +610,8 @@ for (const sf of project.getSourceFiles()) {
 holds for the overwhelming majority of the M3 population. Note `Node.isParameterDeclaration` is
 the guard in the installed ts-morph (not `Node.isParameter`, which does not exist there).
 
-**What the measurement is NOT:** it is not a count of mechanism-rule *violations* — it is a
-count of the *spelling distribution* of one seam (method calls on local receivers) across a real
+**What the measurement is NOT:** it is not a count of mechanism-rule _violations_ — it is a
+count of the _spelling distribution_ of one seam (method calls on local receivers) across a real
 corpus. The transfer to "how much of a real mechanism rule's surface `onResultOf` catches"
 assumes violations distribute like the general seam does; that is the residual, stated
 assumption. A future re-measurement against an actual mechanism rule's violations would tighten

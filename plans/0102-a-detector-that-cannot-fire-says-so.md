@@ -17,8 +17,8 @@ an on-record High-severity fail-open the vacuity matrix already audits, and the 
 project's own dogfood corpus's worked example of the exact failure the tool exists to prevent. Priority and
 blast radius sit on different axes and are not in tension: priority tracks the severity of the lie (a
 first-party showcase case), blast radius (below) tracks how far ADR-008 rule 6 says to chase the guard.
-**Effort:** Medium. The *design* is small and localized — a pure accessor, one violation producer, one
-diagnose hook, in one file. The *surface* is not: a public interface addition (`DiagnosableRule.inertAdvice?`),
+**Effort:** Medium. The _design_ is small and localized — a pure accessor, one violation producer, one
+diagnose hook, in one file. The _surface_ is not: a public interface addition (`DiagnosableRule.inertAdvice?`),
 a new `DiagnosticFinding['kind']` literal, a two-release version-gated migration with its own scheduling
 requirement (see Release), a fix to an existing test this plan's predicate would otherwise silently break
 (see Files Changed), and a 15-row sabotage matrix. Rate the work by the surface, not just the shape.
@@ -62,9 +62,9 @@ green has nothing to say about it.
 
 **This is not discovery; it is liquidation.** [Bug 0077(A)](../bugs/0077-a-non-empty-examined-count-proves-neither-falsifiability-nor-scope.md)
 filed this exact case — the identical rule, the identical measurement, all four guards green — on 2026-08-09,
-and its "why it probably cannot be mechanised" section proposed the candidate: *"a rule is falsifiable if some
+and its "why it probably cannot be mechanised" section proposed the candidate: _"a rule is falsifiable if some
 single-element perturbation of its examined set changes its verdict, which is expensive but not obviously
-impossible for the smell families."* The vacuity matrix audits `.:smells.inconsistentSiblings: 'fail-open'`
+impossible for the smell families."_ The vacuity matrix audits `.:smells.inconsistentSiblings: 'fail-open'`
 (`tests/matrix/vacuity-matrix.test.ts:118`). This plan answers 0077's explicit request that someone check
 whether a cheaper mechanical proxy exists — one does. The mission of ts-archunit is to **catch bad
 architecture**; a divergence-policing detector on a majority-less corpus catches none, while being counted as
@@ -72,15 +72,15 @@ coverage. That is the worst state this project exists to make unrepresentable.
 
 ## The framing, corrected from the proposal
 
-Proposal 027 sells this as *"extending ADR-009's evidence standard."* That is the one thing wrong in it, and
+Proposal 027 sells this as _"extending ADR-009's evidence standard."_ That is the one thing wrong in it, and
 it matters because it misplaces the argument.
 
 - **This is not a vacuity hole.** Vacuum is ∀ over ∅ — a rule that examined nothing. ADR-009 is
   **satisfied** here: `examined: 11` is non-empty, counted at the family's own seam, faithfully. The floor
-  is *correct* to pass it. If this were vacuity, 0099 would already catch it and this plan would be redundant.
-- **It is the adequacy hole** — ADR-009's own Notes name it and hand it off: *"a check can examine 500
-  subjects and still assert nothing worth knowing; ADR-008's rules own that."* Adequacy is explicitly
-  **not** ADR-009's job; the compiler enforces evidence is *present*, not that it can *fail*.
+  is _correct_ to pass it. If this were vacuity, 0099 would already catch it and this plan would be redundant.
+- **It is the adequacy hole** — ADR-009's own Notes name it and hand it off: _"a check can examine 500
+  subjects and still assert nothing worth knowing; ADR-008's rules own that."_ Adequacy is explicitly
+  **not** ADR-009's job; the compiler enforces evidence is _present_, not that it can _fail_.
 
 So this plan is argued **entirely under ADR-008**, not ADR-009:
 
@@ -106,7 +106,7 @@ existing public API.
 ### Phase 1 — a pure split accessor, shared by `detect()` and `diagnose()`
 
 The finding's numbers and truth come from **one pure function**, mirroring `examinedUnits()`'s contract —
-*"the SAME method its `collectViolations()` uses — not a parallel derivation"* (`diagnose.ts:53-56`). A pure
+_"the SAME method its `collectViolations()` uses — not a parallel derivation"_ (`diagnose.ts:53-56`). A pure
 accessor recomputes the partition from scratch every call, so:
 
 - `diagnose()` can call it on a freshly-constructed builder and get **truthful** numbers (the C1 fix);
@@ -239,7 +239,7 @@ protected detect(): ArchViolation[] {
 
 Three gating decisions, each from an existing standard:
 
-- **`a.matching > 0`** — when *no* examined file matches the pattern, the cause is a dead or narrowed
+- **`a.matching > 0`** — when _no_ examined file matches the pattern, the cause is a dead or narrowed
   pattern, not majority arithmetic. `fileMatchesPattern` is gated on `lineCount >= this._minLines`
   (`inconsistent-siblings.ts:44-48`), so a folder whose candidate bodies are all below `minLines` yields
   `matching === 0` and the message "only 0 of N hold the pattern" would be **false** — it names majority
@@ -309,7 +309,7 @@ private inertMessage(a: { matching: number; total: number }, patternDesc: string
 }
 ```
 
-Note the message says "no … majority reachable by adopting files," not "by any single-file edit": a *removal*
+Note the message says "no … majority reachable by adopting files," not "by any single-file edit": a _removal_
 of a non-matching file can also raise the ratio toward a majority (4-of-9 → deleting non-matching files reaches
 0.6), and deletion is not a sanctioned remedy — so the accessible claim is about the adopter route, and the
 message stays literally true. The `''` guard on a non-inert rule means the healthy control is invisible to the
@@ -372,7 +372,7 @@ file falls short. The message says that explicitly (a mid-adoption team swapping
 so the remedy does not surprise the reader. Widen-the-folder and choose-a-shared-pattern follow as the
 intent-flexible alternatives, and the message says so — rule-2's ordering matters because an agent applies the
 first remedy listed. Naming the guaranteed instrument makes rule-2's non-optionality honest — the reader is
-told the sanctioned path for their *actual* intent — and satisfies ADR-008 rule 3 ("no escape hatch, say what
+told the sanctioned path for their _actual_ intent — and satisfies ADR-008 rule 3 ("no escape hatch, say what
 to do instead"). The finding is error because a divergence-policing detector with no majority reachable by
 adopting files is policing nothing while being counted as coverage; the message is complete because the
 legitimate still-forming intent has a named home.
@@ -393,11 +393,7 @@ const byEnclosingFile: KeyFn<ArchCall> = (c) => c.getSourceFile().getBaseNameWit
 
 correspondence(p)
   .side('builders', classes(p).that().resideInFolder('src/builders/**'), byName())
-  .side(
-    'callers-of-copy',
-    calls(p).that().withMethod('copy'),
-    byEnclosingFile,
-  )
+  .side('callers-of-copy', calls(p).that().withMethod('copy'), byEnclosingFile)
   .should()
   .beComplete()
   .rule({ id: 'builders/every-builder-copies', because: 'every builder must implement copy()' })
@@ -514,13 +510,13 @@ future contributor could "helpfully" expose, which would undermine it silently.
 
 ## Files changed
 
-| File | Change |
-| ---- | ------ |
-| `src/core/diagnose.ts` | add `inertAdvice?(): string` to `DiagnosableRule` (optional structural member, parallel to `zeroSubjectsAdvice`); add the `'inert'` `DiagnosticFinding['kind']` literal (Phase 4); add the `inertFinding()` producer, mirroring `zeroSubjectsFinding` |
-| `src/smells/inconsistent-siblings.ts` | `Assessment` type + `inertAssessment()` (pure split accessor) + version-gated emit in `detect()` (now also preserving `_groupByFolder`'s existing sort — Phase 5 correction 4) + `inertViolation()` + `inertMessage()` + `inertElement()` + `inertAdvice()` override + `inertAdviceFor()` + `inertEmitEnabled()` + the `INERT_FINDING_EMIT` gate |
+| File                                                                                                       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/diagnose.ts`                                                                                     | add `inertAdvice?(): string` to `DiagnosableRule` (optional structural member, parallel to `zeroSubjectsAdvice`); add the `'inert'` `DiagnosticFinding['kind']` literal (Phase 4); add the `inertFinding()` producer, mirroring `zeroSubjectsFinding`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `src/smells/inconsistent-siblings.ts`                                                                      | `Assessment` type + `inertAssessment()` (pure split accessor) + version-gated emit in `detect()` (now also preserving `_groupByFolder`'s existing sort — Phase 5 correction 4) + `inertViolation()` + `inertMessage()` + `inertElement()` + `inertAdvice()` override + `inertAdviceFor()` + `inertEmitEnabled()` + the `INERT_FINDING_EMIT` gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `tests/smells/inconsistent-siblings.test.ts` + `tests/fixtures/smells/inconsistent-siblings/repositories/` | corrected from an earlier draft, which named a test file (`tests/archunit/inconsistent-siblings.test.ts`) that does not exist and never mentioned the real one. **This is the file the existing `'does not flag when no majority exists'` test lives in, and review found it structurally inert under the new predicate as written** (`forPattern(call('parseInt'))` is 1-of-4, `editsToMajority = 2 > 1`) — it would start throwing at the N+1 flip with no plan-side acknowledgment. Fix: add a fifth fixture file to the existing corpus (also calling `parseInt`, mirroring `legacy-repo.ts`'s shape) so the pattern becomes 2-of-5 — still below majority (`.not.toThrow()` still holds, unchanged intent) but `editsToMajority = ceil(3.0) − 2 = 1 ≤ 1`, so `canFireSoon = true` and the fixture is no longer inert. This single addition also supplies the "2-of-N boundary, not inert" fixture the Test inventory needs (see below) — no separate new fixture directory required. |
-| `tests/archunit/dogfood.test.ts` | the poisoned row is re-added as the *asserted* finding, not the shipped green; extend the existing `diagnose(BUILT).map(f => \`${f.kind}: …\`)` assertion to cover the new `'inert'` kind |
-| `docs/smell-detection.md`, `docs/upgrading.md`, `docs/api-reference.md` | the new finding + the N/N+1 upgrading row (see Release, including the affected-population sentence and rollback guidance review asked for) + the worked `correspondence().beComplete()` example (Phase 3) landing where the message points, not only in this plan |
+| `tests/archunit/dogfood.test.ts`                                                                           | the poisoned row is re-added as the _asserted_ finding, not the shipped green; extend the existing `diagnose(BUILT).map(f => \`${f.kind}: …\`)`assertion to cover the new`'inert'` kind                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `docs/smell-detection.md`, `docs/upgrading.md`, `docs/api-reference.md`                                    | the new finding + the N/N+1 upgrading row (see Release, including the affected-population sentence and rollback guidance review asked for) + the worked `correspondence().beComplete()` example (Phase 3) landing where the message points, not only in this plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 No change to `terminal-builder.ts`, `smell-builder.ts`, `dedupe-config-findings.ts`, or `violation.ts`. The
 public surface this adds to `DiagnosableRule` is one optional-structural member — `?` on the interface — so
@@ -530,7 +526,7 @@ touch the ADR-009 machinery.
 **`tests/matrix/vacuity-matrix.test.ts:118`'s `.:smells.inconsistentSiblings: 'fail-open'` row does NOT
 change, and review flagged this needs saying explicitly rather than left to be inferred.** It is tempting to
 read the Problem section's citation of that row as implying it becomes stale once this ships; it does not.
-The row audits *vacuity* (an empty `examined` set passing), and this plan's own central argument — "The
+The row audits _vacuity_ (an empty `examined` set passing), and this plan's own central argument — "The
 framing, corrected from the proposal," above — is that the measured case is **not** a vacuity hole:
 `examined: 11` is non-empty and the floor is correctly satisfied. `'fail-open'` remains the honest label for
 the vacuity axis; this plan adds a finding on the separate adequacy axis ADR-009's Notes hand to ADR-008. If
@@ -563,7 +559,7 @@ notion enters, so a reversion to "latch only when a divergent file exists" makes
 
 **Strong vs weak (the resolved open question), on a real fixture, not a hypothetical.** Review found the
 plan described a "2-of-4 folder" for this row without naming where it comes from, and separately found that
-the *existing* `tests/smells/inconsistent-siblings.test.ts` fixture (`repositories/`, `forPattern(call('parseInt'))`,
+the _existing_ `tests/smells/inconsistent-siblings.test.ts` fixture (`repositories/`, `forPattern(call('parseInt'))`,
 1-of-4) is itself inert under the new predicate and would silently start throwing at the N+1 flip. One fixture
 change fixes both: add a fifth file to `repositories/` that also calls `parseInt`, making it 2-of-5 —
 `canFireSoon` is true because `ceil(0.6 × 5) − 2 = 1 <= 1`, so it does **not** report inert (the existing
@@ -586,8 +582,8 @@ tests instead of one.
 
 **`diagnose()` reports the new `'inert'` kind, not `'zero-subjects'`.** `diagnose([measuredCaseRule])` returns
 a finding with `kind: 'inert'` (not `'zero-subjects'`, which cannot fire here since `examinedUnits() === 11`).
-Extend `tests/archunit/dogfood.test.ts`'s existing `diagnose(BUILT).map(f => \`${f.kind}: …\`)` assertion to
-cover it — the place review named as where a missing or wrong `kind` literal would first surface.
+Extend `tests/archunit/dogfood.test.ts`'s existing `diagnose(BUILT).map(f => \`${f.kind}: …\`)`assertion to
+cover it — the place review named as where a missing or wrong`kind` literal would first surface.
 
 **The "one pass, not two" claim is guarded, not just commented.** Review found no test could distinguish one
 `searchFunctionBody` walk from two — `partitionByPattern` is pure, so re-partitioning would silently produce
@@ -622,31 +618,31 @@ why it is not the leading remedy.
 
 **Sabotage matrix** (each row must red, one sabotage round per rule 6):
 
-| Revert | Must red because |
-| ------ | ---------------- |
-| Delete `inertViolation()` and the emit | The measured case reverts to green |
-| Turn `inertAssessment()` into accumulated fields | `inertAdvice()` on a fresh builder reports 0/0 (false), or repeated `check()`+`violations()` double-counts — the diagnostic-first guarantee breaks |
-| Make `inertAssessment()` return a stale/cached value it doesn't recompute | A held builder's second `check()` reports old counts |
-| Move the `canFireSoon` latch to "only when a divergent file exists" | The all-conforming presets control falsely reports inert |
-| Drop the `editsToMajority <= 1` suppression (weak predicate) | The 2-of-5 fixture (`repositories/` + the added `parseInt` caller) falsely reports inert — rule 2 message is false |
-| Remove the `matching > 0` gate | The all-below-minLines corpus reports "0 of N hold the pattern" |
-| Change `bypassFilters` to false / sever to warn | The finding becomes suppressible/optional — rule 1 violated |
-| Constant `element: 'inert'` instead of scope-aware `inertElement()` | Two same-pattern/different-scope inert detectors collapse under `checkAll` |
+| Revert                                                                                                                     | Must red because                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delete `inertViolation()` and the emit                                                                                     | The measured case reverts to green                                                                                                                                                             |
+| Turn `inertAssessment()` into accumulated fields                                                                           | `inertAdvice()` on a fresh builder reports 0/0 (false), or repeated `check()`+`violations()` double-counts — the diagnostic-first guarantee breaks                                             |
+| Make `inertAssessment()` return a stale/cached value it doesn't recompute                                                  | A held builder's second `check()` reports old counts                                                                                                                                           |
+| Move the `canFireSoon` latch to "only when a divergent file exists"                                                        | The all-conforming presets control falsely reports inert                                                                                                                                       |
+| Drop the `editsToMajority <= 1` suppression (weak predicate)                                                               | The 2-of-5 fixture (`repositories/` + the added `parseInt` caller) falsely reports inert — rule 2 message is false                                                                             |
+| Remove the `matching > 0` gate                                                                                             | The all-below-minLines corpus reports "0 of N hold the pattern"                                                                                                                                |
+| Change `bypassFilters` to false / sever to warn                                                                            | The finding becomes suppressible/optional — rule 1 violated                                                                                                                                    |
+| Constant `element: 'inert'` instead of scope-aware `inertElement()`                                                        | Two same-pattern/different-scope inert detectors collapse under `checkAll`                                                                                                                     |
 | Drop any one field (`_folders`/`_ignorePaths`/`_ignoreTests`/`_minLines`) from `inertElement()`'s fold, or don't sort them | Two rules differing only in that field collapse under `checkAll`; unsorted, `inFolder('a').inFolder('b')` and `inFolder('b').inFolder('a')` — the same scope — falsely split into two findings |
-| Emit the inert finding when `declaresEmpty()` | The `expectEmpty` expiry double-reports one rule |
-| **`inertAdvice()` and the finding use different message functions** | `diagnose()` previews one string, the finding says another — plan 0070's exact trust defect |
-| **Move the guard out of `inertAdvice()` back to the emit site** | The healthy-control preview reports falsely ("5 of 5 hold the pattern… no majority") — C1 regression |
-| **`inertAdvice()` returns a message (not `''`) for a non-inert rule** | The healthy-control preview and the check-time emit both report on a rule that can fire |
-| **Revert the `INERT_FINDING_EMIT` gate to false** on the flip | The N+1 `check()` tests go green — the flip is masked |
-| `diagnose()` stops reading `inertAdvice()` | The N-phase loses its preview — the migration instrument disappears before the flip |
-| **Re-partition in `detect()` instead of consuming `inertAssessment()`'s folders** | The `searchFunctionBody` walk runs twice per `check()` — caught only by the call-count assertion above, not by any functional test (review: architect + testing, independently) |
-| **Drop the `_groupByFolder` sort on `inertAssessment()`'s returned folders** | A multi-folder `groupByFolder()` rule's violations stop being directory-sorted — silently breaks a tested public-API guarantee (review, verified against `inconsistent-siblings.ts:189-190`) |
-| Add the fifth `repositories/` fixture file without also calling `parseInt` | The `'does not flag when no majority exists'` test's fixture stays 1-of-4 (genuinely inert) and starts throwing at the N+1 flip, unnoticed by this plan — the exact gap review found |
+| Emit the inert finding when `declaresEmpty()`                                                                              | The `expectEmpty` expiry double-reports one rule                                                                                                                                               |
+| **`inertAdvice()` and the finding use different message functions**                                                        | `diagnose()` previews one string, the finding says another — plan 0070's exact trust defect                                                                                                    |
+| **Move the guard out of `inertAdvice()` back to the emit site**                                                            | The healthy-control preview reports falsely ("5 of 5 hold the pattern… no majority") — C1 regression                                                                                           |
+| **`inertAdvice()` returns a message (not `''`) for a non-inert rule**                                                      | The healthy-control preview and the check-time emit both report on a rule that can fire                                                                                                        |
+| **Revert the `INERT_FINDING_EMIT` gate to false** on the flip                                                              | The N+1 `check()` tests go green — the flip is masked                                                                                                                                          |
+| `diagnose()` stops reading `inertAdvice()`                                                                                 | The N-phase loses its preview — the migration instrument disappears before the flip                                                                                                            |
+| **Re-partition in `detect()` instead of consuming `inertAssessment()`'s folders**                                          | The `searchFunctionBody` walk runs twice per `check()` — caught only by the call-count assertion above, not by any functional test (review: architect + testing, independently)                |
+| **Drop the `_groupByFolder` sort on `inertAssessment()`'s returned folders**                                               | A multi-folder `groupByFolder()` rule's violations stop being directory-sorted — silently breaks a tested public-API guarantee (review, verified against `inconsistent-siblings.ts:189-190`)   |
+| Add the fifth `repositories/` fixture file without also calling `parseInt`                                                 | The `'does not flag when no majority exists'` test's fixture stays 1-of-4 (genuinely inert) and starts throwing at the N+1 flip, unnoticed by this plan — the exact gap review found           |
 
 ## Release
 
 Two events, per ADR-008 rule 1's migration corollary. The mechanism is a **version-gated emit**: the finding
-is always *computable* via the pure accessor, and `diagnose()` can always reach it through the structural
+is always _computable_ via the pure accessor, and `diagnose()` can always reach it through the structural
 hook; only the check-time emit is turned on by the flip.
 
 **Correction (review):** an earlier draft called this "identical to the 0.59.0 vacuity-gate migration."
@@ -655,7 +651,7 @@ the usual shape: it shipped its diagnostic and its gate **together, in one relea
 the rollback valve. What this plan proposes — a genuine two-release, same-source-tree, hand-flipped-constant
 migration — has no prior instance in this repo's history that review could find. Say that plainly rather than
 borrow an authority that does not transfer: this is the first time this exact mechanism is exercised, so the
-sabotage-matrix rows guarding it (below) carry more weight than precedent does. What 0.59.0 *does* share with
+sabotage-matrix rows guarding it (below) carry more weight than precedent does. What 0.59.0 _does_ share with
 this plan is narrower and still true: the doctor preview cannot reach rule files that import a test runner
 (ADR-008 rule 1's corollary), and `diagnose()` inside the suite is the documented path for those users, same
 as 0.59.0.
@@ -669,15 +665,15 @@ as 0.59.0.
   suppression.
   - **Self-check before upgrading, without waiting for N.** `docs/smell-detection.md` already documents the
     60% majority rule publicly, so a user can check today, on their current version, without adding a
-    `diagnose()` assertion: *"if your `forPattern` matches in under 60% of a scoped folder's files, this
-    plan will eventually flag that rule."* State this plainly in the `docs/upgrading.md` row — review found
+    `diagnose()` assertion: _"if your `forPattern` matches in under 60% of a scoped folder's files, this
+    plan will eventually flag that rule."_ State this plainly in the `docs/upgrading.md` row — review found
     the only self-check this plan otherwise offers is "upgrade to N, then proactively add a `diagnose()`
     assertion in a test file," which is opt-in and easy to skip, unlike the runnable preview commands the
     other rows in that file give.
 - **N+1 (flip, `INERT_FINDING_EMIT = true`).** `check()` fails on the rules `diagnose()` previewed on N. The
   `docs/upgrading.md` row must give this the same level of detail as its 0.57.0–0.59.0 neighbours (review:
   those rows each state the affected population up front, enumerate every suppression mechanism that does
-  *not* work, and give a rollback path — this plan's Release section only gestured at assembling that, so
+  _not_ work, and give a rollback path — this plan's Release section only gestured at assembling that, so
   spell it out here):
   - **Affected population:** a `smells.inconsistentSiblings(...)` rule that passes today with
     `examined > 0 / violations: 0` and no folder within one edit of a majority.
@@ -689,8 +685,8 @@ as 0.59.0.
     gives for every other unsuppressable finding (0.59.0's floor). State it here now, not improvised at
     flip time.
   - **The flip must be a scheduled deliverable, not a hoped-for follow-up.** Review's strongest release-level
-    finding: nothing in the plan as drafted *forces* N+1 to happen — the only guard is a sabotage row for
-    *reverting* an already-shipped flip, which cannot exist until the flip PR does, and no flip PR is
+    finding: nothing in the plan as drafted _forces_ N+1 to happen — the only guard is a sabotage row for
+    _reverting_ an already-shipped flip, which cannot exist until the flip PR does, and no flip PR is
     scheduled. `INERT_FINDING_EMIT = false` sitting in `main` indefinitely is the same "permanent, trained
     suppression" shape this project designed against with `.expectEmpty()` (CHANGELOG 0.59.0), with the
     emit gate replacing the escape hatch. Before N ships, file the N+1 flip as its own tracked plan
@@ -717,7 +713,7 @@ it (row: reverting the gate to false makes the N+1 tests green — the flip is n
 - **The `minLines` boundary is a known edge, not solved here.** `fileMatchesPattern` counts below-theshold
   bodies as non-matching (`inconsistent-siblings.ts:44-48`), so a corpus where the real pattern-holders sit
   just under `minLines` can be mis-measured by the assessment. The `matching > 0` gate catches the all-below
-  case; the *partial* case (some holders under `minLines`) is a pre-existing ambiguity in how this detector
+  case; the _partial_ case (some holders under `minLines`) is a pre-existing ambiguity in how this detector
   counts, orthogonal to inertness, and is flagged as an open question rather than claimed resolved.
 - **`duplicateBodies` stays untouched** (it is itself broken — bug 0076). This plan does not fix that detector.
 - **Deletion, not just adoption, can also raise a folder toward a majority — deliberately excluded from
@@ -742,7 +738,7 @@ the sections above (see **Implements**, at the top, for the summary).
 
 **Weak vs strong predicate: resolved to strong.** Both review lenses independently concluded it, and bug
 0077(A) filed the exact candidate ("single-element perturbation changes its verdict") that the strong reading
-implements. Weak is false at the margin: a 2-of-4 folder *can* fire on one edit, so "cannot produce a finding"
+implements. Weak is false at the margin: a 2-of-4 folder _can_ fire on one edit, so "cannot produce a finding"
 would be untrue (rule 2) and would spam the least-broken corpus. Strong is true of everything it reports,
 drops the near-threshold cases that are one adopter from working, and preserves the 4-of-11 case this plan
 exists to catch.
