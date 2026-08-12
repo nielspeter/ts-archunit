@@ -22,8 +22,7 @@ const selectionOf = selectionMemo<[string, SourceFile[]]>()
  * 0102: diagnostic-first. N ships false (diagnose previews, check passes); the
  * flip release sets true (check fails). Not a warn-first migration — a
  * warning is invisible in a test run (bug 0024) and trains suppression.
- * The N+1 flip is tracked in a separate plan, referenced from this constant
- * once that plan is filed.
+ * The N+1 flip is tracked in plan 0105.
  */
 const INERT_FINDING_EMIT = false
 

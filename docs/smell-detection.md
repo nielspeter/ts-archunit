@@ -118,6 +118,28 @@ All base configuration methods from `SmellBuilder` apply (`inFolder`, `minLines`
 
 The `matcher` parameter accepts any expression matcher -- `call()`, `newExpr()`, `access()`, or `expression()`.
 
+### Inert Detection
+
+`inconsistentSiblings()` reports a minority diverging from an already-formed 60% majority — so a rule can examine a real, non-empty corpus and still be structurally unable to ever produce a finding, if no folder's matching files are within one edit of that majority. `.inertAdvice()` names that state before you find out the hard way:
+
+```typescript
+const rule = smells
+  .inconsistentSiblings(p)
+  .inFolder('**/handlers/**')
+  .forPattern(call('handleError'))
+
+rule.inertAdvice()
+// 'This detector examined 5 sibling files, but only 1 of them hold the pattern
+//  'handleError', and no folder is within an edit of a majority — so as written
+//  it cannot produce a finding today. ...'
+```
+
+It returns `''` — nothing to report — once a folder has a real majority, or is one edit away from forming one; and it also returns `''` when the pattern matches nothing at all, since that is a dead pattern, not majority arithmetic. `diagnose()` (and `ts-archunit doctor`) surface the same text, so you see it before `check()` ever runs. Today this is preview-only: `check()` still passes on an inert rule. The message gives three ways out, in order:
+
+- **Still adopting the convention?** Swap for `correspondence().side(...).beComplete()` — it asserts the convention directly and fails the day a file falls short, rather than waiting for a majority to exist.
+- **Wrong scope?** Widen `.inFolder(...)` so a real majority can form.
+- **Wrong pattern?** Point `forPattern()` at a pattern the siblings already share.
+
 ## Real-World Examples
 
 ### Detecting Copy-Pasted Parsers

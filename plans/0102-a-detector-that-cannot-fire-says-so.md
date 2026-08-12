@@ -1,6 +1,7 @@
 # Plan 0102 — A Detector That Cannot Fire Says So
 
-**Status:** PROPOSED.
+**Status:** PROPOSED. Phases 1–4 implemented. The N+1 flip (`INERT_FINDING_EMIT = true`) is tracked
+separately in [plan 0105](./0105-the-inert-finding-flipped.md), per this plan's own Release section.
 **Implements:** [proposal 027](../proposals/027-a-rule-that-cannot-fire-says-so.md). Corrected twice since:
 once against the proposal itself (see "The framing, corrected from the proposal" below), and once by a
 five-persona review of this plan (2026-08-12) that found a compile error in the Phase 3 code sample (verified
@@ -700,7 +701,7 @@ as 0.59.0.
     tracked in plan NNNN"), so the flip is a scheduled deliverable with an owner and a landing point — not a
     property of this plan's prose. The N+1 test (`check()` fails with the identical string `diagnose()`
     previewed on N) cannot be written until that PR exists; it belongs to that PR's own test inventory, not
-    to this one's.
+    to this one's. **Filed: [plan 0105](./0105-the-inert-finding-flipped.md).**
 
 The gate is a single module constant, so the flip is one owned, reviewed line and the sabotage matrix can pin
 it (row: reverting the gate to false makes the N+1 tests green — the flip is not masked).
