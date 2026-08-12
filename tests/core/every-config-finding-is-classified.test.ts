@@ -138,8 +138,10 @@ const CLASSIFIED: Readonly<Record<string, Classification>> = {
     remedy: 'own',
     verified:
       'behavioural: inconsistent-siblings.test.ts — "choose a shared pattern" (the message’s second ' +
-      'remedy) clears the inert finding on a real fixture and replaces it with a normal, real violation ' +
-      '(plan 0102)',
+      'remedy) clears a REAL inertViolation() (via the EmittingSiblings test-only subclass, since ' +
+      'INERT_FINDING_EMIT=false makes this function unreachable through the shipped gate) and replaces ' +
+      'it with a normal, real violation (plan 0102; corrected by review to cite the emit-path test, not ' +
+      'the preview-only one — the original citation never actually constructed an inertViolation())',
   },
   'src/helpers/baseline.ts::descriptionChangeFinding': {
     remedy: 'own',

@@ -1,6 +1,6 @@
 # Plan 0105 — The Inert Finding, Flipped
 
-**Status:** READY. Filed per [plan 0102](./0102-a-detector-that-cannot-fire-says-so.md)'s own Release
+**Status:** READY. Filed per [plan 0102](./completed/0102-a-detector-that-cannot-fire-says-so.md)'s own Release
 section requirement: _"Before N ships, file the N+1 flip as its own tracked plan ... so the flip is a
 scheduled deliverable with an owner and a landing point — not a property of this plan's prose."_ This is
 that filing. `INERT_FINDING_EMIT`'s code comment in `src/smells/inconsistent-siblings.ts` and plan 0102's
@@ -59,16 +59,33 @@ No other line in `detect()`, `inertAdviceFor()`, `inertAssessment()`, or `inertE
 the guard, the message, and the emit gate were all built in plan 0102 to share one derivation for exactly
 this reason, so flipping the constant is the entire runtime change.
 
+**Corrected against the shipped N-phase code (review of plan 0102 found and fixed a guard-split bug
+before release): `inertEmitEnabled()` is now the PURE version gate** — `return INERT_FINDING_EMIT`, no
+`&& !this.declaresEmpty()` operand. That clause moved into `inertAdviceFor()` itself (`if (a.matching ===
+0 || a.canFireSoon || this.declaresEmpty()) return ''`), so it applies identically to `diagnose()`'s
+preview and to `detect()`'s emit — the drift a split guard could otherwise produce (`diagnose()` naming
+one cause, `check()` naming another, for the same rule state) is what that fix closes. This plan's own
+Phase 3 and Phase 4 row 3 below are updated to match.
+
+`inertEmitEnabled()` is also now `protected` specifically so a test-only subclass
+(`EmittingSiblings` in `tests/smells/inconsistent-siblings.test.ts`) can override it to exercise the
+emit path — `inertViolation()`, `inertElement()`, the `detect()` branch that pushes them — before this
+flip ships. That subclass tests the SHARED GUARD LOGIC exhaustively already; what it does NOT test is the
+real `INERT_FINDING_EMIT` constant itself, since the subclass bypasses it entirely. Phase 2's test, below,
+is what proves the constant.
+
 ### Phase 2 — the N+1 test
 
 The regression test plan 0102 named but explicitly deferred to this plan. Use the same measured fixture
 plan 0102's own test inventory already established (`tests/fixtures/smells/inconsistent-siblings/mixed-beta/`,
-1-of-5 files calling `this.normalize()`):
+1-of-5 files calling `this.normalize()`). **`p`, not `mp`** — the N-phase's own review renamed the
+fixture variable (it duplicated `fixturesDir`/`p` under a different name) — use whatever the file's
+current fixture binding is named at implementation time:
 
 ```ts
 it('the flip: check() now fails with the identical string diagnose() previewed on N', () => {
   const builder = smells
-    .inconsistentSiblings(mp)
+    .inconsistentSiblings(p)
     .inFolder('**/mixed-beta/**')
     .minLines(1)
     .forPattern(call('this.normalize'))
@@ -96,21 +113,35 @@ N+1, not a differently-worded surprise.
 
 Plan 0102's C1 regression test (`'a healthy control (majority present) reports no advice'`) and the
 `canFireSoon` boundary test must still pass unchanged: the flip only changes `inertEmitEnabled()`'s
-`INERT_FINDING_EMIT` operand, not `inertAdviceFor()`'s guard (`a.matching === 0 || a.canFireSoon`), so a
-rule that can still fire soon stays silent at N+1 exactly as it was at N. No new test needed here — the
-existing suite is the guard; this phase is a checkpoint, not new code.
+return value (`INERT_FINDING_EMIT`, now the function's ENTIRE body — see Phase 1's correction), not
+`inertAdviceFor()`'s guard (`a.matching === 0 || a.canFireSoon || this.declaresEmpty()`), so a rule that
+can still fire soon — or is declared empty — stays silent at N+1 exactly as it was at N. No new test
+needed here — the existing suite, plus the N-phase's own `EmittingSiblings`-based emit-path tests
+(`tests/smells/inconsistent-siblings.test.ts`, added during plan 0102's post-implementation review), is
+the guard; this phase is a checkpoint, not new code.
+
+**`tests/archunit/dogfood.test.ts` is the one existing test that WILL break, and it is expected to** --
+named explicitly rather than left for the implementer to discover (review: architect, of plan 0102).
+Its `'plan 0102: the poisoned row, re-measured — bug 0077(A) liquidated'` row currently asserts the
+inert rule reports via `diagnose(BUILT)` while its own `.check()` (inside `gate(...)`) still passes. At
+N+1 that same rule's `.check()` now fails too, so the row needs updating to expect the throw — matching
+the same class of update plan 0102's own review found and fixed once already for a different fixture
+(`parseInt`, which would have started throwing at this exact flip with no plan-side acknowledgment).
+Added to Files changed, below.
 
 ### Phase 4 — sabotage matrix
 
-| #   | Sabotage                                                        | Expected                                                                                                                                                               |
-| --- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Revert `INERT_FINDING_EMIT` to `false`                          | Phase 2's new test fails (`.check()` no longer throws) — CAUGHT                                                                                                        |
-| 2   | Delete the `advice !== ''` guard in `detect()`'s emit condition | Plan 0102's healthy-control regression test fails (a `canFireSoon` rule starts emitting) — CAUGHT                                                                      |
-| 3   | Delete `inertEmitEnabled()`'s `!this.declaresEmpty()` clause    | No test in this plan's own inventory catches this — inherited from plan 0102 unchanged and out of this plan's scope; flagged here rather than silently assumed covered |
+| #   | Sabotage                                                        | Expected                                                                                                                                                                                                     |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Revert `INERT_FINDING_EMIT` to `false`                          | Phase 2's new test fails (`.check()` no longer throws) — CAUGHT                                                                                                                                              |
+| 2   | Delete the `advice !== ''` guard in `detect()`'s emit condition | Plan 0102's healthy-control regression test fails (a `canFireSoon` rule starts emitting) — CAUGHT                                                                                                            |
+| 3   | Delete `inertAdviceFor()`'s `this.declaresEmpty()` clause       | The N-phase's own `EmittingSiblings` "declared-empty rule reports its expiry, not the inert finding" test fails — CAUGHT already, by the N-phase's own review-added coverage; no longer this plan's open row |
 
-Row 3 is intentionally left open rather than padded with a test written to make the row read CAUGHT: it is
-plan 0102's guard, not this plan's, and closing it here would duplicate rather than complete that plan's
-own sabotage matrix.
+Row 3 used to be left open because the `declaresEmpty()` clause lived only in `inertEmitEnabled()`
+(unreachable from this plan's own tests) — plan 0102's post-implementation review found that split
+itself was a bug (a rule declared empty could preview one cause via `diagnose()` and fail with a
+different one via `check()`) and moved the clause into the shared guard, which the N-phase's own new
+test now covers directly. This plan inherits that guard closed rather than open.
 
 ## Files changed
 
@@ -118,6 +149,7 @@ own sabotage matrix.
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/smells/inconsistent-siblings.ts`        | flip `INERT_FINDING_EMIT` to `true`; update its doc comment (Phase 1)                                                                                                                                                                                     |
 | `tests/smells/inconsistent-siblings.test.ts` | new N+1 test (Phase 2)                                                                                                                                                                                                                                    |
+| `tests/archunit/dogfood.test.ts`             | update the plan-0102 row: the poisoned rule's `.check()` now throws, not just its `diagnose()` preview (Phase 3)                                                                                                                                          |
 | `docs/upgrading.md`                          | new version row — affected population, no suppression flag, remedies in message order, rollback (`pin to the last N-series version while applying a remedy`) — content already drafted verbatim in plan 0102's Release section, pasted in at release time |
 | `CHANGELOG.md`                               | entry for this release                                                                                                                                                                                                                                    |
 

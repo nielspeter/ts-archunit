@@ -5,6 +5,85 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.60.0] - 2026-08-12
+
+> **Two enforcement-changing families in this release, bundled deliberately so adopters pay one
+> migration instead of two.** `beFreeOfCycles()` findings move to a per-edge identity (baseline
+> regeneration required if you baseline cycles; `.excluding()` rewrite required if you waive one) and
+> `smells.duplicateBodies()` gains a required `Fingerprint` field (breaking for any external caller
+> hand-constructing one) plus a floor that can silently shrink its finding count. Neither adds a NEW
+> class of failure — `beFreeOfCycles()` already failed on cycles, `duplicateBodies()` already flagged
+> pairs — so no version-gated migration is needed, but read the affected rows below before upgrading if
+> you use either.
+>
+> This is `0.60.0`, not a patch. Pre-1.0, `^0.59.0` resolves anywhere inside `0.59.x`, so shipping either
+> change as a patch would reach every consumer silently on an unchanged lockfile.
+
+### Added
+
+- **`smells.inconsistentSiblings()` previews a rule that can never fire** — plan 0102. A rule can examine
+  a real, non-empty folder and still be structurally unable to produce a finding, if no folder's matching
+  files are within one edit of the 60% majority `forPattern()` needs to flag anything — every mechanical
+  guard (the vacuity floor, `diagnose()`, the compiler) reads that state as healthy. `.inertAdvice(): string`
+  (new, on `InconsistentSiblingsBuilder`) and a new `'inert'` `DiagnosticFinding` kind report it truthfully,
+  with the real numbers.
+
+  ⚠️ **`check()` does not fail on this yet, but `diagnose()`/`ts-archunit doctor` report it starting
+  today, unconditionally — `doctor` can go non-zero on this release**, for any `inconsistentSiblings` rule
+  that is already inert. Only the `check()`-failing half is deferred, to a separate, tracked migration
+  ([plan 0105](https://github.com/nielspeter/ts-archunit/blob/main/plans/0105-the-inert-finding-flipped.md)),
+  deliberately diagnose-first (ADR-008 rule 1) — the diagnostic itself is not gated. If you run `doctor`
+  in CI, or assert `expect(diagnose(rules)).toEqual([])` in a test (this project's own documented
+  pattern), run it **on `0.60.0`** — the diagnosis does not exist on `0.59.x` — before relying on either
+  going green. **Self-check today, on your current version, without waiting to upgrade:** if your
+  `forPattern` matches in under 60% of a scoped folder's files, this will report on that rule the moment
+  you're on `0.60.0`.
+
+- **`smells.duplicateBodies()` gains `minDistinctVocabulary(n)`** (default `8`) — plan 0103, fixing
+  [bug 0076](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0076-duplicate-body-similarity-erases-identifiers-so-every-wither-pairs.md).
+  AST-shape similarity alone can't tell a real copy-paste from a shape a framework mandates for every
+  instance of something — every ADR-003 "wither" method in this project's own `src/` (`const next =
+this.copy(); next._field = true; return next`) scored 100% similar to every other one, regardless of
+  what `_field` was: **484 false-positive findings** on this repo's own source, with no working remedy
+  (`withMinSimilarity(1.0)` doesn't help — the false positives sit AT 1.0). The new floor gates comparison
+  on distinct identifier/literal vocabulary, before similarity is even computed: below the floor, a
+  "match" carries no information about what the code does, so the pair is never compared. Default chosen
+  by measuring the real detector against `src/`: excludes the false-positive shape at every floor ≥ 4,
+  keeps the genuine `body-analysis*.ts` duplicate at every floor tested, and cuts survivors on this
+  repo's own `src/` from 495 to ~161 pairs. A second, narrower false-positive class (unrelated condition
+  functions sharing this codebase's own generic `evaluate()` skeleton) is not closed by this floor and
+  remains open, to be filed as its own issue.
+
+  ⚠️ **Breaking for anyone hand-constructing a `Fingerprint` literal.** `Fingerprint` gains a required
+  `distinctVocabulary: number` field (populated by `buildFingerprint()` — no action needed if you only
+  call that). Required rather than optional deliberately: `Fingerprint` is a data shape almost always
+  built by `buildFingerprint()`, never implemented by a third party, so a required field breaks a
+  hand-built literal loudly at compile time instead of silently no-opping the floor (`undefined < n` is
+  always `false` in JS) for anyone who built one without knowing to set it.
+
+### Fixed
+
+- **A cycle waiver could only ever waive a whole tangled component, not one edge — the fail-open half of
+  [bug 0056](https://github.com/nielspeter/ts-archunit/blob/main/bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md)**,
+  plan 0104. `beFreeOfCycles()` used to emit one violation per strongly-connected component, naming one
+  example edge; `.excluding()` matches `element`/`file`/`message`, never `identity`, so a waiver on that
+  one finding silently absorbed any brand-new cycle edge appearing later between two slices already inside
+  the waived component. Every internal edge of a component now gets its own violation — provably, not
+  heuristically: any edge between two members of a strongly connected component lies on some cycle,
+  because the component's own connectivity supplies a return path. `element` becomes `${from} -> ${to}`;
+  `.excluding('helpers -> builders')` now names exactly that fact and nothing else in the component.
+
+  A new mechanical check also warns (to stderr, advisory) when one `.excluding()` pattern matches more
+  than one distinct cycle edge — closing the loophole where a migrator reaches for a loose regex over the
+  message's still-present "part of a cycle with: …" clause instead of naming each edge, which would
+  otherwise silently re-absorb the whole component again.
+
+  ⚠️ **`HASH_VERSION` bumped 4 → 5.** Every cycle finding's identity changes (the old `cycle::${members}`
+  scheme is replaced by `cycle-edge::${from}->${to}`, for that family and no other) — a baseline with no
+  cycle entries is byte-identical and keeps matching. **No pre-upgrade preview is possible** for
+  `.excluding()` string-pattern users: the old version can only ever compute and print one representative
+  edge per tangle, never the rest, so there is nothing to preview on the version you're leaving.
+
 ## [0.59.1] - 2026-08-12
 
 ### Fixed
@@ -857,7 +936,7 @@ for the same migration repeatedly.
   to `[a, b, c]`, reddening CI on the edit "organize imports" performs and printing "it may be stale after
   a rename" about a rename that never happened. `.excluding()` matches element/file/message, which is why
   sorting the element is the fix. `canonicalizeCycle` is deleted — sorting subsumes rotation for a set.
-  ([bug 0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md), fail-red half)
+  ([bug 0056](bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md), fail-red half)
 
 ### Fixed
 
@@ -1037,7 +1116,7 @@ on one function` asserted `2` while its own comment claimed to prove dedup is pe
 ### Known limits now written down rather than implied
 
 - The two rows pinning `['[a, c, b]']` certify DFS-pop order **as the baseline identity** — which is
-  exactly what [bug 0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) says is
+  exactly what [bug 0056](bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md) says is
   unstable. Pinning it is correct today and both rows must change when 0056 lands; they are the two an
   agent is most likely to "correct" to green.
 - v0.48.0's claim that _"a cycle that got wider is a different violation, not a moved one"_ is
@@ -1115,7 +1194,7 @@ Eight bugs and four plans filed, none of them deferred silently. The behavioural
 - [0055](bugs/fixed/0055-a-cycle-finding-names-edges-that-do-not-exist.md) — a cycle finding prints an SCC as a
   path, so on a ring `a→b→c→d→a` it reports `a -> d -> c -> b -> a` at `unknown:0`. On our own source two of
   four arrows are fabricated and the closing edge is never named.
-- [0056](bugs/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — reordering two imports reds CI
+- [0056](bugs/fixed/0056-a-cycle-identity-changes-when-imports-are-reordered.md) — reordering two imports reds CI
   and blames a rename; and an SCC absorbs _new_ intra-component edges without changing its name, so a new
   cycle among four of our six gated slices is silently accepted.
 - [0058](bugs/fixed/0058-workspace-applies-one-packages-compiler-flag-to-all.md) — `workspace()` applies one

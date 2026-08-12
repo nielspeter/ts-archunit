@@ -205,6 +205,15 @@ export interface DiagnosticFinding {
  * running any of them" and that stopped being true; it is the IDE-hover contract
  * for an exported function, so it is corrected here and not only in `docs/`.
  *
+ * As of plan 0102, one family's `inertAdvice?()` goes further than selection:
+ * `inconsistentSiblings` walks every sibling body's AST to answer it (the same
+ * work `check()` does), so for that one family this IS evaluating the
+ * condition, not just counting what would be handed to it (review: architect).
+ * Still no `Condition.evaluate()` call — the boundary this docstring's
+ * predecessor drew — but "without evaluating" is no longer exactly right for
+ * every family, and is corrected here rather than left for the next reader to
+ * discover by profiling `doctor`.
+ *
  * The in-process half of `doctor`. It exists because rules written inside
  * vitest are a co-equal documented path (`docs/running-in-tests.md`), and a
  * CLI-only diagnostic would leave half the users unable to measure before R3

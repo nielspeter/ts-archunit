@@ -148,6 +148,20 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
       // A folder at or within one edit of a majority is a live tripwire. Latched
       // regardless of nonMatching===0: a fully-conforming majority folder is one
       // divergent file away from firing, so it must suppress the inert finding.
+      //
+      // KNOWN LIMIT, conservative direction only (review: architect): for t=2,
+      // m=1 this reads editsToMajority = ceil(1.2) - 1 = 1 <= 1 and latches —
+      // but the only available edit (adopting the second file) yields m=2,
+      // nonMatching=0, which still cannot fire; a THIRD file would be needed.
+      // A two-file folder with one match (e.g. an index.ts plus one impl) is
+      // an ordinary shape, so this latch is reachable in practice, not a
+      // corner case. Never a false POSITIVE (a rule that can genuinely fire
+      // soon is never reported inert) — only a false latch that keeps a
+      // genuinely-inert corpus silent, and it is OR'd across every folder in
+      // scope, so one such folder anywhere suppresses the whole rule's inert
+      // finding. Not fixed here: the arithmetic is a documented approximation
+      // of "close to firing", not a precise one, and narrowing it is a
+      // separate, non-urgent piece of work.
       const editsToMajority = Math.ceil(MAJORITY_THRESHOLD * t) - m.length
       if (editsToMajority <= 1) canFireSoon = true
     }
@@ -241,12 +255,16 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
     // walk is the dominant cost and must run once per check().
     const a = this.inertAssessment(pattern)
 
-    // Preserves groupByFolder()'s existing violation-ordering contract
-    // (tests/integration/coverage-gaps.test.ts: "groupByFolder produces
-    // violations sorted by directory"). Sorting the returned folder array is
-    // O(k log k) on folder COUNT, not a second AST walk: inertAssessment()'s
-    // searchFunctionBody pass already ran once, above, and this sort touches
-    // only its already-computed output.
+    // Preserves groupByFolder()'s existing violation-ordering contract for
+    // THIS family (review: testing — an earlier version of this comment cited
+    // tests/integration/coverage-gaps.test.ts's "groupByFolder produces
+    // violations sorted by directory" row, which covers duplicateBodies and
+    // asserts only `.toThrow()`, not order, for either family; the real guard
+    // for inconsistentSiblings is
+    // "groupByFolder() sorts violations across folders" below). Sorting the
+    // returned folder array is O(k log k) on folder COUNT, not a second AST
+    // walk: inertAssessment()'s searchFunctionBody pass already ran once,
+    // above, and this sort touches only its already-computed output.
     const folders = this._groupByFolder
       ? [...a.folders].sort((x, y) => x.folder.localeCompare(y.folder))
       : a.folders
@@ -288,14 +306,24 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
 
   /**
    * THE single derivation for both surfaces, and the guard. Returns the empty
-   * string unless the rule is genuinely inert (`matching > 0 && !canFireSoon`),
-   * so a healthy control (majority present, or within one edit of one) gets
-   * `''` and diagnose() reports nothing for it. Both `inertAdvice()` above and
-   * `detect()`'s emit call this with an `Assessment` — the SAME guard and the
-   * SAME message either way, so the preview and the finding cannot diverge.
+   * string unless the rule is genuinely inert (`matching > 0 && !canFireSoon &&
+   * !declaresEmpty()`), so a healthy control (majority present, within one edit
+   * of one, or declared empty) gets `''` and diagnose() reports nothing for it.
+   * Both `inertAdvice()` above and `detect()`'s emit call this with an
+   * `Assessment` — the SAME guard and the SAME message either way, so the
+   * preview and the finding cannot diverge.
+   *
+   * `!this.declaresEmpty()` lives HERE, not only in `inertEmitEnabled()` (review:
+   * architect) — a declared-empty rule reports its expiry, not the inert finding,
+   * on BOTH surfaces, so `diagnose()`'s preview and `check()`'s eventual failure
+   * name the same cause for the same rule state. Before this fix the two clauses
+   * were split across two functions and only the emit path read the declaration,
+   * so a rule carrying `.expectEmpty()` could preview one cause via `diagnose()`
+   * and fail with a different one via `check()` — the exact drift this shared-
+   * derivation design exists to make impossible "by construction".
    */
   private inertAdviceFor(a: Assessment): string {
-    if (a.matching === 0 || a.canFireSoon) return '' // the GUARD lives here
+    if (a.matching === 0 || a.canFireSoon || this.declaresEmpty()) return '' // the GUARD lives here
     return this.inertMessage(a, this._pattern?.description ?? 'unknown pattern')
   }
 
@@ -328,6 +356,15 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
       // author grades (ADR-008 rule 1). Config-level: no file to attribute, so it
       // must survive diff/baseline or the guard re-greens under standard CI.
       bypassFilters: true,
+      // No `identity` set, deliberately, NOT an oversight (review: architect
+      // flagged the gap; this is why it stays a gap): `bypassFilters: true`
+      // means baseline/diff never read one today, so setting one buys nothing
+      // yet — and `message` embeds the population count ("examined N... only
+      // M of them"), which ADR-008 rule 4 forbids putting in an identity (a
+      // count rots). If `bypassFilters` is ever relaxed for this family, an
+      // `identity` has to be added HERE, population-free, before that ships —
+      // this comment is the tripwire for that future change, not a promise
+      // the coupling is already handled.
     }
   }
 
@@ -353,18 +390,26 @@ export class InconsistentSiblingsBuilder extends SmellBuilder {
   }
 
   /**
-   * `&& !this.declaresEmpty()` is the `_expectEmpty` precedence: a
-   * declared-empty rule reports its expiry, not the inert finding, so the two
-   * never double-report.
+   * The pure version gate — nothing else. The `_expectEmpty` precedence
+   * (`!this.declaresEmpty()`) moved into `inertAdviceFor()` above, so it applies
+   * identically to `diagnose()`'s preview and to this emit path; this function's
+   * only job is "has the N+1 release happened yet."
    *
    * `INERT_FINDING_EMIT` is deliberately a bare, non-exported module `const` —
    * not an env var, constructor option, or per-project override. The
    * `bypassFilters: true` / unsuppressable design above depends on there being
    * no configuration surface a future contributor could "helpfully" expose,
    * which would undermine it silently.
+   *
+   * `protected`, not `private` — a test-only subclass overrides this to exercise
+   * the emit path (`inertViolation()`, `inertElement()`, the `detect()` branch
+   * that pushes them) before the N+1 flip ships, so that path is not shipped
+   * with zero test coverage merely because the real gate is off today (review:
+   * testing). See `tests/smells/inconsistent-siblings.test.ts`'s
+   * `EmittingSiblings` subclass.
    */
   protected inertEmitEnabled(): boolean {
-    return INERT_FINDING_EMIT && !this.declaresEmpty()
+    return INERT_FINDING_EMIT
   }
 
   protected describe(): string {
