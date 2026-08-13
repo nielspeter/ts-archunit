@@ -4,7 +4,7 @@
 plan 0095's Phase 2a/2b/2d. See **Outcome** below.
 **Amended 2026-08-08 — narrowed to the seam.** The floor moved to
 [0099](./0099-the-floor-no-family-can-be-born-below.md); the preset gap this amendment measured is
-[0100](../0100-a-preset-that-constructs-nothing.md). See **Amendment** below for the measurement that
+[0100](./0100-a-preset-that-constructs-nothing.md). See **Amendment** below for the measurement that
 forced it. Everything from "Convert at the root" onward now belongs to 0099 and is kept here only as
 the design 0099 inherits.
 **Depends on:** [0096](./0096-evidence-at-every-seam.md) (families must produce the evidence before the
@@ -50,7 +50,7 @@ only because that recipe happened to pass fewer options. A preset that construct
 the invariant this programme is built on stops one level short of it: ∀ over ∅ at the **preset** seam
 rather than the rule seam. That is ADR-009's own Context table repeating — four waves each closed
 their enumeration and the next family was outside it — and this plan's enumeration was "families
-implementing the seam". A preset is not one. Filed as [0100](../0100-a-preset-that-constructs-nothing.md)
+implementing the seam". A preset is not one. Filed as [0100](./0100-a-preset-that-constructs-nothing.md)
 rather than absorbed, because the mechanism is different: nothing about `CollectResult` reaches a
 function that returned `[]`.
 

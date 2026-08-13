@@ -174,7 +174,7 @@ const AUDIT_2026_08: Readonly<Record<string, Verdict>> = {
  * configuration finding at both `check()` and `.warn()`. That is bug 0066 closed,
  * measured by an instrument written before the fix and untouched by it.
  *
- * `dataLayerIsolation` is gone too — [plan 0100](../../plans/0100-a-preset-that-constructs-nothing.md)
+ * `dataLayerIsolation` is gone too — [plan 0100](../../plans/completed/0100-a-preset-that-constructs-nothing.md)
  * manufactures a finding at construction time when neither `baseClass` nor
  * `requireTypedErrors` was ever set, so `dataLayerIsolation({ repositories })`
  * now reports `'config-finding'` here instead of `'no-checks'`. The vacuity

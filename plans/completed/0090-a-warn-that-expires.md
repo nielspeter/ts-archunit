@@ -1,8 +1,8 @@
 # Plan 0090 — a `.warn()` that expires
 
-**Status:** Implemented and reviewed 2026-08-13 (architect + testing personas; the architect's Critical
-finding — reproduced independently before fixing — and the testing persona's Important findings are all
-fixed and sabotage-verified; see **Review findings, fixed** below). On `main`, not yet released. Design
+**Status:** DONE (v0.61.0). Implemented and reviewed 2026-08-13 (architect + testing personas; the
+architect's Critical finding — reproduced independently before fixing — and the testing persona's
+Important findings are all fixed and sabotage-verified; see **Review findings, fixed** below). Design
 settled the same day before implementation — see **Design, resolved** below. Scoped for this pass: Phases
 1 and 2 (the primitive itself), plus a Phase 3 proof scoped to `tests/archunit/dogfood.test.ts` only (5
 `gate()` sites, self-contained). `tests/archunit/arch-rules.test.ts`'s much larger migration (44 sites,
@@ -14,12 +14,12 @@ itself.
 the work.
 **Blast radius:** **Published API, and a gate on the thing that hides regressions.** New surface, so
 additive; but if the expiry ever _fails_ a build it becomes a gate, and
-[ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 already names "a check with a scheduled expiry"
+[ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 already names "a check with a scheduled expiry"
 as its own blast-radius row. That row exists in the ADR and nothing in the API implements it.
 
 ## Problem
 
-[Plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md) fixed this, for us:
+[Plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md) fixed this, for us:
 
 > `arch/no-cycles` sat at `.warn()` for months behind a comment saying _"switch to .check() when
 > beFreeOfCycles ignores import type"_. While it could not fail, it let a **new** cycle in overnight —
@@ -241,9 +241,9 @@ small follow-up than as an inconsistency introduced by this plan alone.
 
 ## Related
 
-- [Plan 0084](./completed/0084-cycle-detection-that-ignores-type-only-imports.md) — solved this locally, and
+- [Plan 0084](./0084-cycle-detection-that-ignores-type-only-imports.md) — solved this locally, and
   the review's fair criticism that it did not generalise.
-- [ADR-008](../adr/008-agent-first-failure-surfaces.md) rules 1 and 6.
-- [Bug 0024](../bugs/fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md) — made warnings visible;
+- [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rules 1 and 6.
+- [Bug 0024](../../bugs/fixed/0024-warn-terminal-is-invisible-inside-a-test-runner.md) — made warnings visible;
   visibility turned out not to be enforcement, which is this plan's premise.
 - `src/core/orphan-exclusions.ts` — the machinery Phase 1's tracking variant should reuse.

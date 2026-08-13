@@ -282,14 +282,14 @@ and was never in the plan: **ADR-008 has six rules; how many does this repositor
 
 Audited 2026-08-04, by grep and by reading the enforcement sites:
 
-| Rule                                          | Enforced by                                                                                 | State                                                                                |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 1 — actionable findings fail                  | config findings cannot be downgraded; `gate()` makes `.warn()` unrepresentable in our suite | **inward only.** Nothing for an adopter — [plan 0090](./0090-a-warn-that-expires.md) |
-| 2 — every failure carries a _verified_ remedy | _nothing_                                                                                   | **zero machinery.** Cited in 21 test files, checked in none                          |
-| 3 — state escape hatches                      | `orphanExclusions()`, `commentSuppressions()`, two unforgeable `WeakSet` registries         | **enforced**                                                                         |
-| 4 — identities, never totals                  | `tests/tools/scan-cardinality-assertions.ts`, run as a test                                 | **enforced**                                                                         |
-| 5 — differently-derived disagreement          | per-change sabotage matrices                                                                | **practice, no machinery** — and it produced nearly every real finding               |
-| 6 — depth ∝ blast radius                      | a header line on plans                                                                      | **convention, no test.** Present on 17 of 88 plans; on all 10 filed 2026-08-04       |
+| Rule                                          | Enforced by                                                                                 | State                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1 — actionable findings fail                  | config findings cannot be downgraded; `gate()` makes `.warn()` unrepresentable in our suite | **inward only.** Nothing for an adopter — [plan 0090](./completed/0090-a-warn-that-expires.md) |
+| 2 — every failure carries a _verified_ remedy | _nothing_                                                                                   | **zero machinery.** Cited in 21 test files, checked in none                                    |
+| 3 — state escape hatches                      | `orphanExclusions()`, `commentSuppressions()`, two unforgeable `WeakSet` registries         | **enforced**                                                                                   |
+| 4 — identities, never totals                  | `tests/tools/scan-cardinality-assertions.ts`, run as a test                                 | **enforced**                                                                                   |
+| 5 — differently-derived disagreement          | per-change sabotage matrices                                                                | **practice, no machinery** — and it produced nearly every real finding                         |
+| 6 — depth ∝ blast radius                      | a header line on plans                                                                      | **convention, no test.** Present on 17 of 88 plans; on all 10 filed 2026-08-04                 |
 
 **Two findings, and rule 2's is the sharp one.** Every sibling rule that has machinery got it from a
 dedicated plan — 0069, 0070, 0078, 0079, over 07-25 → 08-03. Rule 2 never had one, so its gap is not "not
@@ -326,7 +326,7 @@ Enforcement, not inventory. Each row is a rule that fails a build, or it does no
    only one needing design: a remedy must not name a location the rule's own selecting predicate matches.
    Not a same-session task; it has a real false-positive question to settle first.
 
-4. **Rule 1 outward — [plan 0090](./0090-a-warn-that-expires.md).** New API surface, so it is last.
+4. **Rule 1 outward — [plan 0090](./completed/0090-a-warn-that-expires.md).** New API surface, so it is last.
 
 **What is deliberately NOT here:** rule 5. It has no machinery and should not get any. It produced nearly
 every real finding of 2026-08-04 _as a practice_, and the thing a machine could check — "was a sabotage
