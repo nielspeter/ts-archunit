@@ -68,7 +68,11 @@ interface GraphQLPackage {
   buildSchema: (sdl: string) => GraphQLSchemaLike
 }
 
-// Cached reference to the graphql package
+// Cached reference to the graphql package. Module-level state, swappable via
+// setGraphQLLoaderForTests() below — safe only because Vitest gives each test
+// FILE its own instance of this module (vitest.config.ts pins `isolate: true`
+// and says why: bug 0080). A worker that reused this module across files
+// would let one file's swapped loader leak into another's.
 let cachedGraphQL: GraphQLPackage | undefined
 
 /**

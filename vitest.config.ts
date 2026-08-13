@@ -52,6 +52,16 @@ export default defineConfig({
     // step — the pattern `scripts/verify-package.mjs` established for the same reason.
     exclude: ['**/node_modules/**', '**/dist/**', 'tests/matrix/**'],
     globals: false,
+    // Pinned, not just inherited: several modules use a swappable module-level
+    // reference for test-only overrides (schema-loader.ts's loadGraphQL,
+    // stderr.ts's listenerAttached, diff-disclosure.ts's noticed — the
+    // *ForTests convention). Correctness of that pattern depends on each test
+    // FILE getting its own module instance; isolate: false reuses one across
+    // files sharing a worker, which is exactly the isolation gap bug 0080
+    // measured (there, for a Node builtin; here, it would be for these
+    // modules' own state). Left explicit so a throughput-motivated change
+    // doesn't flip this silently.
+    isolate: true,
     // Vitest's default is 5000ms, and this suite loads real ts-morph projects.
     // A case costing 300ms alone costs 3-5s under full parallelism — the repo's
     // own tsconfig is 454 files — so the default put several tests at 95% of
