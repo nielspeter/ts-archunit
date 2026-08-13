@@ -28,6 +28,19 @@ describe('requireGraphQL() error branching', () => {
     resetGraphQLLoaderForTests()
   })
 
+  it('resetGraphQLLoaderForTests() restores the real loader', () => {
+    // Each test below sets its own loader before using it, so none of them
+    // would notice a missing afterEach — this is the one direct proof that
+    // reset actually restores real, working graphql loading rather than
+    // leaving a prior test's stub (or a stale cache) in place.
+    setGraphQLLoaderForTests(() => {
+      throw new Error('stub — should never be reachable after reset')
+    })
+    resetGraphQLLoaderForTests()
+
+    expect(isGraphQLAvailable()).toBe(true)
+  })
+
   it('reports "not installed" when graphql itself cannot be found', () => {
     setGraphQLLoaderForTests(() => {
       throw Object.assign(new Error("Cannot find module 'graphql'"), {

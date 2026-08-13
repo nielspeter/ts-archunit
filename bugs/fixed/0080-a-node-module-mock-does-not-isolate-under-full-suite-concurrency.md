@@ -91,9 +91,13 @@ The test file (`tests/graphql/schema-loader-require-errors.test.ts`) now imports
 ...)` + `vi.resetModules()` + a dynamic re-import. This removes the isolation gap by construction rather
 than by characterising it: no builtin is mocked, no module graph is reset, and every test body is fully
 synchronous (no `await` between the swap and the assertions) — JS's single-threaded execution means
-nothing else in the same worker can observe the swapped state mid-test, regardless of how Vitest schedules
-files sharing that worker. `resetGraphQLLoaderForTests()` in `afterEach` restores the real loader and
-clears `requireGraphQL()`'s cache, matching what `vi.resetModules()` used to buy per-test.
+nothing else in **this file's own** tests can interleave and observe the swapped state mid-test.
+`resetGraphQLLoaderForTests()` in `afterEach` restores the real loader and clears `requireGraphQL()`'s
+cache, matching what `vi.resetModules()` used to buy per-test.
+
+**Cross-FILE safety is a separate claim, and rests on `isolate: true`, now pinned rather than
+inherited** (see Review findings below) — `loadGraphQL`/`cachedGraphQL` are still module-level state, and
+nothing about this fix removes the need for each test file to get its own instance of `schema-loader.ts`.
 
 **Root cause (sketch 1) not chased further, by ADR-008 rule 6.** This is a test-infrastructure gap over a
 corpus this project controls, not a published-API or irreversible-effect row — rule 6 asks for the
@@ -109,3 +113,37 @@ the corresponding test failed with the expected diff, confirming the rewritten t
 real branching logic and are not vacuous. `npx vitest run tests/graphql/` passed 4/4 files in isolation;
 the full suite (`npx vitest run`) passed 247/247 files across 8 consecutive runs, versus the original
 ~1-in-3 failure rate this bug measured.
+
+## Review findings, fixed
+
+Architect + testing persona review, run **after** this fix had already merged — a process gap in itself
+(this should have run before merge, not after; noted so the gap is recorded rather than quietly
+corrected). Both personas independently converged on the same two Important findings, neither of which
+is a bug in the shipped fix — both are about the fix now resting on an assumption that was inherited
+rather than asserted. The testing persona additionally verified the fix empirically in a scratch
+worktree (6 more full-suite runs, two independent sabotage passes reproducing both branching failures) —
+14 consecutive clean full-suite runs total, across two environments.
+
+**Important, fixed: the cross-file safety claim rested on Vitest's `isolate: true` default, un-pinned.**
+`loadGraphQL`/`cachedGraphQL` are module-level state; a test file's swap is invisible to other files only
+because Vitest gives each test file its own module instance. Nothing in `vitest.config.ts` said so — a
+future throughput-motivated `isolate: false` would silently reintroduce this bug's exact failure class,
+now for library-owned state instead of a Node builtin. Fixed: `vitest.config.ts` now sets `isolate: true`
+explicitly with a comment naming this dependency and the modules that rely on it (`schema-loader.ts`,
+`stderr.ts`, `diff-disclosure.ts` — every current `*ForTests` seam). A matching comment was added directly
+on `cachedGraphQL`'s declaration.
+
+**Important, fixed: `resetGraphQLLoaderForTests()` had no direct test.** Every existing test sets its own
+loader before using it, so none of them would notice `afterEach`'s call being deleted — the reset path
+itself was only ever exercised incidentally. Fixed: added a direct test (`resetGraphQLLoaderForTests()
+restores the real loader`) that swaps to a throwing stub, resets, and asserts `isGraphQLAvailable()` is
+`true` again. Sabotage-verified (`resetGraphQLLoaderForTests` reduced to a no-op fails the new test;
+reverted).
+
+**Minor, noted but not changed:** the testing persona observed that repeated-green-run evidence
+corroborates but doesn't prove the fix — the stronger argument is mechanistic (the mocked-builtin
+mechanism is gone, not just less likely to fail) and that framing is now the primary one above, run counts
+secondary. Also noted: all local reproductions are on developer machines, not the GitHub Actions runner
+that produced the original CI failure — PR #56's own CI run (`gh run 31672964076`) is one clean data point
+on that exact channel, but not the several the persona would want for full confidence. Left as future
+signal rather than blocking follow-up work.
