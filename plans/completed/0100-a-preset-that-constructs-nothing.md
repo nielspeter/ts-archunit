@@ -1,23 +1,23 @@
 # Plan 0100 — a preset that constructs nothing
 
-**Status:** Implemented and reviewed 2026-08-12 (architect + testing personas; both rounds' Important
-findings fixed and sabotage-verified — see **Review findings, fixed** below). On `main`, not yet
-released. Design settled the same day before implementation — see **Design, resolved** below, added
+**Status:** DONE (v0.61.0). Implemented and reviewed 2026-08-12 (architect + testing personas; both
+rounds' Important findings fixed and sabotage-verified — see **Review findings, fixed** below). Design
+settled the same day before implementation — see **Design, resolved** below, added
 before the code rather than after, per this project's own convention that a plan is the record of the
 decision, not a retrospective of it.
-Filed 2026-08-08 from [0098](./completed/0098-the-evidence-seam-and-the-floor.md)'s amendment, which measured that
+Filed 2026-08-08 from [0098](./0098-the-evidence-seam-and-the-floor.md)'s amendment, which measured that
 the fail-closed floor cannot reach this.
 **Depends on:** nothing structurally, but **coupled to 0099's release**: if this lands first, 0099's
 claim drops its qualifier; if after, the changelog ships a named exception. Best decided alongside
-[0089](./completed/0089-presets-forward-their-options.md), which already threads preset options.
-**Priority:** Medium as a defect, **High as a claim**: [0099](./completed/0099-the-floor-no-family-can-be-born-below.md)'s
+[0089](./0089-presets-forward-their-options.md), which already threads preset options.
+**Priority:** Medium as a defect, **High as a claim**: [0099](./0099-the-floor-no-family-can-be-born-below.md)'s
 release note says vacuity is unrepresentable, and this is the exception that has to be named in it. An
 unqualified claim gets falsified by the first person who hits this, and burns the trust the whole programme
 is spending.
 **Effort:** Small. Review resolved most of the deciding: (b) is the shape, `overrideFindings()` is the
 precedent, and the legitimate-zero case is the one real constraint.
 **Blast radius:** **Published API on the preset surface.** A preset that legitimately produces zero rules
-would start failing. Middle row of [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 6 — prove the
+would start failing. Middle row of [ADR-008](../../adr/008-agent-first-failure-surfaces.md) rule 6 — prove the
 detector fires for each preset and stop, unless the answer turns out to be a type change, which moves it up.
 
 ## Problem
@@ -96,7 +96,7 @@ is a function returning `TerminalBuilder[]`, and a function that returns `[]` ne
 mechanism. The matrix records it as `'no-checks'` — a verdict distinct from `'fail-open'` precisely because
 the authors of 0095 saw it was a different fault — and 0098 nevertheless promised to empty the list.
 
-This is [ADR-009](../adr/009-a-pass-is-constructed-from-evidence.md)'s Context table happening to ADR-009:
+This is [ADR-009](../../adr/009-a-pass-is-constructed-from-evidence.md)'s Context table happening to ADR-009:
 four waves of vacuity guards, each closing its own enumeration, each followed by a family outside it. The
 enumeration here was "families implementing the seam". A preset is not one.
 
@@ -261,4 +261,4 @@ control test proving a violation without it is not misread.
 
 ## Out of scope
 
-Everything the per-rule floor already covers ([0099](./completed/0099-the-floor-no-family-can-be-born-below.md)).
+Everything the per-rule floor already covers ([0099](./0099-the-floor-no-family-can-be-born-below.md)).

@@ -182,7 +182,7 @@ that touches it:
 `inconsistentSiblings`, `agentGuardrails`, `strictBoundaries` all become `config-finding`. It cannot be
 emptied: `dataLayerIsolation` constructs zero rules and no per-rule floor reaches it — and 0100's
 measurement found `agentGuardrails` silent at its minimal call too, which the matrix's own recipe hid
-([0100](../0100-a-preset-that-constructs-nothing.md)). The matrix's `EXPIRES_AT_VERSION` stays, and the
+([0100](./0100-a-preset-that-constructs-nothing.md)). The matrix's `EXPIRES_AT_VERSION` stays, and the
 remaining entry carries a `// 0100` citation so the list names its own reason rather than looking stalled.
 
 **Measure this repo's own 53-rule dogfood suite BEFORE the flip.** `tests/archunit/arch-rules.test.ts`
@@ -330,7 +330,7 @@ closed because moving the expiry branch to the root deleted the duplicate that c
 
 **`KNOWN_FAIL_OPEN` went from six entries to two**, and the two that remain cannot be closed by any
 per-rule floor: `graphql:schema` fails closed in its own loader, and `dataLayerIsolation` constructs
-zero rules, so there is no rule for a floor to reach — [plan 0100](../0100-a-preset-that-constructs-nothing.md).
+zero rules, so there is no rule for a floor to reach — [plan 0100](./0100-a-preset-that-constructs-nothing.md).
 Repairing the matrix's own expiry gate was forced into the same commit, and found three silent
 failures in it.
 
@@ -367,7 +367,7 @@ unreachable now — but the floor is necessary and not sufficient, and this plan
 
 The CLI beyond what the root conversion reaches (0095 measures it; a fix beyond that gets its own number).
 Bug 0056's fail-open half. `defineCondition` internal vacuity. ADR-010's contract fixture. The preset seam —
-[0100](../0100-a-preset-that-constructs-nothing.md). Splitting the message into a per-finding form and a
+[0100](./0100-a-preset-that-constructs-nothing.md). Splitting the message into a per-finding form and a
 run-level explanation — [0101](../0101-the-shared-explanation-is-printed-once.md).
 
 ## Scope, measured 2026-08-08 — why this is one PR

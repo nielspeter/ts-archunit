@@ -91,7 +91,7 @@ Same for `arch/helpers-no-builders`' `.excluding('within.ts')`, which is the oth
 Both go in the commit that fixes this, and the test inventory below is where that is recorded rather than
 remembered.
 
-Found by the v0.47–0.49 review; the general form is [plan 0090](../../plans/0090-a-warn-that-expires.md).
+Found by the v0.47–0.49 review; the general form is [plan 0090](../../plans/completed/0090-a-warn-that-expires.md).
 
 ## Related
 

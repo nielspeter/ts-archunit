@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.61.0] - 2026-08-13
+
+### Added
+
+- **`.asSeverity('warn', { accepted })` — a warning that can fail** — plan 0090. Plain `.asSeverity('warn')`
+  is unchanged: permanent, advisory, no ceiling. The new `accepted` option makes a warning accountable
+  instead of permanently silent: a violation stays `warn` only while its `subjectOf()` identity is in
+  `accepted`; anything not on that list — a genuinely new finding — escalates to `error` through
+  `.violations()`, `checkAll()`, and the CLI `check` command. Identity-based rather than a bare count,
+  deliberately: a count ceiling can't tell a fixed finding from a different new one arriving at the same
+  time, which is exactly the regression this closes (`arch/no-cycles` sitting at `.warn()` for months and
+  letting a cycle in overnight, bug 0084). Review found and fixed a real hole in the identity approach
+  before this shipped: two violations sharing one subject (no producer-set identity) could collide onto the
+  same positional disambiguation suffix across runs, letting a fixed finding and a genuinely new one land on
+  the same accepted-list entry — now detected, and the whole batch escalates until identity is reliably
+  unique. `doctor`/`diagnose()` preview a breach via a new `'deferred-warning'` finding kind, firing only
+  when `accepted` no longer covers everything currently found.
+
+- **A silently empty preset call now reports it** — plan 0100. `agentGuardrails` and `dataLayerIsolation`
+  have every rule gated behind an optional flag with no unconditional floor rule, so calling either with
+  only the required fields set constructed zero rules and passed green, enforcing nothing. `assertEnabled()`
+  (`src/presets/shared.ts`) now manufactures a `constructs-nothing` config-finding when no rule was ever
+  enabled and nothing else already explains the emptiness — stays silent when a rule was attempted and
+  explicitly overridden `'off'`, which is already a legitimate declaration. `strictBoundaries` /
+  `layeredArchitecture` / `recommended` are unaffected: each constructs at least one rule unconditionally.
+  Also fixes a pre-existing `agentGuardrails` bug the review surfaced: override validation was using the
+  flag-gated id list instead of the full known set, so a real, correctly-spelled override on a not-yet-
+  enabled rule was misdiagnosed "unknown key" — and that wrong finding was silently suppressing the correct
+  one.
+
 ## [0.60.0] - 2026-08-12
 
 > **Two enforcement-changing families in this release, bundled deliberately so adopters pay one

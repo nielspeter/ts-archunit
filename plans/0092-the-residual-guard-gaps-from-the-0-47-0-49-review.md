@@ -67,7 +67,7 @@ and the only signal is a `writeStderr` "Unused exclusion" line: a warning, green
 remedy — delete the line — is not optional.
 
 Pre-existing mechanism; this release is what put a `.check()` rule behind it. The general fix is
-[plan 0090](./0090-a-warn-that-expires.md)'s territory; the specific one is to delete the exclusion in the
+[plan 0090](./completed/0090-a-warn-that-expires.md)'s territory; the specific one is to delete the exclusion in the
 same commit that fixes 0054, which belongs in 0054's own test inventory. Add it there rather than solving it
 here.
 
@@ -102,4 +102,4 @@ these are worth doing at all.
 - [ADR-008](../adr/008-agent-first-failure-surfaces.md) rule 5 — the bundled-revert corollary this review
   produced, and rule 6, which is why these are one small plan rather than eight bugs.
 - [Bug 0054](../bugs/fixed/0054-within-makes-helpers-depend-on-builders.md) — item 5 belongs to its inventory.
-- [Plan 0090](./0090-a-warn-that-expires.md) — item 5's general form.
+- [Plan 0090](./completed/0090-a-warn-that-expires.md) — item 5's general form.
