@@ -163,6 +163,15 @@ picks this up should decide: is `onResultOf`'s resolver meant to seed the shared
 `symbolOf()`/`resolvesTo()` will need, or is it a deliberately separate, narrower one-off? This
 proposal does not take a position on that question; a plan built from it should.
 
+**Cross-reference, added 2026-08-13.** There is a third party to this reconciliation, not just
+`symbolOf()`/`resolvesTo()`: [plan 0048](../plans/0048-using-tagged-symbol-matcher.md)
+(`usingTagged()`), deferred 2026-07-14 specifically until "a second symbol-resolving matcher is
+proposed with independent value" — which this proposal now is. 0048 already built and extracted a
+reusable `src/helpers/symbol-resolution.ts` shape (resolver + alias-unwrapping + reference/symbol
+caches) in its own design, unbuilt but fully specified. Whoever picks up either this proposal or
+0048 should read the other first — the shared facility question above has two candidate answers
+already designed independently, not zero.
+
 ## The honesty line — what the spike does and does not claim
 
 **Measured:** the four-forms table above, against the real `call()` implementation, in the

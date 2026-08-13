@@ -4,7 +4,12 @@
 measurement, and the question was already settled correctly in
 [plan 0069](./completed/0069-no-rule-may-certify-nothing.md)'s decision table before this plan
 re-opened it. What survives is a successor with a different shape — an **author-declared
-expectation**, not a diagnosis — specified in "What is actually left" below.
+expectation**, not a diagnosis — specified in "What is actually left" below. **Scheduled
+2026-08-13, split out to [plan 0106](./0106-a-denylist-glob-declares-it-must-match.md)** once the
+product question below ("whether this earns API surface") was answered — yes, build it. This plan
+stays as the record of why the two obvious mechanisms don't work; 0106 carries the successor
+forward against the current codebase (the precedent this plan cites, `.expectNonEmpty()`, is
+itself superseded — see 0106's "What changed since 0072").
 **Prerequisite for anything here:** [plan 0073](./completed/0073-conditions-declare-their-globs.md),
 **done 2026-07-30**. Condition globs now reach the diagnosis machinery stamped
 `position: 'condition'` — a defect fixed on its own terms, and still _not_ a route to this
