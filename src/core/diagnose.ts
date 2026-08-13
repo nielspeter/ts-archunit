@@ -113,6 +113,20 @@ export interface DiagnosableRule extends RuleBuilderLike {
    * carry the same string by construction, not two texts for one state.
    */
   inertAdvice?: () => string
+
+  /**
+   * This rule's own deferred-warning advice — plan 0090.
+   *
+   * A DEFERRED warning (`.asSeverity('warn', { accepted })`) stays `warn` only
+   * for violations whose subject is in `accepted`; this reports when a CURRENT
+   * violation is not — the exact regression an accepted list exists to catch.
+   * Returns `''` for an advisory warning, for a rule at `'error'` severity, and
+   * for a deferred warning whose findings are all still accepted, matching
+   * `inertAdvice`/`zeroSubjectsAdvice`'s own precedent: reported VERBATIM, so
+   * `doctor`'s preview and `checkAll()`/CLI `check`'s eventual failure carry the
+   * same string by construction.
+   */
+  deferredWarningAdvice?: () => string
 }
 
 /** One thing wrong with one rule, named specifically enough to fix. */
@@ -162,6 +176,16 @@ export interface DiagnosticFinding {
      * rule at once, and `diagnose()` is called per rule file.
      */
     | 'orphan-exclusion'
+    /**
+     * A DEFERRED warning (`.asSeverity('warn', { accepted })`) whose current
+     * findings are not all covered by `accepted` — plan 0090. The preview for
+     * the escalation `.violations()`/`checkAll()`/CLI `check` already apply: one
+     * of those findings will report at `error` severity the moment this rule
+     * runs. Distinct from `'inert'` and `'zero-subjects'`, which are about
+     * whether a rule can ever fail; this is about a rule that already fails,
+     * previewed before the run that discovers it does.
+     */
+    | 'deferred-warning'
   /** The rule's id if it has one, else its assembled description. */
   readonly rule: string
   /** Where the glob was written: `resideInFolder("**\/src/x/**")`. */
@@ -418,6 +442,15 @@ export function diagnose(
     // adequate, and nothing else in this loop speaks to it.
     const inert = inertFinding(rule, name)
     if (inert !== undefined) findings.push(inert)
+
+    // Also unconditional, and naturally exclusive from the two branches above:
+    // `deferredWarningAdvice()` only fires when `.violations()` returns at
+    // least one `error`-severity result, which cannot happen when examined
+    // units is zero (zero-subjects) or the family's own adequacy predicate says
+    // this rule can never produce a finding (inert) — both of those states mean
+    // no violations at all, so `breaching.length` is `0` and this stays silent.
+    const deferred = deferredWarningFinding(rule, name)
+    if (deferred !== undefined) findings.push(deferred)
   }
   return findings
 }
@@ -491,6 +524,16 @@ function inertFinding(rule: DiagnosableRule, name: string): DiagnosticFinding | 
   const advice = rule.inertAdvice?.()
   if (advice === undefined || advice === '') return undefined
   return { kind: 'inert', rule: name, advice }
+}
+
+/** A deferred warning whose accepted list no longer covers everything it finds — plan 0090. */
+function deferredWarningFinding(
+  rule: DiagnosableRule,
+  name: string,
+): DiagnosticFinding | undefined {
+  const advice = rule.deferredWarningAdvice?.()
+  if (advice === undefined || advice === '') return undefined
+  return { kind: 'deferred-warning', rule: name, advice }
 }
 
 /**

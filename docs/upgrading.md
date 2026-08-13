@@ -80,6 +80,12 @@ export default [...strictBoundaries(p, { boundaries }).map((b) => b.asSeverity('
 Then ratchet: fix a few, and drop the `.asSeverity('warn')` when the list is empty. A warn prints
 on every run and cannot be forgotten; a baselined finding is invisible forever.
 
+**`.asSeverity('warn', { accepted })` makes this accountable** rather than merely visible (plan 0090):
+name the exact findings you are deferring, and anything new — a violation this list did not accept,
+arriving while you work through the rest — fails instead of joining the pile silently. Plain
+`.asSeverity('warn')` still works exactly as shown above; `accepted` is additive. See
+[violation-reporting](/violation-reporting#a-warning-that-can-fail) for the full contract.
+
 **Do not reach for these**, in either case:
 
 | Shortcut                 | What it actually does                                                                                                                  |

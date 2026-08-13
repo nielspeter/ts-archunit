@@ -59,6 +59,54 @@ The thrown error carries **only** the configuration findings; ordinary violation
 
 This applies to `.severity('warn')` and to `.asSeverity('warn')` too — both reach the same place.
 
+### A warning that can fail
+
+Plain `.asSeverity('warn')` is **advisory**: permanent, and correctly so for a finding you want a
+reader to judge rather than have the build refuse — a silent-catch probe, a style preference, anything
+ADR-008 rule 1 calls a judgement call. It never fails, however long it lives.
+
+That is also the trap a warning can become: `.asSeverity('warn')` used to defer a rule you _meant_ to
+enforce, with no way to tell the two apart and no way to catch a **new** violation arriving while it
+sits at `warn`. This project shipped exactly that once — `arch/no-cycles` sat at `.warn()` for months
+waiting on an unrelated fix, and a genuinely new cycle landed, unenforced, because nothing could fail
+while the rule was there.
+
+`.asSeverity('warn', { accepted })` is the accountable version — a **deferred** warning:
+
+```typescript
+classes(p)
+  .that()
+  .resideInFolder('**/src/repositories/**')
+  .should()
+  .extend('BaseRepository')
+  .asSeverity('warn', {
+    accepted: [
+      'LegacyOrderRepository::LegacyOrderRepository does not extend "BaseRepository"',
+      'LegacyUserRepository::LegacyUserRepository does not extend "BaseRepository"',
+    ],
+  })
+```
+
+A violation stays `warn` only while its subject (`identity`, or `element::message` when a producer sets
+no identity) is in `accepted`. Anything not in the list — a repository added tomorrow that also skips
+the base class — escalates to `error` and fails `.violations()`/`checkAll()`/the CLI `check` command,
+the same surfaces `.asSeverity()` already governs. `.check()`/`.warn()` called directly on one builder
+are unaffected either way — they always hardcoded their own severity, before this existed.
+
+**Identity-based, not a count.** `accepted` is a list of the exact findings you are choosing to defer,
+not a number. A ceiling like "warn while there are ≤ 2 findings" cannot tell a fixed violation from a
+different, brand-new one that happens to arrive at the same time — the count stays the same and the
+regression passes unnoticed, which is precisely the failure this exists to close.
+
+`ts-archunit doctor` previews a breach before `check()` discovers it — a `'deferred-warning'` finding
+names exactly which current violations are not in `accepted`, so you see the same list `check()` would
+fail on, before running it.
+
+**Choosing between the two.** `.asSeverity('warn')` alone for something a person should read and decide
+about, every time. `.asSeverity('warn', { accepted })` for something you are actively deferring — real
+debt, named, that must not silently grow. Neither is a general escape hatch: a
+[configuration finding](#the-one-thing-warn-cannot-silence) still cannot be suppressed by either.
+
 ### A rule must assert something
 
 Since 0.23.0, a rule that never states a condition is a configuration finding too — it fails, on every terminal, with the remedy for its particular shape:

@@ -1,5 +1,5 @@
 import type { ArchViolation } from './violation.js'
-import { severityFor } from './violation.js'
+import { severityFor, subjectOf } from './violation.js'
 import type { GlobNode } from './glob-site.js'
 import type { GlobSite } from './glob-site.js'
 import type { ArchProject } from './project.js'
@@ -91,10 +91,59 @@ function singularise(noun: string, n: number): string {
   return noun.endsWith('ies') ? `${noun.slice(0, -3)}y` : noun.replace(/s$/, '')
 }
 
+/**
+ * True when two or more of this batch's RAW violations would share one
+ * `subjectOf()` before `disambiguateIdentities()` (`applyFilters()`'s own
+ * first step) repairs the collision with a positional `#1`/`#2` suffix —
+ * plan 0090's own review found this, reproduced: a rule whose FIXED violation
+ * held the bare subject and whose NEW violation lands on the same position a
+ * PRIOR run's `#1` occupied gets the identical accepted-list identity the
+ * fixed one held — a genuinely new finding silently absorbed as accepted,
+ * because the identity `accepted` was built from was never stable, only
+ * positionally stable. That is bug 0084's exact swap-blindness, reintroduced
+ * through the identity primitive `accepted` is built on rather than through a
+ * bare count.
+ *
+ * Deliberately coarse: this does not try to isolate which violations
+ * collided and escalate only those — `violations()` escalates the WHOLE
+ * batch once this is true, because a batch whose identities are not reliably
+ * unique is a batch `accepted` cannot safely reason about AT ALL, and
+ * silently trusting the non-colliding remainder risks the same false
+ * confidence in a smaller blast radius. The remedy is on the rule, not the
+ * mechanism: narrow the selector or qualify the condition's message so
+ * violations do not collide (`ArchViolation.identity`'s own doc comment
+ * states this contract), not to make the escalation more surgical.
+ *
+ * Computed independently of `identityCollisions()`/`resetIdentityCollisions()`
+ * (`violation.ts`) — that channel is global, mutable, disclosure-only state
+ * for a different consumer (a test asserting a specific producer collided);
+ * reading or resetting it from inside `violations()`, a widely-called,
+ * side-effect-free accessor, would couple this to a different feature's
+ * instrumentation. This is a pure recomputation instead, using the same
+ * `rule::subject` grouping key `disambiguateIdentities()` itself groups on.
+ */
+function hasIdentityCollision(violations: readonly ArchViolation[]): boolean {
+  const seen = new Set<string>()
+  for (const v of violations) {
+    const key = `${v.rule}::${subjectOf(v)}`
+    if (seen.has(key)) return true
+    seen.add(key)
+  }
+  return false
+}
+
 export abstract class TerminalBuilder {
   protected _reason?: string
   protected _metadata?: RuleMetadata
   protected _severity?: 'error' | 'warn'
+  /**
+   * Plan 0090 — the debt half of a `warn`. `undefined` means an ADVISORY
+   * warning: permanent, no ceiling, exactly today's `.asSeverity('warn')`.
+   * Set means DEFERRED: a violation whose `subjectOf()` is in this list stays
+   * `warn`; anything not in it escalates to `error` in `violations()` — a new
+   * finding this list did not accept. See `asSeverity()`'s own doc comment.
+   */
+  protected _acceptedWarnings?: readonly string[]
   // `protected`, not `private`. `RuleBuilder` declared these `protected` before
   // the single-root refactor and both classes are public exports, so narrowing
   // them is a compile break for an external subclass — the same argument that
@@ -472,7 +521,31 @@ export abstract class TerminalBuilder {
       silentIndices: this._silentIndices,
     })
     const sev: 'error' | 'warn' = this._severity ?? 'error'
-    return filtered.map((v) => ({ ...v, severity: severityFor(v, sev) }))
+    // Computed from `raw`, not `filtered`: `applyFilters()` already ran
+    // `disambiguateIdentities()` by this point, which REPAIRS a colliding
+    // subject with a positional `#1`/`#2` suffix — see `hasIdentityCollision`'s
+    // own doc comment for why checking post-repair identities would miss
+    // exactly the case this exists to catch. Only computed when it can matter.
+    const unsafe =
+      sev === 'warn' && this._acceptedWarnings !== undefined && hasIdentityCollision(raw)
+    return filtered.map((v) => ({
+      ...v,
+      severity: severityFor(v, unsafe ? 'error' : this.fallbackSeverityFor(v, sev)),
+    }))
+  }
+
+  /**
+   * Plan 0090's escalation, per violation. A DEFERRED warning (`_acceptedWarnings`
+   * set) stays `warn` only for a violation whose `subjectOf()` is in the accepted
+   * list; anything else — a genuinely new finding — escalates to `error`, which is
+   * the whole point: an accepted list that never fails on something new is
+   * indistinguishable from an advisory warning, and bug 0084 is what that costs.
+   * An ADVISORY warning (`_acceptedWarnings` `undefined`) is unaffected — `sev`
+   * passes through unchanged, exactly today's behaviour.
+   */
+  private fallbackSeverityFor(v: ArchViolation, sev: 'error' | 'warn'): 'error' | 'warn' {
+    if (sev !== 'warn' || this._acceptedWarnings === undefined) return sev
+    return this._acceptedWarnings.includes(subjectOf(v)) ? 'warn' : 'error'
   }
 
   /**
@@ -520,10 +593,25 @@ export abstract class TerminalBuilder {
    * Returns `this` so the builder can be collected into a rule array and run by
    * the CLI pipeline; its `.violations()` stamp each result with this severity.
    * Distinct from the terminal `.severity()` below, which executes immediately.
+   *
+   * `'warn'` alone is an ADVISORY warning — permanent, unchanged from every
+   * release before plan 0090, for a finding ADR-008 rule 1 says the reader must
+   * judge. `'warn'` with `accepted` is a DEFERRED warning — debt, with a
+   * ceiling: any violation whose `subjectOf()` is not in `accepted` escalates to
+   * `error`. The overloads make `accepted` a compile error on a literal
+   * `'error'`, where it would mean nothing — every violation already fails
+   * there. The third overload (no `options`) is for a caller dispatching on a
+   * runtime-computed `'error' | 'warn'` — several presets do — which cannot
+   * satisfy either literal overload; it still cannot pair a dynamic level with
+   * `accepted` in the same call, which is not a real use case today.
    */
-  asSeverity(level: 'error' | 'warn'): this {
+  asSeverity(level: 'error'): this
+  asSeverity(level: 'warn', options?: { accepted?: readonly string[] }): this
+  asSeverity(level: 'error' | 'warn'): this
+  asSeverity(level: 'error' | 'warn', options?: { accepted?: readonly string[] }): this {
     const next = this.copy()
     next._severity = level
+    next._acceptedWarnings = level === 'warn' ? options?.accepted : undefined
     return next
   }
 
@@ -538,6 +626,57 @@ export abstract class TerminalBuilder {
     } else {
       this.warn()
     }
+  }
+
+  /**
+   * The advice for a DEFERRED warning whose accepted list no longer covers
+   * everything it currently finds — plan 0090.
+   *
+   * PUBLIC and zero-arg, following `inertAdvice()`/`zeroSubjectsAdvice()`'s
+   * precedent exactly: read structurally by `diagnose()`, so `doctor`'s preview
+   * and `checkAll()`/CLI `check`'s eventual failure carry the same evidence by
+   * construction. Returns `''` for an advisory warning (`_acceptedWarnings`
+   * `undefined`), for a rule at `'error'` severity, and for a deferred warning
+   * whose current findings are all still within `accepted` — a working, healthy
+   * deferral is not a problem `doctor` should report, only a breached one is.
+   *
+   * Calls `this.violations()` rather than re-deriving "is this accepted" a
+   * second time: that already applies the exact escalation this reports on, so
+   * the two can never disagree about which violations breached the list.
+   *
+   * Also checks `hasIdentityCollision()` separately, on its own
+   * `collectWithAssertionGuard()` pass — not to decide WHETHER to report (that
+   * is already folded into `.violations()`'s own escalation, which forces the
+   * whole batch to `error` when unsafe), but to choose the RIGHT message: a
+   * collision means `accepted` cannot be trusted at all here, which is a
+   * different, more urgent fact than "this specific finding is new".
+   */
+  deferredWarningAdvice(): string {
+    if (this._severity !== 'warn' || this._acceptedWarnings === undefined) return ''
+    const breaching = this.violations().filter((v) => v.severity === 'error')
+    if (breaching.length === 0) return ''
+    const described = this.describeRule()
+    const name = described.id || described.rule || this.constructor.name
+    if (hasIdentityCollision(this.collectWithAssertionGuard())) {
+      return (
+        `"${name}" is a deferred warning, but its findings are not reliably identifiable: two or ` +
+        `more share one subject (rule + element + message, with no producer-set \`identity\`), so ` +
+        `the repair that keeps them distinct assigns a POSITIONAL "#1"/"#2" suffix — not stable ` +
+        `across runs, so a fixed finding and a genuinely new one can land on the same suffix and ` +
+        `\`accepted\` would silently treat the new one as already-known debt. Every finding here is ` +
+        `escalated to error until this is fixed: qualify the condition's message, or set ` +
+        `ArchViolation.identity explicitly, so each finding's subject is unique on its own.`
+      )
+    }
+    const subjects = breaching.map((v) => subjectOf(v))
+    return (
+      `"${name}" is a deferred warning (accepted: ${String(this._acceptedWarnings.length)} finding` +
+      `${this._acceptedWarnings.length === 1 ? '' : 's'}), and ${String(breaching.length)} current ` +
+      `finding${breaching.length === 1 ? '' : 's'} ${breaching.length === 1 ? 'is' : 'are'} not in ` +
+      `that list — a new finding this deferral did not accept, which will fail at check() time: ` +
+      `${subjects.join(', ')}. Either fix it, or extend \`accepted\` if it is genuinely more debt of ` +
+      `the same kind you already deferred.`
+    )
   }
 
   /**

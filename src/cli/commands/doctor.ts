@@ -194,6 +194,10 @@ const HAS_GLOB: Readonly<Record<DiagnosticFinding['kind'], boolean>> = {
   // No glob: the subject is a comment in a source file, and the identity is the
   // rule id it names plus where it sits. That is why this kind carries `line`.
   'orphan-exclusion': false,
+  // No glob: the fault is specific CURRENT violations not covered by the
+  // rule's own `accepted` list, not a selector — the corpus was found and
+  // examined, and some of what it found is not what was accepted (plan 0090).
+  'deferred-warning': false,
 }
 
 function format(findings: readonly DiagnosticFinding[]): string {

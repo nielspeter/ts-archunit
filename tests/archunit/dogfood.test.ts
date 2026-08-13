@@ -49,6 +49,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { Project } from 'ts-morph'
 import {
   project,
   types,
@@ -59,8 +60,10 @@ import {
   crossLayer,
   satisfyPairCondition,
   checkAll,
+  ArchRuleError,
 } from '../../src/index.js'
 import type { ArchViolation } from '../../src/index.js'
+import type { ArchProject } from '../../src/core/project.js'
 import type { DiagnosableRule } from '../../src/core/diagnose.js'
 import { diagnose } from '../../src/core/diagnose.js'
 // Through the `./presets` barrel, not the individual modules: that subpath is
@@ -89,44 +92,65 @@ const root = path.resolve(import.meta.dirname, '../..')
  */
 const OUR_SRC = root.replaceAll('\\', '/') + '/src/**'
 
-/** A rule that can be run at error severity. `warn` is deliberately absent. */
-interface Checkable {
-  check: () => void
-}
-
 const BUILT: DiagnosableRule[] = []
 
 /**
- * The same gate `arch-rules.test.ts` uses, and for the same reason.
+ * Registers a rule with `BUILT` — plan 0090, Phase 3's scoped proof — instead
+ * of the `gate()` this file used to wrap every rule in.
  *
- * This file shipped without it and was wrong to: every rule below was reachable
- * at `.warn()`, which is the regression plan 0084 exists to prevent —
- * `arch/no-cycles` sat at `.warn()` for months, could not fail, and let a cycle
- * in overnight. Handing back only `.check()` makes the downgrade fail twice, at
- * `npm run typecheck` and at runtime.
+ * `gate()` was a repo-local type trick: it handed back an object exposing only
+ * `.check`, so a rule downgraded to `.warn()` failed both `npm run typecheck`
+ * and, if that were bypassed, at runtime. That mattered: this file shipped
+ * without it once, every rule below was reachable at `.warn()`, and `.warn()`
+ * never fails on an ordinary violation — the exact regression plan 0084 exists
+ * to prevent (`arch/no-cycles` sat at `.warn()` for months and let a cycle in
+ * overnight). It does not generalise to a primitive adopters can use.
+ *
+ * Plan 0090 ships one that does: `.asSeverity('warn', { accepted })` makes a
+ * DEFERRED warning fail on anything not explicitly accepted, and pairing
+ * `accepted` with `'error'` is a compile error. None of the five rules below
+ * is legitimately warn-severity debt, so none of them calls `.asSeverity()` at
+ * all — they stay at the default, which is `'error'`.
+ *
+ * `gate()`'s actual guarantee was narrower than "severity cannot be
+ * downgraded" — `.check()` always hardcoded `'error'` and ignored
+ * `.asSeverity()` entirely, gated or not, so a rule quietly gaining
+ * `.asSeverity('warn')` was never something `gate()` caught either. What it
+ * closed was a CALL-SITE mistake: writing `.warn()` where `.check()` was
+ * meant. This file closes the same call-site mistake more simply — there is
+ * now only ONE terminal call in the whole file (`checkAll(BUILT)`, at the
+ * bottom), so there is only one place left to get it wrong, instead of five.
+ * Each rule's own `it()` block keeps a REAL, independent assertion on
+ * `.violations()` directly (a plain data list, unaffected by severity either
+ * way) so a regression still has a specifically-named failing test, not only
+ * the aggregate's.
  *
  * Registering into `BUILT` also puts these rules under the `diagnose()`
  * pre-flight at the bottom of this file, so a dead glob here is caught before
- * `check()` rather than by whichever assertion happens to notice.
+ * `checkAll()` rather than by whichever assertion happens to notice.
  */
-function gate<T extends DiagnosableRule & Checkable>(rule: T): Checkable {
+function built<T extends DiagnosableRule>(rule: T): T {
   BUILT.push(rule)
-  return {
-    check: () => {
-      rule.check()
-    },
-  }
+  return rule
 }
 
 describe('tsconfig: the toolchain ADR-001 pins', () => {
   it('the compiler options ADR-001 requires are actually set', () => {
     // ADR-001 and the CLAUDE.md "Key Implementation Rules" both state these.
     // Stated in prose in two places and enforced in none, until here.
-    gate(
-      tsconfig(p)
-        .requires({ strict: true, noUncheckedIndexedAccess: true })
-        .because('ADR-001: strict mode with noUncheckedIndexedAccess'),
-    ).check()
+    //
+    // Asserted on `.violations()`, not `.check()` — this is a REAL assertion
+    // ADR-008 rule 5 demands (sabotage the tsconfig and this must red), not a
+    // vacuous `built()`-only call. `.violations()` never depended on severity
+    // to begin with, so it is unaffected by whether `checkAll(BUILT)` at the
+    // bottom of this file (`built()`'s own doc comment explains it) also
+    // catches the same regression — this and that are two independent reasons
+    // the same fault fails, which is stronger than `gate()`'s single terminal
+    // ever was.
+    const rule = tsconfig(p)
+      .requires({ strict: true, noUncheckedIndexedAccess: true })
+      .because('ADR-001: strict mode with noUncheckedIndexedAccess')
+    expect(built(rule).violations()).toEqual([])
   })
 })
 
@@ -242,14 +266,13 @@ describe('correspondence: the surfaces that must stay in step', () => {
     // `beComplete()`, not `haveNoOrphans()`: the invariant is one-directional.
     // Every builder needs a test; extra test files (`within`, the object-literal
     // and identified-by-arg cases) are additional coverage, not orphans.
-    gate(
-      correspondence(p)
-        .side('builder', builders)
-        .side('test', tests)
-        .should()
-        .beComplete()
-        .because('a builder with no test file is a surface nothing exercises'),
-    ).check()
+    const rule = correspondence(p)
+      .side('builder', builders)
+      .side('test', tests)
+      .should()
+      .beComplete()
+      .because('a builder with no test file is a surface nothing exercises')
+    expect(built(rule).violations()).toEqual([])
   })
 })
 
@@ -262,7 +285,7 @@ describe('the rule-builder grammar we never turned on ourselves', () => {
       .haveNameMatching(/^[A-Z]/)
       .because('exported type names are public API')
     expect(rule.examinedUnits()).toBeGreaterThan(0)
-    gate(rule).check()
+    expect(built(rule).violations()).toEqual([])
   })
 })
 
@@ -318,7 +341,7 @@ describe('crossLayer: the family most likely to look healthy while empty', () =>
       .because('a test file that does not import its builder is covering something else')
 
     expect(rule.examinedUnits()).toBeGreaterThan(0)
-    gate(rule).check()
+    expect(built(rule).violations()).toEqual([])
   })
 })
 
@@ -366,9 +389,13 @@ describe('inconsistentSiblings: the second detector the floor gates', () => {
       .forPattern(call('this.copy'))
     expect(rule.examinedUnits()).toBe(11)
     expect(rule.violations()).toEqual([])
+    built(rule)
     // N-phase: INERT_FINDING_EMIT is false, so check() still passes today —
     // this is what lets N ship without breaking an adopter's green build.
-    expect(() => gate(rule).check()).not.toThrow()
+    // `.check()` directly: it was never gate()'s job to guard THIS call
+    // (gate()'s risk was `.warn()` at a call site, and `.check()` always
+    // hardcoded 'error' regardless of gate() either way).
+    expect(() => rule.check()).not.toThrow()
     // The diagnose-first preview carries the real numbers regardless of the
     // gate — this is the liquidation: a showcase rule this repo ships, pinned
     // as inert rather than reported as coverage.
@@ -459,25 +486,23 @@ describe('presets: the surface an adopter actually installs', () => {
   })
 })
 
-// ─── The pre-flight over this file's own gated rules ────────────────
+// ─── The pre-flight and the aggregate over this file's own rules ────
 //
 // Declared LAST on purpose: `BUILT` fills as the `it()` callbacks above run, so
 // this must see all of them.
 //
 // There is deliberately NO cross-check of the `BUILT` population here.
-// `arch-rules.test.ts` has one — it scans its own source for `.check()`
-// terminals — and it earns it: 39 rules, one uniform call shape, and a real
-// chance of one silently dropping out. Copying it here was a mistake. This file
-// mixes `).check()` with single-line `gate(rule).check()`, so the regex had to
-// be widened, which pulled in `gate()`'s own forwarding call, which then needed
-// a string-equality exclusion; the replacement — a hand-written list of the
-// four rule names — would have been transcribed from the failure output. A
-// derivation adjusted until it agrees with the thing it checks is the first
-// derivation retyped, and labelling it "ADR-008 rule 5" makes it worse, because
-// then it looks guarded. Four rules on one screen do not need it.
+// `arch-rules.test.ts` has one — it scans its own source for `.check()`/
+// `.warn()` terminals — and it earns it: 39 rules, one uniform call shape, and
+// a real chance of one silently dropping out. Copying it here was a mistake,
+// measured before this file had only five rules to gate, let alone the plan
+// 0090 migration that removed the one uniform call shape entirely — each rule
+// below asserts on `.violations()` in its own way, so a source-text scan
+// counting terminals would have nothing uniform left to count. Five rules on
+// one screen do not need it.
 
-describe('the gated rules in this file can all enforce something', () => {
-  it('diagnoses every gated rule, and finds exactly the one poisoned row — plan 0102', () => {
+describe('the rules in this file can all enforce something', () => {
+  it('diagnoses every rule, and finds exactly the one poisoned row — plan 0102', () => {
     // Identities, never a count — ADR-008 rule 4. Not `toEqual([])`: this file
     // deliberately gates one rule known to be inert (the `call('this.copy')`
     // row above, bug 0077(A)'s exact case) — a green `diagnose(BUILT)` here
@@ -503,5 +528,42 @@ describe('the gated rules in this file can all enforce something', () => {
     // And a healthy rule stays silent, or the control would pass for a
     // `diagnose()` that simply reported everything.
     expect(diagnose([BUILT[0] as DiagnosableRule])).toEqual([])
+  })
+})
+
+describe('checkAll(BUILT) — the aggregate that replaces gate() (plan 0090, Phase 3)', () => {
+  it('enforces every rule above in one call, and does not throw today', () => {
+    // Nothing above calls `.check()`/`.warn()` per rule any more — `built()`'s
+    // own doc comment explains why. This ONE aggregated call is where severity
+    // is read and any violation on any of the five rules above would fail the
+    // run. All five are currently clean (including the deliberately-inert
+    // sixth-that-isn't — `INERT_FINDING_EMIT` is false, so it reports no
+    // violation either), so this does not throw.
+    expect(() => checkAll(BUILT)).not.toThrow()
+  })
+
+  it('would fail if one of them had a real violation — not vacuously green', () => {
+    // ADR-008 rule 5, asked of the aggregate itself: `checkAll(BUILT)` passing
+    // above is meaningful only if a genuine violation on one of these rules
+    // would make it fail. A fresh in-memory project with one deliberately
+    // lowercase-named exported type reproduces the exact shape the
+    // PascalCase rule (`built()`ed above) guards — this is that same rule,
+    // pointed at a corpus that violates it, not a synthetic finding invented
+    // for this test.
+    const badProject = new Project({ useInMemoryFileSystem: true })
+    badProject.createSourceFile('/src/bad.ts', 'export type lowercaseType = string')
+    const bad: ArchProject = {
+      tsConfigPath: '/tsconfig.json',
+      _project: badProject,
+      getSourceFiles: () => badProject.getSourceFiles(),
+    }
+    const brokenRule = types(bad)
+      .that()
+      .areExported()
+      .should()
+      .haveNameMatching(/^[A-Z]/)
+      .because('exported type names are public API')
+    expect(brokenRule.violations().length).toBeGreaterThan(0)
+    expect(() => checkAll([...BUILT, brokenRule])).toThrow(ArchRuleError)
   })
 })
