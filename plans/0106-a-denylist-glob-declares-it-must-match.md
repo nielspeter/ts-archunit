@@ -40,10 +40,12 @@ measurement, not carried in detail here (see that plan for the full record):
 
 - **Static (unsatisfiable-against-the-path-universe) fails on a real, legitimate case.**
   `notImportFrom('**/legacy/**')` in a repository with no `legacy/` folder yet is a correct,
-  pre-emptive ban — `docs/modules.md:38` teaches this exact glob as the canonical example.
-  Nothing static distinguishes "typo" from "armed tripwire": they are the same string, same
-  position, same match count (zero), and 0069's own decision table already reached this
-  conclusion before 0072 re-opened it.
+  pre-emptive ban — this exact glob, in this exact condition position, is the condition's own
+  JSDoc example (`src/conditions/dependency.ts:280`); `docs/modules.md`'s Conditions table
+  (line 49) teaches the same shape with a different glob (`**/controllers/**`). Nothing static
+  distinguishes "typo" from "armed tripwire": they are the same string, same position, same
+  match count (zero), and 0069's own decision table already reached this conclusion before 0072
+  re-opened it.
 - **Runtime (a glob-exercise tally) distinguishes nothing either.** Every edge is tested against
   the glob whether or not the ban is respected — `tested > 0, matched == 0` is byte-for-byte what
   a respected ban produces.
@@ -69,9 +71,14 @@ selector default doesn't touch that. What it changes is which existing mechanism
 precedent to build against. Two candidates, both newer than `.expectNonEmpty()`:
 
 1. **The `assertEnabled()` / `declaredEmptyFindings()` / `overrideFindings()` family**
-   (`src/presets/shared.ts`, plan 0100) — the freshest precedent for "manufacture a config-finding,
-   `bypassFilters: true`, computed after the real run, only when nothing else already explains the
-   state." Shape-compatible with this plan's own inherited constraints (see below).
+   (`src/presets/shared.ts`) — only `assertEnabled()` is plan 0100's own contribution;
+   `declaredEmptyFindings()` is plan 0089's and `overrideFindings()` traces to bug 0038, though
+   0100's own text discusses all three together as one established family. The freshest precedent
+   for "manufacture a config-finding, `bypassFilters: true`, computed after the real run, only when
+   nothing else already explains the state." Shape-compatible with this plan's own inherited
+   constraints (see below) — but see Phase 1 item 3: the closer implementation-location precedent
+   is `emptySelectionViolation()`, which (unlike this family) fires from a condition-adjacent
+   pipeline step, not from pure construction-time facts.
 2. **0073's condition-declared-globs** (`Condition<T>.globs`, already shipped) — gives every
    condition a declared glob surface `diagnose()` can see, but by 0072's own measurement this
    surface answers "is the glob syntactically dead" (which `syntacticFault` already covers), not
@@ -82,14 +89,29 @@ precedent to build against. Two candidates, both newer than `.expectNonEmpty()`:
 `notImportFrom`'s violations and its glob-matches are the **same event** — every match IS a
 violation (`src/conditions/dependency.ts:283-326`, `matchedCandidate(...) !== undefined` pushes a
 violation on the spot). So "the glob matched nothing across this run" and "this condition produced
-zero violations across this run" are the identical fact, observed two ways. That means
-`.expectGlobsMatch()` cannot be answered inside the condition's own `evaluate()` — a single call
-sees one subject at a time, not the whole run — and it isn't a selector-cardinality question either
-(`filtered.length` can be large — many files tested, zero of them importing anything banned). The
-signal has to be gathered across the **whole rule's execution** and checked once, after every
-subject has been evaluated, which is a different seam than either precedent above touches solo:
-closer to `assertEnabled()`'s "compute after the real run, append a manufactured finding" shape,
-but keyed on violation count from one flagged condition, not on constructed-rule count.
+zero violations across this run" are the identical fact, observed two ways.
+
+**Corrected from an earlier draft of this plan, which claimed the condition's own `evaluate()`
+"sees one subject at a time" — checked against the actual signature and it does not.**
+`evaluate(sourceFiles: SourceFile[], context: ConditionContext)` receives the **entire** filtered
+subject array in one call (`src/conditions/dependency.ts:304`), and `RuleBuilder`'s own loop calls
+it exactly once per condition with the complete set (`condition.evaluate(filtered, context)`,
+`src/core/rule-builder.ts:532-534`) — full within-run visibility already exists inside a single
+`evaluate()` call. That is not why this can't live in the condition. The real reasons: (a)
+`Condition<T>` is a plain, context-free object (`{ globs, description, evaluate }`) with no way to
+know whether `.expectGlobsMatch()` was declared for it — that flag has to live on the builder,
+where `.should()`/`.andShould()` already track state; and (b) manufacturing the actual
+`bypassFilters: true` config-finding needs builder-level context (`_reason`, `_metadata`, severity
+handling) that only `RuleBuilder`/`TerminalBuilder` carry, mirroring exactly how
+`_expectEmpty`/`emptySelectionViolation()` already work (`rule-builder.ts:506-513`). So the
+signal — did this specific, flagged condition produce zero violations — is trivially available
+the moment `condition.evaluate(filtered, context)` returns inside the existing loop
+(`rule-builder.ts:530-534`); what's missing is the flag itself and where to attach the manufactured
+finding, not cross-subject aggregation machinery. Closer to `assertEnabled()`'s "compute after the
+real run, append a manufactured finding" shape in outcome, though `assertEnabled()` itself fires
+from pure construction-time facts (unknown override key, zero rules built) and never touches a
+condition's `evaluate()` output — the analogy is to the finding-manufacture pattern, not to where
+in the pipeline it fires.
 
 ## Design constraints (carried from 0072, unchanged — still correct)
 
@@ -113,24 +135,37 @@ but keyed on violation count from one flagged condition, not on constructed-rule
 
 ## Phase 1 — locate the mechanism (spike, not yet run)
 
-Following this project's own precedent (0047/0048 both ran a Phase 0 spike before locking
-implementation phases, and got real answers that changed the design) — this plan does not invent
-implementation code it hasn't verified. Before Phase 2 can be written for real:
+Following this project's own precedent — [plan 0048](./0048-using-tagged-symbol-matcher.md) ran an
+executed investigation (`tests/investigation/plan-0048-spike.test.ts`, against real ts-morph 27
+behavior) before locking its implementation phases, and it corrected real API assumptions
+(`getExportSymbolIfAlias` doesn't exist; only `getAliasedSymbol()` does). [Plan
+0047](./0047-typescript-escape-hatch-matchers.md) is a related but different precedent — a
+grounded source-reading review, not an executed spike — that caught its own real bug (class/function
+traversal misses sibling type positions) by reading `body-traversal.ts` rather than running code.
+This plan does not invent implementation code it hasn't verified. Before Phase 2 can be written for
+real:
 
-1. Read `RuleBuilder.evaluate()` past the condition-execution step (`src/core/rule-builder.ts`,
-   past line ~527) to find where per-condition violation counts are available after a full run,
-   and whether `.andShould()`'s multiple-condition case needs `.expectGlobsMatch()` scoped
-   per-condition or per-rule.
+1. **Resolved while grounding this plan, not deferred to the spike:** `condition.evaluate(filtered,
+context)` is called once per condition with the **entire** filtered subject array
+   (`src/core/rule-builder.ts:532-534`), so a condition's own `evaluate()` already has full
+   within-run visibility — "zero violations from this condition across the whole run" is available
+   the moment that call returns inside `RuleBuilder`'s existing loop (`rule-builder.ts:530-534`), no
+   new side-channel on `Condition<T>`'s return type needed. What Phase 1 still has to resolve is
+   _not_ that signal — it's (a) where `.expectGlobsMatch()`'s declaration is stored so the loop
+   knows WHICH condition instance it applies to, and (b) how that survives `.andShould()`'s
+   multiple-condition case (scoped per-condition or per-rule).
 2. Decide where the opt-in itself is declared. 0072's sketch chains it directly after the
    condition (`.should().notImportFrom(...).expectGlobsMatch()`), which reads as a
    `ModuleRuleBuilder` method, not a `Condition<T>` method (conditions are plain objects,
    `{ globs, description, evaluate }` — no fluent surface). Confirm that's still the right
-   attachment point, and how it survives `.andShould()` with a second, unrelated condition.
-3. Confirm the "zero violations across the whole run from a flagged condition" signal is
-   obtainable without changing `Condition<T>`'s `evaluate()` return type (`ArchViolation[]`) —
-   i.e., the RuleBuilder already has enough information post-run without a new side-channel, or it
-   doesn't and one is needed. This is the open question the "harder question" section above
-   surfaces but does not resolve.
+   attachment point, and how it identifies which condition in an `.andShould()` chain it flags —
+   the builder needs to associate the declaration with a specific condition instance, not just a
+   boolean on the rule.
+3. Confirm the manufactured finding's shape and attachment point against `emptySelectionViolation()`
+   (`rule-builder.ts:453-487`) as the direct precedent — same `bypassFilters: true` shape, same
+   `_reason`/`_metadata` access, same builder-level home — rather than `assertEnabled()`, which is
+   the right shape-analogy but fires from construction-time facts, never from a condition's
+   `evaluate()` output.
 4. Re-verify the Problem section's table against current `src/conditions/dependency.ts` (the
    0072 measurement is 2 weeks old; confirm the two silent rows haven't changed shape under 0073's
    condition-declared-globs work).
