@@ -1,6 +1,6 @@
 # Bug 0080: a `node:module` mock does not isolate cleanly under full-suite concurrency
 
-**Reported:** 2026-08-12
+**Reported:** 2026-08-12 · **Fixed:** 2026-08-13, unreleased
 **Found in:** the v0.60.0 release's publish workflow — `prepublishOnly` re-runs the full suite a
 second time (after the workflow's own explicit `npm run test` step already passed), and that second
 run failed on a test that has nothing to do with the release being shipped.
@@ -74,3 +74,38 @@ separate piece of work from filing that it's needed).
 Not a defect in `requireGraphQL()`'s own logic — bug 0056/0076/0102/0103/0104's release
 (`v0.60.0`) shipped no change to `src/graphql/schema-loader.ts`, and the same test passes deterministically
 in isolation. This is a test-infrastructure gap, filed against the harness, not the family it exercises.
+
+## Fix as shipped
+
+**A third option, found during implementation: stop mocking the builtin at all.** Neither sketch above
+was taken. `schema-loader.ts`'s loading step is now indirected through a swappable module-private
+reference (`loadGraphQL`, defaulting to `defaultLoadGraphQL`), with two test-only exports —
+`setGraphQLLoaderForTests()` / `resetGraphQLLoaderForTests()` — following the same `ForTests` convention
+already used by `resetStderrGuardForTests()` (`src/core/stderr.ts`) and `resetDiffDisclosureForTests()`
+(`src/core/diff-disclosure.ts`). Neither function is reachable from the published `./graphql` subpath:
+`package.json`'s `exports` map has no wildcard under `graphql/`, and `src/graphql/index.ts` re-exports
+only `loadSchemaFromGlob`/`loadSchemaFromSDL` by name — zero published-API surface added.
+
+The test file (`tests/graphql/schema-loader-require-errors.test.ts`) now imports `schema-loader.ts`
+**once**, statically, and calls `setGraphQLLoaderForTests()` per test instead of `vi.doMock('node:module',
+...)` + `vi.resetModules()` + a dynamic re-import. This removes the isolation gap by construction rather
+than by characterising it: no builtin is mocked, no module graph is reset, and every test body is fully
+synchronous (no `await` between the swap and the assertions) — JS's single-threaded execution means
+nothing else in the same worker can observe the swapped state mid-test, regardless of how Vitest schedules
+files sharing that worker. `resetGraphQLLoaderForTests()` in `afterEach` restores the real loader and
+clears `requireGraphQL()`'s cache, matching what `vi.resetModules()` used to buy per-test.
+
+**Root cause (sketch 1) not chased further, by ADR-008 rule 6.** This is a test-infrastructure gap over a
+corpus this project controls, not a published-API or irreversible-effect row — rule 6 asks for the
+detector proved to fire and then stop, not a full characterisation of Vitest's builtin-mock isolation
+under worker reuse. That characterisation remains genuinely open; this fix sidesteps it rather than
+resolves it, and the note stays here in case another builtin gets mocked the same way in the future.
+
+**Sketch 2 (narrowing `prepublishOnly`) not taken either** — it would have reduced exposure to the old
+mechanism's flake rate, which is moot once the mechanism is gone. `prepublishOnly` is unchanged.
+
+**Verified:** sabotaged the `notInstalled` regex in `requireGraphQL()`'s catch branch (reverted after) —
+the corresponding test failed with the expected diff, confirming the rewritten tests still exercise the
+real branching logic and are not vacuous. `npx vitest run tests/graphql/` passed 4/4 files in isolation;
+the full suite (`npx vitest run`) passed 247/247 files across 8 consecutive runs, versus the original
+~1-in-3 failure rate this bug measured.

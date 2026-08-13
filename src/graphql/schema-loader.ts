@@ -72,23 +72,32 @@ interface GraphQLPackage {
 let cachedGraphQL: GraphQLPackage | undefined
 
 /**
+ * The actual loading step, indirected through a swappable reference (see
+ * {@link setGraphQLLoaderForTests}). Uses createRequire for synchronous
+ * loading since schema loading is synchronous.
+ */
+function defaultLoadGraphQL(): GraphQLPackage {
+  const esmRequire = createRequire(import.meta.url)
+  // `createRequire` returns `any` for an optional peer dependency resolved at
+  // runtime, so there is no typed path here — the JS-interop boundary ADR-005
+  // allows. The `catch` below is the real guard: a missing or malformed
+  // `graphql` throws with an install instruction rather than failing later on a
+  // property access (bug 0049).
+  // ts-archunit-exclude adr005/no-as-cast-module: optional peer dep, no typed path
+  return esmRequire('graphql') as GraphQLPackage
+}
+
+let loadGraphQL: () => GraphQLPackage = defaultLoadGraphQL
+
+/**
  * Load the graphql package synchronously. Throws a clear error describing why
  * the package could not be used.
- *
- * Uses createRequire for synchronous loading since schema loading is synchronous.
  */
 function requireGraphQL(): GraphQLPackage {
   if (cachedGraphQL) return cachedGraphQL
 
   try {
-    const esmRequire = createRequire(import.meta.url)
-    // `createRequire` returns `any` for an optional peer dependency resolved at
-    // runtime, so there is no typed path here — the JS-interop boundary ADR-005
-    // allows. The `catch` below is the real guard: a missing or malformed
-    // `graphql` throws with an install instruction rather than failing later on a
-    // property access (bug 0049).
-    // ts-archunit-exclude adr005/no-as-cast-module: optional peer dep, no typed path
-    cachedGraphQL = esmRequire('graphql') as GraphQLPackage
+    cachedGraphQL = loadGraphQL()
     return cachedGraphQL
   } catch (cause) {
     // The install instruction only answers "the `graphql` package itself is
@@ -229,4 +238,25 @@ export function isGraphQLAvailable(): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * Replace how `graphql` is loaded. **Tests only** —
+ * [bug 0080](../../bugs/fixed/0080-a-node-module-mock-does-not-isolate-under-full-suite-concurrency.md):
+ * `vi.doMock('node:module', ...)` intercepts a Node builtin, which is not
+ * reliably isolated per-file under Vitest's worker-reuse defaults and failed
+ * intermittently under full-suite load. This seam replaces only this
+ * module's own loading step — nothing shared with any other file to race on.
+ */
+export function setGraphQLLoaderForTests(loader: () => GraphQLPackage): void {
+  loadGraphQL = loader
+}
+
+/**
+ * Restore the real loader and clear the cached package. **Tests only** — see
+ * {@link setGraphQLLoaderForTests}.
+ */
+export function resetGraphQLLoaderForTests(): void {
+  loadGraphQL = defaultLoadGraphQL
+  cachedGraphQL = undefined
 }
